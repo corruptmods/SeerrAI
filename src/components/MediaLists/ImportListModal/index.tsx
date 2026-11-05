@@ -56,7 +56,7 @@ const messages = defineMessages('components.MediaLists.ImportListModal', {
   notTrakt: 'That isn’t a link to a Trakt list or watchlist.',
 });
 
-/** Whether the pasted text is a link to Trakt, rather than a written list. */
+/** A Trakt link, rather than a written list. */
 const TRAKT_LINK = /^(https?:\/\/)?(www\.|app\.)?trakt\.tv\/\S*$/i;
 
 interface Candidate {
@@ -126,10 +126,7 @@ const ImportListModal = ({
       : describe(e);
   };
 
-  /**
-   * A Trakt link: the list's titles come with TMDB's ids, so each is looked
-   * up rather than searched for, in batches as a written list is.
-   */
+  /** Trakt titles carry TMDB ids, so each is looked up in batches, not searched. */
   const importTrakt = async (url: string) => {
     let titles: {
       tmdbId?: number;
@@ -184,9 +181,8 @@ const ImportListModal = ({
   };
 
   /**
-   * Searches in batches so progress can be reported honestly. Sending the
-   * whole list in one request gives no way to say how far along it is, and a
-   * long list can take a while — each title is a TMDB lookup.
+   * Searches in batches so progress can be shown: each title is a TMDB
+   * lookup, and one request for a long list gives no progress.
    */
   const search = async () => {
     setBusy(true);
@@ -240,11 +236,7 @@ const ImportListModal = ({
     }
   };
 
-  /**
-   * Re-runs a single line against a title the user typed. Automatic matching
-   * always misses some, and an unmatched line with no way to correct it is a
-   * dead end — the point of this feature is migrating a list that exists.
-   */
+  /** Re-runs one line against a title the user typed, to fix missed matches. */
   const searchOne = async (index: number) => {
     const query = (manual[index] ?? '').trim();
 

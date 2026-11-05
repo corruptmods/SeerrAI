@@ -10,16 +10,15 @@ import path from 'path';
 
 /*
  * TRaSH Guides (https://trash-guides.info, MIT licence, copyright TRaSH):
- * the JSON files its GitHub repository publishes for Radarr and Sonarr,
- * the same ones Recyclarr reads. Checked once every 24 hours; only files that
- * changed are fetched, and the copy kept in the config folder goes on
- * working when GitHub can't be reached.
+ * the Radarr and Sonarr JSON files from its GitHub repo, the same ones
+ * Recyclarr reads. Checked every 24 hours; only changed files are fetched,
+ * and the copy in the config folder keeps working when GitHub is unreachable.
  */
 
 const REPO = 'TRaSH-Guides/Guides';
 const BRANCH = 'master';
 const API = 'https://api.github.com';
-/** A commit, as GitHub names it: never part of a path. */
+/** A commit sha; rejects anything that could act as a path segment. */
 const COMMIT = /^[0-9a-z]{1,64}$/i;
 const RAW = 'https://raw.githubusercontent.com';
 const LABEL = 'Quality';
@@ -33,10 +32,10 @@ export interface TrashState {
   commit?: string;
   /** When GitHub last answered. */
   checkedAt?: string;
-  /** When a check last failed, and why; cleared by the next that works. */
+  /** Last failed check and its error; cleared by the next success. */
   failedAt?: string;
   error?: string;
-  /** GitHub's tag for the commit answer, so an unchanged one costs nothing. */
+  /** ETag of the commit response, so an unchanged commit costs nothing. */
   etag?: string;
   /** Path → blob sha of each file kept. */
   blobs: Record<string, string>;
@@ -49,7 +48,7 @@ const dataPath = () => path.join(trashDir(), 'data.json');
 const http = axios.create({ timeout: 30_000 });
 http.interceptors.request.use(proxyRequestInterceptor);
 http.interceptors.request.use(userAgentRequestInterceptor);
-/** For tests: the client GitHub is reached with. */
+/** For tests: the GitHub HTTP client. */
 export const trashHttp = http;
 
 let cached: TrashData | null | undefined;
@@ -69,7 +68,7 @@ const writeJson = async (file: string, value: unknown) => {
   await fs.rename(temp, file);
 };
 
-/** The copy of TRaSH Guides last fetched; null when there is none yet. */
+/** The last fetched TRaSH Guides copy, or null if none yet. */
 export const trashData = async (): Promise<TrashData | null> => {
   if (cached !== undefined) return cached;
   try {
@@ -80,7 +79,7 @@ export const trashData = async (): Promise<TrashData | null> => {
   return cached;
 };
 
-/** For tests: TRaSH data as if it had been fetched. */
+/** For tests: sets TRaSH data as if fetched. */
 export const setTrashDataForTests = (data: TrashData | null) => {
   cached = data;
 };
@@ -98,7 +97,7 @@ const fetchRaw = async <T>(commit: string, file: string): Promise<T> => {
   return data;
 };
 
-/** Runs the work a few at a time. */
+/** Runs the work a few items at a time. */
 const inBatches = async <T>(
   items: T[],
   size: number,
@@ -112,10 +111,9 @@ const inBatches = async <T>(
 let refreshing: Promise<TrashState> | null = null;
 
 /**
- * Checks GitHub for a newer TRaSH Guides and fetches what changed. Answers
- * the state after; a failure is kept in it (and logged), and the copy
- * already kept stays in use. One check runs at a time; a second caller
- * gets the first's answer.
+ * Checks GitHub for a newer TRaSH Guides and fetches changed files. Returns
+ * the resulting state; a failure is recorded there (and logged) and the
+ * existing copy stays in use. Concurrent callers share one check.
  */
 export const refreshTrash = (): Promise<TrashState> => {
   refreshing ??= check().finally(() => {
@@ -124,7 +122,7 @@ export const refreshTrash = (): Promise<TrashState> => {
   return refreshing;
 };
 
-/** Checks only when the last check is older than this many milliseconds. */
+/** Checks only if the last check is older than `ms`. */
 export const refreshTrashIfOlder = async (ms: number): Promise<TrashState> => {
   const state = await readTrashState();
   const last = Date.parse(state.checkedAt ?? '') || 0;
@@ -135,7 +133,7 @@ const check = async (): Promise<TrashState> => {
   const state = await readTrashState();
   try {
     const kept = !!state.commit && !!(await trashData());
-    // A 304 (nothing new) doesn't count against GitHub's hourly limit.
+    // A 304 doesn't count against GitHub's hourly rate limit.
     const head = await http.get<{ sha: string }>(
       `${API}/repos/${REPO}/commits/${BRANCH}`,
       {
@@ -176,7 +174,7 @@ const check = async (): Promise<TrashState> => {
     const filesDir = path.resolve(trashDir(), 'files');
     const wanted = tree.tree.filter((entry) => {
       if (entry.type !== 'blob') return false;
-      // Kept under files/ by its path, so never one that leaves it.
+      // Skip any path that resolves outside files/.
       const local = path.resolve(filesDir, entry.path);
       if (!local.startsWith(`${filesDir}${path.sep}`)) return false;
       return (['radarr', 'sonarr'] as const).some((kind) => {

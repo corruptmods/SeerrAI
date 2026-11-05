@@ -68,9 +68,7 @@ const Login = () => {
     settings.currentSettings.mediaServerLogin
   );
 
-  // Effect that is triggered when the `authToken` comes back from the Plex OAuth
-  // We take the token and attempt to sign in. If we get a success message, we will
-  // ask swr to revalidate the user which _should_ come back with a valid user.
+  // Exchange the Plex OAuth token for a session, then revalidate the user.
   useEffect(() => {
     const login = async () => {
       setProcessing(true);
@@ -91,7 +89,7 @@ const Login = () => {
     }
   }, [authToken, revalidate, intl]);
 
-  // Back from a single sign-on provider that did not sign them in: say why.
+  // Show why a single sign-on provider did not sign them in.
   const oidcProviders = settings.currentSettings.oidcProviders;
   useEffect(() => {
     const outcome = singleSignOnOutcome(intl, router.query, oidcProviders);
@@ -100,10 +98,7 @@ const Login = () => {
     }
   }, [intl, router.query, oidcProviders]);
 
-  // Effect that is triggered whenever `useUser`'s user changes. Every way of
-  // signing in (Plex, Jellyfin or Emby, Quick Connect, a password, a passkey)
-  // ends by revalidating the user, so this is where all of them go on: to
-  // the page the person was sent here from, or home.
+  // Every sign-in method ends by revalidating the user, so all redirect here.
   useEffect(() => {
     if (user) {
       router.push(safeRedirect(router.query.redirect));
@@ -116,8 +111,7 @@ const Login = () => {
     revalidateOnFocus: false,
   });
 
-  // The servers people may sign in with, the primary one first: Plex by
-  // its button, Jellyfin and Emby by the form, one of them at a time.
+  // Primary server first. Plex uses its button; Jellyfin/Emby share one form.
   const servers = signInServers(settings.currentSettings);
   const plexSignIn = servers.includes('plex');
   const formServers = servers.filter(isJellyfinFamily);
@@ -138,13 +132,10 @@ const Login = () => {
 
   const loginFormVisible = isJellyfin || settings.currentSettings.localLogin;
 
-  // With a form showing, the other ways are under "Or sign in with", so a
-  // button only names the way (its full name is what a screen reader says);
-  // without one they are the main buttons, and say it all.
+  // Under a form, option buttons show short labels (full text in aria-label).
   const compact = loginFormVisible;
   const { supported: passkeysSupported } = usePasskeySupport();
 
-  /** A button that brings up the form for this server. */
   const serverFormButton = (kind: JellyfinFamilyKind) => {
     const Logo = SERVER_LOGOS[kind];
     return (
@@ -165,10 +156,7 @@ const Login = () => {
     );
   };
 
-  /*
-   * Each other way to sign in, with the label its button shows (for laying
-   * them out evenly).
-   */
+  // Labels drive the column layout.
   const additionalLoginOptions: {
     key: string;
     label: string;
@@ -191,7 +179,6 @@ const Login = () => {
       ),
     });
   }
-  // Each Jellyfin or Emby server whose form is not the one showing.
   formServers
     .filter((kind) => !showingServerForm || kind !== shownServer)
     .forEach((kind) =>
@@ -201,7 +188,6 @@ const Login = () => {
         button: serverFormButton(kind),
       })
     );
-  // Each single sign-on provider people may sign in with.
   oidcProviders.forEach((provider) =>
     additionalLoginOptions.push({
       key: `oidc-${provider.id}`,
@@ -238,8 +224,7 @@ const Login = () => {
       ),
     });
   }
-  // Anyone who has added a passkey, whatever account it belongs to, where
-  // the browser can use one.
+  // Any account type can have a passkey.
   if (passkeysSupported) {
     additionalLoginOptions.push({
       key: 'passkey',

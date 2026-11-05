@@ -3,22 +3,20 @@ import { MusicalNoteIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 
 interface MusicImageProps {
-  /** A cover, a picture of an artist, or none. */
+  /** A cover, an artist picture, or none. */
   src?: string;
-  /** What stands in for a picture that is not there: an icon, or nothing. */
+  /** Icon (or nothing) shown when there is no picture. */
   fallback: 'album' | 'artist' | 'none';
   priority?: boolean;
   sizes?: string;
   className?: string;
-  /** Told when there turns out to be no picture. */
+  /** Called when there is no picture. */
   onMissing?: () => void;
 }
 
 /**
- * An album cover or a picture of an artist, filling its box (which must be
- * positioned). Cached and converted as posters are. Many albums have no
- * cover and many artists no picture: the archive answers 404, and a plain
- * icon takes its place.
+ * An album cover or artist picture filling its (positioned) box, cached like
+ * posters. Many have none: on a 404 an icon takes its place.
  */
 const MusicImage = ({
   src,
@@ -59,7 +57,7 @@ const MusicImage = ({
         setFailed(true);
         onMissing?.();
       }}
-      // Otherwise loaded as its card nears the screen (see CachedImage).
+      // Otherwise loads as its card nears the screen (see CachedImage).
       {...(priority ? { priority: true } : {})}
     />
   );

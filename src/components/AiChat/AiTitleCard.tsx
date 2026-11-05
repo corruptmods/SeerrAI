@@ -1,7 +1,7 @@
 import TitleCard from '@app/components/TitleCard';
 import type { MovieResult, TvResult } from '@server/models/Search';
 
-/** A title an AI feature found, shown as it is anywhere else in the app. */
+/** Standard title card for an AI result. */
 const AiTitleCard = ({ result }: { result: MovieResult | TvResult }) => (
   <TitleCard
     id={result.id}
@@ -20,7 +20,7 @@ const AiTitleCard = ({ result }: { result: MovieResult | TvResult }) => (
   />
 );
 
-/** "Title (year)", as the model is told what it offered. */
+/** "Title (year)", the form the model is told it offered. */
 export const resultLabel = (result: MovieResult | TvResult) => {
   const name = result.mediaType === 'movie' ? result.title : result.name;
   const year = (

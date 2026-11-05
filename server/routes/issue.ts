@@ -106,7 +106,7 @@ issueRoutes.post<Record<string, string>, Issue, IssueRequestBody>(
     type: 'or',
   }),
   async (req, res, next) => {
-    // Satisfy typescript here. User is set, we assure you!
+    // Narrows the type; isAuthenticated guarantees a user.
     if (!req.user) {
       return next({ status: 500, message: 'User missing from request.' });
     }
@@ -160,7 +160,7 @@ issueRoutes.post<Record<string, string>, Issue, IssueRequestBody>(
     });
 
     const newIssue = await issueRepository.save(issue);
-    // Tried at once, in the background; what happens is commented on it.
+    // Attempted at once in the background; the outcome is posted as a comment.
     void autofix.fromIssue(newIssue.id, { actor: req.user });
 
     return res.status(201).json(newIssue);
@@ -241,7 +241,7 @@ issueRoutes.get<{ issueId: string }>(
   ),
   async (req, res, next) => {
     const issueRepository = getRepository(Issue);
-    // Satisfy typescript here. User is set, we assure you!
+    // Narrows the type; isAuthenticated guarantees a user.
     if (!req.user) {
       return next({ status: 500, message: 'User missing from request.' });
     }
@@ -287,7 +287,7 @@ issueRoutes.post<{ issueId: string }, Issue, { message: string }>(
   }),
   async (req, res, next) => {
     const issueRepository = getRepository(Issue);
-    // Satisfy typescript here. User is set, we assure you!
+    // Narrows the type; isAuthenticated guarantees a user.
     if (!req.user) {
       return next({ status: 500, message: 'User missing from request.' });
     }
@@ -334,7 +334,7 @@ issueRoutes.post<{ issueId: string; status: string }, Issue>(
   }),
   async (req, res, next) => {
     const issueRepository = getRepository(Issue);
-    // Satisfy typescript here. User is set, we assure you!
+    // Narrows the type; isAuthenticated guarantees a user.
     if (!req.user) {
       return next({ status: 500, message: 'User missing from request.' });
     }

@@ -23,14 +23,11 @@ const messages = passkeyMessages;
 interface PasskeyLoginButtonProps {
   onSignedIn: () => void;
   onError: (message: string) => void;
-  /**
-   * Under "Or sign in with": the button just says "Passkey" (its full
-   * "Sign in with a passkey" is what a screen reader says).
-   */
+  /** Show just "Passkey"; the full label stays as the aria-label. */
   compact?: boolean;
 }
 
-/** Only shown where the browser can use passkeys. */
+/** Renders nothing where the browser can't use passkeys. */
 const PasskeyLoginButton = ({
   onSignedIn,
   onError,

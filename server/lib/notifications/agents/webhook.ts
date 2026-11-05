@@ -16,9 +16,8 @@ type KeyMapFunction = (
 ) => string;
 
 /**
- * The variables a webhook's payload can use. The Jellyfin ones keep their
- * meaning on a server set up with Emby, whose ids they carried before Emby
- * had its own; the Emby ones are Emby's alone.
+ * Webhook template variables. The Jellyfin ones fall back to Emby ids, which
+ * they carried before Emby had its own; the Emby ones are Emby-only.
  */
 export const KeyMap: Record<string, string | KeyMapFunction> = {
   notification_type: (_payload, type) => Notification[type],
@@ -35,20 +34,17 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
   media_tmdbid: 'media.tmdbId',
   media_tvdbid: 'media.tvdbId',
   media_type: 'media.mediaType',
-  /** For music (whose TMDB id is 0): the artist's MusicBrainz id. */
+  /** Music only (TMDB id is 0): the artist's MusicBrainz id. */
   media_mbid: (payload) =>
     payload.media?.mediaType === MediaType.MUSIC
       ? (payload.media.foreignId ?? '')
       : '',
-  /** For music: the titles of the albums asked for, one per line. */
+  /** Music only: requested album titles, one per line. */
   music_albums: (payload) =>
     payload.media?.mediaType === MediaType.MUSIC
       ? (payload.request?.albums ?? []).map((album) => album.title).join('\n')
       : '',
-  /**
-   * For music: the songs asked for, one per line, each with what names its
-   * version: "Song (radio edit)".
-   */
+  /** Music only: requested songs, one per line, as "Song (radio edit)". */
   music_songs: (payload) =>
     payload.media?.mediaType === MediaType.MUSIC
       ? (payload.request?.songs ?? [])
@@ -103,10 +99,10 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
   commentedBy_settings_telegramChatId: 'comment.user.settings.telegramChatId',
 };
 
-/** A variable in a webhook's address or payload, such as {{subject}}. */
+/** A template variable such as {{subject}}. */
 const VARIABLE = /\{\{(\w+)\}\}/g;
 
-/** A variable's value for this notification, as text; '' when it has none. */
+/** A variable's value as text; '' when unset. */
 const variableValue = (
   key: string,
   payload: NotificationPayload,
@@ -121,10 +117,8 @@ const variableValue = (
 };
 
 /**
- * Fills a template's variables in one pass over the template as written:
- * every copy of each is filled, and a value goes in exactly as it is, so a
- * "$" in it or a "{{…}}" someone typed into an issue is never read as part
- * of the template. Anything in braces that is not a variable is left be.
+ * Fills variables in one pass, inserting values verbatim: a "$" or a typed
+ * "{{…}}" in a value is never read as template. Unknown braces are left as is.
  */
 const fillVariables = (
   template: string,
@@ -250,9 +244,7 @@ class WebhookAgent
 
     let webhookUrl = settings.options.webhookUrl;
 
-    // The test notification has no title or request behind it, so its
-    // address is filled with "test"; a real one gets each value, or nothing
-    // (a music title's TMDB id stays 0).
+    // A test notification has no data, so every variable becomes "test".
     if (settings.options.supportVariables) {
       webhookUrl = fillVariables(webhookUrl, (key) =>
         encodeURIComponent(
@@ -279,7 +271,7 @@ class WebhookAgent
           const value = header.value?.trim();
 
           if (key && value) {
-            // Don't override Authorization header if it's already set via authHeader
+            // authHeader wins over a custom Authorization header.
             if (
               key.toLowerCase() !== 'authorization' ||
               !settings.options.authHeader

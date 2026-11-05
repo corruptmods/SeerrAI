@@ -3,9 +3,7 @@ import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
-/*
- * Which site a passkey belongs to, and which page addresses may use it.
- */
+/* Which site a passkey belongs to, and which page addresses may use it. */
 
 const request = (host: string, protocol: 'http' | 'https') =>
   ({

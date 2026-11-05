@@ -81,7 +81,7 @@ interface ServerResponse {
     lastSeenAt: string;
     numLibraries: string;
     owned: string;
-    /** Every library is shared, new ones too. */
+    /** Every library is shared, including new ones. */
     allLibraries?: string;
   };
 }
@@ -111,14 +111,14 @@ interface PlexSectionAttrs {
 
 /** A library as plex.tv shares it. */
 export interface PlexSharingSection {
-  /** plex.tv's id for it, which shares list. */
+  /** plex.tv's id, which shares list. */
   id: string;
-  /** The server's own key for it. */
+  /** The server's own key. */
   key: string;
   title: string;
   /** movie, show, artist or photo. */
   type: string;
-  /** In a share: whether it is shared. */
+  /** Within a share: whether it is shared. */
   shared: boolean;
 }
 
@@ -127,10 +127,10 @@ interface WatchlistResponse {
     totalSize: number;
     Metadata?: {
       ratingKey: string;
-      /** Epoch seconds. Plex sends this; it was simply not read before. */
+      /** Epoch seconds. */
       addedAt?: number;
     }[];
-    /** Where Plex puts the items in some replies, in place of Metadata. */
+    /** Some replies list items here instead of Metadata. */
     Video?: {
       ratingKey: string;
       addedAt?: number;
@@ -147,7 +147,7 @@ type PlexMetadataItem = {
   }[];
 };
 interface MetadataResponse {
-  // Missing from the odd malformed reply; the item is then skipped.
+  // Missing from some malformed replies; the item is then skipped.
   MediaContainer?: {
     Metadata?: PlexMetadataItem[];
     Video?: PlexMetadataItem[];
@@ -155,10 +155,9 @@ interface MetadataResponse {
 }
 
 /**
- * Whether a watchlist reply is one. Discover sometimes answers 200 with a
- * body that is not (no MediaContainer); kept with its ETag, that body was
- * then pinned by If-None-Match, every later request got a 304 for it, and
- * the user's watchlist failed until the cache expired.
+ * Whether a body is a real watchlist. Discover sometimes answers 200 without
+ * a MediaContainer; caching that with its ETag pins it via If-None-Match, so
+ * every later request gets a 304 until the cache expires.
  */
 const isWatchlistResponse = (data: unknown): data is WatchlistResponse => {
   if (typeof data !== 'object' || data === null) {
@@ -173,7 +172,7 @@ const isWatchlistResponse = (data: unknown): data is WatchlistResponse => {
   );
 };
 
-// Plex returns seconds, so fall back to a millisecond value if that ever changes.
+// Plex returns seconds; also accept milliseconds in case that changes.
 const normalizeWatchlistedAt = (value: number | undefined): number | null => {
   if (value === undefined || value <= 0) {
     return null;
@@ -197,24 +196,22 @@ export interface PlexWatchlistItem {
   type: 'movie' | 'show';
   title: string;
   /**
-   * When the user added this to their watchlist. Undefined if Plex did not
-   * send it, in which case callers must not assume anything about age.
+   * When the user watchlisted this. Undefined if Plex did not send it;
+   * callers must not assume anything about age then.
    */
   addedAt?: Date;
 }
 
 export interface PlexWatchlistCache {
-  /** Missing when Plex sent none; the next request then asks afresh. */
+  /** Missing when Plex sent none; the next request then fetches fresh. */
   etag?: string;
   response: WatchlistResponse;
 }
 
-/** Longest to wait for when a title went on someone's watchlist. */
 const USER_STATE_TIMEOUT_MS = 8000;
-/** How long that is kept, in seconds. */
+/** Cache TTL for watchlistedAt, in seconds. */
 const USER_STATE_TTL_S = 15 * 60;
 
-/** Longest to wait on a plex.tv request before giving up its slot. */
 const PLEX_TV_TIMEOUT_MS = 20000;
 
 class PlexTvAPI extends ExternalAPI {
@@ -232,10 +229,9 @@ class PlexTvAPI extends ExternalAPI {
         },
         nodeCache: cacheManager.getCache('plextv').data,
         /*
-         * Watchlist sync fetches metadata for every item on every user's
-         * watchlist. Bounding the concurrency stopped the flood, but without
-         * a timeout one request that never answers holds its slot and stalls
-         * the whole sync behind it (seerr-team/seerr#3235).
+         * Watchlist sync fetches metadata for every item of every user's
+         * watchlist with bounded concurrency; without a timeout one hung
+         * request holds its slot and stalls the sync (seerr-team/seerr#3235).
          */
         timeout: PLEX_TV_TIMEOUT_MS,
       }
@@ -366,20 +362,19 @@ class PlexTvAPI extends ExternalAPI {
     totalSize: number;
     items: PlexWatchlistItem[];
     /**
-     * Plex rejected the token. The caller needs to know this apart from an
-     * empty watchlist: the user has to sign in again, and nothing else will
-     * fix it.
+     * Plex rejected the token. Distinct from an empty watchlist: only
+     * signing in again fixes it.
      */
     authFailed?: boolean;
     /**
-     * The watchlist could not be read for some other reason (Plex down, a
-     * timeout). Says nothing about the token either way.
+     * The watchlist could not be read for another reason (Plex down,
+     * timeout). Says nothing about the token.
      */
     failed?: boolean;
   }> {
     try {
-      // Each page of the watchlist kept apart: one page's tag says nothing
-      // of another's, and a 304 for one must not answer with another.
+      // Cache per page: one page's ETag says nothing of another's, and a 304
+      // for one must not serve another.
       const cacheKey = `${this.authToken}:${offset}:${size}`;
       const watchlistCache = cacheManager.getCache('plexwatchlist');
       let cachedWatchlist =
@@ -400,9 +395,9 @@ class PlexTvAPI extends ExternalAPI {
         }
       );
 
-      // Anything but a 304 is a new watchlist, to keep in place of the
-      // cached one, unless it is not a watchlist at all: that is never kept,
-      // so it cannot be pinned, and the last good one (if any) is used.
+      // A 2xx replaces the cached watchlist, unless the body is not a
+      // watchlist: that is never cached, so it cannot be pinned, and the last
+      // good one (if any) is used.
       if (response.status >= 200 && response.status <= 299) {
         if (isWatchlistResponse(response.data)) {
           cachedWatchlist = {
@@ -426,10 +421,9 @@ class PlexTvAPI extends ExternalAPI {
         }
       }
 
-      // One metadata request per watchlist item. Firing them all at once
-      // times out against discover.provider.plex.tv on large watchlists, so
-      // keep a small number in flight (seerr-team/seerr#3235).
-      // Upstream #3406: some replies list the items under Video instead.
+      // One metadata request per item. Firing all at once times out against
+      // discover.provider.plex.tv on large watchlists, so keep few in flight
+      // (seerr-team/seerr#3235). Upstream #3406: some replies use Video.
       const listed = cachedWatchlist?.response.MediaContainer;
       const watchlistItems = Array.isArray(listed?.Metadata)
         ? listed.Metadata
@@ -458,12 +452,9 @@ class PlexTvAPI extends ExternalAPI {
             }
 
             /*
-             * A timeout or a Plex-side error used to abort the whole sync,
-             * so one unlucky item cost every other user their watchlist run.
-             * Skip the item and carry on; the next sync picks it up.
-             *
-             * An auth failure is different — the token is wrong and every
-             * remaining request will fail too, so that still stops the run.
+             * Skip an item on a timeout or Plex-side error so it doesn't abort
+             * every user's sync; the next sync retries it. An auth failure
+             * stops the run, since every remaining request would fail too.
              */
             const status = e.response?.status;
             const isAuthFailure = status === 401 || status === 403;
@@ -505,16 +496,15 @@ class PlexTvAPI extends ExternalAPI {
 
           return {
             ratingKey: metadata.ratingKey,
-            // This should always be set? But I guess it also cannot be?
-            // We will filter out the 0's afterwards
+            // Can be missing; 0s are filtered out afterwards.
             tmdbId: tmdbString ? Number(tmdbString.id.split('//')[1]) : 0,
             tvdbId: tvdbString
               ? Number(tvdbString.id.split('//')[1])
               : undefined,
             title: metadata.title,
             type: metadata.type,
-            // Plex sends epoch seconds on the watchlist entry, not on the
-            // metadata, so it comes from the item we looked up from.
+            // Plex sends epoch seconds on the watchlist entry, not the
+            // metadata.
             addedAt: watchlistItem.addedAt
               ? new Date(watchlistItem.addedAt * 1000)
               : undefined,
@@ -536,10 +526,8 @@ class PlexTvAPI extends ExternalAPI {
       const status = e.response?.status;
 
       /*
-       * A 401 means this user's Plex token is no longer valid — they need to
-       * sign in again. It is not a fault anyone can fix from the server. It
-       * is said once, as a warning, when first noticed (lib/plexReauth);
-       * every later try only repeats it.
+       * The user's Plex token is invalid; only signing in again fixes it.
+       * lib/plexReauth warns once when first noticed, so log at debug here.
        */
       if (status === 401 || status === 403) {
         logger.debug(
@@ -569,12 +557,12 @@ class PlexTvAPI extends ExternalAPI {
   }
 
   /**
-   * When the user put this title on their watchlist, in Unix seconds. Removing
-   * it and adding it back gives a new time, which is how watchlist sync tells
-   * a deliberate re-add from the entry it already acted on.
+   * When the user watchlisted this title, in Unix seconds. A re-add gets a
+   * new time, which lets watchlist sync tell it from an entry it already
+   * acted on.
    *
-   * Deliberately not this.get(): ExternalAPI's cache key omits the auth
-   * token and would serve one user's watchlist state to another.
+   * Not this.get(): ExternalAPI's cache key omits the auth token and would
+   * serve one user's watchlist state to another.
    */
   public async getWatchlistedAt(ratingKey: string): Promise<number | null> {
     const watchlistCache = cacheManager.getCache('plexwatchlist');
@@ -590,8 +578,7 @@ class PlexTvAPI extends ExternalAPI {
         `/library/metadata/${ratingKey}/userState`,
         {
           baseURL: 'https://discover.provider.plex.tv',
-          // A small answer: one that has not come in this long is not
-          // coming, and every title waiting on it holds up the sync.
+          // A slow answer holds up every title waiting on it in the sync.
           timeout: USER_STATE_TIMEOUT_MS,
         }
       );
@@ -600,9 +587,8 @@ class PlexTvAPI extends ExternalAPI {
         response.data.MediaContainer.UserState?.[0]?.watchlistedAt
       );
 
-      // Kept longer than the watchlist itself: it only changes when the
-      // title is taken off the watchlist and added back, which this then
-      // notices within a quarter of an hour.
+      // Cached longer than the watchlist: it only changes on a re-add, which
+      // this then notices within 15 minutes.
       watchlistCache.data.set(cacheKey, watchlistedAt, USER_STATE_TTL_S);
 
       return watchlistedAt;
@@ -617,7 +603,7 @@ class PlexTvAPI extends ExternalAPI {
     }
   }
 
-  /** Reads one of plex.tv's XML answers, uncached. */
+  /** Fetches and parses a plex.tv XML reply, uncached. */
   private async getXml<T>(path: string): Promise<T> {
     const response = await this.axios.get(path, {
       transformResponse: [],
@@ -627,8 +613,8 @@ class PlexTvAPI extends ExternalAPI {
   }
 
   /**
-   * A server's libraries as plex.tv numbers them for sharing: these ids,
-   * not the server's own keys, are what a share lists.
+   * A server's libraries with plex.tv's sharing ids, which shares list
+   * instead of the server's own keys.
    */
   public async getSharingSections(
     machineId: string
@@ -645,7 +631,7 @@ class PlexTvAPI extends ExternalAPI {
     }));
   }
 
-  /** The libraries one share of a server gives, each with whether it is. */
+  /** A share's libraries, each marked shared or not. */
   public async getShareSections(
     machineId: string,
     shareId: string
@@ -669,8 +655,8 @@ class PlexTvAPI extends ExternalAPI {
   }
 
   /**
-   * Shares exactly these libraries (plex.tv's section ids) of a server
-   * with someone it is already shared with.
+   * Shares exactly these libraries (plex.tv section ids) with someone the
+   * server is already shared with.
    */
   public async setShareSections(
     machineId: string,

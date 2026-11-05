@@ -55,8 +55,8 @@ const movies: Record<number, object> = {
   },
 };
 
-// The plain lookups too: saving a request sends a notification, which
-// names the title.
+// The plain lookups too: saving a request sends a notification, which names the
+// title.
 for (const [method, table, key] of [
   ['getTvShowForScan', shows, 'tvId'],
   ['getMovieForScan', movies, 'movieId'],
@@ -78,7 +78,7 @@ for (const [method, table, key] of [
   });
 }
 
-// What the fake Sonarr and Radarr hold, and the edits they were sent.
+// What the fake Sonarr and Radarr hold, and the edits sent to them.
 let series: Record<number, Record<string, unknown>> = {};
 let radarrMovies: Record<number, Record<string, unknown>> = {};
 let edits: { url: string; body: Record<string, unknown> }[] = [];
@@ -379,7 +379,7 @@ describe('PUT /media/:id/anime', () => {
         },
       },
     ]);
-    // Read again after the move, it is where it belongs.
+    // Read again after the move, it's where it belongs.
     assert.equal(res.body.servers[0].path, '/anime/Yorumaki');
     assert.deepEqual(res.body.servers[0].ifAnime, {});
     const saved = await getRepository(Media).findOneByOrFail({ id: media.id });
@@ -451,8 +451,8 @@ describe('PUT /media/:id/anime', () => {
     const requestedBy = await getRepository(User).findOneByOrFail({
       email: 'friend@seerr.dev',
     });
-    // Pending: an approved one would be sent on to Sonarr when saved, which
-    // is not what is tested here.
+    // Pending: an approved one would be sent to Sonarr on save, which isn't
+    // under test here.
     await getRepository(MediaRequest).save(
       new MediaRequest({
         type: MediaType.TV,

@@ -12,9 +12,8 @@ import { RELEASE_SEARCH_TIMEOUT_MS } from '@server/lib/backfill/sonarr';
 import type { RadarrSettings } from '@server/lib/settings';
 
 /*
- * The Radarr calls Backfill makes for movies: the same as for Sonarr, with
- * movies for series. Radarr's profiles, qualities, commands and path
- * mappings have Sonarr's shapes.
+ * Radarr calls for movie Backfill, mirroring the Sonarr ones. Radarr's
+ * profiles, qualities, commands and path mappings share Sonarr's shapes.
  */
 
 export interface RadarrMovieDetail {
@@ -32,7 +31,7 @@ export interface RadarrMovieDetail {
   hasFile: boolean;
   movieFileId: number;
   lastSearchTime?: string;
-  /** When it was added to Radarr. */
+  /** When added to Radarr. */
   added?: string;
   alternateTitles?: { title: string }[];
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
@@ -109,9 +108,8 @@ class BackfillRadarr extends RadarrAPI {
   }
 
   public async getQualityDefinitions(): Promise<QualityDefinition[]> {
-    const { data } = await this.axios.get<QualityDefinition[]>(
-      '/qualitydefinition'
-    );
+    const { data } =
+      await this.axios.get<QualityDefinition[]>('/qualitydefinition');
     return Array.isArray(data) ? data : [];
   }
 
@@ -123,9 +121,8 @@ class BackfillRadarr extends RadarrAPI {
   }
 
   /**
-   * Monitored movies that are missing, or below their cutoff. `complete` is
-   * false when there were more than `maxPages` pages: what was left out is
-   * still wanted, not found.
+   * Monitored movies missing or below cutoff. `complete` is false past
+   * `maxPages` pages: the rest is still wanted, not found.
    */
   public async getWanted(
     kind: 'missing' | 'cutoff',
@@ -147,7 +144,7 @@ class BackfillRadarr extends RadarrAPI {
     return { records: movies, complete: false };
   }
 
-  /** Radarr's own search for a movie, with its reasons for each refusal. */
+  /** Radarr's search for a movie, with each rejection reason. */
   public async getReleases(movieId: number): Promise<ArrSearchRelease[]> {
     const { data } = await this.axios.get<ArrSearchRelease[]>('/release', {
       params: { movieId },
@@ -204,7 +201,7 @@ class BackfillRadarr extends RadarrAPI {
     return data;
   }
 
-  /** Every command Radarr has queued, running or lately done. */
+  /** Commands Radarr has queued, running or recently finished. */
   public async getCommands(): Promise<SonarrCommand[]> {
     const { data } = await this.axios.get<SonarrCommand[]>('/command');
     return Array.isArray(data) ? data : [];

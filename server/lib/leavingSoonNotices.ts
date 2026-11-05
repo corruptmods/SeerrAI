@@ -16,13 +16,13 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Leaving Soon: whoever requested a film or series is told when Maintainerr
- * is about to delete it, once for each date it is set to go. Kept, and set
- * to go again later, it is told again then.
+ * Leaving Soon: requesters of a film or series are told when Maintainerr is
+ * about to delete it, once per scheduled date. If it is kept and rescheduled,
+ * they are told again.
  */
 
 const DAY_MS = 24 * 60 * 60_000;
-/** How often the deletion schedule is looked through. */
+/** How often the deletion schedule is checked. */
 const EVERY_MS = 30 * 60_000;
 
 let lastRun = 0;
@@ -120,7 +120,7 @@ export const tellLeavingSoon = async (now = Date.now()): Promise<void> => {
   }
 };
 
-/** Forgets when it last ran (for tests). */
+/** For tests: clears the last run time. */
 export const resetLeavingSoon = (): void => {
   lastRun = 0;
 };

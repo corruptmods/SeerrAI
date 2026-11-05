@@ -85,8 +85,8 @@ import { canMakePermissionsChange } from '.';
 import personalCssRoutes from './customCss';
 
 /**
- * Trakt usernames: letters, digits, dots, dashes and underscores, and not
- * only dots ("." and ".." would change which Trakt page is read).
+ * Trakt usernames: letters, digits, dots, dashes and underscores, not only
+ * dots ("." and ".." would change which Trakt page is read).
  */
 const TRAKT_USERNAME = /^(?=.*[\w-])[\w.-]{1,64}$/;
 
@@ -157,8 +157,8 @@ userSettingsRoutes.post<
       return next({ status: 404, message: 'User not found.' });
     }
 
-    // Only the owner changes the owner's settings, or another admin's: an
-    // admin's email is where their password reset link goes.
+    // Only the owner changes the owner's or another admin's settings: an
+    // admin's email receives their password reset link.
     if (!mayEditUser(req.user, user)) {
       return next({
         status: 403,
@@ -184,7 +184,7 @@ userSettingsRoutes.post<
       throw new ApiError(400, ApiErrorCode.InvalidEmail);
     }
 
-    // Update quota values only if the user has the correct permissions
+    // Only user managers may change quotas.
     if (
       !user.hasPermission(Permission.MANAGE_USERS) &&
       req.user?.id !== user.id
@@ -197,7 +197,7 @@ userSettingsRoutes.post<
       user.musicQuotaLimit = req.body.musicQuotaLimit;
     }
 
-    // A Trakt username as Trakt writes them; blank clears it.
+    // A Trakt username in Trakt's format; blank clears it.
     const traktUsername =
       typeof req.body.traktUsername === 'string'
         ? req.body.traktUsername.trim()
@@ -314,8 +314,8 @@ userSettingsRoutes.post<
       });
     }
 
-    // A key can't set a password to sign in with: never a personal key, and
-    // the server's key only someone else's, as an admin would.
+    // A key can't set a sign-in password: never a personal key, and the
+    // server's key only for another user, as an admin would.
     if (
       req.authMethod === 'personalKey' ||
       (req.authMethod !== 'session' && req.user?.id === user.id)
@@ -326,15 +326,14 @@ userSettingsRoutes.post<
       });
     }
 
-    // If the user has the permission to manage users and they are not
-    // editing themselves, we will just set the new password
+    // A user manager editing someone else sets it without the current one.
     if (
       req.user?.hasPermission(Permission.MANAGE_USERS) &&
       req.user?.id !== user.id
     ) {
       await user.setPassword(req.body.newPassword);
       await userRepository.update(user.id, { password: user.password });
-      // Signed out everywhere: the new password is the only way back in.
+      // Sign out everywhere: the new password is the only way back in.
       await endSessions(user.id);
       logger.debug('Password overriden by user.', {
         label: 'User Settings',
@@ -344,8 +343,8 @@ userSettingsRoutes.post<
       return res.status(204).send();
     }
 
-    // If the user has a password, we need to check the currentPassword is
-    // correct. Only the copy loaded with the password has it.
+    // Check currentPassword when one is set; only the copy loaded with the
+    // password has it.
     if (
       userWithPassword.password &&
       (!req.body.currentPassword ||
@@ -360,7 +359,7 @@ userSettingsRoutes.post<
 
     await user.setPassword(req.body.newPassword);
     await userRepository.update(user.id, { password: user.password });
-    // Signed out everywhere else; this session stays.
+    // Sign out everywhere else; this session stays.
     await endSessions(user.id, req.sessionID);
 
     return res.status(204).send();
@@ -370,16 +369,14 @@ userSettingsRoutes.post<
 });
 
 /*
- * Linked accounts: someone's accounts on the connected media servers, one
- * per server. Linking takes proof (signing in there), an account nobody
- * else here has, and one that may use that server. It never changes what
- * kind of account someone has, unless they only had a password.
+ * Linked accounts: one per connected media server. Linking needs a sign-in
+ * there, an account no other user has, and access to that server. It changes
+ * the account type only for a password-only account.
  */
 
-/** The address Jellyfin and Emby are told a sign-in comes from. */
 /**
- * Only while signed in, not with a key: linking a sign-in or setting a
- * password would let a key, which might have leaked, become a full sign-in.
+ * Session only, never a key: linking a sign-in or setting a password would
+ * let a possibly leaked key become a full sign-in.
  */
 const signedInOnly = (req: Request, _res: Response, next: NextFunction) =>
   req.authMethod === 'session'
@@ -389,6 +386,7 @@ const signedInOnly = (req: Request, _res: Response, next: NextFunction) =>
         message: 'This can only be done while signed in, not with a key.',
       });
 
+/** The address Jellyfin and Emby are told a sign-in comes from. */
 const clientIpOf = (req: Request): string | undefined => {
   const ip = req.ip;
   if (ip && net.isIPv4(ip)) {
@@ -400,23 +398,23 @@ const clientIpOf = (req: Request): string | undefined => {
   return undefined;
 };
 
-/** The device Seerr signs in to Jellyfin or Emby as, for this person. */
+/** The device id Seerr signs in to Jellyfin or Emby with for this user. */
 const deviceIdFor = (user: User): string =>
   Buffer.from(
     user.id === 1 ? 'BOT_seerr' : `BOT_seerr_${user.username ?? ''}`
   ).toString('base64');
 
 /**
- * The server POST and DELETE /linked-accounts/jellyfin work with. Before
- * Emby had its own, they also stood for an Emby server, and still do when
- * Emby is the one connected.
+ * The server POST and DELETE /linked-accounts/jellyfin act on: Jellyfin, or
+ * Emby when it is the one connected (for callers from before Emby had its
+ * own routes).
  */
 const jellyfinRouteKind = (user?: Partial<User>): JellyfinFamilyKind =>
   user?.jellyfinUserId || isConnected('jellyfin') || !isConnected('emby')
     ? 'jellyfin'
     : 'emby';
 
-/** Links a Jellyfin or Emby account someone signed in to. */
+/** Links a Jellyfin or Emby account the user signed in to. */
 const linkJellyfinAccount = async (
   user: User,
   kind: JellyfinFamilyKind,
@@ -455,7 +453,7 @@ const linkJellyfinAccount = async (
       authToken: account.AccessToken,
       deviceId,
     }),
-    // Only a password account becomes this server's kind of account.
+    // Only a password account takes this server's account type.
     ...(user.userType === UserType.LOCAL ? { userType: USER_TYPE[kind] } : {}),
   });
 
@@ -463,11 +461,10 @@ const linkJellyfinAccount = async (
 };
 
 /**
- * Unlinks someone's account on a media server, if they can still sign in
- * afterwards: with a password, another account on a connected server, or a
- * single sign-on provider that is switched on.
- * The owner keeps their account on the primary server, and their Plex
- * account while Plex is connected: Seerr reaches Plex with it.
+ * Unlinks a media server account if the user can still sign in afterwards
+ * (password, another connected server's account, or an enabled single
+ * sign-on provider). The owner keeps their primary server account, and
+ * their Plex account while Plex is connected: Seerr reaches Plex with it.
  */
 const unlinkAccount = async (
   req: Request,
@@ -485,7 +482,7 @@ const unlinkAccount = async (
     return { status: 404, body: { message: 'User not found.' } };
   }
 
-  // Unlinking an admin from someone else's settings is the owner's call.
+  // Only the owner may unlink another admin's account.
   if (!mayEditUser(req.user, user)) {
     return {
       status: 403,
@@ -512,8 +509,8 @@ const unlinkAccount = async (
       },
     };
   }
-  // A Jellyfin or Emby server with no account of its own chosen for Seerr
-  // is read as the owner's (jellyfinAdmin): without it, its scans fail.
+  // A Jellyfin or Emby server with no account chosen for Seerr is read as
+  // the owner's (jellyfinAdmin); without it, scans fail.
   if (
     user.id === 1 &&
     isJellyfinFamily(kind) &&
@@ -560,15 +557,15 @@ const unlinkAccount = async (
           deviceId: null,
         });
 
-  // Their kind of account moves to another account they still have,
-  // the primary server's first, else they have a password account.
+  // The account type moves to another linked account, primary server
+  // first, else it becomes a password account.
   if (user.userType === USER_TYPE[kind]) {
     const next = others[0];
     changes.userType = next ? USER_TYPE[next] : UserType.LOCAL;
     if (next && isJellyfinFamily(next)) {
       changes.avatar = `/avatarproxy/${user[USER_ID[next]]}`;
     } else if (!next && user.avatar.startsWith('/avatarproxy/')) {
-      // The picture came from the account being unlinked.
+      // The avatar came from the account being unlinked.
       changes.avatar = gravatarUrl(user.email || 'none', {
         default: 'mm',
         size: 200,
@@ -596,19 +593,18 @@ userSettingsRoutes.post<{ id: string }>(
     }
 
     try {
-      // First we need to use this auth token to get the user's email from plex.tv
       const account = await new PlexTvAPI(req.body.authToken).getUser();
 
-      // Do not allow linking of an already linked account
+      // Refuse an account that is already linked.
       if (await userRepository.exist({ where: { plexId: account.id } })) {
         return res.status(422).json({
           message: 'This Plex account is already linked to a Seerr user',
         });
       }
 
-      // A Plex or password account links the Plex account with its own
-      // email. Someone who signs in with Jellyfin or Emby has that server's
-      // name as their email, so theirs cannot be compared.
+      // A Plex or password account must link the Plex account with its own
+      // email. Jellyfin and Emby users have their username as email, so it
+      // can't be compared.
       if (
         (user.userType === UserType.PLEX || user.userType === UserType.LOCAL) &&
         user.email !== account.email.toLowerCase()
@@ -619,7 +615,7 @@ userSettingsRoutes.post<{ id: string }>(
         });
       }
 
-      // The owner shares the Plex server with this account.
+      // The owner must share the Plex server with this account.
       const owner = await userRepository.findOneOrFail({
         select: { id: true, plexId: true, plexToken: true },
         where: { id: 1 },
@@ -675,7 +671,7 @@ userSettingsRoutes.delete<{ id: string }>(
   }
 );
 
-/** Linking a Jellyfin or Emby account with its username and password. */
+/** Links a Jellyfin or Emby account by username and password. */
 const linkWithPassword =
   (kindOf: () => JellyfinFamilyKind) =>
   async (
@@ -699,7 +695,7 @@ const linkWithPassword =
         .json({ message: `${serverName(kind)} login is disabled` });
     }
 
-    // Do not allow linking of an already linked account
+    // Refuse an account that is already linked.
     if (
       await userRepository.exist({
         where: { [USERNAME[kind]]: req.body.username },
@@ -801,10 +797,9 @@ userSettingsRoutes.delete<{ id: string }>(
 );
 
 /*
- * Single sign-on links. Made by signing in at the provider (see
- * routes/oidc.ts); listed and removed here. A provider that is switched off
- * or removed keeps its links, shown as not available, as are links made
- * before its issuer URL changed.
+ * Single sign-on links, made by signing in at the provider (routes/oidc.ts),
+ * listed and removed here. Links to a disabled or removed provider, or from
+ * before its issuer URL changed, are kept and shown as unavailable.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/linked-accounts/oidc',
@@ -820,7 +815,7 @@ userSettingsRoutes.get<{ id: string }>(
         const provider = providers.find((p) => p.id === link.provider);
         return {
           provider: link.provider,
-          // A removed provider's name went with it; its id is made from it.
+          // A removed provider's name is gone; its id derives from it.
           name: provider?.name ?? link.provider,
           logoUrl: provider?.logoUrl ?? '',
           username: link.username ?? null,
@@ -832,10 +827,9 @@ userSettingsRoutes.get<{ id: string }>(
 );
 
 /**
- * Removes a single sign-on link, if the person can still sign in
- * afterwards: with a password, an account on a connected media server, or
- * another provider that is switched on. A link that can't be used to sign
- * in can always go.
+ * Removes a single sign-on link if the user can still sign in afterwards
+ * (password, a connected media server account, or another enabled
+ * provider). A link unusable for sign-in can always be removed.
  */
 userSettingsRoutes.delete<{ id: string; providerId: string }>(
   '/linked-accounts/oidc/:providerId',
@@ -954,8 +948,8 @@ userSettingsRoutes.get<{ id: string }, UserSettingsNotificationsResponse>(
         pgpKey: user.settings?.pgpKey,
         discordEnabled:
           settings?.discord.enabled && settings.discord.options.enableMentions,
-        // Discord only posts to the channel, mentioning people there, and
-        // list activity never goes to a channel: it can't reach anyone here.
+        // Discord only posts to the channel, and list activity never goes to
+        // one, so it can't reach anyone here.
         discordEnabledTypes:
           settings?.discord.enabled && settings.discord.options.enableMentions
             ? (settings.discord.types ?? 0) & ~Notification.LIST_ACTIVITY
@@ -994,7 +988,7 @@ userSettingsRoutes.post<{ id: string }, UserSettingsNotificationsResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      // Only the owner changes the owner's settings, or another admin's.
+      // Only the owner changes the owner's or another admin's settings.
       if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
@@ -1098,7 +1092,7 @@ userSettingsRoutes.post<
         return next({ status: 404, message: 'User not found.' });
       }
 
-      // Nobody sets their own permissions or the owner's, and only the owner
+      // Nobody sets their own or the owner's permissions; only the owner
       // changes another admin's.
       if (!mayManageUser(req.user, user)) {
         return next({
@@ -1125,8 +1119,8 @@ userSettingsRoutes.post<
 );
 
 /*
- * The fork's optional features this person has turned off for themselves.
- * Features an admin turned off for everyone stay off whatever this says.
+ * The fork's optional features this user turned off. Features an admin
+ * turned off for everyone stay off regardless.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/features',
@@ -1165,7 +1159,7 @@ userSettingsRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      // As with every other setting: only the owner changes the owner's.
+      // As everywhere: only the owner changes the owner's.
       if (user.id === 1 && req.user?.id !== 1) {
         return next({
           status: 403,
@@ -1190,8 +1184,8 @@ userSettingsRoutes.post<{ id: string }>(
 );
 
 /**
- * The home page rows a person hid for themselves, by slider id. Rows an
- * admin turned off are off for everyone whatever this says.
+ * Home page rows this user hid, by slider id. Rows an admin turned off stay
+ * off regardless.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/discover',
@@ -1231,8 +1225,8 @@ userSettingsRoutes.post<{ id: string }>(
         message: 'A list of slider ids, or of networks, is required.',
       });
     }
-    // Their own list for the Networks row, checked and re-written; null (or
-    // empty) for the usual list.
+    // Their own Networks row list, validated and rewritten; null or empty
+    // for the default list.
     let networks: string | null | undefined;
     if (sentNetworks) {
       try {
@@ -1246,7 +1240,7 @@ userSettingsRoutes.post<{ id: string }>(
         throw e;
       }
     }
-    // Only rows that exist, once each.
+    // Only existing rows, deduplicated.
     let hidden: number[] | undefined;
     if (raw !== undefined) {
       const existing = new Set(
@@ -1293,9 +1287,9 @@ userSettingsRoutes.post<{ id: string }>(
 );
 
 /*
- * A person's own look (Profile → Settings → Appearance): light or dark,
- * accent, dark background and extras, or null to use the server's default.
- * It changes only their own screens.
+ * A user's own look (Profile → Settings → Appearance): mode, accent, dark
+ * background and extras, or null for the server default. Affects only their
+ * screens.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/appearance',
@@ -1360,9 +1354,8 @@ userSettingsRoutes.post<{ id: string }>(
 );
 
 /*
- * Their answer to the note a seasonal theme shows the first time it shows
- * for them: keep it, or turn it off until it ends. Kept with the account,
- * so the note is not asked again on another device.
+ * The answer to a seasonal theme's first-time note: keep it, or turn it off
+ * until it ends. Stored on the account so other devices don't ask again.
  */
 userSettingsRoutes.post<{ id: string }>(
   '/appearance/season',
@@ -1403,9 +1396,9 @@ userSettingsRoutes.post<{ id: string }>(
 );
 
 /*
- * The order a person put their sidebar and phone menu in, and the items
- * they hid, by item name (server/constants/navigation.ts). Arranged from
- * their home page; nobody else's sidebar changes.
+ * This user's sidebar and phone menu order and hidden items, by item name
+ * (server/constants/navigation.ts). Set from their home page; affects only
+ * their sidebar.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/sidebar',
@@ -1445,9 +1438,9 @@ userSettingsRoutes.post<{ id: string }>(
         message: 'A list of sidebar items to order, or to hide, is required.',
       });
     }
-    // Names that are not items are dropped. The usual order is kept as no
-    // order at all, so items added later take their usual place and the
-    // phone menu keeps its own order.
+    // Unknown names are dropped. The default order is stored as no order, so
+    // items added later take their default place and the phone menu keeps
+    // its own order.
     const order =
       body.order === undefined
         ? undefined
@@ -1490,10 +1483,9 @@ userSettingsRoutes.post<{ id: string }>(
 );
 
 /*
- * Someone else's passkeys, for whoever manages users: to see which devices
- * can sign in as them and remove one that is lost or no longer theirs.
- * Adding or renaming stays with the person themselves. As with passwords,
- * only the owner can touch the owner's, or another admin's.
+ * Another user's passkeys, for user managers: see which devices can sign in
+ * as them and remove a lost one. Only the user adds or renames. As with
+ * passwords, only the owner touches the owner's or another admin's.
  */
 const passkeyManager = async (
   req: Request<{ id: string }>
@@ -1549,7 +1541,7 @@ userSettingsRoutes.delete<{ id: string; passkeyId: string }>(
       if (!result.affected) {
         return next({ status: 404, message: 'Passkey not found.' });
       }
-      // Whoever has the device it was on is signed out with it.
+      // End the user's other sessions, so the device it was on is signed out.
       await endSessions(
         user.id,
         req.user?.id === user.id ? req.sessionID : undefined
@@ -1568,11 +1560,11 @@ userSettingsRoutes.delete<{ id: string; passkeyId: string }>(
 );
 
 /*
- * Personal API keys (lib/personalApiKeys). Each person makes and revokes
- * their own, once an admin lets them (Settings → Users). Someone who
- * manages users can see another person's keys and revoke them, but never
- * see a key itself, which nobody can after it is made; as with passkeys,
- * only the owner touches the owner's, or another admin's.
+ * Personal API keys (lib/personalApiKeys). Users create and revoke their own
+ * once an admin allows it (Settings → Users). User managers can list and
+ * revoke another user's keys but never see a secret, which nobody can after
+ * creation; as with passkeys, only the owner touches the owner's or another
+ * admin's.
  */
 const apiKeyOwner = async (
   req: Request<{ id: string }>
@@ -1606,7 +1598,7 @@ userSettingsRoutes.get<{ id: string }, ApiKeyListResponse>(
       if (!(user instanceof User)) {
         return next(user);
       }
-      // A Siri key is on the Siri page.
+      // Siri keys are listed on the Siri page.
       const keys = await getRepository(UserApiKey).find({
         where: { userId: user.id, scope: IsNull() },
         order: { createdAt: 'ASC', id: 'ASC' },
@@ -1628,8 +1620,8 @@ userSettingsRoutes.post<
   { name?: unknown; expiresInDays?: unknown }
 >('/api-keys', isOwnProfile(), async (req, res, next) => {
   const user = req.user as User;
-  // Made by the person, signed in: a key, which might have leaked, can't
-  // make itself a successor, and nor can the server's key acting for them.
+  // Session only: a possibly leaked key can't create its successor, nor can
+  // the server's key acting for the user.
   if (req.authMethod !== 'session') {
     return next({
       status: 403,
@@ -1669,8 +1661,7 @@ userSettingsRoutes.post<
   try {
     const repository = getRepository(UserApiKey);
     const now = new Date();
-    // Keys that expired a month ago or more are cleared away, so expired
-    // ones don't pile up in the list.
+    // Delete keys expired a month or more, so they don't pile up.
     await repository.delete({
       userId: user.id,
       expiresAt: LessThan(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)),
@@ -1689,7 +1680,7 @@ userSettingsRoutes.post<
     }
 
     let made = makeKey();
-    // The visible id is random; on the rare clash, roll again.
+    // The public id is random; retry on a clash.
     while (await repository.exists({ where: { publicId: made.publicId } })) {
       made = makeKey();
     }
@@ -1753,11 +1744,10 @@ userSettingsRoutes.delete<{ id: string; keyId: string }>(
 );
 
 /*
- * Someone's Siri key: one key that only reports what is playing
- * (lib/siri), for the "Fix this show" shortcut. Made on their Siri page
- * while signed in, whether or not people may make their own API keys; a
- * new one replaces the old. Like other keys, someone who manages users
- * can see that it is there and revoke it.
+ * A user's Siri key: one key that only reports what is playing (lib/siri),
+ * for the "Fix this show" shortcut. Created on their Siri page while signed
+ * in, even when personal API keys are off; a new one replaces the old. User
+ * managers can see and revoke it, like other keys.
  */
 const mayUseSiri = (user: User) =>
   featureEnabled('siri', user) &&
@@ -1828,7 +1818,7 @@ userSettingsRoutes.post<{ id: string }, ApiKeyCreatedResponse>(
           expiresAt: null,
         })
       );
-      // The old key stops working once the new one is there.
+      // Revoke the old key once the new one exists.
       if (before.length) {
         await repository.delete(before.map((k) => k.id));
       }

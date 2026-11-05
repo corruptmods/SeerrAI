@@ -1,9 +1,9 @@
 /**
  * Like Promise.all(items.map(fn)) but with at most `limit` calls in flight.
  *
- * Results are returned in input order. Use this anywhere a list of external
- * requests would otherwise be fired all at once — third-party APIs throttle
- * or time out under an unbounded burst, and a slow item stalls nothing else.
+ * Results are in input order. Use it wherever a list of external requests would
+ * otherwise fire at once: third-party APIs throttle or time out under unbounded
+ * bursts, and a slow item stalls nothing else.
  */
 export const mapWithConcurrency = async <T, R>(
   items: readonly T[],

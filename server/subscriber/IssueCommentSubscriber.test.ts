@@ -12,12 +12,10 @@ import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-/*
- * Commenting on an issue notifies the people involved. The subscriber used
- * to look the new comment up on a different connection from the save that
- * created it — one that cannot see the row until it commits — so the lookup
- * failed and the notification never went out. Upstream fix 6fb4c239.
- */
+// Commenting on an issue notifies those involved. Regression: the subscriber
+// looked the new comment up on a different connection from the save, which
+// couldn't see the uncommitted row, so the notification never went out.
+// Upstream fix 6fb4c239.
 
 setupTestDb();
 
@@ -73,8 +71,8 @@ describe('issue comment notifications', () => {
       })
     );
 
-    // The first comment is the issue's description, which the issue-created
-    // notification already covers. A reply is what notifies.
+    // The first comment is the issue's description, covered by the
+    // issue-created notification; a reply is what notifies.
     await getRepository(IssueComment).save(
       new IssueComment({
         issue,
@@ -94,7 +92,7 @@ describe('issue comment notifications', () => {
       })
     );
 
-    // The subscriber used not to await its work either.
+    // Give the subscriber's unawaited work time to finish.
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     assert.ok(

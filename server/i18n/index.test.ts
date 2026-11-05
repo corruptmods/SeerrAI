@@ -42,9 +42,9 @@ describe('notification languages', () => {
     const en = JSON.parse(
       fs.readFileSync(path.join(dir, 'en.json'), 'utf-8')
     ) as Record<string, string>;
-    // The names of a message's arguments, at any depth. The text inside a
-    // select or plural option ({kind, select, movie {Movie Approved} …}) is
-    // wording, not a name, and differs in every language.
+    // A message's argument names, at any depth. Text inside select or plural
+    // options ({kind, select, movie {Movie Approved} …}) is wording, not a
+    // name, and differs per language.
     const names = (text: string) => {
       const found = new Set<string>();
       let i = 0;

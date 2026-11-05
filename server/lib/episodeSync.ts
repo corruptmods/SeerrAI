@@ -15,17 +15,8 @@ interface SonarrEpisodeState {
 }
 
 /**
- * Keeps per-episode availability in step with Sonarr, and notifies when a new
- * episode of a requested season lands.
- *
- * Deliberately separate from availabilitySync: that path drives season and
- * media status, which removal tooling depends on. This job only ever writes
- * Episode rows, so it cannot influence whether media is considered removed.
- */
-/**
- * What Sonarr's series list says about a series' episodes: per season, how
- * many there are and how many have a file. Unchanged since the last pass, its
- * episodes cannot have changed either, so they are not asked for again.
+ * Per-season episode and file counts from Sonarr's series list. If unchanged
+ * since the last pass, the episodes can't have changed, so they aren't read.
  */
 const fingerprintOf = (series: SonarrSeries): string | null => {
   const seasons = series.seasons ?? [];
@@ -41,6 +32,13 @@ const fingerprintOf = (series: SonarrSeries): string | null => {
     .join(',');
 };
 
+/**
+ * Keeps per-episode availability in step with Sonarr.
+ *
+ * Separate from availabilitySync on purpose: that drives season and media
+ * status, which removal tooling depends on. This only writes Episode rows, so
+ * it can't affect whether media counts as removed.
+ */
 class EpisodeSync {
   private running = false;
 
@@ -88,9 +86,8 @@ class EpisodeSync {
         );
       }
 
-      // One call per server for every series' episode counts. Only series
-      // whose counts moved since their last sync are read episode by episode,
-      // so a library of finished shows costs a single request per pass.
+      // One call per server for all series' counts. Only series whose counts
+      // changed are read episode by episode, so finished shows add no calls.
       const seriesByServer = new Map<number, Map<number, SonarrSeries>>();
       for (const [serverId, sonarr] of clients) {
         try {
@@ -112,14 +109,11 @@ class EpisodeSync {
         }
       }
 
-      // A show records which Sonarr instance it was sent to. Asking only that
-      // instance keeps each pass at one call per show rather than one per
-      // show per server, and avoids polling instances the show is not on.
+      // Ask only the Sonarr instance each show was sent to.
       for (const show of shows) {
-        // externalServiceId is the Sonarr series id recorded when the request
-        // was sent. A show without one was never sent to Sonarr, so there is
-        // nothing to sync — and looking it up via /series/lookup would return
-        // TVDB metadata with no library id, producing a 400 on /episode.
+        // Without externalServiceId the show was never sent to Sonarr. A
+        // /series/lookup would return TVDB metadata with no library id, and
+        // /episode would 400.
         if (
           show.serviceId === null ||
           show.serviceId === undefined ||
@@ -136,27 +130,27 @@ class EpisodeSync {
         }
 
         const series = seriesList.get(show.externalServiceId);
-        // Gone from Sonarr since it was sent: nothing to read.
+        // Removed from Sonarr since it was sent.
         if (!series) {
           continue;
         }
 
-        // The title's own id is part of the key: a title cleared and
-        // requested again is a new row, with no episodes stored yet, though
-        // the Sonarr series and its counts are the same.
+        // Include the media id: a cleared and re-requested title is a new row
+        // with no episodes stored, though Sonarr's series and counts match.
         const key = `${show.id}:${show.serviceId}:${show.externalServiceId}`;
         const fingerprint = fingerprintOf(series);
         if (fingerprint && this.synced.get(key) === fingerprint) {
           continue;
         }
 
-        // One show's failure (a season deleted mid-pass, say) must not stop
+        // One show's failure (e.g. a season deleted mid-pass) must not stop
         // the rest.
         try {
-          if (await this.syncShow(sonarr, show, show.externalServiceId)) {
-            if (fingerprint) {
-              this.synced.set(key, fingerprint);
-            }
+          if (
+            (await this.syncShow(sonarr, show, show.externalServiceId)) &&
+            fingerprint
+          ) {
+            this.synced.set(key, fingerprint);
           }
         } catch (e) {
           logger.warn("Could not sync one show's episodes", {
@@ -187,9 +181,8 @@ class EpisodeSync {
     try {
       episodes = await sonarr.getEpisodes(sonarrSeriesId);
     } catch (e) {
-      // The series may have been removed from this instance since the request
-      // was sent. Logged so a persistently failing series is visible rather
-      // than silently never syncing.
+      // It may have been removed from Sonarr since; logged so a series that
+      // never syncs is visible.
       logger.debug('Could not read episodes from Sonarr', {
         label: 'Episode Sync',
         sonarrSeriesId,
@@ -206,10 +199,8 @@ class EpisodeSync {
     const episodeRepository = getRepository(Episode);
     const seasonRepository = getRepository(Season);
 
-    // A season Sonarr has files for, that Seerr has no row for yet (a title
-    // just requested gets its season rows from the next scan), has nowhere
-    // to keep its episodes: this show is read again next pass, rather than
-    // marked done and skipped until its file count changes.
+    // Seasons with files but no Seerr row yet (the next scan adds them) have
+    // nowhere to store episodes: re-read next pass instead of marking done.
     const waiting = [
       ...new Set(
         episodes

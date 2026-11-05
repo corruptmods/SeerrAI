@@ -22,22 +22,20 @@ import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
 
 /*
- * A fix asked for in AI Search. Subtitles, transcriptions and searches for
- * missing episodes are done at once. A broken or wrong episode, or a whole
- * season to replace, removes files, so it is only offered, with the title
- * it is for shown, and done once the person confirms. It needs permission
- * to report issues: it is filed as one, for a record and to tell the
- * person how it went, and fixed in the background.
+ * Fixes from AI Search. Subtitles, transcription and missing-episode
+ * searches run at once. File-replacing fixes are offered with the title
+ * shown and run only after confirmation; they need issue-reporting
+ * permission and are filed as an issue (record and status), then fixed in
+ * the background.
  *
- * The season and episode named in their words are taken over the model's:
- * a model that leaves them out (or gets them wrong) must not turn "season 6"
- * into All Seasons.
+ * Season/episode from the user's words beat the model's, so a model that
+ * drops or misreads "season 6" can't turn it into All Seasons.
  */
 
 interface ChatFix {
   kind: FixKind;
   title?: NamedTitle;
-  /** An album or artist, for a fix to music. */
+  /** Album or artist, for a music fix. */
   music?: NamedMusic;
   seasonNumber?: number;
   episodeNumber?: number;
@@ -50,13 +48,13 @@ const ISSUE_TYPE: Partial<Record<FixKind, IssueType>> = {
   replaceSeason: IssueType.OTHER,
 };
 
-/** A fix that replaces files, waiting for the person to confirm it. */
+/** A file-replacing fix awaiting confirmation. */
 export interface FixToConfirm {
   kind: 'broken' | 'wrongEpisode' | 'replaceSeason';
   mediaId: number;
   seasonNumber?: number;
   episodeNumber?: number;
-  /** What they wrote: the issue's first comment. */
+  /** The user's text, used as the issue's first comment. */
   message: string;
 }
 
@@ -67,7 +65,7 @@ type ChatResults = Awaited<ReturnType<typeof withLibraryStatus>>;
 interface ChatFixAnswer {
   reply: string;
   results: ChatResults;
-  /** The album or artist a music fix is about, shown as music results are. */
+  /** The music fix's album or artist, shown like music results. */
   music?: { albums: MusicAlbumResult[]; artists: MusicArtistResult[] };
   fix?: Pick<FixResult, 'kind' | 'ok' | 'link'>;
   confirm?: FixToConfirm;
@@ -90,7 +88,7 @@ const search = async (
   }
 };
 
-/** Of TMDB's matches, the ones on the server, with their media. */
+/** TMDB matches that are on the server, with their media. */
 const onServer = async (kind: 'movie' | 'tv', hits: Hit[]) => {
   if (!hits.length) {
     return [];
@@ -110,7 +108,7 @@ const onServer = async (kind: 'movie' | 'tv', hits: Hit[]) => {
     .filter((f): f is typeof f & { media: Media } => !!f.media);
 };
 
-/** One with files before one without. */
+/** Prefers one with files. */
 const best = <T extends { media: Media }>(found: T[]): T | undefined =>
   found.find((f) =>
     [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE].includes(
@@ -125,7 +123,7 @@ const plain = (text: string) =>
     .trim()
     .replace(/^the /, '');
 
-/** What a report says around the title, never part of one. */
+/** Report words that are never part of a title. */
 const NOT_TITLE = new RegExp(
   [
     String.raw`\bs\d{1,2}\s*e\d{1,3}\b`,
@@ -139,9 +137,8 @@ const NOT_TITLE = new RegExp(
 const LEADING = /^(?:(?:on|in|for|with|of|to|at|from|the|a|an|my|this)\s+)+/i;
 
 /**
- * The title in their own words, for a title the model does not know (one
- * newer than it, or one it renamed): the longest stretch left once the
- * words of the report are taken out.
+ * The title in the user's words, for titles the model doesn't know or
+ * renames: the longest stretch left after removing report words.
  */
 export const titleInTheirWords = (message: string): string | undefined =>
   message
@@ -151,14 +148,12 @@ export const titleInTheirWords = (message: string): string | undefined =>
     .sort((a, b) => b.length - a.length)[0];
 
 /**
- * Which title the person means: of TMDB's matches for the name, the first
- * on the server, one with files before one without. TMDB's first match can
- * be a newer film or series of the same name, and a fix must never act on
- * the wrong one. The model's name for it is tried first, then their own
- * words: the model can rename, or not know, a title newer than it. Their
- * words only count for a title on the server that they name in full, or
- * the only one there they could mean. Without any on the server, TMDB's
- * first match, to show.
+ * Resolves the intended title: the first TMDB match on the server,
+ * preferring one with files, since TMDB's top hit may be a same-named newer
+ * title and a fix must never hit the wrong one. Tries the model's name, then
+ * the user's words (the model may rename or not know newer titles); those
+ * count only for an on-server title named in full or the only candidate.
+ * With none on the server, returns TMDB's first match for display.
  */
 const findOnServer = async (
   title: NamedTitle | undefined,
@@ -170,8 +165,7 @@ const findOnServer = async (
 }> => {
   let shown: { kind: 'movie' | 'tv'; result: Hit } | undefined;
   if (title) {
-    // The year narrows it when the model gave one; a wrong year should not
-    // lose a title that is there.
+    // Try with the model's year first; a wrong year mustn't lose the title.
     const dated = title.y ? await search(title.k, title.t, title.y) : [];
     const found = best(await onServer(title.k, dated));
     if (found) {
@@ -213,8 +207,8 @@ const findOnServer = async (
 };
 
 /**
- * This person's open report of the same title, season and episode from the
- * last day, if there is one: asking again adds nothing to it.
+ * The user's open report of the same title/season/episode from the last day, if
+ * any.
  */
 export const reportedToday = (
   user: User,
@@ -233,7 +227,7 @@ export const reportedToday = (
     },
   });
 
-/** The checks before a file-replacing fix is offered, and again when done. */
+/** Checks before offering a file-replacing fix, repeated on confirm. */
 const refuseToFile = async (
   user: User,
   media: Media,
@@ -251,7 +245,7 @@ const refuseToFile = async (
       results,
     };
   }
-  // Asked again about the same episode: the open report already covers it.
+  // Already reported today: the open issue covers it.
   const open = await reportedToday(
     user,
     media,
@@ -269,10 +263,9 @@ const refuseToFile = async (
 };
 
 /**
- * What was asked, from the model's reading and their words: the season and
- * episode they named win, and a whole season said to be bad is replaced
- * whatever the model called it. `earlier` is what they said before, for a
- * season they named there ("Fix season 6", then "replace all of it").
+ * Merges the model's reading with the user's words: their season/episode
+ * win, and "whole season is bad" forces replaceSeason. `earlier` supplies a
+ * season named in a prior message ("Fix season 6", then "replace all of it").
  */
 export const readFix = (
   fix: ChatFix,
@@ -292,7 +285,7 @@ export const readFix = (
     kind === 'replaceSeason'
       ? undefined
       : (said.episode ??
-        // The model's episode only goes with the season it was for.
+        // Keep the model's episode only with its own season.
         (said.season === undefined || said.season === fix.seasonNumber
           ? fix.episodeNumber
           : undefined));
@@ -300,10 +293,8 @@ export const readFix = (
 };
 
 /**
- * A fix to music: an album's missing tracks, an album that never came, or
- * an artist's missing albums, searched for again. The album or artist is
- * found as AI Search finds music, then on the server; the rest of what
- * can be fixed (subtitles, a bad file) is for films and series.
+ * Music fixes: re-search an album's missing tracks, an album that never
+ * came, or an artist's missing albums. Other fix kinds are video-only.
  */
 const fixMusicFromChat = async (
   user: User,
@@ -411,7 +402,7 @@ export const fixFromChat = async (
     };
   }
 
-  // A whole movie is its one file.
+  // A movie's "whole season" is its one file.
   const kind = (
     fix.kind === 'replaceSeason' && mediaType === MediaType.MOVIE
       ? 'broken'
@@ -433,8 +424,7 @@ export const fixFromChat = async (
           fix.episodeNumber ? ` episode ${fix.episodeNumber}` : ''
         }`
       : '';
-  // Offered, not done: it replaces files, so the person sees which title
-  // it is for and confirms it.
+  // Offer only: it replaces files, so the user confirms the title first.
   const admin = user.hasPermission(Permission.ADMIN);
   return {
     reply:
@@ -461,7 +451,7 @@ export const fixFromChat = async (
   };
 };
 
-/** A file-replacing fix the person confirmed: filed, and started. */
+/** Files and starts a confirmed file-replacing fix. */
 export const confirmFix = async (
   user: User,
   fix: FixToConfirm
@@ -489,8 +479,7 @@ export const confirmFix = async (
       comments: [
         new IssueComment({
           user,
-          // The issue's first comment is what they wrote; a photo alone
-          // says so.
+          // A photo-only report gets placeholder text.
           message: fix.message.trim() || 'Reported with a photo.',
         }),
       ],

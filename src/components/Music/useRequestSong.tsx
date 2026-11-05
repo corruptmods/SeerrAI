@@ -10,11 +10,9 @@ const messages = defineMessages('components.Music.useRequestSong', {
 });
 
 /**
- * Asking for one song, a tap away: one version of it (a MusicBrainz
- * recording), as a request of its artist's, with the same approval and
- * limits as an album. Says how it went; `isBusy` tells each version being
- * asked for, until what shows it has been read again (`then`), so it can't
- * be asked for twice.
+ * Requests one song version (a MusicBrainz recording) under its artist, with
+ * an album's approval and limits, and toasts the result. `isBusy` stays true
+ * for a version until `then` finishes, so it can't be requested twice.
  */
 const useRequestSong = () => {
   const intl = useIntl();
@@ -29,9 +27,9 @@ const useRequestSong = () => {
   }: {
     artistMbid: string;
     recordingMbid: string;
-    /** How the song is named in what is said: "Song (radio edit)". */
+    /** The name in toasts: "Song (radio edit)". */
     name: string;
-    /** Reads again what shows the song, once it is asked for. */
+    /** Refetches whatever shows the song, after the request. */
     then?: () => Promise<unknown>;
   }): Promise<boolean> => {
     if (busy.has(recordingMbid)) return false;

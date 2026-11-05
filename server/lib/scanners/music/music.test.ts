@@ -46,9 +46,9 @@ import {
 } from 'node:test';
 
 /*
- * The music scans against stand-ins that answer as Plex, Jellyfin, Emby,
- * Lidarr and a MusicBrainz mirror do: which albums are found, how they are
- * placed, and what is marked as here or gone.
+ * Music scans against stand-ins for Plex, Jellyfin, Emby, Lidarr and a
+ * MusicBrainz mirror: which albums are found, how they're placed, and what
+ * is marked present or gone.
  */
 
 setupTestDb();
@@ -297,7 +297,7 @@ const lidarrServer = (over: Partial<LidarrSettings> = {}): LidarrSettings =>
     ...over,
   }) as LidarrSettings;
 
-/** Connects the servers given, the first as the primary one. */
+/** Connects the given servers; the first is primary. */
 const connect = (...kinds: ('plex' | 'jellyfin' | 'emby')[]) => {
   const settings = getSettings();
   settings.main.mediaServerType =
@@ -450,7 +450,7 @@ const artistOf = async (foreignId: string) =>
     foreignId,
   });
 
-/** An artist Seerr has, with albums, as a request would leave them. */
+/** Seeds an artist with albums, as a request would leave them. */
 const seedArtist = async (
   albumRows: Partial<MusicAlbum>[],
   over: Partial<Media> = {}
@@ -481,7 +481,7 @@ const seedArtist = async (
   return media;
 };
 
-/** A music request for these albums, saved as it would be. */
+/** Seeds a music request for these albums. */
 const seedRequest = async (
   media: Media,
   albumList: { mbid: string; title: string }[],
@@ -545,7 +545,7 @@ describe('music scans', () => {
       assert.equal(album.lidarrAlbumId, 70);
       const artist = await artistOf(ARTIST);
       assert.equal(artist.ratingKey, '500');
-      // The one album Lidarr monitors is here: the artist is.
+      // The only album Lidarr monitors is present, so the artist is.
       assert.equal(artist.status, MediaStatus.AVAILABLE);
       assert.equal(state.mb.calls, 0);
     });
@@ -559,7 +559,7 @@ describe('music scans', () => {
       await musicFullScan.run();
 
       assert.equal((await albumOf(SING)).status, MediaStatus.AVAILABLE);
-      // Not monitored nor asked for: the artist is only partly here.
+      // Neither monitored nor requested: the artist is only partly available.
       assert.equal(
         (await artistOf(ARTIST)).status,
         MediaStatus.PARTIALLY_AVAILABLE
@@ -569,8 +569,8 @@ describe('music scans', () => {
 
     it('places an album songs were taken from as only partly here', async () => {
       state.lidarr.artists = [lidarrArtist()];
-      // Unmonitored, with one of its 14 tracks on file: as real Lidarr
-      // says, its track count is then only the one with a file.
+      // Unmonitored, one of 14 tracks on file: real Lidarr then reports a
+      // track count of just the one with a file.
       state.lidarr.albums = [
         lidarrAlbum({
           statistics: {
@@ -611,7 +611,7 @@ describe('music scans', () => {
         plexAlbum('600', 'Sing', { guid: SING, leafCount: 1 }),
       ];
       await musicFullScan.run();
-      // As an earlier version left it.
+      // Legacy status from an older version.
       await getRepository(MusicAlbum).update(
         { mbId: SING },
         { status: MediaStatus.AVAILABLE }
@@ -630,7 +630,7 @@ describe('music scans', () => {
         'nothing in the artist’s history'
       );
 
-      // Plex listing every track of it: here after all.
+      // Plex lists every track, so it's available.
       state.plex.albums = [
         plexAlbum('600', 'Sing', { guid: SING, leafCount: 14 }),
       ];
@@ -674,7 +674,7 @@ describe('music scans', () => {
         MediaStatus.PARTIALLY_AVAILABLE
       );
 
-      // Marked available by an earlier version: lowered.
+      // Legacy available status is lowered.
       await getRepository(MusicAlbum).update(
         { mbId: SING },
         { status: MediaStatus.AVAILABLE }
@@ -699,10 +699,10 @@ describe('music scans', () => {
 
       assert.equal((await albumOf(FOG_B)).ratingKey, '600');
       assert.equal((await albumOf(SOMNOLENT)).ratingKey, '601');
-      // One call for the release; two for the album (as a release first).
+      // One call for the release; two for the album (tried as a release first).
       assert.equal(state.mb.calls, 3);
 
-      // What MusicBrainz said is kept: the next scan asks nothing.
+      // MusicBrainz answers are cached: the next scan asks nothing.
       state.mb.calls = 0;
       cacheManager.getCache('musicbrainz').flush();
       await musicFullScan.run();
@@ -758,7 +758,7 @@ describe('music scans', () => {
       assert.equal((await albums()).length, 1);
       assert.equal((await albumOf(SING)).ratingKey, '600');
       assert.ok(state.plex.asked.some((url) => url.includes('addedAt')));
-      // The artist was read on its own, not the whole library.
+      // Only the artist was read, not the whole library.
       assert.ok(
         state.plex.asked.includes('/library/metadata/500?includeGuids=1')
       );
@@ -774,7 +774,7 @@ describe('music scans', () => {
 
     await Promise.all([musicFullScan.run(), musicSync.run()]);
 
-    // The sync was left out: the full scan covered it.
+    // The sync was skipped: the full scan covered it.
     assert.ok(!state.plex.asked.some((url) => url.includes('addedAt')));
     assert.equal((await albums()).length, 1);
     assert.equal(musicSync.status().running, false);
@@ -814,7 +814,7 @@ describe('music scans', () => {
       assert.equal((await albums()).length, 1);
       assert.equal(state.mb.calls, 0);
 
-      // Where to play it: each server that has it.
+      // Play links: each server that has it.
       assert.deepEqual(
         albumPlayLinks([album]).map((link) => [link.server, link.url]),
         [
@@ -1027,8 +1027,8 @@ describe('music scans', () => {
       await musicFullScan.run();
       assert.equal((await albumOf(group)).status, MediaStatus.AVAILABLE);
 
-      // The kept answer has been pruned, and MusicBrainz does not answer
-      // during this full scan.
+      // The cached answer is pruned and MusicBrainz is down for this full
+      // scan.
       await getRepository(MusicMetadata).clear();
       cacheManager.getCache('musicbrainz').flush();
       getSettings().music.musicbrainzUrl = 'http://127.0.0.1:1';
@@ -1136,7 +1136,7 @@ describe('music scans', () => {
         MediaStatus.PARTIALLY_AVAILABLE
       );
 
-      // Lidarr loses the files: the full scan takes the album down.
+      // Lidarr loses the files: the full scan removes the album.
       state.lidarr.albums[0].statistics = stats(0);
       await musicFullScan.run();
       assert.equal((await albumOf(SING)).status, MediaStatus.DELETED);
@@ -1201,7 +1201,7 @@ describe('music scans', () => {
     await musicFullScan.run();
 
     assert.equal(state.mb.calls, MB_CALL_CAP);
-    // Nothing is kept unplaced for want of an answer.
+    // Nothing is stored unplaced for lack of an answer.
     const rows = await albums();
     assert.equal(rows.length, MB_CALL_CAP);
     assert.ok(rows.every((row) => row.mbId));
@@ -1228,7 +1228,7 @@ describe('music scans', () => {
         { mbid: FOG_B, title: 'Fog B' },
         { mbid: STATIC_GARDEN, title: 'Static Garden' },
       ]);
-      // Someone else asked for two of them too: each is sent once.
+      // Someone else requested two of them too: each is sent once.
       await seedRequest(media, [
         { mbid: SING, title: 'Sing to the Ferryman' },
         { mbid: FOG_B, title: 'Fog B' },
@@ -1426,12 +1426,12 @@ describe('music scans', () => {
       await musicFullScan.run();
       assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing (tagged)');
 
-      // A server's name never replaces one known.
+      // A server's name never replaces a known one.
       state.plex.albums[0].parentTitle = 'Someone Else';
       await musicFullScan.run();
       assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing (tagged)');
 
-      // Lidarr's, MusicBrainz's own, does.
+      // Lidarr's (MusicBrainz's own) does.
       state.lidarr.artists = [lidarrArtist()];
       await musicFullScan.run();
       assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing');
@@ -1525,7 +1525,7 @@ describe('music scans', () => {
       );
       assert.equal(downloadTracker.getMusicProgress(0, 7).length, 1);
 
-      // Not here yet: still shown.
+      // Not present yet: still shown.
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum({ monitored: true })];
       await musicSync.run();

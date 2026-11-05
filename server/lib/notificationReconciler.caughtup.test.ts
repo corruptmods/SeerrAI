@@ -40,9 +40,9 @@ const stubTmdb = () => {
 };
 
 /**
- * Season detail with air dates. Three episodes aired before the request, the
- * rest after — so the requester should hear once those three are downloaded,
- * and not again when episode four lands later.
+ * Season detail with air dates. Three episodes aired before the request and
+ * the rest after, so the requester hears once those three are downloaded,
+ * not again when episode four lands.
  */
 const stubSeason = (airDates: string[]) =>
   Object.defineProperty(TheMovieDb.prototype, 'getTvSeason', {
@@ -58,29 +58,27 @@ const stubSeason = (airDates: string[]) =>
     },
   });
 
-// Relative to the request, which the harness creates as "now". Fixed dates
-// would silently drift into the past and stop testing the distinction.
+// Relative to the request, which the harness creates as "now"; fixed dates
+// would drift into the past and stop testing the distinction.
 const daysFromNow = (days: number) =>
   new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
 const BEFORE_REQUEST = [daysFromNow(-60), daysFromNow(-30), daysFromNow(-7)];
 const AFTER_REQUEST = [daysFromNow(7), daysFromNow(14)];
 
-/**
+/*
  * An ongoing series arrives week by week, so it sits at partially available
- * and never triggers the "now available" notification. The requester should
- * still hear when the first episodes land, and again as more arrive — but only
- * once per milestone.
+ * and never triggers "now available". The requester should still hear when
+ * the first episodes land, and as more arrive, once per milestone.
  */
 /**
- * Only the caught-up notification is under test. Creating the request in
- * setup also fires an auto-approval notification, and that one is
- * fire-and-forget — on a slower database it can land after setup has cleared
- * the list, inside the test itself. Counting every notification made these
- * tests flaky on Postgres; counting only the one being tested does not.
+ * Only caught-up notifications are counted. Creating the request in setup
+ * also fires a fire-and-forget auto-approval notification, which on a slow
+ * database can land inside the test; counting everything made these tests
+ * flaky on Postgres.
  */
 let sent: number[] = [];
-/** Everything each send was given, for the watcher's copy. */
+/** Every send's arguments, for the watcher's copy. */
 let calls: Parameters<typeof MediaRequest.sendNotification>[] = [];
 
 const caughtUp = () =>
@@ -112,8 +110,7 @@ describe('series caught-up notifications', () => {
     sent = [];
     calls = [];
 
-    // Record what the reconciler decides to send, without going near a real
-    // notification agent.
+    // Capture what the reconciler sends without a real notification agent.
     Object.defineProperty(MediaRequest, 'sendNotification', {
       configurable: true,
       value: async (
@@ -209,7 +206,7 @@ describe('series caught-up notifications', () => {
     );
     assert.deepEqual(toWatcher[3], ready[0][3]);
     assert.deepEqual(toWatcher[4], ready[0][4]);
-    // Sent to the watcher alone, not dressed up as their own request.
+    // Sent to the watcher alone, not posing as their own request.
     assert.equal(toWatcher[5]?.id, watcher.id);
   });
 
@@ -244,8 +241,8 @@ describe('series caught-up notifications', () => {
 
   it('survives a request whose media row has gone', async () => {
     // Reproduces "Cannot read properties of null (reading 'id')": the media is
-    // removed from the library while the request stays behind, which is how
-    // the row ends up orphaned in practice.
+    // removed from the library while the request stays, which is how rows end
+    // up orphaned in practice.
     const doomed = await getRepository(Media).save(
       new Media({
         tmdbId: 80002,
@@ -335,9 +332,9 @@ describe('series caught-up notifications', () => {
     );
   });
   it('leaves a finished series to the ordinary notification', async () => {
-    // Reproduces a double notification: every requested episode had aired,
-    // all were downloaded, and the title had not yet been marked available.
-    // "Ready to watch" went out, then "now available" five minutes later.
+    // Reproduces a double notification: every requested episode had aired and
+    // downloaded before the title was marked available, so "Ready to watch"
+    // went out, then "now available" five minutes later.
     stubSeason(BEFORE_REQUEST);
     await addEpisodes(3, MediaStatus.AVAILABLE);
 
@@ -378,7 +375,7 @@ describe('series caught-up notifications', () => {
         request,
       })
     );
-    // An earlier season nobody asked for, with nothing downloaded.
+    // An earlier, unrequested season with nothing downloaded.
     await getRepository(Season).save(
       new Season({
         seasonNumber: 2,
@@ -398,7 +395,7 @@ describe('series caught-up notifications', () => {
   });
 
   it('says nothing while an early episode is missing, whatever came later', async () => {
-    // Episode 1 missing; 2 and 3 here, and 4 and 5 (aired since) too.
+    // Episode 1 missing; 2 and 3 here, plus 4 and 5 (aired since).
     await getRepository(Episode).save(
       [2, 3, 4, 5].map(
         (episodeNumber) =>

@@ -56,8 +56,7 @@ const DiscoverAnime = () => {
   const router = useRouter();
   const updateQueryParams = useUpdateQueryParams({});
 
-  // Kept in the page address, as the other Discover pages keep theirs, so
-  // coming back from a title returns to the same list.
+  // Kept in the URL so coming back from a title returns to the same list.
   const choice = readAnimeChoice(router.query.show);
   const country = readAnimeCountry(router.query.country);
   const season = choiceSeason(choice);
@@ -69,8 +68,8 @@ const DiscoverAnime = () => {
       code,
     [intl]
   );
-  // Every other country TMDB knows, after the ones most anime comes from.
-  // One chosen in the address is offered even before the list arrives.
+  // Other TMDB countries after the main ones; the URL's country shows before
+  // the list loads.
   const otherCountries = useMemo(
     () =>
       sortBy(
@@ -102,8 +101,7 @@ const DiscoverAnime = () => {
   } = useDiscover<MovieResult | TvResult>(
     '/api/v1/discover/anime',
     animeQuery(choice, new Date(), country),
-    // Titles from countries an admin leaves out are taken out of the page
-    // they arrive in, so a short page is not always the last.
+    // Excluded countries are removed per page, so a short page isn't the end.
     { shortPages: true }
   );
 

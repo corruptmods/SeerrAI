@@ -127,8 +127,8 @@ const SettingsMediaServers = () => {
 
   useEffect(() => preloadModule(loadConnect), []);
 
-  // Back from signing in to Plex in this tab, to connect it (the Plex
-  // window could not open): the Connect dialog finishes that.
+  // Back from Plex sign-in in this tab (the window couldn't open): the Connect
+  // dialog finishes connecting.
   useEffect(() => {
     if (hasPlexReturn('connect')) {
       setConnecting('plex');
@@ -156,7 +156,7 @@ const SettingsMediaServers = () => {
     };
   }, [removing]);
 
-  /** The list as a change left it, and what every page knows of it. */
+  /** Applies a changed list here and refreshes the public settings. */
   const changed = (list: MediaServerSummary[]) => {
     revalidate(list, { revalidate: false });
     mutate('/api/v1/settings/public');

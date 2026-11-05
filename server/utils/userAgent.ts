@@ -18,5 +18,5 @@ export function userAgentRequestInterceptor(
   return config;
 }
 
-// default instance only, axios.create() clients register this themselves
+// Default instance only; axios.create() clients register this themselves.
 axios.interceptors.request.use(userAgentRequestInterceptor);

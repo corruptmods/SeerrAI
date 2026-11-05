@@ -1,18 +1,18 @@
 import type TheMovieDb from '@server/api/themoviedb';
 
-/** What the list pages and their notifications show of a title. */
+/** A title as list pages and their notifications show it. */
 export interface ListTitle {
   title: string;
   posterPath?: string;
   /** A film's release date, or a series' first air date. */
   releaseDate: string;
-  /** A series' episodes, not counting specials. Absent for a film. */
+  /** A series' episode count excluding specials; absent for a film. */
   totalEpisodes?: number;
 }
 
 /**
- * A film's or a series' details from TMDB: a film when `mediaType` is
- * 'movie', otherwise a series. Throws as TMDB does.
+ * TMDB details for a film (`mediaType` 'movie') or a series. Throws as TMDB
+ * does.
  */
 export const listTitle = async (
   tmdb: TheMovieDb,

@@ -62,9 +62,9 @@ const errorOf = (e: unknown) =>
       : String(e);
 
 /**
- * Whether a title is anime, set by hand when detection gets it wrong, and
- * where it sits in Sonarr or Radarr against that (lib/animePlacement).
- * Admins only; read only while the manage panel is open.
+ * Manual anime override for when detection is wrong, and the resulting
+ * Sonarr/Radarr placement (lib/animePlacement). Admins only; fetched only
+ * while the manage panel is open.
  */
 const AnimeSetting = ({
   mediaId,
@@ -94,7 +94,7 @@ const AnimeSetting = ({
   }, [data]);
 
   const changed = !!data && choice !== choiceOf(data.animeSetting);
-  // What saving the chosen setting would change on a server.
+  // Changes saving the current choice would make on a server.
   const changesFor = (server: AnimePlacementServer) => {
     const anime = choice === 'auto' ? server.automatic : choice === 'anime';
     return anime ? server.ifAnime : server.ifNotAnime;

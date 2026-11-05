@@ -4,17 +4,15 @@ import { aiFeatureOn, askAiJson, cacheKey } from '@server/lib/ai';
 import { z } from 'zod';
 
 /*
- * A second opinion on where songs may be, when no release is named for
- * their album or single and no pack of the artist's releases has them: of
- * the releases the artist's name finds, the model names those most likely
- * to hold them as the artist recorded them (the album a single is on, a
- * deluxe edition). It only says where to look. A song is still only taken
- * from a file named as it, never another version, as from any release.
+ * AI fallback when no release names the album or single and no artist pack
+ * has the songs: the model picks which of the artist's releases likely hold
+ * them. It only says where to look; a song is still only taken from a file
+ * named as it, never another version.
  */
 
-/** Releases listed for the model, best shared first. */
+/** Releases shown to the model, best seeded first. */
 const MAX_LISTED = 40;
-/** Releases it may name. */
+/** Most releases the model may pick. */
 export const MAX_NAMED = 3;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -32,7 +30,7 @@ const SYSTEM =
 export interface SongSourceQuestion {
   artist: string;
   songs: string[];
-  /** The album or single the songs were looked for as. */
+  /** Album or single the songs were searched under. */
   album: string;
   releases: ProwlarrRelease[];
 }
@@ -46,7 +44,7 @@ export type SongSources = (
   question: SongSourceQuestion
 ) => Promise<SongSourceAnswer>;
 
-/** The releases named: only listed ones, each once, at most three. */
+/** Picked releases: listed ones only, deduplicated, at most MAX_NAMED. */
 export const readNamed = (
   numbers: number[],
   listed: ProwlarrRelease[]
@@ -61,8 +59,8 @@ export const readNamed = (
 };
 
 /**
- * The second opinion as the given admin asks for it, or nothing when
- * Backfill's second opinion is off or no model is set up.
+ * The AI fallback for this admin, or undefined when it's off or no model is
+ * set up.
  */
 export const aiSongSources = (
   user: User | null | undefined

@@ -180,7 +180,7 @@ describe('naming the episodes a series’ badge is about', () => {
     const items = [held(3), held(1), held(2)];
     assert.equal(isOneRelease(items), true);
     assert.deepEqual(episodeSpan(items), { kind: 'season', season: 1 });
-    // Its size counts once.
+    // Listed as one release.
     assert.equal(releasesOf(items).length, 1);
     assert.equal(releasesOf(items)[0].episodes, 3);
   });

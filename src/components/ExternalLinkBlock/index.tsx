@@ -30,7 +30,7 @@ interface ExternalLinkBlockProps {
   tvdbId?: number;
   imdbId?: string;
   rtUrl?: string;
-  /** The title on each media server that has it (usePlayLinks). */
+  /** Links to the title on each media server that has it (usePlayLinks). */
   playLinks?: PlayLink[];
 }
 

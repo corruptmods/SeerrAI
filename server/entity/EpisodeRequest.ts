@@ -11,8 +11,8 @@ import SeasonRequest from './SeasonRequest';
 /**
  * A single episode covered by a season request.
  *
- * A season request with no episode rows means the whole season, which is the
- * pre-existing behaviour and what every migrated request represents.
+ * A season request with no episode rows means the whole season, as for every
+ * migrated request.
  */
 @Entity()
 @Unique(['seasonRequest', 'episodeNumber'])

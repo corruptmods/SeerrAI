@@ -127,8 +127,8 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
   configurable: true,
 });
 
-// both are assigned in the constructor, so the prototype stubs miss the
-// instances the scanners built when they were first imported
+// These methods are assigned in the constructor, so prototype stubs miss
+// the scanner instances built at import; stub the instances too.
 for (const scanner of [jellyfinFullScanner, embyFullScanner]) {
   for (const method of ['getTvShow', 'getTvShowForScan'] as const) {
     Object.defineProperty(scanner.tmdb, method, {
@@ -616,9 +616,9 @@ describe('Jellyfin Scanner', () => {
   });
 
   /*
-   * Jellyfin and Emby list a file before they have read it. Until then it
-   * has no media sources, or sources with no video stream, and so no
-   * resolution: it counts as standard quality until the server knows.
+   * Jellyfin and Emby list a file before probing it, so it has no media
+   * sources or no video stream, and no resolution. It counts as standard
+   * quality until the server knows.
    */
   describe('files the server has not read yet', () => {
     const movieLibrary: Library = {
@@ -716,8 +716,8 @@ describe('Jellyfin Scanner', () => {
           ? fakeJellyfinShowMetadata('jf-unread', '6303')
           : undefined;
       getSeasonsImpl = async () => [fakeJellyfinSeason(1, 'jf-unread-s1')];
-      // Ten episodes: four with no sources, three with a source not read
-      // yet, three read as 4K.
+      // Ten episodes: four with no sources, three with an unprobed source,
+      // three probed as 4K.
       getEpisodesImpl = async () =>
         fakeJellyfinEpisodes(10).map((episode, i) => ({
           ...episode,
@@ -740,8 +740,8 @@ describe('Jellyfin Scanner', () => {
 
   /*
    * A server still identifying a new library lists titles with no TMDB or
-   * TVDB id yet. That is normal: the scan skips them quietly and says once,
-   * at the end, how many and why. Every line names the server scanned.
+   * TVDB id yet. The scan skips them quietly and reports once, at the end,
+   * how many and why. Every line names the server scanned.
    */
   describe('a server still identifying a new library', () => {
     type Line = {
@@ -800,7 +800,7 @@ describe('Jellyfin Scanner', () => {
       MediaType: 'Video',
     });
 
-    /** Each library's items, and what the server says about each. */
+    /** Each library's items and the server's details for each. */
     const serve = (
       items: Record<string, JellyfinLibraryItem[]>,
       providerIds: Record<string, JellyfinLibraryItemExtended['ProviderIds']>
@@ -903,7 +903,7 @@ describe('Jellyfin Scanner', () => {
         );
       }
 
-      // What is stored is as before: the identified film, nothing else.
+      // Only the identified film is stored.
       const media = await getRepository(Media).find();
       assert.deepEqual(
         media.map((m) => [m.tmdbId, m.embyMediaId]),

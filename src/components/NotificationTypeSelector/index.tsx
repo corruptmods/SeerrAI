@@ -79,21 +79,13 @@ export const hasNotificationType = (
   types: Notification | Notification[],
   value: number
 ): boolean => {
-  let total: number;
-
-  // If we are not checking any notifications, bail out and return true
   if (types === 0) {
     return true;
   }
 
-  if (Array.isArray(types)) {
-    // Combine all notification values into one
-    total = types.reduce((a, v) => a + v, 0);
-  } else {
-    total = types;
-  }
+  const total = Array.isArray(types) ? types.reduce((a, v) => a + v, 0) : types;
 
-  // Test notifications don't need to be enabled
+  // Test notifications don't need to be enabled.
   if (!(value & Notification.TEST_NOTIFICATION)) {
     value += Notification.TEST_NOTIFICATION;
   }
@@ -129,7 +121,7 @@ export const ALL_NOTIFICATIONS = Object.values(Notification)
   .filter((v) => !isNaN(Number(v)))
   .reduce((a, v) => a + Number(v), 0);
 
-/** What web push sends someone who hasn't chosen (as the server does). */
+/** Web push default types, matching the server. */
 export const WEB_PUSH_STARTING_TYPES =
   Notification.MEDIA_AVAILABLE |
   Notification.MEDIA_FAILED |
@@ -151,9 +143,9 @@ export interface NotificationItem {
   hasNotifyUser: boolean;
   children?: NotificationItem[];
   hidden?: boolean;
-  /** Only ever the person's own, never sent to a shared channel. */
+  /** Personal only; never sent to a shared channel. */
   personal?: boolean;
-  /** Shown, but turned off for everyone by the admin. */
+  /** Shown, but disabled for everyone by the admin. */
   turnedOff?: boolean;
 }
 
@@ -163,11 +155,7 @@ interface NotificationTypeSelectorProps {
   currentTypes: number;
   onUpdate: (newTypes: number) => void;
   error?: string;
-  /**
-   * The person is told in a shared channel (Discord): their own types,
-   * which never reach a channel, are left out, and those the admin turned
-   * off are shown greyed rather than hidden.
-   */
+  /** A shared channel (Discord): personal types are hidden; admin-disabled ones greyed. */
   channel?: boolean;
 }
 
@@ -311,8 +299,7 @@ const NotificationTypeSelector = ({
         description: intl.formatMessage(messages.listactivityDescription),
         value: Notification.LIST_ACTIVITY,
         hasNotifyUser: true,
-        // Only ever sent to the people a list is shared with, through their
-        // own settings: a channel never gets it.
+        // Only to list members via their own settings, never a channel.
         hidden: !user,
         personal: true,
       },
@@ -394,8 +381,7 @@ const NotificationTypeSelector = ({
           !hasPermission([Permission.MANAGE_ISSUES, Permission.CREATE_ISSUES], {
             type: 'or',
           }),
-        hasNotifyUser:
-          !user || hasPermission(Permission.MANAGE_ISSUES) ? false : true,
+        hasNotifyUser: !!user && !hasPermission(Permission.MANAGE_ISSUES),
       },
       {
         id: 'issue-resolved',
@@ -413,8 +399,7 @@ const NotificationTypeSelector = ({
           !hasPermission([Permission.MANAGE_ISSUES, Permission.CREATE_ISSUES], {
             type: 'or',
           }),
-        hasNotifyUser:
-          !user || hasPermission(Permission.MANAGE_ISSUES) ? false : true,
+        hasNotifyUser: !!user && !hasPermission(Permission.MANAGE_ISSUES),
       },
       {
         id: 'issue-reopened',
@@ -432,8 +417,7 @@ const NotificationTypeSelector = ({
           !hasPermission([Permission.MANAGE_ISSUES, Permission.CREATE_ISSUES], {
             type: 'or',
           }),
-        hasNotifyUser:
-          !user || hasPermission(Permission.MANAGE_ISSUES) ? false : true,
+        hasNotifyUser: !!user && !hasPermission(Permission.MANAGE_ISSUES),
       },
       {
         id: 'backfill',
@@ -475,7 +459,7 @@ const NotificationTypeSelector = ({
     ).flatMap((type) =>
       hasNotificationType(type.value, enabledTypes)
         ? [type]
-        : // Nothing on at all is a service not set up, which says so.
+        : // Nothing enabled means the service isn't set up, which it says.
           channel && enabledTypes
           ? [{ ...type, turnedOff: true }]
           : []
@@ -488,7 +472,7 @@ const NotificationTypeSelector = ({
       setAllowedTypes(newAllowedTypes);
     }
 
-    // What the admin turned off goes last, after what can be chosen.
+    // Admin-disabled types go last.
     return sortBy(
       filteredTypes,
       (type) => (type.turnedOff ? 1 : 0),

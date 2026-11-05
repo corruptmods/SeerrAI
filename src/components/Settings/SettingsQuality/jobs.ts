@@ -3,10 +3,9 @@ import type { AxiosResponse } from 'axios';
 import axios, { AxiosError } from 'axios';
 
 /*
- * An apply or undo can take minutes on a big server, longer than a proxy
- * in front of Seerr AI waits. The server answers one that isn't done in a
- * few seconds with a job (202), and this follows it to the end, so the
- * answer is never lost to the proxy giving up.
+ * An apply or undo can take minutes on a big server, longer than a proxy in
+ * front of Seerr AI waits. The server answers a slow one with a job (202), and
+ * this polls it to the end so the result isn't lost to a proxy timeout.
  */
 
 const POLL_MS = 800;
@@ -24,8 +23,8 @@ const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * Posts a slow Quality request and answers as it finally did, throwing
- * an error as axios would for a failed one.
+ * Posts a slow Quality request and returns its final answer, throwing as axios
+ * does on failure.
  */
 export const postAndFollow = async <T>(
   url: string,

@@ -4,8 +4,8 @@ import type {
 } from '@server/interfaces/api/subtitlesInterfaces';
 
 /*
- * How the Subtitles card and the episode tags describe what Bazarr has:
- * one row per kind of subtitle, and for a series which episodes it covers.
+ * Formatting Bazarr subtitles for the Subtitles card and episode tags: one row
+ * per kind, with episode coverage for series.
  */
 
 /** "SRT" for a file, by its extension; "IN VIDEO" for a track in the file. */
@@ -21,7 +21,7 @@ export const formatSize = (bytes?: number): string | undefined => {
   if (!bytes) {
     return undefined;
   }
-  // A non-breaking space: "64 KB" never splits across lines.
+  // Non-breaking space so "64 KB" never wraps.
   return bytes >= 1024 * 1024
     ? `${(bytes / (1024 * 1024)).toFixed(1)}\u00a0MB`
     : `${Math.max(1, Math.round(bytes / 1024))}\u00a0KB`;
@@ -145,8 +145,8 @@ export const ranges = (numbers: number[]): string => {
 };
 
 /**
- * Where a set of episodes is: whole seasons ("Seasons 1–3"), part of one
- * season ("S4 E1–10"), or parts of several ("Seasons 3, 4").
+ * A set of episodes: whole seasons ("Seasons 1–3"), part of one ("S4 E1–10"),
+ * or parts of several ("Seasons 3, 4").
  */
 export type Where =
   | { kind: 'seasons'; seasons: number[] }
@@ -173,14 +173,14 @@ export const whereAre = (
   return { kind: 'seasons', seasons };
 };
 
-/** An episode's subtitles are complete when nothing it wants is missing. */
+/** Whether no wanted subtitle is missing. */
 export const isCovered = (episode: EpisodeSubtitles): boolean =>
   episode.tracks.length > 0 && episode.missing.length === 0;
 
 export const isTranscribed = (episode: EpisodeSubtitles): boolean =>
   episode.tracks.some((track) => track.ai);
 
-/** Bazarr's provider names, as people know them. */
+/** Display names for Bazarr providers. */
 const PROVIDERS: Record<string, string> = {
   opensubtitlescom: 'OpenSubtitles.com',
   opensubtitles: 'OpenSubtitles.org',

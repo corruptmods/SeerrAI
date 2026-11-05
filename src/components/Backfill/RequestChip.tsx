@@ -25,7 +25,7 @@ export type BackfillLookup = SeriesView & {
   jobs?: { id: number; progress: number }[];
 };
 
-/** On a stuck request, for admins: where Backfill is with it. */
+/** Admin chip on a stuck request showing its Backfill status. */
 const BackfillRequestChip = ({ backfill }: { backfill: BackfillLookup }) => {
   const intl = useIntl();
   const [type, text, href] = backfill.job
@@ -61,8 +61,7 @@ const BackfillRequestChip = ({ backfill }: { backfill: BackfillLookup }) => {
         {intl.formatMessage(messages.backfill)}
       </span>
       <div className="flex min-w-0 flex-wrap gap-1">
-        {/* The admin agent looking is what's happening, in place of what
-            Backfill's own search last found. */}
+        {/* A running agent overrides Backfill's last search result. */}
         {backfill.workingRunId ? (
           <AiSearchingBadge runId={backfill.workingRunId} />
         ) : (
@@ -75,10 +74,7 @@ const BackfillRequestChip = ({ backfill }: { backfill: BackfillLookup }) => {
   );
 };
 
-/**
- * On someone's own request: that Backfill is looking beyond the usual
- * search for it, or downloading what it found. Nothing more.
- */
+/** Requester-facing line: Backfill is searching or downloading. */
 export const BackfillStatusLine = ({ status }: { status: BackfillStatus }) => {
   const intl = useIntl();
   return (

@@ -159,7 +159,7 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
     }
   }, [slider]);
 
-  // A streaming services row's country and services, as it was saved.
+  // Saved region and services of a streaming services row.
   const savedServices = readStreamingRow(slider?.data);
 
   const CreateSliderSchema = Yup.object().shape({

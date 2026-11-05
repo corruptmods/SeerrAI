@@ -11,11 +11,9 @@ import { songFetchStages } from '@server/lib/music/songFetch';
 import { In } from 'typeorm';
 
 /**
- * Fills in, on each music request, whether each album asked for is here
- * yet (or being added to the library), for the request cards: a request's
- * own status only says whether it was approved, not which of its albums
- * have arrived. One query for any number of requests; films and series are
- * left as they are.
+ * Sets each requested album's availability for request cards, since a
+ * request's status only says whether it was approved. One query for all
+ * requests; non-music requests are untouched.
  */
 export const attachAlbumStatuses = async (
   requests: Pick<MediaRequest, 'type' | 'media' | 'albums' | 'songs'>[]
@@ -44,8 +42,8 @@ export const attachAlbumStatuses = async (
     },
   });
   const byKey = new Map(rows.map((row) => [`${row.mediaId}:${row.mbId}`, row]));
-  // Lidarr has its files but no media server lists it yet (see
-  // albumsBeingAdded); not while Lidarr's files decide on their own.
+  // Lidarr has the files but no media server lists them yet (see
+  // albumsBeingAdded). Skipped when Lidarr alone decides availability.
   const serversDecide = !lidarrOnly();
 
   for (const request of music) {
@@ -63,10 +61,7 @@ export const attachAlbumStatuses = async (
   }
 };
 
-/**
- * Fills in, on each song being taken from an album, what is being done
- * for it now ("Downloading, 40%"), for the request cards.
- */
+/** Sets the fetch stage ("Downloading, 40%") on songs taken from albums. */
 const attachSongStages = async (
   requests: Pick<MediaRequest, 'type' | 'songs'>[]
 ): Promise<void> => {

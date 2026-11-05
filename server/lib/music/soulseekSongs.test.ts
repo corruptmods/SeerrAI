@@ -11,9 +11,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * A song's file among what Soulseek's sharers answered: named as the
- * song, by the artist, the same take and length, from the best sharer.
- * Names are invented.
+ * Picking song files from Soulseek results: named as the song, with the
+ * artist, same take and length, from the best sharer. Names are invented.
  */
 
 const MB = 1024 ** 2;
@@ -133,7 +132,7 @@ describe('the Soulseek sharer songs are taken from', () => {
       ]),
       'flac'
     );
-    // One tried already is passed over.
+    // Already-tried sharers are skipped.
     assert.equal(
       pick([sharer('tried', both), sharer('next', both)], new Set(['tried'])),
       'next'

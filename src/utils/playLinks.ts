@@ -3,19 +3,17 @@ import type { PlayLink } from '@server/entity/Media';
 import { accountServers, SERVER_NAMES } from './mediaServerAccounts';
 
 /*
- * Where a title can be played. The server sends a link for each connected
- * media server that has the title, the primary server's first. Pages that
- * show every link put the viewer's own servers first; badges, request cards
- * and issues show one: on a server the viewer has an account on, else the
- * first that has the title.
+ * Play links. The server sends one per connected media server with the
+ * title, primary first. Full lists put the viewer's servers first; badges,
+ * request cards and issues show one: the viewer's server, else the first.
  */
 
 export type { PlayLink };
 
-/** One place to play one version of a title. */
+/** Where to play one version of a title. */
 export interface PlayTarget {
   server: MediaServerKind;
-  /** The server's kind, as people know it: Plex, Jellyfin, Emby. */
+  /** Server kind: Plex, Jellyfin, Emby. */
   name: string;
   url: string;
 }
@@ -25,7 +23,7 @@ interface Viewer {
   linkedServers?: MediaServerKind[];
 }
 
-/** What a title's media info says about where to play it. */
+/** The play-related fields of a title's media info. */
 export interface MediaPlayInfo {
   playLinks?: PlayLink[];
   mediaUrl?: string;
@@ -35,9 +33,8 @@ export interface MediaPlayInfo {
 }
 
 /**
- * A title's play links. An answer from before titles had one for each
- * server (kept by the service worker, say) only has the primary server's,
- * as mediaUrl.
+ * A title's play links. Older cached responses only have the primary
+ * server's, as mediaUrl.
  */
 export const playLinksOf = (
   media: MediaPlayInfo | undefined,
@@ -67,13 +64,13 @@ export const playLinksOf = (
   ];
 };
 
-/** On an iPhone or iPad, a Plex link opens Plex's app rather than the web. */
+/** On iPhone/iPad, Plex links open the Plex app instead of the web. */
 export const withAppLinks = (link: PlayLink): PlayLink =>
   link.server === 'plex'
     ? { ...link, url: link.iosUrl, url4k: link.iosUrl4k }
     : link;
 
-/** An iPhone or iPad, including an iPad that says it is a Mac. */
+/** iPhone or iPad, including iPads reporting as Mac. */
 export const isAppleTouchDevice = ({
   userAgent,
   maxTouchPoints,
@@ -84,10 +81,7 @@ export const isAppleTouchDevice = ({
   /iPad|iPhone|iPod/.test(userAgent) ||
   (userAgent.includes('Mac') && maxTouchPoints > 1);
 
-/**
- * The links with those on servers the viewer has an account on first,
- * otherwise in the order the server gave (the primary server first).
- */
+/** Links on the viewer's servers first, otherwise in server order (primary first). */
 export const orderPlayLinks = (
   links: PlayLink[],
   viewer: Viewer | undefined
@@ -100,9 +94,8 @@ export const orderPlayLinks = (
 };
 
 /**
- * The one link to offer for a title, or its 4K version: on a server the
- * viewer has an account on (the primary one first), else on the first
- * server that has it.
+ * The single link for a title (or its 4K version): the viewer's server
+ * (primary first), else the first server with it.
  */
 export const pickPlayLink = (
   links: PlayLink[],
@@ -118,10 +111,7 @@ export const pickPlayLink = (
   return undefined;
 };
 
-/**
- * The server the viewer watches on: the first connected one (primary
- * first) they have an account on, else the primary one.
- */
+/** The viewer's server: the first (primary first) they have an account on, else the primary. */
 export const viewerServer = (
   viewer: Viewer | undefined,
   mediaServers: { kind: MediaServerKind }[]

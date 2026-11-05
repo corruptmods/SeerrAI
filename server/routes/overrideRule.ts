@@ -27,8 +27,8 @@ import { Router } from 'express';
 const overrideRuleRoutes = Router();
 
 /**
- * A rule's series type: any for a Sonarr rule, anime or standard for a
- * Radarr one; anything else is none.
+ * A rule's series type: any for a Sonarr rule, anime or standard for a Radarr
+ * one; otherwise none.
  */
 const seriesTypeFor = (body: {
   seriesType?: string | null;
@@ -42,8 +42,8 @@ const seriesTypeFor = (body: {
       : null;
 
 /**
- * A rule's age ratings, tidied: each "country:rating" kept as given, and
- * anything without both left out. Nothing left is no condition at all.
+ * Normalize a rule's age ratings: keep each "country:rating" as given and drop
+ * anything missing either part. Empty means no condition.
  */
 const certificationFor = (value?: string | null) =>
   formatRuleCertifications(parseRuleCertifications(value));
@@ -212,9 +212,9 @@ overrideRuleRoutes.post<
         where: { tmdbId: req.body.tmdbId, mediaType: req.body.mediaType },
       });
 
-      // Matched as the request itself will be (MediaRequest.request): on
-      // the server chosen, or the default one when it isn't one of them,
-      // and as anime or not as the dialog's tick says.
+      // Matched as the request itself will be (MediaRequest.request): on the
+      // chosen server, or the default when it isn't one of them, and anime or
+      // not per the dialog's tick.
       const settings = getSettings();
       const serviceId = (
         req.body.mediaType === MediaType.MOVIE

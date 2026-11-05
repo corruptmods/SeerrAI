@@ -12,7 +12,7 @@ export const runMigrations = async (
   let migrated = settings;
 
   try {
-    // we read old backup and create a backup of currents settings
+    // Keep the previous backup in memory, then back up the current settings.
     const BACKUP_PATH = SETTINGS_PATH.replace('.json', '.old.json');
     let oldBackup: string | null = null;
     try {
@@ -44,7 +44,7 @@ export const runMigrations = async (
         }
         migrated = newSettings;
       } catch (e) {
-        // we stop Seerr if the migration failed
+        // A failed migration stops Seerr.
         logger.error(
           `Error while running migration '${migration}': ${e.message}\n${e.stack}`,
           {
@@ -64,24 +64,22 @@ export const runMigrations = async (
     const settingsAfter = JSON.stringify(migrated);
 
     if (settingsBefore !== settingsAfter) {
-      // a migration occured
-      // we check that the new config will be saved
+      // Verify the migrated settings were written.
       await fs.writeFile(
         SETTINGS_PATH,
         JSON.stringify(migrated, undefined, ' ')
       );
       const fileSaved = JSON.parse(await fs.readFile(SETTINGS_PATH, 'utf-8'));
       if (JSON.stringify(fileSaved) !== settingsAfter) {
-        // something went wrong while saving file
         throw new Error('Unable to save settings after migration.');
       }
     } else if (oldBackup) {
-      // no migration occured
-      // we save the old backup (to avoid settings.json and settings.old.json being the same)
+      // Nothing migrated: restore the previous backup so it doesn't equal
+      // settings.json.
       await fs.writeFile(BACKUP_PATH, oldBackup.toString());
     }
   } catch (e) {
-    // we stop Seerr if the migration failed
+    // A failed migration stops Seerr.
     logger.error(
       `Something went wrong while running settings migrations: ${e.message}`,
       {

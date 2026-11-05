@@ -39,10 +39,10 @@ import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
 /*
- * The canonical names below are the ones Sonarr was asked about on the live
- * server while this was built: Sonarr maps them to the right episode and
- * scores them as the real release (Tengu's Kitsuraga 202 as Bluray-1080p, +700;
- * LiangSubs' Ninefold Sky 131 under its 2021 title, +403).
+ * The canonical names below were checked against a live Sonarr: it maps
+ * them to the right episode and scores them as the real release (Tengu's
+ * Kitsuraga 202 as Bluray-1080p, +700; LiangSubs' Ninefold Sky 131 under its
+ * 2021 title, +403).
  */
 
 /** The fork's "Anime 1080p" profile, as Sonarr returns it, trimmed. */
@@ -166,7 +166,7 @@ describe('Backfill: reading names', () => {
       episode: 1,
       through: 2,
     });
-    // Both names were checked with Sonarr's own parser on the live server.
+    // Both names checked against a live Sonarr's parser.
     assert.equal(
       canonicalName({
         fileName: 'Show.S01E01E02.1080p.WEB-DL-GRP',
@@ -402,8 +402,7 @@ describe('Backfill: torrents and NZBs', () => {
       }),
       'scrambled'
     );
-    // Only repair data and a note, and no video: nothing to hide, just
-    // nothing in it.
+    // Only repair data and a note: not packed, just empty.
     assert.equal(
       packingOf({
         files: [
@@ -997,9 +996,8 @@ describe('Backfill: a name whose episode title is another episode', () => {
     profile: ANIME_1080P,
     names: ['Remote Reach'],
     sonarr: {
-      // As Sonarr reads a series numbered by the scene: by the scene's
-      // numbers, then by TVDB's for an episode the scene doesn't renumber.
-      // It has nothing for season 5.
+      // Sonarr on a scene-numbered series: scene numbers first, then TVDB's
+      // for episodes the scene doesn't renumber. Nothing for season 5.
       parse: async (title: string) => {
         const m = /S(\d+)E(\d+)/i.exec(title);
         if (!m) {
@@ -1087,7 +1085,7 @@ describe('Backfill: a name whose episode title is another episode', () => {
     assert.deepEqual(byIndex.get(0)?.episodeIds, [map.id]);
     assert.equal(byIndex.get(0)?.matchedBy, 'title');
     assert.equal(byIndex.get(0)?.action, 'fill');
-    // Sonarr has nothing for season 5, as before.
+    // Sonarr has nothing for season 5.
     assert.equal(byIndex.get(1)?.action, 'reject');
   });
 

@@ -51,8 +51,6 @@ describe('listWatchRules', () => {
     });
 
     it('ignores a viewing from before it was added', () => {
-      // Adding something you watched years ago means you intend to watch it
-      // again, so it should only clear once you actually do.
       const old = play({ at: seconds('2025-01-01T00:00:00Z') });
 
       assert.equal(hasWatchedMovie([old], ADDED_AT), false);
@@ -95,8 +93,8 @@ describe('listWatchRules', () => {
     });
 
     it('does not require episodes that are not in the library', () => {
-      // Season two exists on TMDB but is not available; watching what is here
-      // is enough.
+      // Season two exists on TMDB but isn't available; watching what's here is
+      // enough.
       const plays = [
         episode(1, 1, '2026-07-01T00:00:00Z'),
         episode(1, 2, '2026-07-02T00:00:00Z'),

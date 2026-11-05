@@ -53,20 +53,19 @@ type ListViewProps = {
   onScrollBottom: () => void;
   mutateParent?: () => void;
   /**
-   * The kind of title the page lists, on the Movies and Series pages: the
-   * filter, which only looks through this page's list, then offers to
-   * search every title of that kind.
+   * On the Movies and Series pages: the filter, which only searches this
+   * list, then offers to search every title of this type.
    */
   searchAllType?: 'movie' | 'tv';
 };
 
-/** How many titles a filter looks through before asking to go further. */
+/** Titles a filter searches before asking to go further. */
 const SEARCH_STEP = 400;
-/** Matches worth showing before a filter stops loading more on its own. */
+/** Matches after which a filter stops loading more on its own. */
 const ENOUGH_MATCHES = 24;
 const keyOf = bulkKey;
 
-/** Names a title is known by in the list itself, before any details. */
+/** A title's names from the list item, before any details load. */
 const namesOf = (item: ListItem): string => {
   switch (item.mediaType) {
     case 'movie':
@@ -90,10 +89,9 @@ const readStored = (path: string): string => {
 };
 
 /**
- * A page of posters: every Discover page, search results, a watchlist,
- * recommendations. Each gets a filter over what it shows — by title, cast,
- * the characters they play, who made it, genre and keyword — and a way to
- * pick several titles and request them together.
+ * A grid of posters (Discover, search, watchlists, recommendations) with a
+ * filter by title, cast, character, crew, genre and keyword, and bulk
+ * request.
  */
 const ListView = ({
   items,
@@ -113,9 +111,8 @@ const ListView = ({
     [Permission.MANAGE_BLOCKLIST, Permission.VIEW_BLOCKLIST],
     { type: 'or' }
   );
-  // The filter, kept for this page for the rest of the visit, so it is still
-  // there after opening a title and coming back.
-  // Per page, not per address: changing a page's own filters or sort keeps it.
+  // Kept per page (path, not query) for the session, so it survives opening a
+  // title and coming back, and changing the page's own filters or sort.
   const pagePath = router.asPath.split('?')[0];
   const [filter, setFilter] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -133,7 +130,7 @@ const ListView = ({
         sessionStorage.removeItem(storageKey(pagePath));
       }
     } catch {
-      // Not kept past this page, which is all that is lost.
+      // Storage unavailable: the filter just isn't kept.
     }
     return () => clearTimeout(timeout);
   }, [filter, pagePath]);
@@ -180,15 +177,15 @@ const ListView = ({
   const matchCount = shownItems.length + shownPlexItems.length;
   const loadedCount = visibleItems.length + (plexItems?.length ?? 0);
 
-  // A filter keeps loading pages until it has enough to show, up to a limit
-  // that can be raised: some lists never end.
+  // A filter loads pages until it has enough matches, up to a raisable limit:
+  // some lists never end.
   const [searchLimit, setSearchLimit] = useState(SEARCH_STEP);
   const [matchTarget, setMatchTarget] = useState(ENOUGH_MATCHES);
   useEffect(() => {
     setSearchLimit(SEARCH_STEP);
     setMatchTarget(ENOUGH_MATCHES);
   }, [debounced]);
-  /** Still loading more of the list, looking for matches. */
+  /** Loading more of the list to find matches. */
   const searching =
     filtering &&
     !isReachingEnd &&
@@ -200,21 +197,19 @@ const ListView = ({
     }
   }, [searching, isLoading, loadedCount, onScrollBottom]);
 
-  // Scrolling to the bottom loads more of an unfiltered list. While
-  // filtering, loading is the filter's to decide, above: scrolling would
-  // otherwise keep pulling in pages of titles that do not match.
+  // Infinite scroll only while unfiltered; while filtering the filter decides
+  // (above), or scrolling would keep loading non-matching pages.
   useVerticalScroll(
     onScrollBottom,
     !filtering && !isLoading && !isEmpty && !isReachingEnd
   );
-  // Choosing titles to request together, as on every page of posters.
   const { selecting, statusOf, pick, selectButton, bar } = useBulkRequest({
     onDone: mutateParent,
   });
 
   const showControls = !isEmpty || filtering;
 
-  // Counts each title as it is drawn, below.
+  // Render count per title key, to tell duplicates apart.
   const renderedKeys = new Map<string, number>();
 
   return (
@@ -367,10 +362,8 @@ const ListView = ({
               break;
           }
 
-          // Keyed by the title, not its place: when one drops out (it was
-          // just requested, say) the cards after it keep their state and
-          // images instead of all being rebuilt. A title listed twice,
-          // as a search across pages can, is told apart by its count.
+          // Keyed by title, not index, so cards after a removed one keep
+          // their state and images. A title listed twice gets its count.
           const baseKey = keyOf(title.mediaType, title.id);
           const repeat = renderedKeys.get(baseKey) ?? 0;
           renderedKeys.set(baseKey, repeat + 1);
@@ -399,9 +392,8 @@ const ListView = ({
           ))}
       </ul>
       {/*
-        While filtering, only matches are shown: no placeholder cards for
-        pages still loading, just a line saying the search is going on, or,
-        once it stops, a way to look further down the list.
+        While filtering, no placeholder cards: a searching line, or once it
+        stops, a way to search further.
       */}
       {filtering &&
         (searching || isLoading || pending ? (

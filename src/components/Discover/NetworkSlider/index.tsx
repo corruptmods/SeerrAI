@@ -9,8 +9,7 @@ import defineMessages from '@app/utils/defineMessages';
 import dynamic from 'next/dynamic';
 import { useIntl } from 'react-intl';
 
-// Only an admin customizing the page sees the editor: it is loaded then, not
-// with the page everyone opens.
+// Admin-only editor, loaded on demand.
 const NetworkSliderEditor = dynamic(
   () => import('@app/components/Discover/NetworkSlider/Editor'),
   { ssr: false }

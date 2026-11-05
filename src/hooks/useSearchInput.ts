@@ -24,13 +24,7 @@ const useSearchInput = (): SearchObject => {
     (router.query.query as string) ?? ''
   );
 
-  /**
-   * This effect handles routing when the debounced search input
-   * value changes.
-   *
-   * If we are not already on the /search route, then we push
-   * in a new route. If we are, then we only replace the history.
-   */
+  // On debounced input: push /search, or replace history if already there.
   useEffect(() => {
     if (debouncedValue !== '' && searchOpen) {
       if (router.pathname.startsWith('/search')) {
@@ -53,12 +47,7 @@ const useSearchInput = (): SearchObject => {
     }
   }, [debouncedValue]);
 
-  /**
-   * This effect is handling behavior when the search input is closed.
-   *
-   * If we have a lastRoute, we will route back to it. If we don't
-   * (in the case of a deeplink) we take the user back to the index route
-   */
+  // On close: return to lastRoute, or / when there is none (deep link).
   useEffect(() => {
     if (
       searchValue === '' &&
@@ -73,21 +62,9 @@ const useSearchInput = (): SearchObject => {
     }
   }, [searchOpen]);
 
-  /**
-   * This effect handles behavior for when the route is changed.
-   *
-   * If after a route change, the new debounced value is not the same
-   * as the query value then we will update the searchValue to either the
-   * new query or to an empty string (in the case of null). This makes sure
-   * that the value in the searchbox is whatever the user last entered regardless
-   * of routing to something like a detail page.
-   *
-   * If the new route is not /search and query is null, then we will close the
-   * search if it is open.
-   *
-   * In the final case, we want the search to always be open in the case the user
-   * is on /search
-   */
+  // On route change: sync the input to the query (or empty), so it keeps the
+  // last entry across detail pages. Close off /search with no query; always
+  // open on /search.
   useEffect(() => {
     if (router.query.query !== debouncedValue) {
       setSearchValue(

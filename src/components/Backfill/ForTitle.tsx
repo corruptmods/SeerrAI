@@ -38,12 +38,11 @@ export interface ForTitleTarget {
 }
 
 /**
- * What Backfill has for the title a page is about, or undefined when it
- * doesn't follow it. The page's button and its Backfill box ask together,
- * in one request; it stays live while something downloads.
+ * Backfill's record for a title, or undefined when not followed. SWR shares
+ * the request between the button and the box; polls while downloading.
  */
 export const useBackfillForTitle = (
-  /** The TMDB id; an album's MusicBrainz id. */
+  /** TMDB id, or MusicBrainz id for an album. */
   id: number | string,
   target: ForTitleTarget
 ): TitleLookup | undefined => {
@@ -76,16 +75,14 @@ export const useBackfillForTitle = (
 };
 
 /**
- * On a series', movie's or album's page, for admins: where Backfill is with it, the
- * downloads it has running (each opens its own page), and the way to its
- * Backfill page. Nothing for a title it doesn't follow, or has completed
- * with nothing left running; the page's Backfill button still leads there.
+ * Admin box on a title's page: Backfill status, running downloads and a link
+ * to its Backfill page. Hidden when not followed, or done with nothing running.
  */
 const BackfillForTitle = ({
   id,
   target,
 }: {
-  /** The TMDB id; an album's MusicBrainz id. */
+  /** TMDB id, or MusicBrainz id for an album. */
   id: number | string;
   target: ForTitleTarget;
 }) => {
@@ -128,8 +125,7 @@ const BackfillForTitle = ({
           <DocumentMagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
           {intl.formatMessage(messages.backfill)}
         </h3>
-        {/* While the admin agent looks, that is what's happening, not
-            what Backfill's own search last found. */}
+        {/* A running agent overrides Backfill's last search result. */}
         {tracked.workingRunId ? (
           <AiSearchingBadge runId={tracked.workingRunId} />
         ) : (
@@ -160,8 +156,7 @@ const BackfillForTitle = ({
                   className="block rounded-md px-2 py-2 hover:bg-gray-700/40"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    {/* Two lines, so the episode in the release's name
-                        shows on a narrow box. */}
+                    {/* Two lines so the episode shows when narrow. */}
                     <div className="min-w-0 text-sm text-strong [overflow-wrap:anywhere] sm:line-clamp-2">
                       {job.title}
                     </div>

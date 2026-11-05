@@ -96,7 +96,7 @@ const ResetPassword = () => {
                     });
                     setSubmitted(true);
                   } catch (e) {
-                    // Asked too often: the links already sent still work.
+                    // Rate limited: links already sent still work.
                     if (axios.isAxiosError(e) && e.response?.status === 429) {
                       setSubmitted(true);
                     }

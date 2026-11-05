@@ -12,9 +12,9 @@ import { MoreThan } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * Download Check's findings for the Backfill page (admins only, as all of
- * /backfill): the newest, everything waiting for an admin, and the week's
- * counts; and an admin's choice about one.
+ * Download Check findings for the Backfill page (admin only, like all of
+ * /backfill): the newest, everything awaiting an admin, the week's counts, and
+ * an admin's choice on one.
  */
 const downloadCheckRoutes = Router();
 
@@ -94,7 +94,7 @@ const choice = z.object({
   choice: z.enum(['reject', 'import', 'clear', 'drop', 'dismiss']),
 });
 
-/** Does what a finding says, imports or rejects it instead, or leaves it. */
+/** Apply a finding's action, import or reject it instead, or leave it. */
 downloadCheckRoutes.post('/:id', async (req, res, next) => {
   const id = Number(req.params.id);
   const parsed = choice.safeParse(req.body);

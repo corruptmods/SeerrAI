@@ -7,10 +7,9 @@ const calendarRoutes = Router();
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * What is coming over the next few weeks. Starts a day early: a film's
- * release sits at midnight UTC, which west of UTC is still the day before,
- * so today's releases would otherwise be missed. The page shows from the
- * viewer's own today.
+ * Releases over the next few weeks. Starts a day early: a film's release is at
+ * midnight UTC, which west of UTC is the day before, so today's releases would
+ * be missed. The client shows from the viewer's own today.
  */
 calendarRoutes.get('/', async (req, res, next) => {
   const weeks = Math.min(12, Math.max(1, Number(req.query.weeks) || 4));

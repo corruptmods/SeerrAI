@@ -149,10 +149,8 @@ export interface IMDBRating {
 }
 
 /**
- * This is a best-effort API. The IMDB API is technically
- * private and getting access costs money/requires approval.
- *
- * Radarr hosts a public proxy that's in use by all Radarr instances.
+ * Best effort: IMDb's API is paid and gated, so this uses the public proxy
+ * every Radarr instance uses.
  */
 class IMDBRadarrProxy extends ExternalAPI {
   constructor() {
@@ -169,11 +167,7 @@ class IMDBRadarrProxy extends ExternalAPI {
     );
   }
 
-  /**
-   * Ask the Radarr IMDB Proxy for the movie
-   *
-   * @param IMDBid Id of IMDB movie
-   */
+  /** A movie's IMDb rating from Radarr's proxy. */
   public async getMovieRatings(IMDBid: string): Promise<IMDBRating | null> {
     try {
       const data = await this.get<IMDBRadarrProxyResponse>(

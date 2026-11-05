@@ -3,11 +3,10 @@ import logger from '@server/logger';
 import { normalizeSearchText } from '@server/utils/searchText';
 
 /*
- * What a title can be found by when filtering a page of posters: its names,
- * the cast and the characters they play, the people who made it, its studios
- * (and a series' networks), genres and keywords. From TMDB's details for the
- * title — the same lookup its page makes, so usually cached already — and
- * kept here a day, bounded.
+ * What a title can be found by when filtering a poster page: names, cast and
+ * characters, key crew, studios (and series networks), genres and keywords.
+ * Built from TMDB's details (the same lookup the title page makes, so usually
+ * cached) and kept a day, bounded.
  */
 
 export type SearchKey = `${'movie' | 'tv'}:${number}`;
@@ -15,12 +14,12 @@ export type SearchKey = `${'movie' | 'tv'}:${number}`;
 const TTL_MS = 24 * 60 * 60 * 1000;
 /** Titles kept: a few pages' worth for everyone at once. */
 const MAX_ENTRIES = 5000;
-/** TMDB lookups at once, for everyone together: well inside its rate limit. */
+/** Concurrent TMDB lookups across all users: well inside its rate limit. */
 const CONCURRENCY = 6;
-/** Cast listed: well past anyone searched for by name. */
+/** Cast members included: well past anyone searched by name. */
 const CAST_LIMIT = 60;
 
-/** Crew worth finding a title by. */
+/** Crew jobs worth finding a title by. */
 const CREW_JOBS = new Set([
   'Director',
   'Screenplay',
@@ -79,7 +78,7 @@ const build = async (tmdb: TheMovieDb, key: SearchKey): Promise<string> => {
 
 /** How long a request waits for titles still being looked up. */
 const ANSWER_WITHIN_MS = 5000;
-/** A title TMDB could not answer for is not asked about again for this long. */
+/** A title TMDB failed for isn't retried for this long. */
 const FAILED_FOR_MS = 10 * 60 * 1000;
 
 const failed = new Map<string, number>();
@@ -88,8 +87,8 @@ const queue: { key: SearchKey; done: () => void }[] = [];
 let workers = 0;
 
 /**
- * One queue for everyone, so several pages filtering at once share the same
- * few lookups rather than each starting their own.
+ * One shared queue, so pages filtering at once share lookups instead of each
+ * starting their own.
  */
 const work = async () => {
   workers++;
@@ -124,8 +123,8 @@ const lookUp = (key: SearchKey): Promise<void> => {
   }
   const promise = new Promise<void>((done) => queue.push({ key, done }));
   building.set(key, promise);
-  // A worker takes its first job as it starts, so start one per waiting job
-  // until the limit.
+  // A worker takes its first job on start, so start one per waiting job up to
+  // the limit.
   while (workers < CONCURRENCY && queue.length > 0) {
     void work();
   }
@@ -133,8 +132,8 @@ const lookUp = (key: SearchKey): Promise<void> => {
 };
 
 const prune = (now: number) => {
-  // Oldest first, as a Map keeps insertion order: drop what is past its day,
-  // then the oldest past the limit.
+  // Maps keep insertion order, so oldest first: drop expired entries, then the
+  // oldest past the limit.
   for (const [key, entry] of cache) {
     if (cache.size <= MAX_ENTRIES && now - entry.at < TTL_MS) {
       break;
@@ -150,12 +149,11 @@ const prune = (now: number) => {
 };
 
 /**
- * Searchable text for each title asked about, and which are still being
- * looked up. A page of new titles can take TMDB longer than anyone should
- * wait for one answer, so this answers with what is ready within a few
- * seconds and carries on in the background; the page asks again for the
- * rest. A title TMDB cannot answer for is in neither list, and the page
- * falls back to matching its name.
+ * Searchable text per requested title, and which are still being looked up.
+ * A page of new titles can take TMDB longer than one answer should wait, so
+ * this returns what is ready within a few seconds and continues in the
+ * background; the page asks again for the rest. A title TMDB fails for is in
+ * neither list, and the page falls back to matching its name.
  */
 export const getSearchText = async (
   keys: SearchKey[]

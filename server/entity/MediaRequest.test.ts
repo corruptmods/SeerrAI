@@ -21,7 +21,8 @@ import { Permission } from '@server/lib/permissions';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { setupTestDb } from '@server/test/db';
 
-// get is a prototype method unlike getMovie, and replaces the cache lookup too
+// get is a prototype method, unlike getMovie, and also replaces the cache
+// lookup.
 const externalApiGetMock = mock.method(
   ExternalAPI.prototype as unknown as {
     get: (endpoint: string) => Promise<unknown>;
@@ -38,7 +39,7 @@ const externalApiGetMock = mock.method(
       id: tmdbId,
       external_ids: {},
       seasons: [1, 2, 3].map((season_number) => ({ season_number })),
-      // Skips getMovie's localized fallback call
+      // Skips getMovie's localized fallback call.
       videos: { results: [{ type: 'Trailer', key: 'trailer' }] },
     };
   }
@@ -136,7 +137,7 @@ describe('MediaRequest.request', () => {
       media,
       is4k: false,
     });
-    // Sending it on marks it complete while its media is being looked up.
+    // Dispatch completes it while its media is being looked up.
     const repository = getRepository(Media);
     const findOne = repository.findOne.bind(repository);
     const lookup = mock.method(
@@ -203,7 +204,7 @@ describe('MediaRequest.request', () => {
         status4k: MediaStatus.UNKNOWN,
       })
     );
-    // An old declined request, then one still waiting for approval.
+    // An old declined request, then one awaiting approval.
     for (const status of [
       MediaRequestStatus.DECLINED,
       MediaRequestStatus.PENDING,
@@ -333,7 +334,7 @@ describe('saving a request', () => {
         is4k: false,
       })
     );
-    // Approved long ago, without the save hooks.
+    // Approved long ago, bypassing save hooks.
     await requestRepository.update(id, {
       status: MediaRequestStatus.APPROVED,
     });
@@ -361,7 +362,7 @@ describe('saving a request', () => {
       MediaStatus.PROCESSING
     );
 
-    // A real change of status still is announced.
+    // A real status change is still announced.
     request.status = MediaRequestStatus.DECLINED;
     await requestRepository.save(request);
 

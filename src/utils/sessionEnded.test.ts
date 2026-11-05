@@ -20,7 +20,7 @@ describe('sessionEnded', () => {
   });
 
   it('keeps the session through a server or network failure', () => {
-    // A deploy, a proxy answering 502, the phone between networks.
+    // e.g. a deploy, a proxy 502, a network switch.
     assert.equal(sessionEnded(user, failed(502)), false);
     assert.equal(sessionEnded(user, failed(500)), false);
     assert.equal(sessionEnded(user, failed()), false);

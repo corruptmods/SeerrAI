@@ -2,16 +2,14 @@ import type { AiSettings } from '@server/lib/settings';
 import axios, { isAxiosError } from 'axios';
 
 /*
- * The two ways of talking to a model. Kept to the smallest request each API
- * accepts: one system prompt, one user message, a cap on the answer, and the
- * least thinking the model allows. No temperature or sampling settings, which
- * newer models reject anyway.
+ * The two model APIs, each sent the smallest request it accepts: one system
+ * prompt, one user message, an answer cap and the least thinking allowed.
+ * No temperature or sampling settings, which newer models reject.
  *
- * Newer models on both APIs think before answering, and that thinking is
- * billed and counts against the cap. Each request asks for the lowest effort
- * the model accepts and leaves room for it; which level a model accepts is
- * learned from its first refusal and remembered, so it costs one retry per
- * model per restart at most.
+ * Newer models on both APIs think before answering; thinking is billed and
+ * counts against the cap. Each request asks for the lowest effort accepted
+ * and leaves room for it. A model's accepted level is learned from its
+ * first refusal and remembered: at most one retry per model per restart.
  */
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1';
@@ -23,13 +21,12 @@ const COMPLETION_TIMEOUT_MS = 90_000;
 const LIST_TIMEOUT_MS = 15_000;
 
 /**
- * Room for thinking on top of the answer's own cap. Only what is used is
- * billed; without it a thinking model can spend the whole cap and say
- * nothing.
+ * Room for thinking on top of the answer's cap. Only what is used is
+ * billed; without it a thinking model can spend the cap and say nothing.
  */
 const THINKING_ROOM = 2048;
 
-/** The picture types both APIs take. */
+/** Image types both APIs accept. */
 export const IMAGE_TYPES = [
   'image/jpeg',
   'image/png',
@@ -38,7 +35,7 @@ export const IMAGE_TYPES = [
 ] as const;
 export type ImageType = (typeof IMAGE_TYPES)[number];
 
-/** A picture sent with the message: its type, and its bytes as base64. */
+/** An image sent with the message, as base64. */
 export interface CompletionImage {
   type: ImageType;
   data: string;
@@ -48,9 +45,9 @@ export interface CompletionRequest {
   model: string;
   system: string;
   prompt: string;
-  /** A picture for the model to look at along with the prompt. */
+  /** An image for the model to read with the prompt. */
   image?: CompletionImage;
-  /** The most the answer itself should need. Every feature sets its own. */
+  /** Max tokens the answer itself needs; set per feature. */
   maxTokens: number;
   /** Ask for a JSON object where the API can enforce it. */
   json?: boolean;
@@ -67,7 +64,7 @@ export interface ModelInfo {
   name: string;
 }
 
-/** Something the person setting it up, or using it, can act on. */
+/** An error the admin or user can act on. */
 export class AiProviderError extends Error {
   constructor(
     message: string,
@@ -75,8 +72,8 @@ export class AiProviderError extends Error {
     /** The provider said the account has no credit left. */
     public readonly outOfCredit = false,
     /**
-     * For the page to show it in the person's language, as AiError's code;
-     * left out where the message carries the provider's own details.
+     * Lets the page translate it, like AiError's code; omitted when the
+     * message carries the provider's own details.
      */
     public readonly code?: string
   ) {
@@ -91,8 +88,8 @@ const isOfficialOpenAi = (ai: AiSettings) =>
   ai.provider === 'openai' && openAiBase(ai) === OPENAI_URL;
 
 /**
- * The provider that bills for these settings, or null for another server
- * (a home server, or another service's OpenAI-compatible address).
+ * The provider billing for these settings, or null for any other server
+ * (self-hosted, or another OpenAI-compatible service).
  */
 export const billedBy = (ai: AiSettings): 'anthropic' | 'openai' | null =>
   ai.provider === 'anthropic'
@@ -102,19 +99,19 @@ export const billedBy = (ai: AiSettings): 'anthropic' | 'openai' | null =>
       : null;
 
 /**
- * OpenAI's chat models that do not reason. Everything newer (the o-series,
- * GPT-5 and later) does, and gets the least reasoning it accepts.
+ * Whether an OpenAI model reasons: all but GPT-4, GPT-3.5 and chatgpt-*.
+ * Reasoning models get the least effort they accept.
  */
 export const isReasoningModel = (model: string) =>
   !/^(gpt-4|gpt-3\.5|chatgpt-)/i.test(model.trim());
 
-/** Cheapest first. A model that refuses one is asked with the next. */
+/** Cheapest first; a model that refuses one is retried with the next. */
 const OPENAI_EFFORTS = ['none', 'minimal', 'low'] as const;
 const CLAUDE_EFFORT = 'low';
 
 /**
- * What each model accepted: an effort level, or null for "send none". Kept
- * for the life of the process.
+ * What each model accepted, for the process lifetime: an OpenAI effort (null
+ * to send none), and whether Claude takes an effort at all.
  */
 const openAiEffort = new Map<string, string | null>();
 const claudeEffort = new Map<string, boolean>();
@@ -169,8 +166,8 @@ const refused = (e: unknown, ...names: string[]) =>
   names.some((name) => detailOf(e).toLowerCase().includes(name));
 
 /**
- * A refusal of the picture itself: a model that only reads text, or a server
- * that does not take pictures at all, says so in many ways.
+ * A refusal of the image itself, which text-only models and servers without
+ * image support word in many ways.
  */
 const refusedPicture = (e: unknown) =>
   isAxiosError(e) &&
@@ -186,7 +183,7 @@ const explain = (
   apiKey: string,
   withImage = false
 ): AiProviderError => {
-  // Whatever a server sends back, the key never goes any further.
+  // The key never goes further, whatever the server echoes back.
   const scrub = (text: string) =>
     apiKey ? text.split(apiKey).join('[key]') : text;
   if (!isAxiosError(e)) {
@@ -372,8 +369,8 @@ const completeOpenAi = async (
   const reasoning = official && isReasoningModel(req.model);
   const name = official ? 'OpenAI' : 'The AI server';
 
-  // A picture goes as a data URL beside the text, the form OpenAI and the
-  // servers that copy it (Ollama, LM Studio, vLLM) all take.
+  // An image goes as a data URL beside the text, which OpenAI and its
+  // imitators (Ollama, LM Studio, vLLM) all accept.
   const user = req.image
     ? [
         { type: 'text', text: req.prompt },
@@ -384,9 +381,9 @@ const completeOpenAi = async (
       ]
     : req.prompt;
 
-  // OpenAI itself: its current names for the cap and the system role, JSON
-  // enforced, and the least reasoning. Other servers get the long-standing
-  // form every OpenAI-compatible server understands.
+  // OpenAI itself gets its current names for the cap and system role,
+  // enforced JSON and the least reasoning. Other servers get the older form
+  // every OpenAI-compatible server understands.
   const body = (effort: string | null, json: boolean) =>
     official
       ? {
@@ -470,8 +467,8 @@ export const complete = (
     : completeOpenAi(ai, req);
 
 /**
- * OpenAI's list includes models this cannot use: speech, images,
- * embeddings, and ones only its newer Responses API serves.
+ * Filters out OpenAI models this cannot use: speech, images, embeddings,
+ * and ones only the Responses API serves.
  */
 const OPENAI_CHAT = /^(gpt-|o\d|chatgpt-)/i;
 const OPENAI_NOT_CHAT =
@@ -517,14 +514,13 @@ export const listModels = async (ai: AiSettings): Promise<ModelInfo[]> => {
 // ---- A conversation with tools ---------------------------------------------
 
 /*
- * For the admin agent: several turns, where the model may ask to run tools
- * and is given their results. The messages are kept in one neutral form and
- * written out in each API's own shape. What the model said in a turn, its
- * thinking included, is sent back exactly as it came, which both APIs need
- * for a conversation with tools to go on.
+ * Multi-turn conversations with tool calls, for the admin agent. Messages
+ * are kept in one neutral form and written out in each API's shape. Each
+ * model turn, thinking included, is sent back exactly as received, which
+ * both APIs require to continue a tool conversation.
  */
 
-/** A tool the model may ask for, its input described as a JSON schema. */
+/** A tool the model may call, its input described as a JSON schema. */
 export interface ConverseTool {
   name: string;
   description: string;
@@ -669,7 +665,7 @@ interface OpenAiToolCall {
   function: { name: string; arguments: string };
 }
 
-/** The model's arguments: JSON it wrote, which may not be. */
+/** Parses the model's tool arguments, which may not be valid JSON. */
 const argumentsOf = (text: string): Record<string, unknown> => {
   try {
     const value = JSON.parse(text || '{}');
@@ -747,7 +743,7 @@ const converseOpenAi = async (
       { headers: openAiHeaders(ai), timeout: COMPLETION_TIMEOUT_MS }
     );
 
-  // Tools rule out the very least reasoning on some models, so "none" and
+  // With tools, some models refuse the lowest efforts, so "none" and
   // "minimal" may each be refused once before "low" is remembered.
   const known = openAiEffort.get(req.model);
   const efforts: (string | null)[] = !reasoning
@@ -801,8 +797,8 @@ const converseOpenAi = async (
 };
 
 /**
- * The service can't be reached, is busy or answered too slowly: it may well
- * answer a moment later, and a try that failed costs nothing.
+ * The service is unreachable, busy or too slow: a retry may well succeed,
+ * and the failed try cost nothing.
  */
 export const isOutage = (e: unknown): e is AiProviderError =>
   e instanceof AiProviderError &&

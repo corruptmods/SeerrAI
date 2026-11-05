@@ -15,17 +15,16 @@ import request from 'supertest';
 setupTestDb();
 
 /*
- * People's avatars from Jellyfin and Emby. Their stored address carries
- * only the account's id (/avatarproxy/<id>?v=…); the server is the one
- * whose column holds it, so an Emby install's avatars keep working once
- * Emby's ids have their own column.
+ * Jellyfin and Emby avatars. The stored URL carries only the account id
+ * (/avatarproxy/<id>?v=…); the server is the one whose column holds it, so Emby
+ * avatars keep working with Emby ids in their own column.
  */
 
 const JELLYFIN_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const EMBY_ID = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 const asked: string[] = [];
-/** The picture the server's cache holds, and the ETag its host sent. */
+/** The picture in the server's cache, and the ETag its host sent. */
 const held = { bytes: 'avatar', etag: 'etag' };
 mock.method(ImageProxy.prototype, 'getImage', async (path: string) => {
   asked.push(path);

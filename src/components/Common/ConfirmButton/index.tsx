@@ -29,8 +29,7 @@ const ConfirmButton = forwardRef<HTMLButtonElement, ConfirmButtonProps>(
           }
         }}
       >
-        {/* Both labels share one grid cell, so the button is as wide as
-            the longer of them and neither is cut off. */}
+        {/* Both labels share one grid cell, so the button fits the longer. */}
         <span ref={ref} className="grid h-full w-full">
           <span
             className={`col-start-1 row-start-1 flex transform-gpu items-center justify-center transition duration-300 ${

@@ -10,16 +10,14 @@ import { after, before, describe, it } from 'node:test';
 import { downloadBadgeLabel } from './downloadSummary';
 
 /*
- * The status pill for a download, from each download client Seerr AI reads:
- * a Sonarr queue item carrying the download id exactly as Sonarr records
- * it for that client, the client's own answer (from a stand-in speaking its
- * protocol), merged as the tracker merges them, and the pill's label.
+ * Download pills per client: a Sonarr queue item with the client's download
+ * id as Sonarr records it, a fake client response in its protocol, merged as
+ * the tracker does, and the resulting label.
  */
 
 const MB = 1024 * 1024;
 const NOW = Date.parse('2026-10-11T21:00:00Z');
-// Sonarr records a torrent by its hash in capitals, an NZBGet job by the
-// "drone" GUID it gave the NZB.
+// Sonarr records torrents by uppercase hash, NZBGet jobs by its "drone" GUID.
 const HASH_A = 'AA'.repeat(20);
 const HASH_B = 'BB'.repeat(20);
 const HASH_C = 'CC'.repeat(20);
@@ -181,7 +179,7 @@ const client = (
   ...extra,
 });
 
-/** The pill for each download id, as the tracker builds it. */
+/** The tracker's pill for each download id. */
 const pills = async (settings: DownloadClientSettings, ids: string[]) => {
   const live = await downloadClientFor(settings).getDownloads(ids);
   return ids.map((id) => {

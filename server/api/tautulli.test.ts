@@ -11,7 +11,7 @@ describe('plays from Tautulli since a time', () => {
       apiKey: 'x',
     });
     const asked: Record<string, unknown>[] = [];
-    // Added at half past midnight on 10 May, Seerr's time.
+    // 00:30 on 10 May, Seerr's time.
     const added = new Date(2026, 4, 10, 0, 30);
     const seconds = Math.floor(added.getTime() / 1000);
 
@@ -39,11 +39,10 @@ describe('plays from Tautulli since a time', () => {
       after: added,
     });
 
-    // Tautulli reads the date as midnight where it runs. A Tautulli a few
-    // hours behind would still be on 9 May when the title was added, so
-    // asking from the 10th would miss what was watched in those hours.
+    // Tautulli reads the date as its local midnight. A Tautulli a few hours
+    // behind is still on 9 May, so asking from the 10th would miss plays.
     assert.equal(asked[0].after, '2026-05-09');
-    // The exact time is still the cut-off.
+    // The exact time is still the cutoff.
     assert.deepEqual(
       plays.map((play) => play.date),
       [seconds + 60]

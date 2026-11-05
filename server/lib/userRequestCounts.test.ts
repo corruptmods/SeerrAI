@@ -37,10 +37,7 @@ const stubTmdb = () => {
   });
 };
 
-/**
- * `requestCount` is shown on the profile and in the user list. It used to come
- * from a `@RelationCount` decorator; these cover the explicit replacement.
- */
+/** `requestCount` is shown on the profile and in the user list. */
 describe('user request counts', () => {
   setupTestDb();
 
@@ -134,7 +131,7 @@ describe('user request counts', () => {
 
     await attachRequestCount(user);
 
-    // Must be 0, not undefined — the profile formats this as a number.
+    // Must be 0, not undefined: the profile formats it as a number.
     assert.equal(user.requestCount, 0);
   });
 

@@ -63,7 +63,7 @@ const sameChoice = (a?: AccessSet, b?: AccessSet) =>
     (a.libraries.length === b.libraries.length &&
       a.libraries.every((id) => b.libraries.includes(id))));
 
-/** A person's libraries on each media server, for an admin to change. */
+/** Admin editor for a user's libraries on each media server. */
 const UserLibrarySettings = () => {
   const intl = useIntl();
   const router = useRouter();

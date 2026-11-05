@@ -14,16 +14,15 @@ import { rollBackOnRelease } from '@server/utils/nestedTransaction';
 import gravatarUrl from 'gravatar-url';
 
 export interface SeedDbOptions {
-  /** If true, preserves existing data instead of dropping the database */
+  /** Keep existing data instead of dropping the database. */
   preserveDb?: boolean;
-  /** If true, runs migrations instead of synchronizing schema */
+  /** Run migrations instead of synchronizing the schema. */
   withMigrations?: boolean;
-  /** If true, permits seeding while NODE_ENV is not test */
+  /** Allow seeding when NODE_ENV is not test. */
   allowOutsideTest?: boolean;
 }
 
-// Precomputed bcrypt hash of 'test1234'. We precompute this to avoid
-// having to hash the password every time we seed the database.
+// Precomputed bcrypt hash of 'test1234', so seeding doesn't hash every time.
 const TEST_USER_PASSWORD_HASH =
   '$2b$12$Z5V2P5HZgmx4/AnWFMZN1.aD5AM1NucNi.mhNTSQ9oVtmdzu7Le/a';
 
@@ -37,10 +36,7 @@ function assertTestDatabase(operation: string, allowOutsideTest = false): void {
   );
 }
 
-/**
- * Seeds test users into the database.
- * Assumes the database schema is already set up.
- */
+/** Seeds test users. Assumes the schema exists. */
 async function seedTestUsers(): Promise<void> {
   const userRepository = getRepository(User);
 
@@ -86,8 +82,8 @@ async function seedTestUsers(): Promise<void> {
 }
 
 /**
- * Initializes the database connection and seeds test users.
- * Used by both Cypress tests and Vitest unit tests.
+ * Initializes the database connection and seeds test users, for Cypress and
+ * unit tests.
  */
 export async function seedTestDb(options: SeedDbOptions = {}): Promise<void> {
   assertTestDatabase('seed the test database', options.allowOutsideTest);
@@ -111,9 +107,8 @@ export async function seedTestDb(options: SeedDbOptions = {}): Promise<void> {
 }
 
 /**
- * Resets the database to a clean state with seeded test users.
- * Used between tests to ensure isolation.
- * Assumes DB has been initialized.
+ * Resets the database to seeded test users between tests. Assumes it's
+ * initialized.
  */
 export async function resetTestDb(): Promise<void> {
   assertTestDatabase('reset the test database');
@@ -122,13 +117,13 @@ export async function resetTestDb(): Promise<void> {
   await seedTestUsers();
 }
 
-/** MusicBrainz ids the music fixtures use. */
+/** MusicBrainz ids used by the music fixtures. */
 export const MUSIC_FIXTURE_IDS = {
   /** An artist with albums in the library and a request in each status. */
   artist: '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844',
   album: '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35',
   otherAlbum: '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40',
-  /** An artist whose albums Lidarr is still getting. */
+  /** An artist whose albums Lidarr is still fetching. */
   processingArtist: 'd2b7c4e9-6a13-4f58-8e06-c39f71a5b204',
   processingAlbum: '1d84b6f2-9e07-3c5a-a4d8-e3f2b7091c6d',
 } as const;
@@ -142,10 +137,9 @@ export interface MusicFixtures {
 }
 
 /**
- * Music in the test database: two artists (Media of type music, tmdbId 0)
- * with ids on every server and in Lidarr, their albums, and a request for
- * an album in each status, all made long enough ago to count as old.
- * Saved without subscribers, as data already there would be.
+ * Seeds music: two artists (music Media, tmdbId 0) with ids on every server and
+ * in Lidarr, their albums, and an album request in each status, all old enough
+ * to count as old. Saved without subscribers, like pre-existing data.
  */
 export async function seedMusicFixtures(): Promise<MusicFixtures> {
   assertTestDatabase('seed music fixtures');
@@ -269,7 +263,7 @@ export async function seedMusicFixtures(): Promise<MusicFixtures> {
     requests[status] = request;
   }
 
-  // Old enough for every "waiting too long" check to look at.
+  // Old enough for every "waiting too long" check.
   await manager
     .createQueryBuilder()
     .update(MediaRequest)

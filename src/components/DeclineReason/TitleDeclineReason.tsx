@@ -10,10 +10,7 @@ const messages = defineMessages('components.DeclineReason.TitleDeclineReason', {
   declined4k: 'Your 4K request was declined: {reason}',
 });
 
-/**
- * On a title's page, why the viewer's own latest request for it was
- * declined, when whoever declined it gave a reason.
- */
+/** The decline reason for the viewer's latest request on a title page, if one was given. */
 const TitleDeclineReason = ({ requests }: { requests?: MediaRequest[] }) => {
   const intl = useIntl();
   const { user } = useUser();

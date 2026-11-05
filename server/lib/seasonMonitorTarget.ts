@@ -4,17 +4,17 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { EntityManager } from 'typeorm';
 
 /**
- * The set of episodes that should be monitored for one season.
+ * The episodes that should be monitored for one season.
  *
- * `wholeSeason` means at least one live request asked for the season without
+ * `wholeSeason`: at least one live request asked for the season without
  * naming episodes, so every episode is wanted and `episodeNumbers` is
- * irrelevant. Otherwise `episodeNumbers` is the union of every episode named
- * by every live request.
+ * irrelevant. Otherwise `episodeNumbers` is the union of episodes named by
+ * every live request.
  *
- * Unioning rather than overwriting is what lets two users coexist: if one asks
- * for episodes 3 and 5 and another later asks for the whole season, the season
- * wins for both; if the second asks only for episode 8, all three are
- * monitored. No request ever removes what another request asked for.
+ * The union lets users coexist: if one asks for episodes 3 and 5 and another
+ * later for the whole season, the season wins for both; if the second asks
+ * only for episode 8, all three are monitored. No request removes what
+ * another asked for.
  */
 export interface SeasonMonitorTarget {
   wholeSeason: boolean;
@@ -33,13 +33,13 @@ export const resolveSeasonMonitorTarget = async (
   is4k: boolean,
   options: {
     /**
-     * The connection of the save this runs inside. After a request is
-     * removed, the clean-up runs inside the removal's transaction: through
-     * the global connection, Postgres still shows the removed request, whose
-     * episodes then stay wanted and are never unmonitored.
+     * The connection of the enclosing save. After a request is removed,
+     * clean-up runs inside the removal's transaction; via the global connection
+     * Postgres still shows the removed request, whose episodes would never be
+     * unmonitored.
      */
     manager?: EntityManager;
-    /** A request being removed, left out whatever the connection shows. */
+    /** A request being removed, excluded whatever the connection shows. */
     excludeRequestId?: number;
   } = {}
 ): Promise<SeasonMonitorTarget> => {
@@ -69,8 +69,8 @@ export const resolveSeasonMonitorTarget = async (
         continue;
       }
 
-      // No episode rows means the whole season, which is also how every
-      // request created before episode-level requests existed is stored.
+      // No episode rows means the whole season, which is also how requests from
+      // before episode-level requests are stored.
       if (!seasonRequest.episodes?.length) {
         wholeSeason = true;
         continue;

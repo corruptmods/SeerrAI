@@ -17,7 +17,7 @@ const Failed = ({ error, onRetry }: { error: Error; onRetry: () => void }) => {
       <ExclamationTriangleIcon className="h-5 w-5 flex-none text-warning-text" />
       <div className="min-w-0 flex-1">
         <p>{intl.formatMessage(messages.failed)}</p>
-        {/* Said on screen: on a phone there is no console to read it from. */}
+        {/* Shown on screen: phones have no console. */}
         <p className="mt-1 break-words text-xs text-gray-400">
           {`${error.name}: ${error.message}`.slice(0, 300)}
         </p>
@@ -34,15 +34,12 @@ const Failed = ({ error, onRetry }: { error: Error; onRetry: () => void }) => {
 };
 
 interface RowBoundaryProps {
-  /** What the row is, for the log. */
+  /** Names the row in the log. */
   name: string;
   children: ReactNode;
 }
 
-/**
- * Keeps one row that fails to draw from taking the whole page with it: the
- * row says what went wrong and the rest of the page carries on.
- */
+/** Error boundary for one row: it shows the error and the page carries on. */
 class RowBoundary extends Component<RowBoundaryProps, { error: Error | null }> {
   state = { error: null as Error | null };
 

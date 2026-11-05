@@ -30,16 +30,16 @@ import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import sharp from 'sharp';
 
 /*
- * The AI features through the real API spec, with the model stubbed at the
- * HTTP call: what each person may use, what it costs them, and what is (and
- * is not) sent to the model.
+ * AI features through the real API spec, with the model stubbed at the HTTP
+ * call: who may use what, what it costs them, and what is and isn't sent to the
+ * model.
  */
 
 setupTestDb();
 
 // ---- a fake model -----------------------------------------------------------
 
-/** What each call sent, and what the model answers next. */
+/** What each call sent, and the model's next answers. */
 let calls: { system: string; prompt: string; image?: unknown }[] = [];
 let answers: (string | Error)[] = [];
 
@@ -363,7 +363,7 @@ describe('the saved key', () => {
       assert.equal(seen[0].authorization, undefined);
       assert.ok(!JSON.stringify(seen).includes('saved-secret-key'));
 
-      // OpenAI itself needs a key, and the saved Claude key is not it.
+      // OpenAI needs its own key; the saved Claude key isn't it.
       const openai = await call<{ message: string }>(
         'POST',
         '/api/v1/settings/ai/models',
@@ -400,7 +400,7 @@ describe('who gets the AI features', () => {
       { message: 'hi' }
     );
     assert.equal(chat.status, 403);
-    // A code for the page to show in the person's language, and the English.
+    // A code the client translates, plus the English message.
     assert.equal(chat.body.code, 'off');
     assert.match(chat.body.message, /turned off/);
     assert.equal(calls.length, 0);
@@ -446,7 +446,7 @@ describe('the AI chat', () => {
     });
     assert.equal(status, 200);
     assert.equal(body.reply, 'Sounds like this one.');
-    // A title TMDB cannot find is dropped, not guessed.
+    // A title TMDB can't find is dropped, not guessed.
     assert.deepEqual(
       body.results.map((r) => r.id),
       [137]
@@ -484,7 +484,7 @@ describe('the AI chat', () => {
         body.results.map((r) => r.id),
         [137]
       );
-      // What the model gets is the photo made over to its budget.
+      // The model gets the photo resized to its budget.
       const sent = calls[0].image as { media_type: string; data: string };
       assert.equal(sent.media_type, 'image/jpeg');
       assert.equal(
@@ -576,15 +576,15 @@ describe('the AI chat', () => {
     assert.equal(status, 200);
     assert.match(calls[0].prompt, /You: Want more like these\?/);
     assert.match(calls[0].prompt, /Already offered: Hedgehog Morning \(1993\)/);
-    // The model repeated itself; the person does not see it, or a "more
-    // like that" with nothing under it.
+    // The model repeated itself: the person sees neither it nor an empty "more
+    // like that".
     assert.deepEqual(body.results, []);
     assert.match(body.reply, /Nothing new turned up/);
   });
 
   it('clips an earlier turn that runs long rather than refusing the message', async () => {
-    // The app marks a turn that came with a photo, which can take a full
-    // 500-character message over the limit.
+    // The app marks a photo turn, which can push a full 500-character message
+    // over the limit.
     answers = ['{"r":"ok","titles":[]}'];
     const { status } = await call('POST', '/api/v1/ai/chat', {
       message: 'and another',
@@ -702,7 +702,7 @@ describe('the AI chat', () => {
         count: 2,
         offset: 0,
         'release-groups': [
-          // A near miss, ranked first: never taken for the album named.
+          // A near miss ranked first: never taken for the named album.
           {
             id: OTHER_GROUP,
             title: 'Static Garden (Live)',
@@ -756,7 +756,7 @@ describe('the AI chat', () => {
           body.music?.artists.map((a) => a.name),
           ['Glasswing']
         );
-        // Told music is there, and how to give it.
+        // Told music is available, and its format.
         assert.match(calls[0].system, /"music":/);
       }));
 
@@ -865,7 +865,7 @@ describe('the AI chat', () => {
       });
 
       assert.equal(status, 200);
-      // The exact name was chosen over the first result, and every page read.
+      // The exact name beats the first result, and every page is read.
       assert.deepEqual(
         asked.map((a) => [a.keywords, a.page]),
         [
@@ -913,7 +913,7 @@ describe('the AI chat', () => {
       }>('POST', '/api/v1/ai/chat', { message: 'every a24 film' });
       assert.equal(body.results.length, 100);
       assert.equal(body.source.more, true);
-      // Nothing to set up unless asked.
+      // No action unless asked.
       assert.equal(body.action, undefined);
     });
 
@@ -979,9 +979,9 @@ describe('the AI chat', () => {
       for (const reply of [
         // Flat, as the instructions show.
         '{"r":"Vell.","titles":[],"do":"request","set":"director","of":"Adrian Vell","m":"movie"}',
-        // Nested, with its own words for the fields.
+        // Nested, with its own field names.
         '{"r":"Vell.","titles":[],"do":"request","src":{"kind":"filmography","name":"Adrian Vell","role":"directed"}}',
-        // The older shape.
+        // Legacy shape.
         '{"r":"Vell.","titles":[],"do":"request","src":{"k":"person","q":"Adrian Vell","r":"director"}}',
       ]) {
         clearAiCache();
@@ -1092,15 +1092,14 @@ describe('the AI chat', () => {
       Object.defineProperty(TautulliAPI.prototype, 'getUserHistory', {
         configurable: true,
         value: async () => [
-          // Part-way through an episode just now: that is what they are
-          // watching.
+          // Partway through an episode just now: currently watching.
           play({
             media_type: 'episode',
             grandparent_title: 'Outlastia',
             date: now - 600,
             percent_complete: 40,
           }),
-          // Opened for a moment: not watched.
+          // Opened briefly: not watched.
           play({
             media_type: 'movie',
             title: 'Glanced At',
@@ -1190,10 +1189,10 @@ describe('the daily limit', () => {
   });
 
   it('gives the answer back only when the provider fails', async () => {
-    // An answer that cannot be read, even on the second try, still counts:
-    // the provider billed for both replies, and handing it back let anyone
-    // word every question so the reply could not be read and never use up
-    // their answers. An empty answer was billed too.
+    // An unreadable answer, even after the retry, still counts: the provider
+    // billed both replies, and refunding it would let anyone phrase questions
+    // to be unreadable and never use up their quota. An empty answer is billed
+    // too.
     getSettings().ai.dailyLimit = 5;
     answers = ['not json', 'still not', '', httpError(500)];
     const unreadable = await call<{ code: string }>('POST', '/api/v1/ai/chat', {
@@ -1216,7 +1215,7 @@ describe('the daily limit', () => {
   });
 
   describe('with a photo', () => {
-    // A JPEG by its first bytes, and nothing a decoder can read.
+    // JPEG magic bytes, then nothing decodable.
     const unreadable = Buffer.from([
       0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8,
     ]).toString('base64');
@@ -1229,7 +1228,7 @@ describe('the daily limit', () => {
       });
       assert.equal(first.status, 400);
       assert.match(first.body.message, /could not be read/);
-      // Reading it was the work; the answer it took is kept.
+      // Reading it was the work, so the use is counted.
       assert.equal(await usesToday(), 1);
       const second = await call('POST', '/api/v1/ai/chat', {
         message: 'this',
@@ -1297,7 +1296,7 @@ describe('the daily limit', () => {
     }>('POST', '/api/v1/ai/chat', { message: 'c' });
     assert.equal(third.status, 429);
     assert.match(third.body.message, /all 2 of today's AI answers/);
-    // A code the page shows in the person's language.
+    // A code the client translates.
     assert.equal(third.body.code, 'limit');
     assert.deepEqual(third.body.values, { limit: 2 });
     assert.equal(calls.length, 2);
@@ -1487,14 +1486,14 @@ describe('explaining a log entry', () => {
       [{ displayName: 'Carol King' }, 'King'],
       [{ email: 'carol at home' }, 'carol'],
       [{ user: { name: 'Erin' } }, 'Erin'],
-      // As Tautulli's lookups log who they were for.
+      // As Tautulli lookups log who they were for.
       [{ user: 'frank_w', userId: 7 }, 'frank_w'],
     ];
     for (const [value, personal] of cases) {
       const sent = JSON.stringify(redact(value));
       assert.ok(!sent.includes(personal), `${JSON.stringify(value)} → ${sent}`);
     }
-    // What explains the entry stays.
+    // Context explaining the entry stays.
     for (const kept of [
       'Request failed at 12:34:56 with status code 404',
       'Sonarr v4.0.10 answered in 1.5s',
@@ -1539,7 +1538,7 @@ describe('credit', () => {
     }[];
   }
 
-  /** The count of an answer is written just after the answer is sent. */
+  /** Usage is written just after the answer is sent. */
   const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
 
   const report = async () =>
@@ -1584,7 +1583,7 @@ describe('credit', () => {
     // Spending on the day the balance was entered counts against it.
     assert.ok(Math.abs((body.remaining ?? 0) - (5 - 0.00012)) < 1e-12);
 
-    // Forgetting the balance forgets what is left.
+    // Clearing the balance clears what's left.
     body = (
       await call<Report>('POST', '/api/v1/settings/ai/credit', {
         balance: null,
@@ -1753,15 +1752,15 @@ describe('credit', () => {
     );
     const zone = process.env.TZ;
     try {
-      // East of UTC, local midnight on the 1st is still the last day of
-      // the month before in UTC.
+      // East of UTC, local midnight on the 1st is still the previous month in
+      // UTC.
       process.env.TZ = 'Australia/Sydney';
       const report = await creditReport(new Date('2026-10-15T00:00:00Z'));
       assert.equal(report.monthStart, '2026-10-01');
       assert.deepEqual(since, ['2026-10-01T00:00:00.000Z']);
 
-      // In the first hours of the month there, the UTC month has not
-      // begun: nothing has been spent in it yet.
+      // In the month's first hours there, the UTC month hasn't begun: nothing
+      // spent yet.
       forgetSpendReports();
       since.length = 0;
       const early = await creditReport(new Date('2026-09-30T15:00:00Z'));
@@ -1787,7 +1786,7 @@ describe('credit', () => {
       prices: { 'claude-test': { input: 1, output: 5 } },
       outOfCreditAt: new Date().toISOString(),
     };
-    // Saved turned off, so it is not tested against the fake model.
+    // Saved disabled so it isn't tested against the fake model.
     const moved = await call('POST', '/api/v1/settings/ai', {
       enabled: false,
       provider: 'openai',
@@ -1803,7 +1802,7 @@ describe('credit', () => {
       [credit.adminKey, credit.balance, credit.outOfCreditAt],
       ['', null, null]
     );
-    // Prices are per model, and kept.
+    // Prices are per model, and persisted.
     assert.deepEqual(credit.prices, {
       'claude-test': { input: 1, output: 5 },
     });

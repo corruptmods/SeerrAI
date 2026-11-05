@@ -1,10 +1,8 @@
 import axios from 'axios';
 
 /**
- * What to tell someone when something done to a request failed: the
- * server's reason where it gave one (such as "Only pending requests can be
- * approved or declined." when someone else got there first), or else the
- * message given.
+ * Error text for a failed request action: the server's reason if given (e.g.
+ * "Only pending requests can be approved or declined."), else `fallback`.
  */
 export const requestActionError = (e: unknown, fallback: string): string => {
   if (axios.isAxiosError(e)) {
@@ -18,10 +16,9 @@ export const requestActionError = (e: unknown, fallback: string): string => {
 };
 
 /**
- * Does something to each request in turn, starting the next only once the
- * last is done, and returns the errors of those that failed. Never two at
- * once: declined together, each of a title's requests still saw the others
- * as waiting, and the title was never reset.
+ * Runs an action on each request sequentially; returns the failures. Never
+ * in parallel: concurrent declines each see the others as pending, so the
+ * title is never reset.
  */
 export const oneAfterAnother = async <T>(
   items: readonly T[],

@@ -8,20 +8,18 @@ import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 /*
- * The shape every poster card shares: films, series and collections
- * (TitleCard), and albums and artists. A 2:3 tile with what it is at the
- * top left, its status at the top right, and on hover, focus or a tap its
- * title over the picture with the card's actions beneath.
+ * Shared poster card for titles, collections, albums and artists: a 2:3
+ * tile with a type badge top left, status top right, and title plus actions
+ * over the picture on hover, focus or tap.
  */
 
-/** The width a card takes in a row of cards, or its grid cell. */
+/** Card width in a row, or full width in a grid cell. */
 export const cardWidth = (canExpand?: boolean) =>
   canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44';
 
 /**
- * How wide a card's picture is drawn, for a picture offered in several
- * widths (see sourcesFor): as cardWidth in a row; in a grid, half a phone's
- * screen, and never as wide as two of the grid's narrowest cells.
+ * `sizes` for the card picture (see sourcesFor): cardWidth in a row; in a
+ * grid, half a phone screen, capped below two of the narrowest cells.
  */
 export const cardImageSizes = (canExpand?: boolean) =>
   canExpand
@@ -29,22 +27,18 @@ export const cardImageSizes = (canExpand?: boolean) =>
     : '(min-width: 768px) 11rem, 9rem';
 
 /**
- * Whether a card's details are showing, and the handlers that show and
- * hide them: on hover with a mouse, on a tap or Enter otherwise.
+ * Card detail state and handlers: hover with a mouse, otherwise tap or Enter.
  */
 export const useCardDetail = () => {
   const isTouch = useIsTouch();
   const [showDetail, setShowDetail] = useState(false);
 
   /*
-   * On a touchscreen a card's details stay open until the browser reports the
-   * finger "leaving" it, which it only does when the next tap lands somewhere
-   * it tracked. After a modal from this card closes (add to a list, request)
-   * that tap was in the modal, so the next card tapped opened alongside this
-   * one. Close on any press outside the card instead. Presses inside the
-   * card's own modals count as inside: they are portalled out of the card in
-   * the page, but React delivers their events through the card, so this
-   * card's handler sees them first.
+   * On touch, mouseleave only fires when the next tap lands on a tracked
+   * element; after one of this card's modals closes it doesn't, leaving two
+   * cards open. So close on any press outside the card. Presses in the
+   * card's portalled modals still bubble through the card in React, so they
+   * count as inside.
    */
   const pressedInside = useRef(false);
   useEffect(() => {
@@ -64,13 +58,13 @@ export const useCardDetail = () => {
 
   return {
     showDetail,
-    /** For the card's outermost element. */
+    /** Spread on the card's outermost element. */
     cardProps: {
       onPointerDown: () => {
         pressedInside.current = true;
       },
     },
-    /** For the tile itself. */
+    /** Spread on the tile. */
     tileProps: {
       onMouseEnter: () => {
         if (!isTouch) {
@@ -90,7 +84,7 @@ export const useCardDetail = () => {
 
 export type CardDetail = ReturnType<typeof useCardDetail>;
 
-/** What a card shows for a title with no picture, filling the tile. */
+/** Placeholder for a title without a picture. */
 export const NoPicture = () => (
   <CachedImage
     type="tmdb"
@@ -103,9 +97,8 @@ export const NoPicture = () => (
 );
 
 /**
- * A card's outermost box. It tells the picture inside when the card comes
- * near the screen, so it loads before it is scrolled to: in a row, as the
- * row tells it; in a grid, by itself.
+ * Card outer box that tells the picture when it nears the screen so it loads
+ * early: from the row's signal in a row, on its own in a grid.
  */
 const NearCard = ({
   cardRef,
@@ -130,35 +123,31 @@ interface CardShellProps {
   canExpand?: boolean;
   testId: string;
   cardRef?: Ref<HTMLDivElement>;
-  /** The card's dialogs, kept inside it so presses in them count as inside. */
+  /** Dialogs rendered inside the card so presses in them count as inside. */
   modals?: ReactNode;
-  /** The picture, filling the tile. */
   image: ReactNode;
-  /** What the card is, at its top left: Movie, Series, Album... */
+  /** Top-left type badge: Movie, Series, Album... */
   badge: { label: string; className: string };
-  /** Its status and markers, at its top right. */
+  /** Top-right status and markers. */
   indicators?: ReactNode;
-  /** Small controls beneath them, shown with the details. */
+  /** Controls under the indicators, shown with the details. */
   controls?: ReactNode;
   updating?: boolean;
-  /** Whether the title and actions show over the picture. */
   showOverlay: boolean;
   href: string;
-  /** Called as the card's page is opened, before it has loaded. */
+  /** Called when the card's link is followed, before the page loads. */
   onOpen?: () => void;
-  /** Above the title: the year. */
+  /** Shown above the title, e.g. the year. */
   overline?: string;
   title: string;
   titleTestId?: string;
-  /** Beneath the title. */
   summary?: ReactNode;
-  /** Whether the actions take a row beneath the text, which leaves room. */
+  /** Reserve a row under the text for the actions. */
   roomForActions: boolean;
   actions?: ReactNode;
   /**
-   * Its name always shows along the bottom of the picture, not only with
-   * the details: for music, whose covers and photos seldom carry a name the
-   * way a film's poster does.
+   * Always caption the picture with the name; music covers rarely show it the
+   * way posters do.
    */
   captioned?: boolean;
 }
@@ -220,16 +209,11 @@ const CardShell = ({
             </div>
           </div>
           {/*
-            Everything on the right sits in one column: the per-user markers
-            on top, the hover controls beneath. Three siblings under
-            justify-between spread unevenly across the card instead.
+            One right-hand column (markers over controls); three siblings
+            under justify-between would spread unevenly.
           */}
           <div className="flex flex-col items-end gap-1">
-            {/*
-              Markers and the status badge share one row and one size, so
-              the top of the card reads as a single strip of indicators.
-              Sized to match StatusBadgeMini's shrink variant.
-            */}
+            {/* One row, sized like StatusBadgeMini's shrink variant. */}
             <div className="pointer-events-none z-40 flex items-center gap-1">
               {indicators}
             </div>

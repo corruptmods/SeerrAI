@@ -19,7 +19,7 @@ describe('filter matching', () => {
   });
 
   it('does not match the middle of a word', () => {
-    // "tam" is inside Rustamson, but only the start of a word counts.
+    // "tam" is inside Rustamson, but only word starts count.
     assert.ok(!matchesSearch(normalizeSearchText('Vivian Rustamson'), ['tam']));
   });
 

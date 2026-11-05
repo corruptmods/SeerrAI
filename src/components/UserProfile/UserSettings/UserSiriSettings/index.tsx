@@ -65,7 +65,7 @@ const messages = defineMessages(
   }
 );
 
-/** A value to paste into the shortcut, with a button that copies it. */
+/** A shortcut value with a copy button. */
 const CopyRow = ({ label, value }: { label: string; value: string }) => {
   const intl = useIntl();
   const [copied, copy] = useClipboard(value, { successDuration: 3000 });
@@ -109,8 +109,7 @@ const UserSiriSettings = () => {
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<ApiKeyCreatedResponse>();
   const [showing, setShowing] = useState(false);
-  // The address this page was opened at, when none is set: known only in
-  // the browser.
+  // Fallback when no address is set; only known in the browser.
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
 
@@ -306,7 +305,7 @@ const UserSiriSettings = () => {
           title={intl.formatMessage(messages.newTitle)}
           okText={intl.formatMessage(messages.done)}
           onOk={() => setShowing(false)}
-          // Shown only this once: Done closes it, not a stray click.
+          // Shown only once: only Done closes it.
           backgroundClickable={false}
         >
           {created && (

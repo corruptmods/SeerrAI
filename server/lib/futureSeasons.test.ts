@@ -25,12 +25,11 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
  * "Future seasons only": which seasons count as future, the scheduled check
- * that requests each as it premieres, and the routes behind the series page
- * button, through the real API validator.
+ * requesting each on premiere, and the series page routes, via the real API
+ * validator.
  */
 
-// The real time: following a series goes by the clock, so the seasons'
-// dates are set from today, not from a fixed day that would pass.
+// Following uses the real clock, so season dates are set relative to today.
 const NOW = Date.now();
 const DAY = 24 * 60 * 60 * 1000;
 const date = (offsetDays: number) =>
@@ -351,7 +350,7 @@ describe('/tv/{tvId}/future-seasons', () => {
       'nobody follows another series'
     );
 
-    // Someone who doesn't manage requests is told it comes, not by whom.
+    // Users who don't manage requests see that it's coming, not for whom.
     await subscribe(await user('admin@seerr.dev'), 100);
     signedIn = 'friend@seerr.dev';
     await getRepository(FutureSeasonSubscription).delete({

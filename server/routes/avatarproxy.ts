@@ -38,8 +38,7 @@ function getJellyfinAvatarUrl(userId: string, kind: JellyfinFamilyKind) {
 
 /**
  * The Jellyfin or Emby server a person's avatar comes from: a connected one
- * they have an account on (the primary one first), else any they have an
- * account on.
+ * they have an account on (primary first), else any they have an account on.
  */
 const avatarServerOf = (
   user: Pick<User, 'jellyfinUserId' | 'embyUserId'>
@@ -125,16 +124,15 @@ export async function checkAvatarChanged(
   }
 }
 
-/** Sends a picture from the avatar cache, or tells the browser its copy is still good. */
+/** Send a cached avatar, or 304 if the browser's copy is current. */
 const sendPicture = (
   req: Request,
   res: Response,
   imageData: Awaited<ReturnType<ImageProxy['getImage']>>
 ) => {
-  // A host that sends no ETag of its own (Jellyfin) would leave every
-  // avatar with the same empty one, and a browser asking whether its old
-  // picture is still good would always be told yes: the picture's own
-  // fingerprint stands in.
+  // A host without its own ETag (Jellyfin) would give every avatar the same
+  // empty one, so revalidation would always say unchanged; use the picture's
+  // hash.
   const etag = `"${
     imageData.meta.etag || computeImageHash(imageData.imageBuffer)
   }"`;
@@ -160,9 +158,8 @@ const sendPicture = (
 };
 
 /**
- * Sent when neither the picture nor the stand-in could be fetched: a plain
- * silhouette, kept by the browser only a few minutes so the real picture is
- * tried again soon.
+ * Fallback when neither the picture nor the stand-in can be fetched: a plain
+ * silhouette, cached only a few minutes so the real picture is retried soon.
  */
 const SILHOUETTE = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#4b5563"/><circle cx="32" cy="25" r="11" fill="#9ca3af"/><path d="M12 56c2-11 10-17 20-17s18 6 20 17z" fill="#9ca3af"/></svg>'
@@ -177,15 +174,14 @@ const sendSilhouette = (res: Response) => {
   res.end(SILHOUETTE);
 };
 
-/** The address of a Plex account's picture, by the id in it. */
+/** Plex account picture URL, capturing its id. */
 export const PLEX_AVATAR =
   /^https:\/\/plex\.tv\/users\/([0-9a-f]{8,64})\/avatar(?:\?.*)?$/;
 
 /**
- * A Plex account's picture, kept here: pages load it from Seerr AI, not each
- * time from plex.tv, which doesn't always answer. Only the pictures of
- * people with an account here, at the address Plex gave for them, are
- * fetched; when plex.tv can't be reached, a stand-in picture is sent.
+ * A Plex account's picture, cached here so pages don't depend on plex.tv, which
+ * is unreliable. Only fetched for users with an account here, at the URL Plex
+ * gave them; when plex.tv is unreachable a stand-in is sent.
  */
 router.get('/plex/:plexAvatarId', async (req, res, next) => {
   const avatarId = req.params.plexAvatarId;
@@ -223,9 +219,9 @@ router.get('/plex/:plexAvatarId', async (req, res, next) => {
 });
 
 /**
- * A Jellyfin or Emby account's picture, by the account's id. The server is
- * the one whose column holds the id (people's stored avatar URLs carry only
- * the id); `?server=jellyfin|emby` says which for an id no one has yet.
+ * A Jellyfin or Emby account's picture by account id. The server is the one
+ * whose column holds the id (stored avatar URLs carry only the id);
+ * `?server=jellyfin|emby` picks it for an id no user has yet.
  */
 router.get('/:jellyfinUserId', async (req, res, next) => {
   const hint =

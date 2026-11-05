@@ -2,24 +2,23 @@ import ExternalAPI from '@server/api/externalapi';
 import { randomUUID } from 'node:crypto';
 
 /*
- * slskd, a Soulseek client run as a service: searched for a song's file
- * when no release of its album or single is on the indexers, and asked to
- * download just that file, into a folder of its own for Lidarr to import
- * from. Needs slskd 0.26 or newer (download batches), and an API key with
- * the ReadWrite role.
+ * slskd (Soulseek service) is searched for a song's file when the indexers
+ * have no release of its album or single, and downloads just that file into
+ * its own folder for Lidarr to import. Needs slskd 0.26+ (download batches)
+ * and an API key with the ReadWrite role.
  */
 
-/** The first slskd with download batches. */
+/** First slskd version with download batches. */
 export const SLSKD_MIN_VERSION = [0, 26, 0] as const;
 
 const TIMEOUT_MS = 20_000;
-/** How long Soulseek is searched: slskd's own default. */
+/** slskd's default search duration. */
 const SEARCH_MS = 15_000;
-/** How often a search is looked at while it runs. */
+/** Poll interval for a running search. */
 const POLL_MS = 1_500;
 
 export interface SlskdFile {
-  /** The path as the sharer names it, folders and all. */
+  /** The sharer's full path, folders included. */
   filename: string;
   size: number;
   bitRate?: number | null;
@@ -31,7 +30,7 @@ export interface SlskdFile {
   isVariableBitRate?: boolean | null;
 }
 
-/** One sharer's answer to a search. */
+/** One sharer's search response. */
 export interface SlskdResponse {
   username: string;
   files: SlskdFile[];
@@ -43,7 +42,7 @@ export interface SlskdResponse {
 
 interface SlskdSearch {
   id: string;
-  /** Flags, as words: "InProgress", "Completed, TimedOut". */
+  /** Comma-separated flags: "InProgress", "Completed, TimedOut". */
   state: string;
   responseCount: number;
 }
@@ -53,12 +52,12 @@ export interface SlskdTransfer {
   username: string;
   filename: string;
   size: number;
-  /** Flags, as words: "Queued, Remotely", "InProgress", "Completed, Succeeded". */
+  /** Comma-separated flags: "Queued, Remotely", "Completed, Succeeded". */
   state: string;
   bytesTransferred: number;
   placeInQueue?: number | null;
   exception?: string | null;
-  /** The batch it was asked for in; none when slskd asked for it itself. */
+  /** Its batch; none when slskd requested it itself. */
   batchId?: string | null;
 }
 
@@ -78,7 +77,7 @@ export interface SlskdApplication {
   server: { isConnected?: boolean; isLoggedIn?: boolean; state?: string };
 }
 
-/** What slskd said no to, in its words: a sharer offline, a file refused. */
+/** slskd's refusal, in its words: a sharer offline, a file refused. */
 export class SlskdRefused extends Error {}
 
 /** Whether a transfer's state holds this flag. */
@@ -95,9 +94,9 @@ const newer = (current: string, wanted: readonly number[]): boolean => {
 };
 
 /**
- * Whether slskd ended the transfer because it was shutting down. Once it is
- * back, slskd asks for the file again itself, but outside its batch and
- * into its usual downloads folder.
+ * Whether slskd ended the transfer by shutting down. On restart slskd
+ * re-requests the file itself, but outside its batch and into its usual
+ * downloads folder.
  */
 export const endedByRestart = (transfer: SlskdTransfer) =>
   transferIs(transfer, 'Completed') &&
@@ -124,10 +123,9 @@ class SlskdAPI extends ExternalAPI {
   }
 
   /**
-   * Searches Soulseek and waits for the answers: every sharer's matching
-   * files, unlocked ones only. A search still running when the wait is
-   * over is stopped, and slskd given a moment to finish it, before it is
-   * cleared from slskd: one cleared while running fails in slskd.
+   * Searches Soulseek and returns every sharer's unlocked matching files. A
+   * search still running at the deadline is stopped and given a moment to
+   * finish before it is cleared: clearing a running search fails in slskd.
    */
   public async search(
     text: string,
@@ -160,8 +158,8 @@ class SlskdAPI extends ExternalAPI {
       throw new Error(`slskd could not search (${res.status}).`);
     }
     try {
-      // slskd's timeout counts from the last answer, so a popular search
-      // runs on: it is stopped once it has had twice its time.
+      // slskd's timeout counts from the last response, so a popular search
+      // runs on; stop it at twice its time.
       let until = Date.now() + timing.searchMs * 2;
       let stopped = false;
       for (;;) {
@@ -191,8 +189,8 @@ class SlskdAPI extends ExternalAPI {
   }
 
   /**
-   * Asks for these files of one sharer's, into `destination` (a folder
-   * under slskd's downloads). Throws SlskdRefused when none could be.
+   * Requests one sharer's files into `destination` (a folder under slskd's
+   * downloads). Throws SlskdRefused when none could be requested.
    */
   public async download(
     username: string,
@@ -228,7 +226,7 @@ class SlskdAPI extends ExternalAPI {
     return id;
   }
 
-  /** A download batch, with its transfers; null once slskd has none. */
+  /** A download batch with its transfers; null once slskd drops it. */
   public async getBatch(id: string): Promise<SlskdBatch | null> {
     const res = await this.axios.get<SlskdBatch>(
       `/transfers/downloads/batches/${id}`,
@@ -237,7 +235,7 @@ class SlskdAPI extends ExternalAPI {
     return res.status === 404 ? null : res.data;
   }
 
-  /** Every download slskd has of one sharer's, of any batch or none. */
+  /** All downloads from one sharer, in any batch or none. */
   public async getDownloadsFrom(username: string): Promise<SlskdTransfer[]> {
     const res = await this.axios.get<{
       directories?: { files?: SlskdTransfer[] | null }[] | null;
@@ -260,9 +258,8 @@ class SlskdAPI extends ExternalAPI {
   }
 
   /**
-   * Deletes a folder under slskd's downloads, once Lidarr has moved what
-   * was in it. Needs slskd's remote file management on; without it the
-   * empty folder stays.
+   * Deletes a folder under slskd's downloads once Lidarr moved its contents.
+   * Needs slskd's remote file management; without it the empty folder stays.
    */
   public async removeDownloadFolder(folder: string): Promise<void> {
     await this.axios.delete(

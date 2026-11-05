@@ -14,8 +14,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
 /*
- * What is actually sent to each API: the smallest request it accepts, and
- * the right shape for each kind of model.
+ * What each API is actually sent: the smallest request it accepts, shaped
+ * for each kind of model.
  */
 
 const settings = (over: Partial<AiSettings> = {}): AiSettings => ({
@@ -321,7 +321,7 @@ describe('a picture with the message', () => {
       }),
       /cannot read pictures/
     );
-    // The same refusal without a picture is reported as it is.
+    // The same refusal without a picture is reported unchanged.
     capture([httpError(400, { error: { message: 'image_url is wrong' } })]);
     await assert.rejects(
       complete(settings({ provider: 'openai' }), {

@@ -1,7 +1,6 @@
 /**
- * The most rows one page of a list endpoint returns. The interface offers
- * pages of up to a hundred; anything larger is someone asking for the whole
- * table at once, which on a big library is a slow query and a large reply.
+ * Max rows per page of a list endpoint. The UI offers up to 100; more means
+ * fetching the whole table, a slow query and large response on a big library.
  */
 export const MAX_PAGE_SIZE = 100;
 
@@ -14,9 +13,9 @@ const wholeNumber = (value: unknown): number | undefined => {
 };
 
 /**
- * `take` and `skip` from a query string, kept to sensible values: a page of
- * one to MAX_PAGE_SIZE rows, starting at zero or later. Nonsense falls back
- * to the default rather than reaching the database as NaN.
+ * `take` and `skip` from a query string, clamped: one to MAX_PAGE_SIZE rows,
+ * from zero on. Invalid values fall back to defaults rather than reaching the
+ * database as NaN.
  */
 export const pageOf = (
   query: { take?: unknown; skip?: unknown },

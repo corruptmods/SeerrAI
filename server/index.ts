@@ -70,10 +70,8 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-// A promise that fails with nothing waiting on it would otherwise stop the
-// whole server (Node's default). It is logged instead: only the message and
-// stack, since an API client's error carries the request it made, API key
-// included.
+// Log unhandled rejections instead of letting Node stop the server. Only
+// message and stack: API client errors carry the request, API key included.
 process.on('unhandledRejection', (reason) => {
   logger.error('A background task failed with nothing to catch it', {
     label: 'Server',
@@ -82,10 +80,9 @@ process.on('unhandledRejection', (reason) => {
   });
 });
 
-// Node's own warnings (a deprecation in a library, a listener leak) go to
-// the server's log too, with where they came from, so they can be read in
-// Settings → Logs rather than only in the container's output. Each is told
-// once a run, however often it comes.
+// Log Node warnings (library deprecations, listener leaks) with their source,
+// so they show in Settings → Logs, not only container output. Each once per
+// run.
 const warningsTold = new Set<string>();
 process.on('warning', (warning) => {
   const key = `${warning.name}:${warning.message}`;
@@ -108,7 +105,6 @@ if (!appDataPermissions()) {
 app
   .prepare()
   .then(async () => {
-    // Run Overseerr to Seerr migration
     await checkOverseerrMerge();
 
     const dbConnection = dataSource.isInitialized
@@ -116,7 +112,6 @@ app
       : await dataSource.initialize();
     rollBackOnRelease(dbConnection);
 
-    // Run migrations in production
     if (process.env.NODE_ENV === 'production') {
       if (isPgsql) {
         await dbConnection.runMigrations();
@@ -127,7 +122,6 @@ app
       }
     }
 
-    // Load Settings
     const settings = await getSettings().load();
     restartFlag.initializeSettings(settings);
 
@@ -135,7 +129,6 @@ app
 
     setForceIpv4First(settings.network.forceIpv4First);
 
-    // Add DNS caching
     if (settings.network.dnsCache?.enabled) {
       initializeDnsCache({
         forceMinTtl: settings.network.dnsCache.forceMinTtl,
@@ -143,7 +136,6 @@ app
       });
     }
 
-    // Register HTTP proxy
     if (settings.network.proxy.enabled) {
       await createCustomProxyAgent(
         settings.network.proxy,
@@ -151,15 +143,14 @@ app
       );
     }
 
-    // On a server set up with Emby, Emby's ids move to its own columns
-    // once, before anything reads them.
+    // On Emby servers, move Emby ids to their own columns once, before anything
+    // reads them.
     await splitEmbyData();
 
-    // A Jellyfin or Emby server set up before Seerr kept the account it
-    // reads the server as keeps the owner's from now on.
+    // Store the owner's account on Jellyfin/Emby servers set up before it was
+    // stored with them.
     await rememberJellyfinAdmins();
 
-    // Migrate library types
     if (
       isConnected('plex') &&
       settings.plex.libraries.length > 1 &&
@@ -181,8 +172,8 @@ app
         try {
           await plexapi.syncLibraries();
         } catch {
-          // Leave the existing libraries untouched so the migration retries on
-          // the next startup instead of discarding the user's configuration
+          // Keep existing libraries so the migration retries next startup
+          // instead of discarding the configuration.
           logger.warn(
             'Failed to migrate Plex libraries; will retry on next startup',
             { label: 'Settings' }
@@ -191,7 +182,6 @@ app
       }
     }
 
-    // Register Notification Agents
     notificationManager.registerAgents([
       new DiscordAgent(),
       new EmailAgent(),
@@ -205,24 +195,24 @@ app
       new WebPushAgent(),
     ]);
 
-    // Notifications held to be sent together go out before the server
-    // stops, rather than being lost with it; a moment is left for them.
+    // Flush batched notifications before shutdown instead of losing them,
+    // allowing a moment to send.
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
       process.once(signal, () => {
-        // Backfill's gathered news first, so it joins the rest.
+        // Backfill's batched notices first, so they join the rest.
         backfillNotices.flush();
         notificationManager.flush();
         setTimeout(() => process.exit(0), 3000).unref();
       });
     }
 
-    // Seerr's own CPU and memory, for the health page's graphs.
+    // Seerr's own CPU and memory, for the health page graphs.
     resourceMonitor.start();
 
     const userRepository = getRepository(User);
     const totalUsers = await userRepository.count();
     if (totalUsers > 0) {
-      // A Backfill search cut short by the restart isn't still running.
+      // A Backfill search interrupted by the restart is no longer running.
       await backfill.unstickSearches().catch((e) =>
         logger.warn('Could not reset Backfill searches cut short', {
           label: 'Server',
@@ -230,12 +220,12 @@ app
         })
       );
       startJobs();
-      // Playlist songs still to be found or requested carry on where the
-      // restart left them, rather than at the next hourly sync.
+      // Resume finding and requesting playlist songs now rather than at the
+      // next hourly sync.
       if (musicReady()) {
         playlists.kick();
       }
-      // The admin agent picks up its queue and hears of empty searches.
+      // The admin agent resumes its queue and subscribes to empty searches.
       agent.init().catch((e) =>
         logger.error('The admin agent could not start', {
           label: 'Agent',
@@ -251,35 +241,31 @@ app
       );
     }
 
-    // Bootstrap Discovery Sliders
     await DiscoverSlider.bootstrapSliders();
 
     const server = express();
     if (settings.network.trustProxy) {
       server.set('trust proxy', trustedProxies(settings.network));
     }
-    // Compress every text response: pages, scripts and styles, and the API's
-    // JSON, which nothing compressed before. Brotli where the browser takes
-    // it (all current ones do): level 5 is about as quick as gzip and a good
-    // deal smaller, while the top levels are far too slow to run per request.
-    // Images are already compressed and are passed through untouched.
+    // Compress text responses (pages, scripts, styles, API JSON). Brotli where
+    // accepted: level 5 is about as fast as gzip and much smaller; top levels
+    // are too slow per request. Images pass through untouched.
     server.use(
       compression({
         brotli: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } },
       })
     );
     server.use(cookieParser());
-    // AI Search's body is read once the session is known (below), as a
-    // photo sent to it may be larger than the usual limit.
+    // AI Search reads its body after the session is known (below), since an
+    // attached photo may exceed the usual limit.
     server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
     if (settings.network.csrfProtection) {
       server.use(csrfProtection(!dev));
     }
 
-    // Set up sessions
-    const sessionRespository = getRepository(Session);
-    const sessionStore = sessionStoreFor(sessionRespository);
+    const sessionRepository = getRepository(Session);
+    const sessionStore = sessionStoreFor(sessionRepository);
     const sessions = session({
       secret: settings.sessionSecret,
       resave: false,
@@ -292,11 +278,11 @@ app
       },
       store: sessionStore,
     });
-    // A request made with an API key is the key's alone, so the session
-    // cookie that came with it isn't read, changed or ended.
+    // API key requests belong to the key alone, so their session cookie is
+    // never read, changed or ended.
     server.use('/api', unlessApiKey(sessions));
     server.use(aiChatBody);
-    // The image cache only takes new images for someone signed in.
+    // The image cache only accepts new images for signed-in users.
     useSessionForImages({
       store: sessionStore,
       secret: settings.sessionSecret,
@@ -310,11 +296,8 @@ app
         validateRequests: true,
       })
     );
-    /**
-     * This is a workaround to convert dates to strings before they are validated by
-     * OpenAPI validator. Otherwise, they are treated as objects instead of strings
-     * and response validation will fail
-     */
+    // Convert dates to strings before OpenAPI response validation, which
+    // otherwise sees objects and fails.
     server.use((_req, res, next) => {
       const original = res.json;
       res.json = function jsonp(json) {
@@ -322,20 +305,20 @@ app
       };
       next();
     });
-    // Pages of titles start their posters into the image cache as they go.
+    // Title pages start warming their posters into the image cache.
     server.use('/api/v1', warmPosters, routes);
 
-    // Do not set cookies so CDNs can cache them
+    // No cookies, so CDNs can cache them.
     server.use('/imageproxy', clearCookies, imageproxy);
     server.use('/avatarproxy', clearCookies, avatarproxy);
     server.use('/flags', clearCookies, flags);
 
-    // Chunk list for the service worker to precache on install. Registered
-    // before the Next.js catch-all so it is answered here.
+    // Chunk list for the service worker to precache. Registered before the
+    // Next.js catch-all.
     server.get('/sw-precache.json', swPrecacheHandler);
 
-    // Pages may load stylesheets and fonts only from here and from the
-    // places the admin's Server CSS names (server/lib/customCss.ts).
+    // Pages may load stylesheets and fonts only from here and the hosts the
+    // admin's Server CSS names (server/lib/customCss.ts).
     server.get(
       '*path',
       stylePolicy(() => settings.appearance.serverCss ?? ''),
@@ -351,12 +334,11 @@ app
         if (res.headersSent) {
           return next(err);
         }
-        // format error
         res.status(err.status || 500).json({
           message: err.message,
           errors: err.errors,
-          // Siri's shortcut says `say` aloud, so a request it got wrong
-          // (turned down by the API spec) is heard too.
+          // Siri's shortcut speaks `say`, so API spec rejections are spoken
+          // too.
           ...(req.originalUrl.startsWith('/api/v1/now-playing')
             ? {
                 say:

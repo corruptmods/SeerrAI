@@ -39,8 +39,8 @@ const WatchSuggestions = () => {
   const [isClosed, setClosed] = useState(false);
   const { addToast } = useToasts();
 
-  // Only fetched once a user is present; the request also triggers the
-  // throttled watch-history check on the server.
+  // Fetched once signed in; it also triggers the server's throttled
+  // watch-history check.
   const on = useFeature('watchSuggestions');
   const { data: suggestions, mutate } = useSWR<Suggestion[]>(
     on && user?.id ? '/api/v1/list/suggestions' : null,
@@ -62,7 +62,7 @@ const WatchSuggestions = () => {
     return null;
   }
 
-  // Default to everything ticked: the common case is wanting them all gone.
+  // All ticked by default: usually all are to go.
   const chosen = selected ?? suggestions.map((s) => s.id);
 
   const resolve = async (action: 'remove' | 'keep') => {
@@ -80,8 +80,8 @@ const WatchSuggestions = () => {
       await mutate();
       setClosed(true);
     } catch (e) {
-      // Some may have been saved before the failure; reloading shows only
-      // the ones still waiting, so the dialog can be tried again.
+      // Some may have saved before failing; reloading leaves only the rest
+      // for a retry.
       const detail =
         (axios.isAxiosError(e) && e.response?.data?.message) ||
         (e instanceof Error ? e.message : String(e));

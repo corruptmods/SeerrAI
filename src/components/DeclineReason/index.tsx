@@ -8,20 +8,14 @@ const messages = defineMessages('components.DeclineReason', {
 
 interface DeclineReasonProps {
   reason: string;
-  /**
-   * Beside the Declined badge on one line, cut short where it does not fit,
-   * rather than a labelled field of its own that wraps.
-   */
+  /** One truncated line beside the Declined badge, instead of a wrapping labelled field. */
   inline?: boolean;
-  /** All of it, however long, where there is room; otherwise two lines. */
+  /** Show it in full; otherwise two lines. */
   whole?: boolean;
   className?: string;
 }
 
-/**
- * Why a request was declined, as written by whoever declined it. Always shown
- * as text. Where it is cut short, the whole reason is in its tooltip.
- */
+/** The decline reason, as plain text; the full text is in a tooltip when truncated. */
 const DeclineReason = ({
   reason,
   inline,

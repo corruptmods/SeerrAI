@@ -76,10 +76,7 @@ interface OverrideRuleModalProps {
   sonarrServices: SonarrSettings[];
 }
 
-/**
- * The series type a rule sets: any for a Sonarr rule, anime or not for a
- * Radarr one.
- */
+/** The series type a rule sets: any for Sonarr, anime or standard for Radarr. */
 const ruleSeriesType = (values: {
   radarrServiceId?: number | null;
   sonarrServiceId?: number | null;
@@ -103,7 +100,7 @@ const OverrideRuleModal = ({
   const { currentSettings } = useSettings();
   // Ratings are read for the server's Discover region; see overrideRules.
   const region = currentSettings.discoverRegion || 'US';
-  const [isValidated, setIsValidated] = useState(rule ? true : false);
+  const [isValidated, setIsValidated] = useState(!!rule);
   const [isTesting, setIsTesting] = useState(false);
   const [testResponse, setTestResponse] = useState<DVRTestResponse>({
     profiles: [],
@@ -293,8 +290,7 @@ const OverrideRuleModal = ({
                         }
                         onChange={(e) => {
                           const id = Number(e.target.value.split('-')[1]);
-                          // Films and series are rated differently, so the
-                          // ratings chosen do not carry over between them.
+                          // Films and series are rated differently; chosen ratings don't carry over.
                           if (
                             values.certification &&
                             e.target.value.split('-')[0] !==

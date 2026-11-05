@@ -10,16 +10,15 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
 /*
- * Backfill's step-down (Settings → Backfill, off by default): a movie or
- * series on one of Seerr AI's presets that nothing has been grabbed for
- * since it was added `days` ago moves to the next looser preset on its
- * server, so what exists can be had, and a search starts. Once it has a
- * file it goes back to its own profile, so the usual upgrades go on.
+ * Backfill step-down (Settings → Backfill, off by default): a title on a
+ * Seerr AI preset with nothing grabbed `days` after it was added moves to
+ * the next looser preset and is searched. Once it has a file it returns to
+ * its own profile so normal upgrades continue.
  */
 
 const LABEL = 'Quality';
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Titles moved down per server per run, so indexers aren't flooded. */
+/** Max titles moved down per server per run, to avoid flooding indexers. */
 const PER_RUN = 10;
 
 export interface StepDownResult {
@@ -44,8 +43,8 @@ const stepServer = async (
   const titles = await arr.titles();
   const byId = new Map(titles.map((t) => [t.id, t]));
 
-  // Back up first: what has a file now, or was moved by someone else. A
-  // title whose own profile is gone stays where it is.
+  // Restore titles that now have a file first. Titles moved by someone else
+  // or whose own profile is gone are forgotten and left where they are.
   const there = stepped.length
     ? new Set((await arr.profiles()).map((p) => p.id))
     : new Set<number>();
@@ -117,7 +116,7 @@ const stepServer = async (
   return result;
 };
 
-/** One run over every server: titles back up, then titles down. */
+/** Runs step-down on every server: restores titles, then steps others down. */
 export const runStepDown = async (): Promise<StepDownResult> => {
   const { enabled, days } = getSettings().backfill.stepDown;
   const total = { down: 0, back: 0 };

@@ -8,11 +8,9 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * An issuer URL as an admin enters it in Settings → Users → Single Sign-On:
- * the issuer itself, or the provider's whole configuration address, which
- * Authentik and others show beside it.
- */
+// Issuer URLs as an admin enters them in Settings → Users → Single Sign-On: the
+// issuer, or the provider's discovery address that Authentik and others show
+// beside it.
 
 describe('an issuer URL as entered', () => {
   it('takes a configuration address back to the issuer it is under', () => {

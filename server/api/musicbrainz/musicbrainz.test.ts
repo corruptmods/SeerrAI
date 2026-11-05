@@ -24,9 +24,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * MusicBrainz allows one request a second from an address. Everything Seerr
- * asks it goes through one queue, and what comes back is kept in memory and
- * in the database.
+ * MusicBrainz allows one request per second per IP, so all requests share
+ * one queue; answers are cached in memory and the database.
  */
 
 const ARTIST = '7f3e9a20-b51c-4d86-92ad-c4e1d08b6f73';
@@ -34,7 +33,7 @@ const ALBUM = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
 const RELEASE = '3a96f0c4-e27d-4b51-8c39-0d5b2e8a714f';
 const OTHER_RELEASE = '2d5e5c7c-3b9a-4b6f-8a50-6bd25a3b2a33';
 
-/** A clock the queue sleeps on: sleeping moves it forward. */
+/** Fake clock; sleeping advances it. */
 const fakeClock = () => {
   let now = 0;
   return {
@@ -113,7 +112,7 @@ describe('the MusicBrainz queue', () => {
       );
     const first = search('trea');
     const typedPast = search('treaty', 'treaty-albums').catch((e) => e);
-    // Wanted by the newer search too, so it is kept.
+    // The newer search also wants it, so it's kept.
     const shared = search('treaty', 'shared');
     newest = 'treaty oak';
     queue.add(
@@ -139,11 +138,11 @@ describe('the MusicBrainz queue', () => {
       ...clock,
     });
     const run = async () => 'kept';
-    // Something ahead, so it waits.
+    // A job ahead keeps it queued.
     const ahead = queue.add('ahead', 'interactive', run);
     let typedPast = false;
     const searched = queue.add('a', 'interactive', run, () => !typedPast);
-    // A page asks for the same, with no test: it is kept for good.
+    // A caller with no wanted check keeps it for good.
     const page = queue.add('a', 'interactive', run);
     typedPast = true;
     assert.deepEqual(await Promise.all([ahead, searched, page]), [
@@ -169,7 +168,7 @@ describe('the MusicBrainz queue', () => {
       queue.add('scan-2', 'background', job('scan-2')),
       queue.add('scan-3', 'background', job('scan-3')),
       queue.add('page', 'interactive', job('page')),
-      // A person now waits on what a scan asked for: it moves up too.
+      // An interactive caller promotes the queued scan.
       queue.add('scan-3', 'interactive', job('scan-3')),
     ];
     await Promise.all(all);
@@ -178,7 +177,7 @@ describe('the MusicBrainz queue', () => {
 
   it('tells a person it is busy rather than keep them waiting', async () => {
     const clock = fakeClock();
-    // A clock that does not move: everything stays queued.
+    // The clock never advances, so everything stays queued.
     const queue = new RequestQueue({
       spacingMs: () => MB_SPACING_MS,
       maxWaitMs: 8000,
@@ -186,7 +185,7 @@ describe('the MusicBrainz queue', () => {
       sleep: () => new Promise(() => undefined),
     });
     const never = () => new Promise<void>(() => undefined);
-    // One under way, then enough waiting to pass eight seconds.
+    // One running plus enough queued to exceed eight seconds.
     for (let i = 0; i < 8; i++) {
       void queue.add(`page-${i}`, 'interactive', never);
     }
@@ -195,7 +194,7 @@ describe('the MusicBrainz queue', () => {
       queue.add('one-more', 'interactive', never),
       MusicBrainzBusyError
     );
-    // A scan just waits its turn.
+    // Background work just waits.
     const scan = queue.add('scan', 'background', never);
     assert.ok(scan instanceof Promise);
     assert.equal(queue.size, 9);
@@ -247,7 +246,7 @@ describe('how the MusicBrainz queue has fared, for Health', () => {
     });
     const overLimit = () => ({ response: { status: 503, headers: {} } });
 
-    // Over the limit twice: tried again, then given up.
+    // Two 503s: retried once, then failed.
     await assert.rejects(
       queue.add('down', 'interactive', async () => {
         throw overLimit();
@@ -258,7 +257,7 @@ describe('how the MusicBrainz queue has fared, for Health', () => {
         throw new Error('timeout of 15000ms exceeded');
       })
     );
-    // No such thing is an answer, not a failure.
+    // A 404 is an answer, not a failure.
     await assert.rejects(
       queue.add('missing', 'interactive', async () => {
         throw { response: { status: 404 } };
@@ -281,7 +280,7 @@ describe('how the MusicBrainz queue has fared, for Health', () => {
     assert.equal(health.failingInARow, 0);
     assert.equal(health.lastSuccessAt, clock.now());
 
-    // An hour on, it is all forgotten.
+    // After an hour, the stats reset.
     await clock.sleep(60 * 60 * 1000);
     health = queue.health();
     assert.deepEqual(
@@ -329,7 +328,7 @@ describe('the MusicBrainz client', () => {
   };
 
   beforeEach(() => {
-    // A mirror: not spaced, so the tests do not wait a second a request.
+    // A mirror isn't spaced, so tests don't wait a second per request.
     getSettings().music = {
       ...musicDefaults(),
       musicbrainzUrl: 'http://mirror.local:5000',
@@ -397,7 +396,7 @@ describe('the MusicBrainz client', () => {
     const lifetime = new Date(row.expiresAt!).getTime() - Date.now();
     assert.ok(lifetime > MB_LIFETIMES.artist - 60_000);
 
-    // After a restart: memory is empty, the database still has it.
+    // After a restart: memory is empty but the database has it.
     cacheManager.getCache('musicbrainz').flush();
     assert.equal((await client.getArtist(ARTIST)).name, 'Glasswing');
     assert.equal(get.mock.callCount(), 1);
@@ -550,7 +549,7 @@ describe('the MusicBrainz client', () => {
       plainText('<p>Glasswing are an <b>English</b> rock band &amp; more.</p>'),
       'Glasswing are an English rock band & more.'
     );
-    // A character past Unicode's last is left alone, not thrown on.
+    // A code point beyond Unicode is left as is rather than throwing.
     assert.equal(plainText('Caf&#233; &#99999999;'), 'Café &#99999999;');
     const { client } = stubbed({
       [`/artist/${ARTIST}/wikipedia-extract`]: {

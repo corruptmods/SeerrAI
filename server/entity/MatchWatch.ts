@@ -4,10 +4,10 @@ import type { MatchKind } from '@server/utils/plexMatch';
 import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 /**
- * A requested title Radarr, Sonarr or Lidarr just imported, waiting to be
- * looked for on one media server (lib/matchWatch). One row a title and
- * server: more episodes of a series imported meanwhile add none. Gone once
- * the server has it right, or its time is up.
+ * A requested title Radarr, Sonarr or Lidarr just imported, awaiting a check on
+ * one media server (lib/matchWatch). One row per title and server: more
+ * episodes imported meanwhile add none. Removed once the server matches it
+ * correctly or time runs out.
  */
 @Entity()
 @Unique(['mediaId', 'mediaServer', 'arrServerId', 'arrItemId'])
@@ -43,7 +43,7 @@ export class MatchWatch {
   @DbAwareColumn({ type: 'datetime' })
   public nextCheckAt: Date;
 
-  /** Looks taken so far. */
+  /** Checks made so far. */
   @Column({ type: 'int', default: 0 })
   public attempts: number;
 
@@ -53,19 +53,18 @@ export class MatchWatch {
 }
 
 /**
- * - waiting: to go out in the next message
+ * - waiting: goes out in the next message
  * - sent: went out in a message
- * - held: past the day's messages; on the Health page, and counted in the
+ * - held: over the daily message limit; on the Health page and counted in the
  *   next message
  * - counted: counted in a later message
- * - none: never told (the nightly check had it already, or it was fixed
- *   before it went out)
+ * - none: never sent (the nightly check had it already, or it was fixed first)
  */
 export type MatchNotice = 'waiting' | 'sent' | 'held' | 'counted' | 'none';
 
 /**
- * A wrong match found on a title just imported: kept after it is fixed, so
- * the same problem is never told twice.
+ * A wrong match found on a just-imported title, kept after it's fixed so the
+ * same problem is never reported twice.
  */
 @Entity()
 export class MatchProblem {
@@ -107,14 +106,14 @@ export class MatchProblem {
   @DbAwareColumn({ type: 'datetime' })
   public foundAt: Date;
 
-  /** When the message it went out in was sent. */
+  /** When the message containing it was sent. */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public sentAt?: Date | null;
 
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public resolvedAt?: Date | null;
 
-  /** While unresolved: when to look at the server's item again. */
+  /** While unresolved: when to recheck the server's item. */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public nextCheckAt?: Date | null;
 

@@ -12,7 +12,7 @@ import type { AddressInfo } from 'node:net';
 import { after, afterEach, before, describe, it, mock } from 'node:test';
 
 const MB = 1024 * 1024;
-/** How SABnzbd 4.2 and later name a job, as Radarr records it here. */
+/** A SABnzbd 4.2+ job id, as Radarr records it. */
 const UUID_JOB = 'a0390606-07de-47d6-8877-46f3ceed243c';
 
 describe('SABnzbd, read directly', () => {
@@ -113,11 +113,11 @@ describe('talking to them', () => {
   let session = 'first';
   let qbitAnswersByStatus = false;
   const servers: http.Server[] = [];
-  /** What was deleted from SABnzbd, and where its jobs are. */
+  /** Ids deleted from SABnzbd. */
   let deleted: string[] = [];
   const queuedJobs = ['SABnzbd_nzo_one'];
   const historyJobs = ['SABnzbd_nzo_two'];
-  /** SABnzbd's whole queue, as asked for without nzo_ids. */
+  /** SABnzbd's whole queue, as returned without nzo_ids. */
   let wholeQueue: { kbpersec: string; slots: Record<string, string>[] } = {
     kbpersec: '0',
     slots: [],
@@ -144,8 +144,8 @@ describe('talking to them', () => {
           JSON.stringify({ status: false, error: 'API Key Incorrect' })
         );
       }
-      // Deleting, as a real SABnzbd 4.2 answers: status false, with no
-      // error, for a job that isn't in the queue.
+      // Like SABnzbd 4.2: status false, no error, for a job not in the
+      // queue.
       if (url.searchParams.get('name') === 'delete') {
         const id = url.searchParams.get('value') ?? '';
         const mode = url.searchParams.get('mode');
@@ -202,7 +202,7 @@ describe('talking to them', () => {
         req.on('data', (chunk) => (body += chunk));
         req.on('end', () => {
           const form = new URLSearchParams(body);
-          // qBittorrent 5.2 and later answer with a status, not words.
+          // qBittorrent 5.2+ answers with a status code, not text.
           if (form.get('password') !== 'secret') {
             res.statusCode = qbitAnswersByStatus ? 401 : 200;
             return res.end(qbitAnswersByStatus ? '' : 'Fails.');
@@ -223,7 +223,7 @@ describe('talking to them', () => {
       }
       res.setHeader('Content-Type', 'application/json');
       const hashes = (url.searchParams.get('hashes') ?? '').split('|');
-      // Like a client that ignores the filter: every torrent it has.
+      // Like a client that ignores the filter: return every torrent.
       if (hashes.includes('b'.repeat(40))) {
         return res.end(
           JSON.stringify(
@@ -310,7 +310,7 @@ describe('talking to them', () => {
   });
 
   it('gives a queued SABnzbd job its size in whole bytes', async () => {
-    // SABnzbd gives megabytes with decimals; Postgres keeps whole bytes.
+    // SABnzbd gives fractional megabytes; Postgres stores whole bytes.
     wholeQueue = {
       kbpersec: '0',
       slots: [
@@ -345,7 +345,7 @@ describe('talking to them', () => {
     };
     assert.equal((await sab('right').getJob('one'))?.speed, 10240 * 1024);
     assert.equal((await sab('right').getJob('two'))?.speed, 0, 'waiting');
-    // Two at once: the one figure is both of theirs, so it is neither's.
+    // Two downloading: the single speed can't be attributed to either.
     wholeQueue = {
       kbpersec: '10240',
       slots: [slot('one', 'Downloading'), slot('two', 'Downloading')],
@@ -372,7 +372,7 @@ describe('talking to them', () => {
     assert.equal(found.get('a'.repeat(40))?.stage, 'stalled');
     assert.equal(logins, 1, 'the session is kept between passes');
 
-    session = 'second'; // qBittorrent restarted: the old session is gone
+    session = 'second'; // qBittorrent restarted, dropping the old session
     await qbit('secret').getVersion();
     assert.equal(logins, 2);
   });
@@ -447,8 +447,8 @@ describe('adding a torrent to qBittorrent for Backfill', () => {
       username: '',
       password: '',
     }).addTorrent({ torrent: Buffer.from('torrent'), category: 'backfill' });
-    // A limit of 0 is reached at once, and qBittorrent is often set to
-    // remove a torrent and its files when it is: before Radarr imports it.
+    // A limit of 0 is hit at once, and qBittorrent is often set to remove
+    // the torrent and files then, before Radarr imports.
     assert.equal(form?.get('ratioLimit'), '-1');
     assert.equal(form?.get('seedingTimeLimit'), '-1');
     assert.equal(form?.get('inactiveSeedingTimeLimit'), '-1');

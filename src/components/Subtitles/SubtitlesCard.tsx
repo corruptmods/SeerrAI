@@ -123,10 +123,10 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
 });
 
 const OPEN_KEY = 'subtitles-card-open';
-/** Bazarr busy this long with other jobs is worth saying. */
+/** Bazarr busy this long with other jobs is reported. */
 const BUSY_MS = 2 * 60 * 60_000;
 
-/** The card stays open or closed as its viewer last left it. */
+/** Remembers whether the viewer left the card open. */
 const useRememberedOpen = (): [boolean, (open: boolean) => void] => {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -135,7 +135,7 @@ const useRememberedOpen = (): [boolean, (open: boolean) => void] => {
         setOpen(false);
       }
     } catch {
-      // Storage refused: open, as it starts.
+      // Storage unavailable: stays open.
     }
   }, []);
   return [
@@ -145,7 +145,7 @@ const useRememberedOpen = (): [boolean, (open: boolean) => void] => {
       try {
         window.localStorage.setItem(OPEN_KEY, String(next));
       } catch {
-        // Not remembered this time.
+        // Storage unavailable: not remembered.
       }
     },
   ];
@@ -191,7 +191,7 @@ const languagesOf = (intl: IntlShape, tracks: SubtitleTrack[]) => {
 interface SubtitlesCardProps {
   kind: SubtitlesKind;
   tmdbId: number;
-  /** The title as dialogs name it: "10 Juniper Lane (2016)". */
+  /** The title as dialogs name it: "Glasswing (2016)". */
   title: string;
 }
 
@@ -210,7 +210,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
   const current = kind === 'movie' ? movie : series;
   const loaded = !!current.data;
   const transcription = useTranscription(kind, tmdbId, on && loaded);
-  // The time a search or transcription has taken, counting up.
+  // Ticks to show elapsed time while a job runs.
   const now = useNow(
     !!(transcription.data?.searchJob || transcription.data?.transcribeJob)
   );
@@ -224,7 +224,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
   const [toDelete, setToDelete] = useState<SubtitleTrack | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // A finished transcription is a new subtitle on disk.
+  // A finished transcription adds a subtitle on disk: refetch.
   const done = transcription.data?.done ?? 0;
   const lastDone = useRef(done);
   useEffect(() => {
@@ -235,7 +235,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
-  // So is whatever a finished search found.
+  // So may a finished search.
   const searching = !!transcription.data?.searching;
   const wasSearching = useRef(searching);
   useEffect(() => {
@@ -271,7 +271,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
             : messages.searching
         )
       );
-      // Followed until Bazarr is done; what it found then shows.
+      // Tracked until Bazarr finishes; its results then show.
       void transcription.mutate(data, { revalidate: false });
     } catch (e) {
       toast(
@@ -339,7 +339,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
     }
   };
 
-  // ---- What the header and rows say ----------------------------------------
+  // ---- Header and row text ----------------------------------------------
 
   const movieData =
     kind === 'movie' ? (movie.data as MovieSubtitles) : undefined;
@@ -353,7 +353,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
 
   const plexSelected = plex.data?.available ? plex.data.selected : undefined;
   const selectedOption = plex.data?.options.find((o) => o.id === plexSelected);
-  /** The track Plex starts this with for the viewer, as best it can be told. */
+  /** Best guess at the track Plex starts with for this viewer. */
   const isDefault = (track: SubtitleTrack) =>
     !!selectedOption &&
     !!track.language3 &&
@@ -363,7 +363,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       : track.kind === 'embedded');
   const defaultTrack = movieData?.tracks.find(isDefault);
   const groups = seriesData ? groupTracks(episodes, wanted) : [];
-  /** A series is set by language: its first group in that language. */
+  /** A series' default is by language: its first group in that language. */
   const defaultGroupKey =
     typeof plexSelected === 'string' && plexSelected
       ? groups.find(
@@ -420,8 +420,8 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
     ? !movieData.tracks.some((t) => t.ai)
     : toTranscribe > 0;
   const status = transcription.data;
-  // Where a job is in Bazarr: how long it has waited or run, what is ahead
-  // of it, and Bazarr's own count when it keeps one.
+  // A Bazarr job's wait or run time, what's ahead of it, and Bazarr's own
+  // count if any.
   const jobNotes = (job?: BazarrJobLive): string[] => {
     if (!job) {
       return [];

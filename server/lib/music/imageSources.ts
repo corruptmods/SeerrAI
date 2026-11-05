@@ -1,12 +1,12 @@
 import { COVER_ART_ARCHIVE_URL } from '@server/api/coverartarchive';
 
 /*
- * Where music's pictures come from, and the only paths the image proxy
- * fetches there: album covers from the Cover Art Archive, pictures of
- * artists from fanart.tv and TheAudioDB.
+ * Music image sources and the only paths the image proxy fetches from them:
+ * covers from the Cover Art Archive, artist images from fanart.tv and
+ * TheAudioDB.
  */
 
-/** Where each music picture source's images are fetched from. */
+/** Origin each music image source is fetched from. */
 export const MUSIC_IMAGE_ORIGINS = {
   caa: COVER_ART_ARCHIVE_URL,
   fanart: 'https://assets.fanart.tv',
@@ -16,9 +16,8 @@ export const MUSIC_IMAGE_ORIGINS = {
 export type MusicImageSource = keyof typeof MUSIC_IMAGE_ORIGINS;
 
 /**
- * Where each source's pictures may be redirected, besides its own host:
- * the Cover Art Archive keeps its covers at archive.org (whose servers are
- * its subdomains). The others answer from their own host.
+ * Extra hosts each source may redirect to. The Cover Art Archive serves
+ * covers from archive.org subdomains.
  */
 export const MUSIC_IMAGE_REDIRECT_HOSTS: Record<
   MusicImageSource,
@@ -32,13 +31,10 @@ export const MUSIC_IMAGE_REDIRECT_HOSTS: Record<
 const DAY_S = 24 * 60 * 60;
 
 /**
- * How long each source's pictures are kept before the host is asked again,
- * whatever it says (the archive's own headers describe archive.org's copy,
- * not the cover). fanart.tv and TheAudioDB give every new picture a new
- * file name, so theirs are kept as long as TMDB's posters: a year. A Cover
- * Art Archive address is an album's cover, whichever that is now: someone
- * can upload a better one to the same address, so covers are checked
- * monthly, which costs a quick "unchanged" when nothing did.
+ * Cache time per source, ignoring upstream headers (the archive's describe
+ * archive.org's copy, not the cover). fanart.tv and TheAudioDB use a new
+ * file name per image, so a year like TMDB posters. A Cover Art Archive URL
+ * can get a new cover at the same address, so it's revalidated monthly.
  */
 export const MUSIC_IMAGE_KEPT_S: Record<MusicImageSource, number> = {
   caa: 30 * DAY_S,
@@ -47,8 +43,8 @@ export const MUSIC_IMAGE_KEPT_S: Record<MusicImageSource, number> = {
 };
 
 /**
- * Pictures whose address stays the same when the picture changes, which a
- * browser must check again once they expire rather than keep for good.
+ * Sources whose URL stays the same when the image changes, so browsers must
+ * revalidate them once expired.
  */
 export const MUSIC_IMAGE_CHANGEABLE: Record<MusicImageSource, boolean> = {
   caa: true,
@@ -57,9 +53,8 @@ export const MUSIC_IMAGE_CHANGEABLE: Record<MusicImageSource, boolean> = {
 };
 
 /**
- * Many albums have no cover, and a page of them would otherwise ask the
- * archive for each one again every few minutes. A cover added later shows
- * within this.
+ * How long a missing cover is remembered, so pages of coverless albums don't
+ * re-ask the archive every few minutes. A later cover shows within this.
  */
 export const MUSIC_IMAGE_MISSING_MS = 6 * 60 * 60 * 1000;
 
@@ -71,20 +66,20 @@ export const FANART_PATH =
 export const TADB_PATH =
   /^\/images\/media\/(?:artist|album)\/[a-z]+\/[\w.-]+\.(?:jpe?g|png)$/i;
 
-/** A picture as the image proxy serves it: a source and a path there. */
+/** An image the proxy serves: a source and a path on it. */
 export interface MusicImage {
   source: MusicImageSource;
   path: string;
 }
 
 export interface ArtistImages {
-  /** A picture of the artist, for cards and their page. */
+  /** Artist photo for cards and the artist page. */
   photo: MusicImage | null;
-  /** A wide one, for behind their page. */
+  /** Wide image behind the artist page. */
   backdrop: MusicImage | null;
 }
 
-/** A picture's address as the proxy takes it, or null for any other. */
+/** Parses an allowed image URL for the proxy; null for any other. */
 export const musicImageFrom = (
   address: string | null | undefined
 ): MusicImage | null => {
@@ -113,7 +108,7 @@ export const musicImageFrom = (
       return { source: 'tadb', path: url.pathname };
     }
   } catch {
-    // Not an address.
+    // Invalid URL.
   }
   return null;
 };

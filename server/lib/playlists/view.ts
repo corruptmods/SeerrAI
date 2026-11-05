@@ -12,20 +12,20 @@ import type { SongProgress } from '@server/lib/music/songProgress';
 import { songProgress } from '@server/lib/music/songProgress';
 import { In, Not } from 'typeorm';
 
-/** Whether this person can have playlists: music is set up and on for them. */
+/** True when music is set up and enabled for this user. */
 export const musicAllowed = (user: User | undefined): boolean =>
   !!user && musicReady() && featureEnabled('music', user);
 
 /**
- * Where a song on a playlist is, as its page shows it. A requested one
- * follows its request: waiting for approval, declined, or here once done.
+ * A playlist song's displayed state. Requested songs follow their request:
+ * approval, declined, or here once completed.
  */
 export type PlaylistSongShown =
   | Exclude<PlaylistSongState, 'matched' | 'waiting' | 'removed'>
   | 'queued'
   | 'limit'
   | 'declined'
-  /** Requested, but its album couldn't be got with it. */
+  /** Requested, but couldn't be fetched. */
   | 'notGot';
 
 export interface PlaylistSongView {
@@ -38,11 +38,11 @@ export interface PlaylistSongView {
   albumMbid: string | null;
   state: PlaylistSongShown;
   problem: string | null;
-  /** Where a requested song is on its way, when Seerr can tell. */
+  /** Progress of a requested song, when known. */
   progress: SongProgress | null;
   /**
-   * For a song MusicBrainz doesn't have, that Deezer does: Harmony, with
-   * MusicBrainz's form for adding its album filled in from Deezer's.
+   * Harmony link prefilling MusicBrainz's add form from Deezer, for songs
+   * MusicBrainz lacks but Deezer has.
    */
   addToMusicBrainz: string | null;
 }
@@ -53,10 +53,7 @@ export interface PlaylistView {
   sourceName: string | null;
   sourceReadAt: Date | null;
   sourceProblem: string | null;
-  /**
-   * Albums of its songs whose search found nothing, waiting hours to look
-   * again: they can be looked for now.
-   */
+  /** Albums of its songs waiting to search again; retryable now. */
   waitingToSearch: number;
   songs: PlaylistSongView[];
 }
@@ -67,7 +64,7 @@ const shownState = (
 ): PlaylistSongShown => {
   if (song.state === 'matched') return 'queued';
   if (song.state === 'waiting') {
-    // Held back by more than a limit (song requests turned off): said so.
+    // A problem other than a limit (e.g. song requests off) shows as failed.
     return song.problem === 'limit'
       ? 'limit'
       : song.problem
@@ -76,7 +73,7 @@ const shownState = (
   }
   if (song.state === 'requested' || song.state === 'approval') {
     switch (requestStatus) {
-      // Its request was deleted: Try again asks for it afresh.
+      // Request deleted: Try again requests it afresh.
       case undefined:
         return song.requestId ? 'notGot' : 'requested';
       case MediaRequestStatus.PENDING:
@@ -94,7 +91,7 @@ const shownState = (
   return song.state as PlaylistSongShown;
 };
 
-/** A playlist's link and songs, in order, as its page shows them. */
+/** A playlist's source and songs in order, for its page. */
 export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
   const songs = await getRepository(MediaListSong).find({
     where: { listId: list.id, state: Not('removed') },
@@ -125,15 +122,15 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
         where: { id: In(requestIds) },
       })
     : [];
-  // Each song by its own part of the request: one song Lidarr couldn't get
-  // fails the request, not the others in it, still on their way.
+  // Use each song's own status: one failed song fails the request but not
+  // its other songs.
   const statusOf = (song: MediaListSong) => {
     const request = requests.find((r) => r.id === song.requestId);
     const status =
       request?.songs?.find((s) => s.recordingMbid === song.recordingMbid)
         ?.status ?? request?.status;
-    // Someone else's request it only followed, declined: not got, so Try
-    // again asks for it in the owner's name.
+    // A declined request by someone else counts as not got, so Try again
+    // requests it in the owner's name.
     return status === MediaRequestStatus.DECLINED &&
       request?.requestedBy?.id !== song.requestForId
       ? MediaRequestStatus.FAILED

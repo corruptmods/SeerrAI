@@ -107,7 +107,7 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
   const intl = useIntl();
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
-  const [isValidated, setIsValidated] = useState(sonarr ? true : false);
+  const [isValidated, setIsValidated] = useState(!!sonarr);
   const [isTesting, setIsTesting] = useState(false);
   const [testResponse, setTestResponse] = useState<SonarrTestResponse>({
     profiles: [],

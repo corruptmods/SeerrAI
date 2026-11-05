@@ -3,14 +3,12 @@ import { userAgentRequestInterceptor } from '@server/utils/userAgent';
 import axios from 'axios';
 
 /**
- * How long a notification waits for the service it goes to (Discord,
- * Telegram, a webhook…), and for a poster it sends along. Without a limit, a
- * service that never answers held its notification, and the Test button,
- * for good.
+ * Timeout for notification services and poster fetches; without it an
+ * unresponsive service hangs the send and the Test button.
  */
 export const NOTIFICATION_TIMEOUT_MS = 15_000;
 
-/** Where a request went, without the path: tokens live in some of them. */
+/** Host only: some paths contain tokens. */
 const hostOf = (url: string | undefined, baseURL: string | undefined) => {
   try {
     return new URL(url ?? '', baseURL).host;
@@ -19,12 +17,7 @@ const hostOf = (url: string | undefined, baseURL: string | undefined) => {
   }
 };
 
-/**
- * The client every notification service is reached through: the server's
- * proxy settings, Seerr's user agent, and the time limit above. A request
- * that runs out of time fails with a message saying so, which each agent
- * logs as the reason its notification wasn't sent.
- */
+/** HTTP client for notification services: proxy, user agent, timeout. */
 const notificationHttp = axios.create({ timeout: NOTIFICATION_TIMEOUT_MS });
 notificationHttp.interceptors.request.use(proxyRequestInterceptor);
 notificationHttp.interceptors.request.use(userAgentRequestInterceptor);

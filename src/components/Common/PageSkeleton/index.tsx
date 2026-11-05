@@ -1,21 +1,18 @@
 import TitleCardPlaceholder from '@app/components/TitleCard/Placeholder';
 
 /*
- * Loading placeholders that stand where the content will appear, in the same
- * layout, so a page fills in rather than jumping from a spinner. They reuse
- * the app's own shapes — the poster placeholder, the request card's loading
- * block, the page's slider and media-header classes — so they match what
- * replaces them.
+ * Loading placeholders in the content's own layout and classes, so a page
+ * fills in rather than jumping from a spinner.
  *
- * Class names are written out in full rather than assembled at runtime;
- * assembled names are stripped from the production stylesheet.
+ * Class names are written in full: names assembled at runtime are purged
+ * from the production stylesheet.
  */
 
 const Bar = ({ className }: { className: string }) => (
   <div className={`animate-pulse rounded-md bg-gray-700 ${className}`} />
 );
 
-/** The home page: rows of sliders, each a title over a strip of posters. */
+/** The home page: rows of poster sliders. */
 export const SliderRowsSkeleton = ({ rows = 3 }: { rows?: number }) => (
   <div aria-busy="true" aria-live="polite">
     {Array.from({ length: rows }, (_, row) => (

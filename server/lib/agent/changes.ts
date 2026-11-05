@@ -18,18 +18,17 @@ import { getSettings } from '@server/lib/settings';
 /*
  * Changes the admin agent can propose and only an admin can approve: block
  * or unblock a release group, mark a download failed, delete a title's
- * files, move a title to another quality profile, replace a whole season.
- * (Replacing chosen files goes through grab with replace: true, also
- * approved first.)
+ * files, change its quality profile, replace a whole season. (Replacing
+ * chosen files goes through grab with replace: true, also approved first.)
  *
- * A proposal is checked and described when it is made, from what Radarr or
- * Sonarr says then, so the admin sees exactly what will happen; it is
- * checked again when approved, against what they say by then.
+ * A proposal is checked and described against Radarr or Sonarr when made,
+ * so the admin sees exactly what will happen, and checked again on
+ * approval against their state by then.
  */
 
 export type ChangeKind =
   | 'replace'
-  /** A grab outside Sonarr's or Radarr's size limits, through grab too. */
+  /** A grab outside Sonarr's or Radarr's size limits, also via grab. */
   | 'oversizeGrab'
   | 'blockGroup'
   | 'unblockGroup'
@@ -38,18 +37,18 @@ export type ChangeKind =
   | 'changeProfile'
   | 'replaceSeason';
 
-/** One change, as proposed: what it does, in words, and how to do it. */
+/** One proposed change: what it does, in words, and how to do it. */
 export interface ProposedChange {
   kind: ChangeKind;
   /** One line: "Delete the file of Hollow Signal (2026)". */
   headline: string;
-  /** What exactly happens, line by line. */
+  /** Exactly what happens, line by line. */
   details: string[];
   title?: TitleRef;
   params: Record<string, unknown>;
 }
 
-/** What waits for an admin's decision on a run. */
+/** Changes on a run awaiting an admin's decision. */
 export interface Proposal {
   id: string;
   at: string;
@@ -78,7 +77,7 @@ const sonarrOf = (title: TitleRef) => {
   return FixSonarr.forServer(server);
 };
 
-/** What deleting does to a file, where Radarr or Sonarr puts deleted ones. */
+/** Where Radarr or Sonarr puts a deleted file, in words. */
 const whereDeletedGo = async (api: FixRadarr | FixSonarr, app: string) => {
   const bin = await api.extras.recycleBin().catch(() => null);
   return bin
@@ -135,7 +134,7 @@ const describeGroup = async (
   };
 };
 
-/** The newest grab of a title still waiting, or the last one made. */
+/** The title's most recent grab. */
 const lastGrab = (history: ArrHistoryRecord[]) =>
   history.find((h) => h.eventType === 'grabbed');
 
@@ -205,7 +204,7 @@ const describeFailed = async (input: ChangeInput): Promise<ProposedChange> => {
   };
 };
 
-/** The episodes a change is for: a season, some of its episodes, or all. */
+/** The episodes a change covers: a season, some of its episodes, or all. */
 const episodesFor = (all: ArrEpisode[], input: ChangeInput): ArrEpisode[] =>
   all.filter(
     (ep) =>
@@ -331,7 +330,7 @@ const needTitle = (input: ChangeInput): TitleRef => {
   return input.title;
 };
 
-/** A change described, or why it cannot be made. */
+/** Describes a change, or throws why it cannot be made. */
 export const describeChange = (input: ChangeInput): Promise<ProposedChange> => {
   switch (input.kind) {
     case 'blockGroup':
@@ -350,9 +349,9 @@ export const describeChange = (input: ChangeInput): Promise<ProposedChange> => {
 // ---- a whole season ----------------------------------------------------------
 
 /**
- * Replacing every file of a season, for an admin to approve: which release
- * comes, which old ones are marked failed and which files go, in that
- * order. On approval it is worked out again from what Sonarr says then.
+ * A proposal to replace every file of a season: the release to grab, then
+ * the old downloads marked failed, then the files removed. Worked out again
+ * from Sonarr on approval.
  */
 export const seasonChange = (
   plan: SeasonPlan,
@@ -369,7 +368,7 @@ export const seasonChange = (
   },
 });
 
-/** A season's replacement worked out, or why there is none. */
+/** A season's replacement, or why there is none. */
 export const describeSeasonReplace = async (
   title: TitleRef,
   season: number,
@@ -384,9 +383,9 @@ export const describeSeasonReplace = async (
 };
 
 /**
- * Replaces an approved season: searched again (Sonarr only grabs from a
- * recent search), taking the release shown when it is still offered;
- * nothing is removed unless a replacement is grabbed.
+ * Replaces an approved season. Searches again (Sonarr only grabs from a
+ * recent search), preferring the release shown; nothing is removed unless
+ * a replacement is grabbed.
  */
 export const applySeasonChange = async (
   change: ProposedChange
@@ -419,8 +418,8 @@ const ids = (value: unknown): number[] =>
     : [];
 
 /**
- * Makes an approved change (all but replacing chosen files, which the
- * agent's grab does), and says what came of it.
+ * Applies an approved change and says what came of it. Replacing chosen
+ * files is done by the agent's grab instead.
  */
 export const applyChange = async (change: ProposedChange): Promise<string> => {
   const params = change.params;
@@ -465,7 +464,7 @@ export const applyChange = async (change: ProposedChange): Promise<string> => {
       if (title.kind === 'movie') {
         const api = radarrOf(title);
         const movie = await api.movieDetail(title.arrId);
-        // Only the file that was shown: a new one since is not deleted.
+        // Only the file that was shown; a newer one is never deleted.
         if (!movie.movieFile || !fileIds.includes(movie.movieFile.id)) {
           throw new ChangeError(
             'The file has changed since this was proposed; nothing was deleted.'
@@ -505,7 +504,7 @@ export const applyChange = async (change: ProposedChange): Promise<string> => {
         await api.editSeries(title.arrId, { qualityProfileId: profileId });
         if (params.search) {
           // Every monitored episode, with a file or not: the new profile may
-          // want better than what is there.
+          // want better.
           const wanted = (await api.episodes(title.arrId)).filter(
             (ep) => ep.monitored && ep.seasonNumber > 0
           );

@@ -3,11 +3,7 @@ import { SEASON_LOOKS } from '@app/utils/theme/seasons';
 import { Transition } from '@headlessui/react';
 import type { SeasonId } from '@server/lib/seasons';
 
-/**
- * A season's small mark: a moon for Halloween, a star for the holidays, a
- * spark for New Year, and so on. Only a picture; the season is named in
- * words wherever it matters.
- */
+/** A season's decorative icon (moon, star, spark…); named in text wherever it matters. */
 export const SeasonIcon = ({
   season,
   className,
@@ -15,7 +11,7 @@ export const SeasonIcon = ({
 }: {
   season: SeasonId;
   className?: string;
-  /** Its colour; the season's own, on screen, if left out. */
+  /** Defaults to the season's on-screen colour. */
   colour?: string;
 }) => (
   <svg
@@ -34,10 +30,7 @@ export const SeasonIcon = ({
   </svg>
 );
 
-/**
- * The mark by the logo while a season shows. It fades in, except for
- * people who have asked their device for less motion.
- */
+/** The mark beside the logo during a season; fades in unless reduced motion is set. */
 const SeasonMark = ({ className }: { className?: string }) => {
   const { season } = useTheme();
   return (

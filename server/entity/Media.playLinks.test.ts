@@ -9,11 +9,9 @@ import { beforeEach, describe, it } from 'node:test';
 
 setupTestDb();
 
-/*
- * Where a title can be played: a link per connected server that has it,
- * and the single links API readers have always had (mediaUrl, iOSPlexUrl,
- * tautulliUrl), built exactly as before for the primary server.
- */
+// Play links: one per connected server that has the title, plus the legacy
+// single links (mediaUrl, iOSPlexUrl, tautulliUrl), built unchanged for the
+// primary server.
 
 beforeEach(() => {
   const settings = getSettings();
@@ -158,7 +156,7 @@ describe('play links', () => {
     );
     assert.match(media.mediaUrl ?? '', /^https:\/\/app\.plex\.tv/);
 
-    // A connected server that does not have the title has no link.
+    // A connected server without the title gets no link.
     const plexOnly = new Media({
       tmdbId: 1,
       mediaType: MediaType.MOVIE,

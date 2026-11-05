@@ -1,9 +1,8 @@
 import type { AllSettings } from '@server/lib/settings';
 
 /**
- * Backfill's one limit on downloads at once is now three: series (the old
- * one), movies and music. Movies and music start at what it was, so
- * nothing runs fewer at once than before. Run once.
+ * Splits Backfill's concurrent download limit into series (the old value),
+ * movies and music; the new two start at the old value. Runs once.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const migrateSplitDownloadLimits = (settings: any): AllSettings => {

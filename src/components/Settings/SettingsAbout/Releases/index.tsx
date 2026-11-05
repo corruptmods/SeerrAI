@@ -13,8 +13,7 @@ import { Fragment, useState } from 'react';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
-// dyanmic is having trouble extracting the props for react-markdown here so we are just ignoring it since its really
-// only children we are using
+// dynamic can't infer react-markdown's props; only children is used.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactMarkdown = dynamic<any>(() => import('react-markdown'), {
   ssr: false,

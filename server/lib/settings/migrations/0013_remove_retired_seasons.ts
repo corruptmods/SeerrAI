@@ -1,9 +1,8 @@
 import type { AllSettings } from '@server/lib/settings';
 
 /**
- * Diwali and Pride Month were seasonal themes an admin could turn on
- * (Settings → Appearance → Seasonal themes). They are gone, so whatever
- * was saved for them goes too; the other seasons stay as they were.
+ * Removes saved settings for the retired Diwali and Pride Month seasonal
+ * themes.
  */
 const RETIRED = ['diwali', 'pride'];
 

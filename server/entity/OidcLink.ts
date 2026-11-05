@@ -9,11 +9,10 @@ import {
 } from 'typeorm';
 
 /**
- * Someone's account on a single sign-on provider, linked to their account
- * here. People are only ever found by the provider and the provider's own
- * id for them (`sub`), never by email. A provider that is switched off or
- * removed keeps its links; they just can't be used to sign in. So does one
- * whose issuer URL changed, for links made at the old issuer.
+ * A user's single sign-on provider account linked to their account here. Users
+ * are only found by provider and the provider's id for them (`sub`), never by
+ * email. Links survive a provider being disabled or removed (they just can't
+ * sign in), and an issuer URL change (for links made at the old issuer).
  */
 @Entity()
 @Index('IDX_oidc_link_provider_sub', ['provider', 'sub'], { unique: true })
@@ -29,21 +28,21 @@ export class OidcLink {
   @Column({ type: 'varchar' })
   public provider: string;
 
-  /** The provider's own id for this person, which never changes there. */
+  /** The provider's permanent id for this user. */
   @Column({ type: 'varchar' })
   public sub: string;
 
   /**
-   * The provider's issuer URL when this was linked, without a slash at the
-   * end. A `sub` only means someone at the issuer that gave it, so a link
-   * is only used while the provider still has this issuer. Empty for links
-   * made before it was recorded: they take the provider's issuer the next
-   * time they sign someone in, or the old one when the issuer is changed.
+   * The provider's issuer URL when linked, without a trailing slash. A `sub`
+   * only identifies someone at the issuer that issued it, so the link is only
+   * used while the provider keeps this issuer. Empty for links made before this
+   * was recorded: they adopt the provider's issuer at their next sign-in, or
+   * the old one when the issuer changes.
    */
   @Column({ type: 'varchar', nullable: true })
   public issuer?: string | null;
 
-  /** Their name there, for Linked Accounts; refreshed on each sign-in. */
+  /** Their username there, for Linked Accounts; refreshed on each sign-in. */
   @Column({ type: 'varchar', nullable: true })
   public username?: string | null;
 

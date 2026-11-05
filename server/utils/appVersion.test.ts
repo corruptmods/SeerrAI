@@ -2,11 +2,8 @@ import { devBuildStatus } from '@server/utils/appVersion';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * A build from build.sh carries the short commit hash; GitHub lists full
- * ones. Compared whole, the two never matched, so such a build always read
- * as out of date.
- */
+// build.sh builds carry the short commit hash; GitHub lists full ones. Compared
+// whole, they never matched, so such builds always read as out of date.
 
 const shas = [
   'f7f224cba74095ac36fb9e2ca4e7f40940d0c5d0',

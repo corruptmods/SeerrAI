@@ -4,18 +4,15 @@ import type { NextRouter } from 'next/router';
 import { useEffect } from 'react';
 
 /*
- * iOS throws an installed app out of memory while it is in the background,
- * and switching back to it starts it afresh, on the home page. The page it
- * was on is kept for the session, so that restart goes back to it, behind
- * the startup screen. Kept in session storage, which a full close of the
- * app (swiped away in the app switcher) clears: opened again after that,
- * it starts fresh on the home page. Only in the installed app.
+ * iOS evicts a backgrounded installed app and restarts it on the home page.
+ * The current page is kept in sessionStorage so a restart returns to it
+ * behind the startup screen; swiping the app away clears it. Installed app only.
  */
 
 const KEY = 'seerr-last-page';
-/** A page left this long ago is not gone back to. */
+/** Don't resume a page left longer ago than this. */
 const FRESH_MS = 12 * 60 * 60_000;
-/** Pages not to come back to. */
+/** Pages never resumed. */
 const SKIP = /^\/(login|setup|resetpassword)(\/|\?|$)/;
 
 const resumable = (path: unknown): path is string =>
@@ -32,7 +29,7 @@ const remember = (path: string) => {
   try {
     sessionStorage.setItem(KEY, JSON.stringify({ path, at: Date.now() }));
   } catch {
-    // Storage refused: the app just starts on the home page.
+    // Storage refused: start on the home page.
   }
 };
 
@@ -53,7 +50,7 @@ const lastPage = (): string | undefined => {
   }
 };
 
-/** Goes back to the page the installed app was on; then the app is shown. */
+/** Returns the installed app to its last page, then reveals the app. */
 const useResumePage = (router: NextRouter) => {
   useEffect(() => {
     const onPage = (url: string) => remember(url);
@@ -78,7 +75,7 @@ const useResumePage = (router: NextRouter) => {
       router.events.off('routeChangeComplete', onPage);
       undo();
     };
-    // Once, when the app starts.
+    // Once, on app start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 };

@@ -9,11 +9,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * What Radarr and Sonarr report at each point of a SABnzbd download, as
- * their code sets it: SABnzbd's queue gives queued, paused or downloading;
- * once SABnzbd moves it to its history, verifying, repairing, unpacking and
- * running the post-processing script all read as downloading with nothing
- * left, and done as completed, until Radarr or Sonarr imports it.
+ * What Radarr and Sonarr report through a SABnzbd download, per their code:
+ * SABnzbd's queue gives queued, paused or downloading; once in its history,
+ * verifying, repairing, unpacking and post-processing read as downloading
+ * with nothing left, and done as completed until imported.
  */
 const size = 4_000_000_000;
 
@@ -110,7 +109,7 @@ describe('where a download stands', () => {
   });
 
   it('while a delay profile holds it, with no estimate of its own', () => {
-    // As the live Sonarr queue had it: the time given is when the hold ends.
+    // From a live Sonarr queue: the time given is when the hold ends.
     assert.equal(
       downloadStageOf({
         status: 'delay',

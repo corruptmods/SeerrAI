@@ -27,7 +27,7 @@ export type BackfillCandidateStatus =
   /** Approved, then its download failed: never offered again. */
   | 'dead';
 
-/** A pack found for a series, with what it would do file by file. */
+/** A pack found for a series, with its planned per-file actions. */
 @Entity()
 export class BackfillCandidate {
   @PrimaryGeneratedColumn()
@@ -66,7 +66,9 @@ export class BackfillCandidate {
   @Column({ type: 'varchar', nullable: true })
   public publishDate: string | null;
 
-  /** Through Prowlarr; carries Prowlarr's key, so it never leaves the server. */
+  /**
+   * Via Prowlarr; contains Prowlarr's key, so it must never leave the server.
+   */
   @Column({ type: 'text', nullable: true })
   public downloadUrl: string | null;
 
@@ -80,7 +82,7 @@ export class BackfillCandidate {
   @Column({ type: 'varchar', default: 'ready' })
   public status: BackfillCandidateStatus;
 
-  /** Why it is rejected or failed. */
+  /** Why it was rejected or failed. */
   @Column({ type: 'varchar', nullable: true })
   public reason: string | null;
 

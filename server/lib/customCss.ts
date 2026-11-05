@@ -1,29 +1,26 @@
 /*
- * The server's side of custom CSS (see server/constants/customCss.ts): the
- * version each stylesheet is fetched by, and the Content-Security-Policy
- * that limits where stylesheets and fonts may come from.
+ * Server side of custom CSS (see server/constants/customCss.ts): stylesheet
+ * versions and the Content-Security-Policy limiting stylesheet and font
+ * sources.
  *
- * The policy covers stylesheets and fonts only. Pictures are not limited
- * by it: posters, avatars and logos come from many places (TMDB when the
- * image cache is off, Gravatar, media servers), so it is the check on a
- * person's own CSS that keeps their pictures on this server.
+ * The policy doesn't cover images: posters, avatars and logos come from many
+ * places (TMDB with the image cache off, Gravatar, media servers), so the
+ * check on a user's own CSS is what keeps their images on this server.
  */
 import { cssAddresses } from '@server/constants/customCss';
 import type { RequestHandler } from 'express';
 import { createHash } from 'node:crypto';
 
 /**
- * A short fingerprint of a stylesheet, which its address carries so a
- * browser can keep it until it changes. Null when there is none.
+ * Short stylesheet hash for its URL, so browsers cache it until it changes.
+ * Null when there is none.
  */
 export const cssVersion = (css: string | null | undefined): string | null =>
   css ? createHash('sha256').update(css).digest('hex').slice(0, 12) : null;
 
 /**
- * Where an address points, as the policy names a place: the scheme, host
- * and port for http and https, or the host and port alone for an address
- * that starts with // (the page's own scheme). Nothing for anything else,
- * this server's own paths included.
+ * An address as a CSP source: scheme, host and port for http(s), or host and
+ * port for a `//` address. Undefined otherwise, this server's paths included.
  */
 const placeOf = (address: string): string | undefined => {
   const relative = address.startsWith('//');
@@ -36,7 +33,7 @@ const placeOf = (address: string): string | undefined => {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     return undefined;
   }
-  // A URL's host and origin are already tidied: no spaces, quotes or ';'.
+  // URL host and origin are normalized: no spaces, quotes or ';'.
   return relative ? url.host : url.origin;
 };
 
@@ -57,9 +54,8 @@ export const contentSecurityPolicy = (serverCss: string): string => {
 };
 
 /**
- * Sends the policy with each page. The server's CSS is read on every
- * request, so a change applies to the next page loaded; the policy is
- * worked out again only when it has changed.
+ * Sends the policy with each page. Server CSS is read per request so changes
+ * apply on the next load; the policy is rebuilt only when it changes.
  */
 export const stylePolicy = (serverCss: () => string): RequestHandler => {
   let last: { css: string; policy: string } | undefined;

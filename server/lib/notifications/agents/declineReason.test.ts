@@ -21,11 +21,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-/*
- * The reason a request was declined, in the "declined" notification on each
- * channel: labelled in the channel's language, and shown as the words typed,
- * never as markup, whatever characters they hold.
- */
+// The decline reason on each channel: labelled in its language, shown
+// literally, never as markup.
 
 const REASON =
   'Already on *Netflix* & <b>Prime</b> [here](https://e.vil) @everyone _a_ \\ #1 > `x` ~y~ |z|';
@@ -56,10 +53,10 @@ const declined = (
   ...overrides,
 });
 
-/** Undoes markdown's backslash escapes, as a markdown reader does. */
+/** Undoes markdown backslash escapes, as a reader would. */
 const unescapeMarkdown = (text: string) => text.replace(/\\(.)/g, '$1');
 
-/** Every ASCII punctuation mark in the text is escaped. */
+/** Asserts every ASCII punctuation mark in the text is escaped. */
 const assertMarkdownEscaped = (text: string) => {
   for (let i = 0; i < text.length; i++) {
     if (text[i] === '\\') {

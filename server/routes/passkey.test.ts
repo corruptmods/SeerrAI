@@ -21,8 +21,8 @@ import type { Server } from 'node:http';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
-// Settings → Users' media server sign-in switch, which turns every
-// connected server's own switch on or off.
+// Settings → Users' media server sign-in switch, which toggles every connected
+// server's own switch.
 const setMediaServerLogin = (on: boolean): void => {
   getSettings().main.mediaServerLogin = on;
   applyMediaServerLogin(on);
@@ -30,9 +30,9 @@ const setMediaServerLogin = (on: boolean): void => {
 
 /*
  * Passkeys end to end against the real verification code: a small software
- * authenticator below makes real P-256 keys and signatures, the way a phone
- * or security key would, and every request goes through the API validator
- * and a real session cookie.
+ * authenticator makes real P-256 keys and signatures like a phone or security
+ * key, and every request goes through the API validator with a real session
+ * cookie.
  */
 
 const RP_ID = 'seerr.test';
@@ -187,7 +187,7 @@ before(async () => {
   ex.set('trust proxy', true);
   ex.use(express.json());
   ex.use(session({ secret: 'test', resave: false, saveUninitialized: false }));
-  // Test-only way in: signs the session in as the user named in the header.
+  // Test-only sign-in: signs the session in as the user named in the header.
   ex.use((req, _res, next) => {
     const as = req.header('x-test-sign-in-as');
     if (as) {
@@ -223,7 +223,7 @@ before(async () => {
 });
 after(() => app?.close());
 
-/** Jellyfin's answer for whether someone's account there is switched on. */
+/** Jellyfin's answer for whether the account is enabled there. */
 let jellyfinEnabled = true;
 Object.defineProperty(JellyfinAPI.prototype, 'getAccount', {
   configurable: true,
@@ -239,7 +239,7 @@ beforeEach(async () => {
   const settings = getSettings();
   settings.main.applicationUrl = ORIGIN;
   setMediaServerLogin(true);
-  // A server set up with Plex, and nothing else connected.
+  // A Plex-set-up server with nothing else connected.
   settings.main.mediaServerType = MediaServerType.PLEX;
   for (const kind of MEDIA_SERVER_KINDS) {
     settings[kind].connected = false;
@@ -260,7 +260,7 @@ beforeEach(async () => {
   );
 });
 
-/** A browser: keeps its session cookie between calls. */
+/** A browser that keeps its session cookie between calls. */
 class Browser {
   public cookie = '';
 
@@ -297,7 +297,7 @@ class Browser {
 const userId = async (email: string) =>
   (await getRepository(User).findOneOrFail({ where: { email } })).id;
 
-/** Adds a passkey for whoever this browser is signed in as. */
+/** Add a passkey for whoever the browser is signed in as. */
 const addPasskey = async (browser: Browser, device: Authenticator) => {
   const options = await browser.call('POST', '/passkey/register/options');
   assert.equal(options.status, 200);
@@ -356,8 +356,8 @@ describe('passkeys', () => {
     const device = new Authenticator();
     assert.equal((await addPasskey(owner, device)).status, 201);
 
-    // Starting a passkey sign-in stores a session before anyone is signed
-    // in; someone could note that id, or plant it in another's browser.
+    // Starting passkey sign-in stores a session before anyone signs in; someone
+    // could note that id or plant it in another's browser.
     const other = new Browser();
     await other.call('POST', '/passkey/login/options');
     const earlier = other.cookie;
@@ -496,7 +496,7 @@ describe('passkeys', () => {
     plexAccess = false;
     assert.equal((await signInWith(device)).status, 200);
 
-    // Jellyfin's sign-in switched off: a passkey does not stand in for it.
+    // Jellyfin sign-in off: a passkey doesn't bypass it.
     settings.jellyfin.signIn = false;
     assert.equal((await signInWith(device)).status, 403);
 

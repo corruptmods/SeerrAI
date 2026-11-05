@@ -15,11 +15,11 @@ const messages = defineMessages('components.Login', {
 
 interface PlexLoginButtonProps {
   onAuthToken: (authToken: string) => void;
-  /** Says why signing in did not work; every failure is told here. */
+  /** Receives every sign-in failure message. */
   onError: (message: string) => void;
   isProcessing?: boolean;
   large?: boolean;
-  /** What signing in is for: setup, or the sign-in page (the default). */
+  /** Defaults to the sign-in page. */
   purpose?: Extract<PlexSignInPurpose, 'login' | 'setup'>;
 }
 

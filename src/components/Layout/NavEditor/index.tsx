@@ -39,7 +39,7 @@ const messages = defineMessages('components.Layout.NavEditor', {
   resetDone: 'Menu back to the usual order, with everything shown.',
 });
 
-/** An item someone can use, as it appears in their menu. */
+/** A menu item the person can use. */
 export interface NavEditorItem {
   id: NavItem;
   name: string;
@@ -60,7 +60,7 @@ interface RowProps {
   buttonRef: (key: string, button: HTMLButtonElement | null) => void;
 }
 
-/* One item: dragged by the row, or moved with its arrows. */
+/* One item: dragged by its row, or moved with its arrows. */
 const Row = ({
   item,
   index,
@@ -77,8 +77,7 @@ const Row = ({
   const [hover, setHover] = useState<keyof typeof Position>(Position.None);
   const hideable = canHideNavItem(item.id);
 
-  // Dragging is for a mouse or a touch screen. By keyboard or screen
-  // reader the arrows move an item, so the row itself starts no drag.
+  // Drag for mouse and touch only; keyboard and screen readers use the arrows.
   const { dragProps, isDragging } = useDrag({
     getItems: () => [{ 'nav-item': item.id }],
     hasDragButton: true,
@@ -104,8 +103,8 @@ const Row = ({
     },
   });
 
-  // Larger buttons side by side on a phone; stacked arrows in the sidebar,
-  // where the width is narrow.
+  // Larger buttons side by side on a phone; stacked arrows in the narrow
+  // sidebar.
   const buttonBase =
     'rounded hover:text-strong focus:text-strong focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:text-gray-700';
   const arrow = `${buttonBase} text-muted ${phone ? 'p-2' : 'p-0.5'}`;
@@ -206,18 +205,17 @@ const Row = ({
 };
 
 interface NavEditorProps {
-  /** The items this person can use; the others are not theirs to arrange. */
+  /** Only the items this person can use. */
   items: NavEditorItem[];
   draft: NavDraft;
   onChange: (draft: NavDraft) => void;
-  /** In the phone menu: bigger buttons, and a word about the bar. */
+  /** In the phone menu: bigger buttons, and a note about the bar. */
   phone?: boolean;
 }
 
 /*
- * The sidebar or the phone menu while someone customizes their home page:
- * each item they can use, to move or hide. Changes are kept in the draft,
- * and saved or dropped with the rest of the home page.
+ * The sidebar or phone menu while customizing the home page: move or hide
+ * each item. Changes stay in the draft, saved or dropped with the home page.
  */
 const NavEditor = ({
   items,
@@ -229,8 +227,7 @@ const NavEditor = ({
   const groupId = useId();
   const [announcement, setAnnouncement] = useState('');
   const buttons = useRef(new Map<string, HTMLButtonElement>());
-  // The buttons to give the focus back to once the menu has changed, the
-  // first one there and enabled.
+  // Buttons to refocus after the menu changes: the first present and enabled.
   const [focusAfter, setFocusAfter] = useState<string[]>();
 
   const byId = new Map(items.map((item) => [item.id, item]));
@@ -238,16 +235,14 @@ const NavEditor = ({
     const item = byId.get(id);
     return item ? [item] : [];
   });
-  // On a phone, the items on the bar along the bottom, and those in the
-  // menu behind its button: the same split the bar itself makes.
+  // On a phone, bar items and menu items, split as the bar itself does.
   const [onBar, inMenu] = phone
     ? splitAtNavBar(shown, draft.hidden)
     : [shown, []];
 
-  // An arrow pressed by keyboard keeps the focus on the item moved, on the
-  // other arrow once it reaches the top or the bottom. On a phone an item
-  // can also move between the bar's group and the menu's, which draws its
-  // row afresh, so a focused eye button gets the focus back too.
+  // Keyboard moves keep focus on the moved item's arrow, or the other arrow
+  // at the top or bottom. On a phone a move between bar and menu remounts
+  // the row, so a focused eye button is refocused too.
   useEffect(() => {
     if (!focusAfter) {
       return;
@@ -275,8 +270,7 @@ const NavEditor = ({
     }
   };
 
-  // Up and down move past the next item this person can see, so a move is
-  // never spent on an item that isn't in their menu.
+  // Moves past the next visible item, never one outside their menu.
   const move = (id: NavItem, by: 'up' | 'down') => {
     const index = shown.findIndex((item) => item.id === id);
     const neighbour = shown[by === 'up' ? index - 1 : index + 1];
@@ -305,8 +299,8 @@ const NavEditor = ({
     );
   };
 
-  // Rows numbered from `start` in the whole order, so the arrows know the
-  // first and the last item whichever group they are in.
+  // Rows are numbered from `start` in the whole order, so the arrows know
+  // the first and last item across groups.
   const list = (items: NavEditorItem[], start: number, labelledBy?: string) => (
     <ul
       className="space-y-2"
@@ -337,8 +331,7 @@ const NavEditor = ({
   );
 
   return (
-    // In the sidebar, room to scroll the last items clear of Discover's
-    // Save bar along the bottom of the screen.
+    // In the sidebar, room to scroll the last items clear of the Save bar.
     <div
       className={`space-y-3 ${phone ? '' : 'pb-24'}`}
       data-testid="nav-editor"

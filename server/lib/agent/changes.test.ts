@@ -12,9 +12,9 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * The changes the admin agent proposes: what an admin is shown, and what
- * is done once they approve, checked again against Radarr and Sonarr as
- * they are by then. Both are stand-ins that record what was asked of them.
+ * Admin-agent proposals: what an admin is shown, and what runs on approval,
+ * rechecked against Radarr and Sonarr as they are by then. Both are stubs
+ * that record what was asked of them.
  */
 
 const GB = 1024 ** 3;
@@ -176,7 +176,7 @@ describe('deleting files', () => {
     );
     assert.match(text(change), /Why: It is a fake\./);
 
-    // A new file arrived since it was proposed: that one is not deleted.
+    // A file that arrived after the proposal is not deleted.
     movieFileId = 10900;
     await assert.rejects(applyChange(change), ChangeError);
     assert.deepEqual(calls, []);

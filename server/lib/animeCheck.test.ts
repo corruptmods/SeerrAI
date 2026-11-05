@@ -23,9 +23,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Anime Check: Sonarr series whose folder or series type, and Radarr movies
- * whose folder or profile, disagree with what Seerr says they are. It only
- * reports.
+ * Anime Check reports Sonarr series with the wrong folder or series type and
+ * Radarr movies with the wrong folder or profile. Report only.
  */
 
 setupTestDb();
@@ -269,7 +268,8 @@ describe('the Anime Check job', () => {
         keywords: { results: [] },
       },
     };
-    // An instance property, so replaced the way the other tests do.
+    // An instance property: stub it with a prototype getter, like the other
+    // tests.
     Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
       configurable: true,
       set() {},

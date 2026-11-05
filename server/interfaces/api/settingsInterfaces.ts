@@ -35,31 +35,25 @@ export interface PublicSettingsResponse {
   initialized: boolean;
   applicationTitle: string;
   applicationUrl: string;
-  /** Optional features turned off for everyone. */
+  /** Optional features disabled for everyone. */
   disabledFeatures: string[];
-  /**
-   * Countries whose anime does not count as anime unless it is in Japanese
-   * (utils/isAnime).
-   */
+  /** Countries whose anime counts as anime only in Japanese (utils/isAnime). */
   animeExcludedCountries: string[];
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
-  /** Who may make their own API keys, for the profile's API Keys tab. */
+  /** Who may create personal API keys (profile API Keys tab). */
   personalApiKeys: PersonalApiKeyAccess;
-  /** The connected media servers, the primary one first. */
+  /** Connected media servers, primary first. */
   mediaServers: {
     kind: MediaServerKind;
     name: string;
     primary: boolean;
     signIn: boolean;
   }[];
-  /**
-   * The single sign-on providers people may sign in with: the switched-on
-   * ones, once the Application URL is set.
-   */
+  /** Enabled SSO providers; empty until the Application URL is set. */
   oidcProviders: { id: string; name: string; logoUrl: string }[];
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
@@ -79,21 +73,21 @@ export interface PublicSettingsResponse {
   versionCheck: boolean;
   plexClientIdentifier: string;
   aiReady: boolean;
-  /** Bazarr is set up, so title pages can show their subtitles. */
+  /** Bazarr is set up, so title pages can show subtitles. */
   subtitlesReady: boolean;
-  /** A Trakt Client ID is set: Trakt links and watchlists can be read. */
+  /** A Trakt Client ID is set. */
   traktReady: boolean;
-  /** Lidarr is set up and music is not turned off for everyone. */
+  /** Lidarr is set up and music is not disabled for everyone. */
   musicReady: boolean;
-  /** Whether music comes below the films and series in All (Settings → Music). */
+  /** All search lists music below movies and series (Settings → Music). */
   musicSearch: { inAll: boolean };
-  /** Songs can be asked for one at a time (Settings → Music). */
+  /** Single songs can be requested (Settings → Music). */
   musicSongs: boolean;
-  /** The look of everyone who has not chosen their own (Settings → Appearance). */
+  /** Default theme for users without their own (Settings → Appearance). */
   themeDefault: ThemeDefaults;
-  /** The seasonal themes that run, and their days (Settings → Appearance). */
+  /** Active seasonal themes and their dates (Settings → Appearance). */
   seasons: SeasonCalendar;
-  /** The Server CSS's version (null for none), and whether people may add their own. */
+  /** Server CSS version (null for none); whether users may add their own. */
   customCss: { server: string | null; personal: boolean };
 }
 
@@ -111,15 +105,15 @@ export interface CacheItem {
 
 export interface CacheResponse {
   apiCaches: CacheItem[];
-  /** Each image cache; music's covers and artists' pictures as one. */
+  /** Per image cache; music covers and artist pictures share one. */
   imageCache: Record<
     'tmdb' | 'tvdb' | 'avatar' | 'music',
     { size: number; imageCount: number }
   >;
   /**
-   * The whole image cache on disk (every source, and any left by older
-   * versions) against its limit, in bytes, and whether pictures can be
-   * converted to AVIF and WebP here.
+   * Whole on-disk image cache (all sources, including older versions'
+   * leftovers) and its limit in bytes, plus whether AVIF/WebP conversion is
+   * available.
    */
   imageCacheTotal: { size: number; limit: number; conversion: boolean };
   dnsCache: {

@@ -5,21 +5,18 @@ import logger from '@server/logger';
 
 /*
  * Release groups an admin has blocked. Seerr AI's own searches (Backfill and
- * the admin agent) pass over their releases, and Radarr and Sonarr are
- * given a custom format that matches them, scored in every quality profile
- * low enough that nothing carrying it is ever acceptable, so they never
- * grab one either. A file already on disk from a blocked group scores as
- * low too, so Radarr and Sonarr take the next acceptable release as an
- * upgrade, and replace the file only once that one has imported.
+ * the admin agent) skip their releases. Radarr and Sonarr get a custom format
+ * matching them, scored in every quality profile so low that no release with
+ * it is acceptable. A blocked group's file already on disk scores as low, so
+ * it is replaced once an acceptable upgrade imports.
  *
- * Only the one custom format below is ever touched; formats an admin made
- * in Radarr or Sonarr themselves are left alone.
+ * Only the format named below is touched; admin-made formats are left alone.
  */
 
 export const BLOCK_FORMAT_NAME = 'Seerr AI: blocked release groups';
 const LABEL = 'Blocked groups';
 
-/** What a group's name may be: what release names carry after the dash. */
+/** A valid group name: what release names carry after the dash. */
 export const GROUP_NAME = /^[\w][\w.\- ]{0,59}$/;
 
 export const blockedGroups = (): string[] =>
@@ -27,15 +24,14 @@ export const blockedGroups = (): string[] =>
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** A group named as its own word, however the release spells the rest. */
+/** Matches the group as a whole word, case-insensitive. */
 const wordOf = (group: string) =>
   new RegExp(`(?:^|[^a-z0-9])${escape(group)}(?:$|[^a-z0-9])`, 'i');
 
 /**
- * The blocked group a release belongs to, by the group its indexer or
- * Radarr/Sonarr read, or by the group's name as a word of the title (a
- * torrent can name it with spaces, "x264 quillowsap mp4", and no group is
- * read at all). Undefined when it is not blocked.
+ * The blocked group a release belongs to, by its parsed group or by the
+ * group's name as a word of the title (torrents can name it with spaces,
+ * "x264 quillowsap mp4", with no group parsed). Undefined when not blocked.
  */
 export const blockedGroupOf = (
   title: string,
@@ -76,9 +72,8 @@ export const blockFormat = (groups: string[]): ArrCustomFormat => {
 };
 
 /**
- * A score low enough that nothing with it is acceptable in this profile,
- * whatever else it scores: below the minimum even with every other format
- * the profile rewards.
+ * A score that keeps a release below the profile's minimum even with every
+ * other rewarded format.
  */
 export const blockScore = (
   profile: {
@@ -93,12 +88,12 @@ export const blockScore = (
   return -(1 + rewards + Math.abs(profile.minFormatScore ?? 0));
 };
 
-/** Brings one Radarr or Sonarr in line with the list. */
+/** Syncs one Radarr or Sonarr with the list. */
 const syncOne = async (api: ArrExtras, groups: string[]): Promise<void> => {
   const formats = await api.customFormats();
   const existing = formats.find((f) => f.name === BLOCK_FORMAT_NAME);
   if (!groups.length) {
-    // Nothing blocked: the format goes, and with it its scores.
+    // Nothing blocked: delete the format, and its scores with it.
     if (existing?.id) await api.deleteCustomFormat(existing.id);
     return;
   }
@@ -123,8 +118,8 @@ const syncOne = async (api: ArrExtras, groups: string[]): Promise<void> => {
 };
 
 /**
- * Brings every Radarr and Sonarr in line with the blocked groups. Returns
- * what could not be done, server by server, in words; empty when all went.
+ * Syncs every Radarr and Sonarr with the blocked groups. Returns one message
+ * per failed server.
  */
 export const syncBlockedGroups = async (): Promise<string[]> => {
   const settings = getSettings();

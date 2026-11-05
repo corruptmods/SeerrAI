@@ -11,8 +11,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * What a title page reveals about the people who requested it or reported
- * problems with it, depending on who is looking.
+ * What a title page reveals about requesters and issue reporters, depending on
+ * the viewer.
  */
 
 const person = (id: number, email: string, permissions = Permission.REQUEST) =>
@@ -95,8 +95,8 @@ describe('a title seen by different people', () => {
   });
 
   it('keeps what the title page lists of each request for anyone', () => {
-    // The page's "Requested by": who, with their picture, for what, how it
-    // stands and when.
+    // The page's "Requested by": who, with avatar, for what, its status and
+    // when.
     const requester = person(1, 'requester@example.com');
     requester.avatar = '/avatar/1.png';
     requester.setDisplayName();

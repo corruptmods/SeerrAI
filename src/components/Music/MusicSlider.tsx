@@ -16,21 +16,18 @@ import useSWR from 'swr';
 interface MusicSliderProps {
   title: string;
   sliderKey: string;
-  /** Where the row's first page comes from... */
+  /** The row's source URL... */
   url?: string;
-  /** ...or what it shows, already loaded. */
+  /** ...or preloaded items. */
   items?: (MusicAlbumResult | MusicArtistResult | MusicSongResult)[];
   isLoading?: boolean;
-  /** The whole list, from the row's title. */
+  /** The full list, linked from the title. */
   linkUrl?: string;
-  /** Told how many it has once its first page answers (none if it failed). */
+  /** Called with the first page's count (0 if it failed). */
   onLoaded?: (count: number) => void;
 }
 
-/**
- * A row of albums, artists or songs. A row with nothing to show, or whose source
- * did not answer, is left out rather than shown empty.
- */
+/** A row of albums, artists or songs; hidden when empty or failed. */
 const MusicSlider = ({
   title,
   sliderKey,

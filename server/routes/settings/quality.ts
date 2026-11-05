@@ -42,8 +42,8 @@ import { z } from 'zod';
 
 /*
  * Settings → Quality. Saving only saves; nothing reaches Radarr or Sonarr
- * until an admin presses Apply on a server's preview (or turned on TRaSH
- * Guides updates applying on their own).
+ * until an admin applies a server's preview (or enables automatic TRaSH
+ * Guides updates).
  */
 const qualityRoutes = Router();
 
@@ -68,8 +68,8 @@ const serverBody = z.object({
     burnedInLastResort: z.boolean(),
     av1LastResort: z.boolean(),
   }),
-  // Each preset's own: one of the three, or MB a minute (Sonarr) or GB a
-  // film (Radarr).
+  // Per preset: one of the three, or MB per minute (Sonarr) or GB per film
+  // (Radarr).
   sizes: z
     .partialRecord(
       presetKey,
@@ -119,7 +119,7 @@ interface Answer {
   body: unknown;
 }
 
-/** An error as the page is told it. */
+/** The error response the page gets. */
 const answerFor = (e: unknown, what: string): Answer => {
   if (e instanceof QualityError) {
     const status =
@@ -146,14 +146,13 @@ const failed = (res: Response, e: unknown, what: string) => {
 };
 
 /*
- * Applies and undoes can take minutes on a big server, longer than a proxy
- * in front of Seerr AI waits for an answer (it answers 502 and the page
- * sees a network error, while the work goes on). One that isn't done in a
- * few seconds answers 202 with a job, and the page asks how it went.
+ * Applies and undoes can take minutes on a big server, longer than a reverse
+ * proxy waits (it answers 502 while the work goes on). One not done within a
+ * few seconds answers 202 with a job, which the page polls.
  */
 let waitMs = 4000;
 
-/** For tests: how long a request waits before answering with a job. */
+/** Sets how long a request waits before answering with a job (tests). */
 export const setJobWaitForTests = (ms: number) => {
   waitMs = ms;
 };
@@ -310,7 +309,7 @@ qualityRoutes.put('/', async (req, res, next) => {
     (s) => s.managed && Object.values(s.presets).includes('trash')
   );
   if (usesTrash && !(await readTrashState()).commit) {
-    // First time TRaSH Guides is chosen: fetch it now, not in an hour.
+    // TRaSH Guides chosen for the first time: fetch now, not in an hour.
     await refreshTrash();
   }
   return res.status(200).json(await shown());
@@ -334,8 +333,8 @@ qualityRoutes.post('/servers/:kind/:serverId/preview', async (req, res) => {
   const parsed = previewBody.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ code: 'bad-request' });
   try {
-    // Never apply a copy of TRaSH Guides more than a day old (the
-    // daily check may not have run, say while the server was off).
+    // Never apply a TRaSH Guides copy over a day old (the daily check may not
+    // have run, e.g. while the server was off).
     const config = configFor(ref);
     if (config.managed && Object.values(config.presets).includes('trash')) {
       await refreshTrashIfOlder(24 * 60 * 60 * 1000);
@@ -346,7 +345,7 @@ qualityRoutes.post('/servers/:kind/:serverId/preview', async (req, res) => {
   }
 });
 
-// How far an apply under way has got, for the page's progress bar.
+// Progress of a running apply, for the page's progress bar.
 qualityRoutes.get('/servers/:kind/:serverId/apply/progress', (req, res) => {
   const ref = refOf(req.params);
   if (!ref) return res.status(404).json({ code: 'not-found' });
@@ -364,7 +363,7 @@ const applyBody = z.object({
     .max(50)
     .optional(),
   restoreKept: z.boolean().optional(),
-  /** The preview's: nothing is applied if what it showed has changed. */
+  /** From the preview: nothing is applied if what it showed has changed. */
   token: z.string().max(64).optional(),
 });
 
@@ -385,7 +384,7 @@ qualityRoutes.post('/servers/:kind/:serverId/apply', async (req, res) => {
   });
 });
 
-// How a slow apply or undo went: done with its answer, or still going.
+// Status of a slow apply or undo: done with its result, or still running.
 qualityRoutes.get('/jobs/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) return res.status(404).json({ code: 'not-found' });
@@ -439,7 +438,7 @@ qualityRoutes.get(
   }
 );
 
-/** Choices on the page not saved yet, for What it does. */
+/** Unsaved choices on the page, for What it does. */
 const choicesBody = serverBody
   .pick({
     presets: true,

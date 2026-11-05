@@ -9,10 +9,10 @@ import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 
 /*
- * The Sonarr and Radarr calls Download Check makes, in one shape for both:
- * the queue (downloads waiting, downloading and blocked), the title each is
- * filed under, the files there already, and the three things it does about
- * a download: take it out of the queue, import it, or search again.
+ * Sonarr and Radarr calls for Download Check, in one shape for both: the
+ * queue (waiting, downloading and blocked), the title each download is
+ * filed under, existing files, and its three actions: remove from the
+ * queue, import, or search again.
  */
 
 export type ArrApp = 'sonarr' | 'radarr';
@@ -22,12 +22,12 @@ export interface QueueEpisode extends SeriesEpisode {
   episodeFileId?: number;
 }
 
-/** One download in a queue; a pack's records joined into one. */
+/** One queued download; a pack's records merged into one. */
 export interface Grab {
-  /** The download client's id in lower case, or the title while waiting. */
+  /** The download client's id lower-cased, or the title while waiting. */
   key: string;
   downloadId?: string;
-  /** Every queue record it has (Sonarr lists a pack once per episode). */
+  /** All its queue record ids (Sonarr lists a pack once per episode). */
   queueIds: number[];
   title: string;
   protocol: string;
@@ -37,9 +37,9 @@ export interface Grab {
   state: string;
   /** ok, warning or error. */
   trackedStatus: string;
-  /** What the server says is wrong, every line. */
+  /** Every status message from the server. */
   messages: string[];
-  /** When the server took it, or held it back. */
+  /** When the server grabbed it or held it back. */
   added?: string;
   size: number;
   sizeLeft: number;
@@ -51,7 +51,7 @@ export interface Grab {
   episodes: QueueEpisode[];
 }
 
-/** A file Sonarr or Radarr would import from a download, as it reads it. */
+/** A file Sonarr or Radarr would import from a download, as it parses it. */
 export interface ImportCandidate {
   path: string;
   size: number;
@@ -65,8 +65,8 @@ export interface ImportCandidate {
 }
 
 /**
- * What a file going in is: the episodes, or the movie. The download's id
- * ties the import to it, so the server finishes the download as its own.
+ * What an imported file is: the episodes or the movie. The download id ties
+ * the import to the download so the server completes it as its own.
  */
 export interface ImportFile extends ImportCandidate {
   itemId: number;
@@ -112,7 +112,7 @@ export interface CheckServer {
   search(itemId: number, episodeIds: number[]): Promise<void>;
 }
 
-/** A queue's records, a page at a time; packs come once per episode. */
+/** Queue page size and max pages; packs appear once per episode. */
 const QUEUE_PAGE = 500;
 const QUEUE_PAGES = 10;
 
@@ -139,7 +139,7 @@ interface RawQueueRecord {
 
 const lower = (value?: string) => (value ?? '').toLowerCase();
 
-/** One Grab per download: a pack's records joined, waiting ones by title. */
+/** One Grab per download: pack records merged, waiting ones keyed by title. */
 export const grabsOf = (records: RawQueueRecord[], app: ArrApp): Grab[] => {
   const grabs = new Map<string, Grab>();
   for (const r of records) {
@@ -221,7 +221,7 @@ const candidatesOf = (data: unknown): ImportCandidate[] =>
     releaseType: c.releaseType,
   }));
 
-/** Both apps take a queue removal, a command and a profile the same way. */
+/** Queue removal, commands and profiles work the same in both apps. */
 const shared = (http: AxiosInstance, app: ArrApp) => ({
   async queuePages(params: Record<string, unknown>) {
     const records: RawQueueRecord[] = [];
@@ -251,8 +251,8 @@ const shared = (http: AxiosInstance, app: ArrApp) => ({
   async manualImport(files: Record<string, unknown>[]) {
     const { data } = await http.post<{ id: number }>('/command', {
       name: 'ManualImport',
-      // Moves what a Usenet client finished, copies (or hard-links) what a
-      // torrent client still seeds, as the server's own import would.
+      // Moves finished Usenet downloads and copies (or hard-links) seeding
+      // torrents, like the server's own import.
       importMode: 'auto',
       files,
     });
@@ -426,8 +426,8 @@ export class CheckRadarr extends RadarrAPI implements CheckServer {
       images?: { coverType: string; remoteUrl?: string }[];
       movieFile?: { id: number; quality: Quality; customFormatScore?: number };
     }>(`/movie/${movieId}`);
-    // The movie's own copy of its file has no custom format score; the file
-    // list does.
+    // The movie's embedded file has no custom format score; the file list
+    // does.
     let score: number | undefined;
     if (data.movieFile) {
       const { data: files } = await this.axios.get<

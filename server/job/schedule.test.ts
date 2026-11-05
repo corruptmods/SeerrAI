@@ -45,11 +45,8 @@ import schedule from 'node-schedule';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
-/*
- * A scheduled job that fails is logged and left to run again next time.
- * Left alone, its rejected promise reached the process unhandled, and
- * Node stops the whole server when that happens.
- */
+// A failing scheduled job is logged and runs again next time. Unhandled, its
+// rejected promise would stop the server.
 
 const fail = async () => {
   throw new Error('service unreachable');
@@ -111,7 +108,7 @@ afterEach(async () => {
   mock.restoreAll();
 });
 
-/** Connects the servers given, the first as the primary one. */
+/** Connects the given servers, the first as primary. */
 const connect = (...kinds: MediaServerKind[]) => {
   const settings = getSettings();
   settings.main.mediaServerType = typeOfKind(kinds[0]);
@@ -139,8 +136,8 @@ describe('scheduled jobs', () => {
       await settle();
 
       assert.deepEqual(unhandled, []);
-      // Every job's failure was logged with its name. Database
-      // maintenance logs its own.
+      // Every job's failure is logged with its name. Database maintenance logs
+      // its own.
       for (const job of scheduledJobs) {
         if (job.id === 'database-maintenance') continue;
         assert.ok(
@@ -153,15 +150,12 @@ describe('scheduled jobs', () => {
     });
   }
 
-  // The interval decides which choices the schedule editor offers. Watchlist
-  // Sync runs every few minutes, so offering only seconds left admins no way
-  // to keep its schedule, or to set a sensible one.
   it('replaces its jobs when started again, rather than scheduling them twice', () => {
     connect('plex');
     stubEveryJob();
     startJobs();
     const first = [...scheduledJobs];
-    // A media server set up after Seerr AI started starts the jobs again.
+    // A media server set up after startup restarts the jobs.
     startJobs();
     assert.equal(new Set(ids()).size, ids().length, 'each job once');
     assert.equal(scheduledJobs.length, first.length);
@@ -197,8 +191,8 @@ describe('scheduled jobs', () => {
     const [message, meta] = logged[0];
     assert.match(message, /Thrower/);
     assert.equal(meta.errorMessage, 'bad settings');
-    // Only the message and stack: an API client's error carries the
-    // request, API key and all, which must not reach the log.
+    // Only message and stack: API client errors carry the request, API key
+    // included, which must not be logged.
     assert.deepEqual(Object.keys(meta).sort(), [
       'errorMessage',
       'label',
@@ -275,10 +269,10 @@ describe('scheduled jobs', () => {
       )
     );
     assert.ok(ids().includes('emby-recently-added-scan'));
-    // The old schedule is gone, and a scan under way stops.
+    // The old schedule is gone, and a running scan stops.
     assert.equal(plexScan?.job.nextInvocation(), null);
     assert.equal(scanCancelled.mock.callCount(), 1);
-    // Everything else is there once, as it was.
+    // Everything else is there once, unchanged.
     assert.equal(scheduledJobs.length - 2, others);
     assert.equal(new Set(ids()).size, scheduledJobs.length);
   });
@@ -325,7 +319,7 @@ describe('scheduled jobs', () => {
     startJobs();
     await onImport();
 
-    // Jellyfin's was already running; Plex failing does not stop Emby's.
+    // Jellyfin's was already running; Plex failing doesn't stop Emby's.
     assert.deepEqual(ran.sort(), ['emby', 'plex']);
   });
 
@@ -357,10 +351,10 @@ describe('scheduled jobs', () => {
       );
       assert.equal(new Set(ids()).size, scheduledJobs.length);
 
-      // Registered again (a Lidarr edited), still once each.
+      // Re-registered (a Lidarr edited), still once each.
       refreshMusicJobs();
       assert.equal(ids().filter((id) => id === 'music-sync').length, 1);
-      // A server connected or removed leaves them be.
+      // Connecting or removing a server leaves them alone.
       connect('plex', 'jellyfin');
       refreshMediaServerJobs();
       assert.ok(ids().includes('music-full-scan'));

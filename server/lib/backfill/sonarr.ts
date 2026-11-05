@@ -2,9 +2,9 @@ import SonarrAPI from '@server/api/servarr/sonarr';
 import type { SonarrSettings } from '@server/lib/settings';
 
 /*
- * The Sonarr calls only Backfill makes: parsing a name the way Sonarr would,
- * reading a series' files, quality profile and wanted lists, and running a
- * manual import and following it to the end.
+ * Backfill-only Sonarr calls: parsing names, reading a series' files,
+ * quality profile and wanted lists, and running and following manual
+ * imports.
  */
 
 export interface SonarrQuality {
@@ -30,9 +30,8 @@ export interface SonarrEpisode {
   episodeFileId: number;
   lastSearchTime?: string;
   /**
-   * The scene's numbering (TheXEM), when it differs from the library's.
-   * A series with scene numbering on is searched for, and has release
-   * names read, by it.
+   * Scene numbering (TheXEM), when it differs from the library's. Series
+   * with scene numbering on are searched and parsed by it.
    */
   sceneSeasonNumber?: number;
   sceneEpisodeNumber?: number;
@@ -50,7 +49,7 @@ export interface SonarrEpisodeFile {
   qualityCutoffNotMet?: boolean;
   releaseGroup?: string;
   languages?: SonarrLanguage[];
-  /** What Sonarr read from the file itself: "eng", "eng/jpn"; "13:43". */
+  /** Read from the file itself: "eng", "eng/jpn"; "13:43". */
   mediaInfo?: { audioLanguages?: string; subtitles?: string; runTime?: string };
 }
 
@@ -83,12 +82,12 @@ export interface SonarrProfileItem {
   quality?: { id: number; name: string };
   items?: SonarrProfileItem[];
   allowed: boolean;
-  /** Sonarr v5: sizes in MB a minute, per quality, in the profile. */
+  /** Sonarr v5: per-profile size limits in MB per minute. */
   minSize?: number | null;
   maxSize?: number | null;
 }
 
-/** Sizes in MB a minute for a quality (Radarr, and Sonarr before v5). */
+/** Global per-quality size limits in MB per minute (Radarr, Sonarr < v5). */
 export interface QualityDefinition {
   quality: { id: number; name: string };
   minSize?: number | null;
@@ -122,7 +121,7 @@ export interface SonarrWantedRecord {
     tmdbId?: number;
     seriesType?: string;
     monitored?: boolean;
-    /** When it was added to Sonarr. */
+    /** When added to Sonarr. */
     added?: string;
     images?: { coverType: string; remoteUrl?: string }[];
   };
@@ -134,7 +133,7 @@ export interface SonarrCommand {
   status: 'queued' | 'started' | 'completed' | 'failed' | 'aborted' | string;
   result?: string;
   message?: string;
-  /** What it was asked for: a search's series, episodes or movies. */
+  /** A search's targets: series, episodes or movies. */
   body?: {
     seriesId?: number;
     episodeIds?: number[];
@@ -148,7 +147,7 @@ export interface SonarrRemotePathMapping {
   localPath: string;
 }
 
-/** A result of Sonarr's or Radarr's own indexer search. */
+/** A result of Sonarr's or Radarr's indexer search. */
 export interface ArrSearchRelease {
   guid: string;
   title: string;
@@ -175,15 +174,15 @@ export interface ArrSearchRelease {
 }
 
 /**
- * A season number as Sonarr reads it from a name, or undefined when the name
- * has none. Sonarr v5 says -1 for that where v4 said 0, in a parse and in
- * search results alike; 0 stays as it was, as v4 also uses it for specials.
+ * A parsed season number, or undefined when the name has none. Sonarr v5
+ * uses -1 for none (v4 used 0); 0 is kept, since v4 also uses it for
+ * specials.
  */
 export const seasonOrNone = (season?: number | null): number | undefined =>
   season === undefined || season === null || season < 0 ? undefined : season;
 
 /**
- * An indexer search can take a while across many indexers; an anime season
+ * Indexer searches across many indexers are slow; an anime season takes
  * minutes, since Sonarr searches it episode by episode.
  */
 export const RELEASE_SEARCH_TIMEOUT_MS = 10 * 60_000;
@@ -199,14 +198,14 @@ export interface SonarrSeriesDetail {
   path: string;
   alternateTitles?: { title: string; seasonNumber?: number }[];
   /**
-   * Sonarr v5: the title in its original language. `title` is then in the
-   * language chosen for the series, which need not be the one releases use.
+   * Sonarr v5: the original-language title. `title` is then in the series'
+   * chosen language, which releases may not use.
    */
   originalTitle?: string;
   originalLanguage?: { id: number; name: string };
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
   statistics?: { episodeFileCount: number; episodeCount: number };
-  /** An episode's usual length, in minutes. */
+  /** Typical episode length in minutes. */
   runtime?: number;
 }
 
@@ -268,9 +267,8 @@ class BackfillSonarr extends SonarrAPI {
   }
 
   public async getQualityDefinitions(): Promise<QualityDefinition[]> {
-    const { data } = await this.axios.get<QualityDefinition[]>(
-      '/qualitydefinition'
-    );
+    const { data } =
+      await this.axios.get<QualityDefinition[]>('/qualitydefinition');
     return Array.isArray(data) ? data : [];
   }
 
@@ -282,9 +280,8 @@ class BackfillSonarr extends SonarrAPI {
   }
 
   /**
-   * Every monitored, missing episode (or every one below its cutoff), a
-   * page at a time, newest first. `complete` is false when there were more
-   * than `maxPages` pages: what was left out is still missing, not found.
+   * Monitored episodes missing or below cutoff, newest first. `complete` is
+   * false past `maxPages` pages: the rest is still missing, not found.
    */
   public async getWanted(
     kind: 'missing' | 'cutoff',
@@ -313,7 +310,7 @@ class BackfillSonarr extends SonarrAPI {
     return { records, complete: false };
   }
 
-  /** The episodes of a series waiting in Sonarr's download queue. */
+  /** Episode ids of a series in Sonarr's download queue. */
   public async getSeriesQueueEpisodes(seriesId: number): Promise<number[]> {
     const { data } = await this.axios.get<{
       records?: { episodeId?: number; episode?: { id: number } }[];
@@ -324,8 +321,8 @@ class BackfillSonarr extends SonarrAPI {
   }
 
   /**
-   * Sonarr's own search across its indexers, every result with its
-   * reasons for turning it down: a season, or one episode.
+   * Sonarr's search for a season or one episode, with each rejection
+   * reason.
    */
   public async getReleases(
     params: { seriesId: number; seasonNumber: number } | { episodeId: number }
@@ -349,7 +346,7 @@ class BackfillSonarr extends SonarrAPI {
     return Number(data?.totalRecords) || 0;
   }
 
-  /** Root folders with their free space now, not from the hour's cache. */
+  /** Root folders with current free space, bypassing the hourly cache. */
   public async getRootFoldersNow(): Promise<
     { path: string; freeSpace: number }[]
   > {
@@ -366,7 +363,7 @@ class BackfillSonarr extends SonarrAPI {
     return Array.isArray(data) ? data : [];
   }
 
-  /** The video files Sonarr sees in a folder, as its own paths. */
+  /** Video files Sonarr sees in a folder, with its own paths. */
   public async getFolderFiles(
     folder: string
   ): Promise<{ path: string; name: string; size: number }[]> {
@@ -378,7 +375,7 @@ class BackfillSonarr extends SonarrAPI {
     return Array.isArray(data) ? data : [];
   }
 
-  /** Starts a manual import; answers the command's id to follow. */
+  /** Starts a manual import; returns the command id. */
   public async manualImport(files: ManualImportFile[]): Promise<number> {
     const { data } = await this.axios.post<SonarrCommand>('/command', {
       name: 'ManualImport',
@@ -388,7 +385,7 @@ class BackfillSonarr extends SonarrAPI {
     return data.id;
   }
 
-  /** Has Sonarr rename files to its naming scheme; answers the command's id. */
+  /** Renames files to Sonarr's naming scheme; returns the command id. */
   public async renameFiles(seriesId: number, files: number[]): Promise<number> {
     const { data } = await this.axios.post<SonarrCommand>('/command', {
       name: 'RenameFiles',
@@ -403,7 +400,7 @@ class BackfillSonarr extends SonarrAPI {
     return data;
   }
 
-  /** Every command Sonarr has queued, running or lately done. */
+  /** Commands Sonarr has queued, running or recently finished. */
   public async getCommands(): Promise<SonarrCommand[]> {
     const { data } = await this.axios.get<SonarrCommand[]>('/command');
     return Array.isArray(data) ? data : [];

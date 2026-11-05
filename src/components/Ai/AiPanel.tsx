@@ -11,8 +11,8 @@ const messages = defineMessages('components.Ai.AiPanel', {
 });
 
 /**
- * Asking the model something from a page: whether it is busy, the answer,
- * or why there is none, and the count left today kept up to date.
+ * Runs an AI request and tracks busy, answer and error state; refreshes the
+ * daily remaining count.
  */
 export const useAiAnswer = <T,>() => {
   const intl = useIntl();
@@ -43,7 +43,7 @@ export const useAiAnswer = <T,>() => {
   return { ...state, ask, reset: () => setState({ busy: false }) };
 };
 
-/** The side panel an AI answer is shown in, with its busy and error states. */
+/** Side panel for an AI answer, with busy and error states. */
 const AiPanel = ({
   show,
   title,

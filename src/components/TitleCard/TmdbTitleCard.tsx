@@ -30,8 +30,8 @@ const TmdbTitleCard = ({
 }: TmdbTitleCardProps) => {
   const { hasPermission } = useUser();
 
-  // The title loads once the card is near the screen, so it is ready (and
-  // its poster with it) by the time it is scrolled to.
+  // Fetch once near the screen so the title and poster are ready when scrolled
+  // to.
   const { ref, near } = useNearScreen();
   const url =
     type === 'movie' ? `/api/v1/movie/${tmdbId}` : `/api/v1/tv/${tmdbId}`;

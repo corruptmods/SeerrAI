@@ -32,10 +32,9 @@ import path from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Settings → Media Servers: connecting Plex, Jellyfin and Emby beside each
- * other, removing them, choosing the primary one and who may sign in with
- * each, against stand-ins that answer as the servers do, behind the real
- * OpenAPI validator.
+ * Settings → Media Servers: connecting Plex, Jellyfin and Emby side by side,
+ * removing them, choosing the primary and who may sign in with each, against
+ * stand-in servers, behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -59,9 +58,9 @@ const accounts = [
 ];
 
 /**
- * A stand-in Jellyfin server: "den-admin" (password "secret") is an
- * administrator, "viewer" (password "pw") is not. The key Seerr makes
- * itself, and "given-key", are its API keys.
+ * Stand-in Jellyfin: "den-admin" (password "secret") is an admin, "viewer"
+ * (password "pw") is not. Its API keys are the one Seerr creates and
+ * "given-key".
  */
 const jellyfinStandIn = (req: IncomingMessage, res: http.ServerResponse) => {
   const auth = String(req.headers.authorization ?? '');
@@ -139,7 +138,7 @@ before(async () => {
 
   const app = express();
   app.use(express.json());
-  // Signed in as the person the test names, the owner when none.
+  // Signed in as the user the test names, else the owner.
   app.use(async (req, _res, next) => {
     req.user = await getRepository(User).findOneOrFail({
       where: { id: Number(req.headers['x-test-user'] ?? 1) },
@@ -251,7 +250,7 @@ interface Summary {
 const byKind = (list: Summary[], kind: MediaServerKind) =>
   list.find((server) => server.kind === kind) as Summary;
 
-/** Connects Jellyfin as Seerr would have, with Seerr's own API key. */
+/** Connects Jellyfin as Seerr does, with Seerr's own API key. */
 const connectJellyfin = (signIn = true) => {
   getSettings().jellyfin = {
     ...jellyfinDefaults(),
@@ -265,7 +264,7 @@ const connectJellyfin = (signIn = true) => {
   };
 };
 
-/** The stand-in Jellyfin server's address, as the connect form sends it. */
+/** The stand-in's address, as the connect form sends it. */
 const at = () => ({
   hostname: '127.0.0.1',
   port: jellyfinPort,
@@ -417,7 +416,7 @@ describe('connecting Jellyfin or Emby', () => {
     assert.equal(owner.userType, UserType.PLEX);
     assert.equal(owner.email, 'admin@seerr.dev');
 
-    // Its scans started, beside Plex's.
+    // Its scans start alongside Plex's.
     const ids = scheduledJobs.map((job) => job.id);
     assert.ok(ids.includes('jellyfin-recently-added-scan'));
     assert.ok(ids.includes('plex-recently-added-scan'));
@@ -786,7 +785,7 @@ describe('removing a server', () => {
     assert.ok(scheduledJobs.some((job) => job.server === 'plex'));
     assert.equal(availabilitySyncRuns, 1);
 
-    // People's accounts on it stay, unused.
+    // Users' accounts on it are kept, unused.
     const friend = await getRepository(User).findOneOrFail({
       where: { id: 2 },
       select: ['id', 'jellyfinUserId'],
@@ -832,11 +831,11 @@ describe('removing a server', () => {
   it('says how many people could then sign in only with a password, or not at all', async () => {
     connectJellyfin();
     const users = getRepository(User);
-    // Owner (1): Plex and Jellyfin, with a password: unaffected.
+    // Owner (1): Plex, Jellyfin and a password: unaffected.
     await users.update(1, { jellyfinUserId: ADMIN_ID });
-    // Friend (2): Jellyfin only, with a password: password only.
+    // Friend (2): Jellyfin only with a password: password only.
     await users.update(2, { jellyfinUserId: VIEWER_ID, plexId: null });
-    // Three: Jellyfin only, no password: not at all.
+    // Three: Jellyfin only, no password: can't sign in.
     await users.save(
       new User({
         email: 'three@seerr.dev',
@@ -846,8 +845,8 @@ describe('removing a server', () => {
         avatar: '',
       })
     );
-    // Four: Jellyfin and Plex, with no password: unaffected while Plex
-    // allows sign-in.
+    // Four: Jellyfin and Plex, no password: unaffected while Plex allows
+    // sign-in.
     await users.save(
       new User({
         email: 'four@seerr.dev',
@@ -907,7 +906,7 @@ describe('removing a server', () => {
     connectJellyfin();
     const users = getRepository(User);
     await users.update(1, { jellyfinUserId: ADMIN_ID });
-    // Jellyfin only, no password, but a provider that is on: unaffected.
+    // Jellyfin only, no password, an enabled provider: unaffected.
     const withSso = await users.save(
       new User({
         email: 'sso@seerr.dev',
@@ -917,7 +916,7 @@ describe('removing a server', () => {
         avatar: '',
       })
     );
-    // Jellyfin only, no password, a provider that is off: not at all.
+    // Jellyfin only, no password, a disabled provider: can't sign in.
     const withOffSso = await users.save(
       new User({
         email: 'off@seerr.dev',
@@ -974,7 +973,7 @@ describe('Match Check on a title page', () => {
   it("shows only problems with this title's own id on each server", async () => {
     connectJellyfin();
     getSettings().emby = { ...getSettings().jellyfin, connected: true };
-    // Emby and Plex number their items alike: Emby's 555 is another film.
+    // Emby and Plex ids overlap: Emby's 555 is a different film.
     report([matchedTo('Emby', '555'), matchedTo('Plex', '555')]);
     await getRepository(Media).save([
       new Media({
@@ -1011,19 +1010,23 @@ describe('Match Check on a title page', () => {
         kind: 'movie',
         problem: JSON.stringify({
           ...matchedTo('Plex', key),
-          expected: { title: 'Border Feud', tmdbId: 846213, server: 'Radarr' },
+          expected: {
+            title: 'Static Garden',
+            tmdbId: 846213,
+            server: 'Radarr',
+          },
           matched: { title, key },
         }),
         foundAt: new Date(),
         resolvedAt,
       });
     await found('old', 'Fixed Since', new Date());
-    await found('new', 'Guerra Fronteriza');
-    // The nightly report has an older finding on the same server.
+    await found('new', 'Jardín Estático');
+    // The nightly report has an older finding for the same server.
     report([
       {
         ...matchedTo('Plex', 'nightly'),
-        expected: { title: 'Border Feud', tmdbId: 846213, server: 'Radarr' },
+        expected: { title: 'Static Garden', tmdbId: 846213, server: 'Radarr' },
       },
     ]);
     assert.deepEqual(await problemsFor(846213, 'x'), ['Plex new']);

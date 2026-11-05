@@ -21,8 +21,8 @@ interface Reason {
 }
 
 /**
- * Why each of the first page of suggestions was suggested, one line each,
- * from what this person has been watching.
+ * One-line reason, from the user's watch history, for each first-page
+ * suggestion.
  */
 const SuggestionReasons = ({
   titles,

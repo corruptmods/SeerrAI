@@ -1,36 +1,38 @@
 import { DbAwareColumn } from '@server/utils/DbColumnHelper';
 import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
-/** Before it downloads, or once it's downloaded and the import is stuck. */
+/** Before download, or after download when the import is stuck. */
 export type CheckStage = 'grab' | 'import';
 
 /**
- * What came after a reject (`params.after`), besides the blocklist:
+ * What followed a reject (`params.after`), besides the blocklist:
+ *
  * - search: the server searched again for what's missing
- * - byTitle: Backfill looks by episode title (a search by the release's
+ * - byTitle: Backfill searches by episode title (searching by the release's
  *   number would find it again)
- * - noSearch: not searched by that number, and Backfill doesn't look
- * - none: nothing missing, so nothing searched
+ * - noSearch: not searched by that number, and Backfill doesn't search
+ * - none: nothing missing, so no search
  */
 export type RejectAfter = 'search' | 'byTitle' | 'noSearch' | 'none';
 
 /**
  * What Download Check found:
+ *
  * - program, archive, noVideo, sample: the torrent's files
  * - early: grabbed a day or more before the episode aired
- * - otherTitle: another show, film or version than it's filed under
- * - renumbered: the right show, numbered another way (`params.episode`)
- * - notUpgrade: no better than the file there
- * - moreEpisodes: the file there holds more episodes than this one
- * - duplicate: a better copy of the same is in the queue
- * - sameTitle: named another way, but the title it's filed under
- * - unsureTitle: matched only on the indexer's id; the name doesn't say
- * - xem, sampleUnsure, unparsed: blocked for something an import gets past
- * - badFiles: nothing in it the server can import
- * - partial: some of a pack came in, the rest wasn't in it
- * - alreadyImported: its files are in already
+ * - otherTitle: a different show, film or version than it's filed under
+ * - renumbered: the right show, numbered differently (`params.episode`)
+ * - notUpgrade: no better than the existing file
+ * - moreEpisodes: the existing file holds more episodes
+ * - duplicate: a better copy is in the queue
+ * - sameTitle: named differently, but the title it's filed under
+ * - unsureTitle: matched only on the indexer's id; the name doesn't confirm it
+ * - xem, sampleUnsure, unparsed: blocked for something an import can get past
+ * - badFiles: nothing the server can import
+ * - partial: part of a pack arrived; the rest wasn't in it
+ * - alreadyImported: its files are already imported
  * - unknown: blocked for a reason Download Check doesn't know
- * - unmapped: right title, but which file is which episode can't be told
+ * - unmapped: right title, but files can't be mapped to episodes
  */
 export type CheckFinding =
   | 'program'
@@ -55,12 +57,11 @@ export type CheckFinding =
   | 'unmapped';
 
 /**
- * - reject: out of the queue and the client, never grabbed again, and
- *   searched for again while anything it was for is still missing
- * - drop: out of the queue and the client, nothing else (a better copy is
- *   coming)
- * - clear: out of the queue, left in the client (it's been imported, or
- *   all of it that could be), and what's still missing searched for
+ * - reject: removed from queue and client, blocklisted, and searched again
+ *   while anything it was for is missing
+ * - drop: removed from queue and client, nothing else (a better copy is coming)
+ * - clear: removed from the queue but left in the client (imported, fully or as
+ *   far as possible), and anything missing searched for
  * - import: imported, telling the server which episodes or movie it is
  * - review: left for an admin
  */
@@ -82,9 +83,8 @@ export type CheckStatus =
   | 'gone';
 
 /**
- * A download Download Check found something wrong with, and what it did.
- * One row a download and stage: a download is judged once before it comes
- * down and once if its import gets stuck.
+ * A download Download Check flagged, and what it did. One row per download and
+ * stage: judged once before download and again if its import gets stuck.
  */
 @Entity()
 @Unique(['app', 'serverId', 'downloadKey', 'stage'])
@@ -105,11 +105,11 @@ export class DownloadCheck {
   @Column({ type: 'varchar' })
   public stage: CheckStage;
 
-  /** The release's name. */
+  /** The release name. */
   @Column({ type: 'varchar' })
   public title: string;
 
-  /** Sonarr's series or Radarr's movie. */
+  /** Sonarr's series or Radarr's movie id. */
   @Column()
   public itemId: number;
 
@@ -133,11 +133,11 @@ export class DownloadCheck {
   @Column({ type: 'varchar' })
   public status: CheckStatus;
 
-  /** What showing the finding needs (files, hours, qualities), as JSON. */
+  /** JSON details for displaying the finding (files, hours, qualities). */
   @Column({ type: 'text', default: '{}' })
   public params: string;
 
-  /** The server's own words for a blocked import. */
+  /** The server's message for a blocked import. */
   @Column({ type: 'text', default: '' })
   public detail: string;
 

@@ -7,10 +7,7 @@ import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
-/*
- * Removing a title goes to the server it was sent to, or else the default
- * one.
- */
+/* Removal goes to the server a title was sent to, else the default. */
 
 const radarr = (
   id: number,
@@ -48,7 +45,7 @@ beforeEach(() => {
     radarr(0, 'first.test', false),
     radarr(1, 'second.test', true),
   ];
-  // Not in that Radarr: nothing more is asked of it.
+  // The movie isn't in that Radarr, so nothing further is called.
   mock.method(
     RadarrAPI.prototype,
     'getMovieByTmdbId',

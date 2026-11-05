@@ -10,9 +10,8 @@ import { useIntl } from 'react-intl';
 type Request = NonFunctionProperties<MediaRequest>;
 
 /**
- * Retrying a failed request. When it is refused for want of a server to send
- * it to, the toast says so in the person's language and what to do: edit
- * the request to choose one, or add one in Settings.
+ * Retries a failed request. If refused for lack of a server, the toast
+ * explains (localised) and suggests editing it or adding one in Settings.
  */
 const useRetryRequest = (
   request: Pick<Request, 'id' | 'is4k'>,

@@ -25,8 +25,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Whoever requested a film Maintainerr is about to delete is told, once for
- * each date it is set to go.
+ * Requesters of a film Maintainerr is about to delete are told once per
+ * scheduled date.
  */
 
 setupTestDb();
@@ -35,7 +35,7 @@ const DAY_MS = 24 * 60 * 60_000;
 const TMDB_ID = 4401;
 
 let sent: { type: Notification; payload: NotificationPayload }[];
-// TMDB's methods are set on each instance: the film's title, from here.
+// TMDB methods are set per instance; the film's title comes from here.
 Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
   configurable: true,
   set() {},
@@ -78,7 +78,7 @@ beforeEach(async () => {
       soonDays: 7,
     } as MaintainerrSettings,
   ];
-  // A 30-day rule, the film added 27 days ago: going in 3 days.
+  // A 30-day rule, film added 27 days ago: leaving in 3 days.
   addDate = new Date(Date.now() - 27 * DAY_MS);
   mock.method(MaintainerrAPI.prototype, 'getCollections', async () => [
     {
@@ -127,7 +127,7 @@ beforeEach(async () => {
   await getRepository(MediaRequest).update(request.id, {
     status: MediaRequestStatus.COMPLETED,
   });
-  // Only what is told from here on.
+  // Only notices from here on.
   sent = [];
 });
 
@@ -152,7 +152,7 @@ describe('leaving soon', () => {
     assert.equal(payload.notifyAdmin, false);
     assert.equal(payload.actionUrl, `/movie/${TMDB_ID}`);
 
-    // Looked at again later: already told.
+    // Checked again later: already told.
     resetLeavingSoon();
     await tellLeavingSoon();
     assert.equal(sent.length, 1);

@@ -2,18 +2,17 @@ import type { MediaRequestStatus } from '@server/constants/media';
 import type AlbumRequest from '@server/entity/AlbumRequest';
 import type SongRequest from '@server/entity/SongRequest';
 
-/** An album Lidarr is asked for: one requested, or a song's single. */
+/** An album sent to Lidarr: a requested album or a song's single. */
 export interface LidarrTarget {
-  /** Its MusicBrainz release-group id. */
+  /** MusicBrainz release-group id. */
   mbId: string;
   title: string;
 }
 
 /**
- * What a music request has Lidarr fetch: its albums, and the singles its
- * songs are fetched through, each once, albums first. Only those whose own
- * status is one of `statuses`, when given. A song only on albums brings
- * none.
+ * Albums Lidarr fetches for a request: its albums, then its songs' singles,
+ * deduplicated, filtered by `statuses` when given. Songs with no single add
+ * nothing.
  */
 export const lidarrTargets = (
   request: { albums?: AlbumRequest[]; songs?: SongRequest[] },

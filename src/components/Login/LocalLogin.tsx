@@ -48,8 +48,7 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
     ),
   });
 
-  // People from Jellyfin or Emby have their name there as their email
-  // until they set one.
+  // Jellyfin/Emby users have their username as email until they set one.
   const jellyfinFamilyNames = settings.currentSettings.mediaServers
     .filter((server) => server.kind === 'jellyfin' || server.kind === 'emby')
     .map((server) => SERVER_NAMES[server.kind]);

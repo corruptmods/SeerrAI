@@ -21,8 +21,8 @@ import { describe, it } from 'node:test';
 
 /*
  * Plex matched the folder "Wrenna" (Sonarr: Wrenna, 2026) to The Wrenna
- * Diaries, and nothing said so. The check finds folders whose Plex match
- * disagrees with what Sonarr or Radarr has in them.
+ * Diaries, unflagged. The check finds folders whose Plex match disagrees with
+ * what Sonarr or Radarr has there.
  */
 
 setupTestDb();
@@ -167,8 +167,8 @@ describe('Plex Match Check, one item at a time', () => {
 });
 
 describe('Plex Match Check, two titles with one name', () => {
-  // Folders that read "Plex matched Quillmore (2025) to Quillmore (2025)":
-  // the names agree and the ids don't, so the ids are what must be shown.
+  // Folders reading "Plex matched Quillmore (2025) to Quillmore (2025)": names
+  // agree and ids don't, so the ids must be shown.
   const quillmore = {
     title: 'Quillmore',
     year: 2025,
@@ -218,17 +218,17 @@ describe('Plex Match Check, two titles with one name', () => {
     const { problem } = compareItem(
       'movie',
       {
-        ...movie('8', 'Guerra Fronteriza', '/m/Border Feud (2024)/c.mkv', [
+        ...movie('8', 'Jardín Estático', '/m/Static Garden (2024)/c.mkv', [
           'tmdb://3',
         ]),
         year: 2024,
       },
       new Map([
         [
-          'border feud (2024)',
+          'static garden (2024)',
           [
             {
-              title: 'Border Feud',
+              title: 'Static Garden',
               year: 2024,
               tmdbId: 846213,
               server: 'radarr',
@@ -239,14 +239,14 @@ describe('Plex Match Check, two titles with one name', () => {
     );
     assert.equal(
       plexMatchText(problem as PlexMatchProblem).title,
-      'Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024)'
+      'Plex matched "Static Garden (2024)" to Jardín Estático (2024)'
     );
   });
 });
 
 describe('Plex Match Check, saying whose mistake it is', () => {
-  // From the owner's 29 reports: Plex matched features to shorts of the
-  // same name, often by IMDb id alone; one folder held the short itself.
+  // From the owner's 29 reports: Plex matched features to same-named shorts,
+  // often by IMDb id alone; one folder held the short itself.
   const radarr = (over: Record<string, unknown>) => ({
     title: 'Brine',
     year: 2023,
@@ -321,7 +321,7 @@ describe('Plex Match Check, saying whose mistake it is', () => {
 
   it('suggests renaming a file not named after the film', () => {
     const borderFeud = {
-      title: 'Border Feud',
+      title: 'Static Garden',
       year: 2024,
       tmdbId: 846213,
       imdbId: undefined,
@@ -329,10 +329,10 @@ describe('Plex Match Check, saying whose mistake it is', () => {
       fileRuntime: 109,
     };
     const plex = {
-      title: 'Guerra Fronteriza',
+      title: 'Jardín Estático',
       year: 2024,
       guids: ['tmdb://1427986'],
-      folder: 'Border Feud (2024)',
+      folder: 'Static Garden (2024)',
     };
     const text = check(
       { ...borderFeud, file: 'Guerra.Fronteriza.2024.1080p.WEB-DL.mkv' },
@@ -341,8 +341,10 @@ describe('Plex Match Check, saying whose mistake it is', () => {
     assert.match(text.detail, /file 109 min, film 109 min/);
     assert.match(text.detail, /rename the file in Radarr/);
     assert.doesNotMatch(
-      check({ ...borderFeud, file: 'Border Feud (2024) WEBDL-1080p.mkv' }, plex)
-        .detail,
+      check(
+        { ...borderFeud, file: 'Static Garden (2024) WEBDL-1080p.mkv' },
+        plex
+      ).detail,
       /rename/
     );
   });
@@ -572,7 +574,7 @@ describe('Match Check on several servers', () => {
       (await plexMatchCheck.problemFor('series', { tvdbId: 577104 })).length,
       2
     );
-    // Found from the title it was wrongly matched to, by that server's id.
+    // Found via the wrongly matched title, by that server's id.
     assert.deepEqual(
       (
         await plexMatchCheck.problemFor('series', {
@@ -587,7 +589,7 @@ describe('Match Check on several servers', () => {
       }),
       []
     );
-    // An id without its server is taken as Plex's.
+    // An id without a server is taken as Plex's.
     assert.deepEqual(
       await plexMatchCheck.problemFor('series', { key: 'jf-wrenna' }),
       []
@@ -606,7 +608,7 @@ describe('Match Check on several servers', () => {
       ],
     }));
     t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => {
-      // Removed in Settings → Media Servers while its library is read.
+      // Removed in Settings → Media Servers while its library is being read.
       getSettings().jellyfin.connected = false;
       await plexMatchCheck.dropServer('Jellyfin');
       return {

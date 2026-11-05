@@ -47,13 +47,10 @@ import type { NextFunction, Request } from 'express';
 import { Router } from 'express';
 
 /*
- * Music to browse: search, artists, their albums and track lists, from
- * MusicBrainz; pictures from Lidarr's lookup, TheAudioDB and the Cover Art
- * Archive. Only once Lidarr is set up, and only for people with music on.
- *
- * MusicBrainz answers one request a second for the whole server. When it
- * would keep someone waiting too long, they are told it is busy (503) and
- * the page can try again.
+ * Music browsing (search, artists, albums, tracks) from MusicBrainz; pictures
+ * from Lidarr's lookup, TheAudioDB and the Cover Art Archive. Only once Lidarr
+ * is set up, for people with music on. MusicBrainz allows one request a second
+ * server-wide; when the wait is too long the client gets 503 and can retry.
  */
 const musicRoutes = Router();
 
@@ -63,33 +60,32 @@ const SEARCH_ARTISTS = 8;
 const SEARCH_ALBUMS = 12;
 const SEARCH_SONGS = 8;
 
-/** Whose songs a search looks among: the artists of the best albums… */
+/** Song search covers the artists of the top albums… */
 const SONG_ARTISTS_FROM_ALBUMS = 3;
-/** …and the best artists. */
+/** …and the top artists. */
 const SONG_ARTISTS_FROM_ARTISTS = 2;
 
 /*
- * How many a search asks MusicBrainz for, to pick the ones shown from: a
- * page of each, and further pages (up to these many) only while the
- * results are still tied on the top score. MusicBrainz scores every exact
- * match the same, so the album most people mean can be far down its list
- * (see lib/music/searchRank).
+ * Results fetched from MusicBrainz to rank from: one page each, plus further
+ * pages (up to these limits) only while results tie on the top score.
+ * MusicBrainz scores every exact match the same, so the intended album can be
+ * far down (see lib/music/searchRank).
  */
 const ARTIST_PAGE = 25;
 const ARTIST_PAGES = 2;
 const ALBUM_PAGE = 100;
 const ALBUM_PAGES = 3;
 
-/** MusicBrainz lists this many of an artist's albums a page. */
+/** MusicBrainz page size for an artist's albums. */
 const ALBUMS_PER_PAGE = 100;
 
 const statusOf = (e: unknown): number | undefined =>
   (e as { response?: { status?: number } })?.response?.status;
 
-/** A MusicBrainz failure, in words for the page and in the log. */
+/** Report a MusicBrainz failure to the client and the log. */
 const mbFailed = (next: NextFunction, e: unknown, what: string) => {
   if (e instanceof MusicBrainzUnwantedError) {
-    // Typed past: the page has already asked for the newer search.
+    // Superseded: the client already sent a newer search.
     return next({ status: 409, message: 'A newer search replaced this one.' });
   }
   if (e instanceof MusicBrainzBusyError) {
@@ -106,16 +102,14 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
 };
 
 /*
- * Each page's newest search: each person's in each tab or window (the
- * X-Seerr-Tab header the app sends), else each person's. MusicBrainz
- * answers one request a second for the whole server, so a search typed
- * past is dropped while it waits, rather than holding up the one now
- * wanted; a search in another tab is not typed past, and is left alone.
- * The songs below the same search are part of it.
+ * Newest search per user and tab (X-Seerr-Tab header), else per user.
+ * MusicBrainz allows one request a second server-wide, so a superseded search
+ * is dropped while queued instead of delaying the current one; searches in
+ * other tabs are unaffected. The song search counts as part of the same search.
  */
 const newestSearch = new Map<string, string>();
 
-/** Most tabs followed at once; the oldest are forgotten first. */
+/** Max tabs tracked; oldest evicted first. */
 export const MOST_TABS = 1000;
 
 const TAB = /^[\w-]{1,64}$/;
@@ -131,15 +125,13 @@ export const wantedSearch = (req: Request, query: string) => {
   if (newestSearch.size > MOST_TABS) {
     newestSearch.delete(newestSearch.keys().next().value as string);
   }
-  // A page forgotten since (another's tabs pushed it out) was not typed
-  // past: its search is still wanted.
+  // An evicted page wasn't superseded, so its search is still wanted.
   return () => (newestSearch.get(page) ?? key) === key;
 };
 
 /**
- * The artists and albums a search shows, best first. The same search asked
- * again within the hour (as the songs below ask it) is answered from
- * memory.
+ * Artists and albums for a search, best first. Repeats within the hour (as the
+ * song search makes) are served from cache.
  */
 const searchArtistsAndAlbums = async (
   query: string,
@@ -201,14 +193,12 @@ musicRoutes.get('/search', async (req, res, next) => {
 });
 
 /*
- * Songs, once Settings → Music lets them be asked for one at a time: each
- * with its versions (the radio edit, the club mix…), and where each stands.
- *
- * MusicBrainz scores every recording of a title the same, and a hit has
- * hundreds of covers, so its recordings are searched among the artists
- * the same search finds: those of the best albums first (a song's single
- * is an album there), then the best artists. Its own request, so artists
- * and albums are shown without waiting for it.
+ * Song search, when Settings → Music allows single-song requests: each with its
+ * versions (radio edit, club mix…) and status. MusicBrainz scores every
+ * recording of a title the same and hits have hundreds of covers, so recordings
+ * are searched among the artists the same search finds: top albums' artists
+ * first (a single is an album there), then top artists. Separate request so
+ * artists and albums don't wait for it.
  */
 musicRoutes.get('/search/songs', async (req, res, next) => {
   const query = String(req.query.query ?? '').trim();
@@ -262,8 +252,8 @@ musicRoutes.get<{ mbid: string }>('/artist/:mbid', async (req, res, next) => {
   try {
     const mb = musicBrainz();
     const artist = await mb.getArtist(mbid);
-    // The biography is a nicety: without it (a mirror that has none, a
-    // busy queue) the page still shows.
+    // Biography is optional: the page still loads without it (mirror lacks it,
+    // queue busy).
     const biography = await mb.getWikipediaExtract(mbid).catch(() => null);
     const media = await artistMedia(mbid);
     return res.status(200).json(
@@ -314,7 +304,7 @@ musicRoutes.get<{ mbid: string }>(
         res.setHeader('Cache-Control', 'private, max-age=3600');
         return next({ status: 404, message: 'No picture of this artist.' });
       }
-      // Kept by the browser for a day; the picture itself much longer.
+      // Browser keeps this a day; the picture itself much longer.
       res.setHeader('Cache-Control', 'private, max-age=86400');
       return res.redirect(302, musicImageUrl(image));
     } catch (e) {
@@ -328,9 +318,9 @@ musicRoutes.get<{ mbid: string }>(
 );
 
 /**
- * What has happened to an artist and their albums, newest first, for the
- * manage panel: requests, approvals, albums arriving or leaving. Kept by
- * the artist's MusicBrainz id, so it outlives Seerr's own record of them.
+ * Newest-first history of an artist and their albums for the manage panel:
+ * requests, approvals, albums arriving or leaving. Keyed by MusicBrainz id, so
+ * it outlives Seerr's own media rows.
  */
 musicRoutes.get<{ mbid: string }>(
   '/artist/:mbid/history',
@@ -385,8 +375,8 @@ musicRoutes.get<{ mbid: string }>(
         mb.getTracks(req.params.mbid).then(mapTracks),
         mb.getReleaseGroup(req.params.mbid),
       ]);
-      // Where each stands: here with the album when all of it is, else
-      // as asked for (or as it came, taken from this album).
+      // Status: available with the album when all of it is, else as requested
+      // (or as fetched from this album).
       const standing = await songStandings(
         tracks
           .filter((track) => track.recordingId)
@@ -398,10 +388,9 @@ musicRoutes.get<{ mbid: string }>(
       for (const track of tracks) {
         Object.assign(track, standing.get(track.recordingId ?? ''));
       }
-      // Without taking songs from albums, a song on no single can't be
-      // asked for by itself. Whether each is on one is known from its
-      // recording, kept from before; those not kept yet are looked up
-      // behind the scenes, and the page asks again.
+      // Without fetching songs from albums, a song on no single can't be
+      // requested alone. Whether it's on one comes from the cached recording;
+      // uncached ones are looked up in the background and the page polls again.
       if (songFetchProblem()) {
         await Promise.all(
           tracks.map(async (track) => {

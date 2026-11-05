@@ -1,6 +1,6 @@
 /**
- * Hours and minutes in a time left, rounded to the minute first so that
- * 1 h 59 min 40 s reads "2 h 0 min", never "1 h 60 min". At least a minute.
+ * Hours and minutes, rounded to the minute first so 1 h 59 min 40 s reads
+ * "2 h 0 min", not "1 h 60 min". Minimum one minute.
  */
 export const durationParts = (
   seconds: number

@@ -4,11 +4,10 @@ import type { AxiosInstance, AxiosResponse } from 'axios';
 import axios from 'axios';
 
 /*
- * The part of Prowlarr's API Backfill uses: one search across every indexer
- * Prowlarr has, and fetching a result's .torrent or .nzb through Prowlarr.
- * Searching Prowlarr directly, rather than through Sonarr, is the point: a
- * pack whose name Sonarr can't parse never reaches Sonarr's results at all,
- * so Backfill has to see it here and judge it by the files inside.
+ * Backfill searches every Prowlarr indexer and fetches a result's .torrent or
+ * .nzb through Prowlarr. It searches Prowlarr directly, not via Sonarr: a
+ * pack whose name Sonarr can't parse never reaches Sonarr's results, so
+ * Backfill judges it here by the files inside.
  */
 
 export interface ProwlarrSettings {
@@ -40,11 +39,11 @@ export type FetchedRelease =
   | { kind: 'magnet'; uri: string }
   | { kind: 'nzb'; data: Buffer };
 
-/** TV, and anime, in Prowlarr's Newznab categories. */
+/** TV and anime Newznab categories. */
 export const TV_CATEGORIES = [5000, 5070];
-/** Movies, and anime, which anime trackers file under TV/Anime. */
+/** Movies, plus anime: anime trackers file films under TV/Anime. */
 export const MOVIE_CATEGORIES = [2000, 5070];
-/** Music: albums, in any format. */
+/** Music albums, any format. */
 export const AUDIO_CATEGORIES = [3000];
 
 /** A search fans out to every indexer; slow ones take most of a minute. */
@@ -72,16 +71,13 @@ class ProwlarrAPI {
     return data?.version ?? 'unknown';
   }
 
-  /** What Prowlarr says is wrong on its own health page. */
+  /** Issues from Prowlarr's health page. */
   public async getHealth(): Promise<ServarrHealthIssue[]> {
     const { data } = await this.axios.get<ServarrHealthIssue[]>('/health');
     return data ?? [];
   }
 
-  /**
-   * Indexers that are failing: Prowlarr stops asking one for a while after
-   * it fails, and says until when.
-   */
+  /** Failing indexers, which Prowlarr disables until the given time. */
   public async getFailingIndexers(): Promise<
     { name: string; disabledTill?: string; failedAt?: string }[]
   > {
@@ -110,9 +106,9 @@ class ProwlarrAPI {
   }
 
   /**
-   * Indexers worth asking for music: turned on, carrying a music category,
-   * and not resting after failures (Prowlarr refuses them until then, and
-   * a search waits on them all).
+   * Indexers to search for music: enabled, with a music category, and not
+   * disabled after failures (Prowlarr refuses those, and a search waits on
+   * every indexer).
    */
   public async musicIndexerIds(now = Date.now()): Promise<number[]> {
     const [{ data: indexers }, { data: statuses }] = await Promise.all([
@@ -157,7 +153,7 @@ class ProwlarrAPI {
     options: {
       categories?: number[];
       limit?: number;
-      /** Only these indexers; all of them when left out. */
+      /** Only these indexers; all when omitted. */
       indexerIds?: number[];
     } = {}
   ): Promise<ProwlarrRelease[]> {
@@ -185,14 +181,14 @@ class ProwlarrAPI {
   }
 
   /**
-   * A result's .torrent or .nzb, fetched through Prowlarr. Many torrent
-   * indexers only have a magnet link, which comes back as one: its files
-   * can only be learned from the swarm.
+   * Fetches a result's .torrent or .nzb through Prowlarr. Many torrent
+   * indexers only have a magnet, returned as such: its files come only from
+   * the swarm.
    */
   public async fetchRelease(release: ProwlarrRelease): Promise<FetchedRelease> {
     let url = release.downloadUrl ?? release.magnetUrl;
     if (!url) {
-      // No link at all: the guid is often the magnet, or the hash makes one.
+      // No link: the guid is often the magnet, or the hash makes one.
       if (release.guid?.startsWith('magnet:')) {
         return { kind: 'magnet', uri: release.guid };
       }
@@ -204,15 +200,15 @@ class ProwlarrAPI {
       }
       throw new Error('The result has no download link.');
     }
-    // Prowlarr hands most magnets over as its own link, which redirects to
-    // the magnet itself; a bare magnet needs no fetching.
+    // Prowlarr usually serves magnets as its own link that redirects to the
+    // magnet; a bare magnet needs no fetching.
     if (url.startsWith('magnet:')) {
       return { kind: 'magnet', uri: url };
     }
     const own = new URL(clientBaseUrl(this.settings)).origin;
-    // The key only goes to Prowlarr, never to an indexer it redirects to,
-    // nor back to Prowlarr from one: an indexer must not choose what is
-    // asked of Prowlarr with its key.
+    // Send the API key only to Prowlarr, never to an indexer it redirects to
+    // nor back to Prowlarr from one: an indexer must not pick what is asked
+    // of Prowlarr with the key.
     let keyed = true;
     for (let hop = 0; hop < 4; hop++) {
       const target = new URL(url);
@@ -251,7 +247,7 @@ class ProwlarrAPI {
   }
 }
 
-/** What a downloaded file is, by its content rather than its headers. */
+/** Detects a downloaded file's kind from its content, not its headers. */
 export const detectKind = (
   data: Buffer,
   protocol: ProwlarrRelease['protocol']

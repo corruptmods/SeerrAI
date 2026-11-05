@@ -2,8 +2,8 @@ import { getRepository } from '@server/datasource';
 import { Watchlist } from '@server/entity/Watchlist';
 
 /**
- * One page of the watchlist a person keeps here (rather than on Plex), and
- * how many it holds, in the order added.
+ * One page of a user's Seerr-side (not Plex) watchlist in added order, plus its
+ * total.
  */
 export const savedWatchlistPage = (
   userId: number,

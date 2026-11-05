@@ -1,9 +1,9 @@
-/* ListenBrainz's answers, only the parts Seerr reads. */
+/* ListenBrainz response fields Seerr reads. */
 
 export interface LbFreshRelease {
   artist_credit_name: string;
   artist_mbids: string[];
-  /** The release whose cover the Cover Art Archive has, and its id there. */
+  /** Cover Art Archive image id and the release it belongs to. */
   caa_id?: number | null;
   caa_release_mbid?: string | null;
   release_date: string;
@@ -20,16 +20,16 @@ export interface LbFreshReleasesResponse {
   };
 }
 
-/** An artist ListenBrainz finds people listen to alongside another. */
+/** A similar artist from ListenBrainz. */
 export interface LbSimilarArtist {
   artist_mbid: string;
   name: string;
   /** MusicBrainz's disambiguation ("French electronic duo"). */
   comment?: string;
-  /** Person, Group and so on. */
+  /** Person, Group, etc. */
   type?: string | null;
-  /** How strongly, against the others for the same artist. */
+  /** Similarity, relative to others for the same reference artist. */
   score: number;
-  /** The artist they are like. */
+  /** The artist they're similar to. */
   reference_mbid: string;
 }

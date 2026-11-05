@@ -7,10 +7,7 @@ import {
   readAnimeCountry,
 } from './animeChoices';
 
-/*
- * The Anime page's choices, as the page asks the server for them: seasons
- * are counted from the day the person is looking.
- */
+/* Seasons are counted from the viewer's current date. */
 
 // 13 October 2026: Fall.
 const today = new Date(2026, 9, 13);

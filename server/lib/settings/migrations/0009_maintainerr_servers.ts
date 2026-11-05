@@ -1,10 +1,9 @@
 import type { AllSettings } from '@server/lib/settings';
 
 /**
- * Maintainerr started as a single server, saved as one object. It is now a
- * list, like Radarr and Sonarr. A configured, enabled server becomes the
- * first entry; one that was never set up, or was switched off, becomes an
- * empty list rather than a server that is suddenly live.
+ * Converts the single Maintainerr object to a list. A configured, enabled
+ * server becomes the first entry; an unset or disabled one becomes an empty
+ * list, so nothing goes live unexpectedly.
  */
 const migrateMaintainerrServers = (settings: any): AllSettings => {
   if (

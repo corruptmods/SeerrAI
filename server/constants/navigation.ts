@@ -1,22 +1,18 @@
-/*
- * The items of the sidebar and the phone menu, by names that never change,
- * in their default order. The sidebar and the phone use the same order, so
- * the menu editor lists exactly what both show; the first ones shown go on
- * the bar along the bottom of a phone (NAV_BAR_SIZE). Each person can put
- * them in their own order and hide the ones they don't want (Discover,
- * Customize), kept in their user settings. An item added here later takes
- * its default place in any order saved before it existed, and is shown, so
- * nobody has to save again to see it.
- */
+// Sidebar and phone menu items by stable names, in default order. Both share
+// one order, so the menu editor lists exactly what both show; the first shown
+// fill the phone's bottom bar (NAV_BAR_SIZE). Users can reorder and hide items
+// (Discover, Customize), saved in their user settings. An item added later
+// takes its default place in older saved orders and is shown, so nobody has to
+// re-save to see it.
 export const NAV_ITEMS = [
-  // The phone bar's five, as it has always been.
+  // The phone bar's original five.
   'discover',
   'movies',
   'series',
   'lists',
   'requests',
-  // Shown once Lidarr is set up, to people with music on. After the bar's
-  // five, so the bar stays as it was.
+  // Shown once Lidarr is set up, to users with music on. After the bar's five,
+  // so the bar is unchanged.
   'music',
   'calendar',
   'blocklist',
@@ -28,12 +24,10 @@ export const NAV_ITEMS = [
 
 export type NavItem = (typeof NAV_ITEMS)[number];
 
-/*
- * Items nobody can hide. Discover is where the sidebar is arranged, and on
- * a phone the menu is the only way back to it, so hiding it could leave no
- * way to show anything again. Settings stays for whoever can see it at all.
- * Everything else can be shown again from Discover.
- */
+// Items nobody can hide. Discover is where the menu is arranged, and on a phone
+// the menu is the only way back to it, so hiding it could make everything
+// unrecoverable. Settings stays for whoever can see it. Everything else can be
+// re-shown from Discover.
 export const NAV_ALWAYS_SHOWN: readonly NavItem[] = ['discover', 'settings'];
 
 export const isNavItem = (value: unknown): value is NavItem =>
@@ -42,24 +36,20 @@ export const isNavItem = (value: unknown): value is NavItem =>
 export const canHideNavItem = (id: NavItem): boolean =>
   !NAV_ALWAYS_SHOWN.includes(id);
 
-/**
- * An order as it is saved: the items it names that are known, each once.
- * Undefined for anything that is not a list.
- */
+/** A saved order: its known items, each once. Undefined for non-arrays. */
 export const cleanNavOrder = (value: unknown): NavItem[] | undefined =>
   Array.isArray(value) ? [...new Set(value.filter(isNavItem))] : undefined;
 
 /**
- * Hidden items as they are saved: known items that can be hidden, each
- * once. Undefined for anything that is not a list.
+ * Saved hidden items: known, hideable items, each once. Undefined for
+ * non-arrays.
  */
 export const cleanNavHidden = (value: unknown): NavItem[] | undefined =>
   cleanNavOrder(value)?.filter(canHideNavItem);
 
 /**
- * Every item, in the saved order. One the saved order does not name goes
- * straight after the item it follows by default (or first, if it is first
- * by default). Names that are not items are passed over.
+ * Every item in the saved order. An item the order omits goes right after its
+ * default predecessor (or first). Unknown names are skipped.
  */
 export const orderNavItems = (
   saved: readonly string[] | undefined
@@ -79,14 +69,14 @@ export const orderNavItems = (
   return order;
 };
 
-/** Whether an order is the default one, so there is nothing to keep. */
+/** Whether an order is the default, so nothing needs saving. */
 export const isDefaultNavOrder = (saved: readonly string[]): boolean =>
   orderNavItems(saved).every((id, index) => NAV_ITEMS[index] === id);
 
 /**
- * The order with one item moved just before or after another. Moving
- * relative to an item, rather than to a place, keeps a move meaningful when
- * the items between them are ones the person cannot see.
+ * The order with one item moved just before or after another. Moving relative
+ * to an item rather than a position keeps the move meaningful when items
+ * between them are hidden from the user.
  */
 export const moveNavItem = (
   order: readonly NavItem[],
@@ -102,7 +92,7 @@ export const moveNavItem = (
   return [...without.slice(0, at), id, ...without.slice(at)];
 };
 
-/** Things that are items (sidebar links, menu links), in the saved order. */
+/** Items (sidebar links, menu links) sorted by the saved order. */
 export const sortByNavOrder = <T extends { id: NavItem }>(
   items: readonly T[],
   saved: readonly string[] | undefined
@@ -111,13 +101,10 @@ export const sortByNavOrder = <T extends { id: NavItem }>(
   return [...items].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 };
 
-/**
- * How many items the bar along the bottom of a phone holds, before its menu
- * button.
- */
+/** Items on the phone's bottom bar, before its menu button. */
 export const NAV_BAR_SIZE = 5;
 
-/** Things that are items, without those someone hid. */
+/** Items minus the hidden ones. */
 export const withoutHiddenNav = <T extends { id: NavItem }>(
   items: readonly T[],
   hidden: readonly string[] | undefined
@@ -127,12 +114,11 @@ export const withoutHiddenNav = <T extends { id: NavItem }>(
   );
 
 /**
- * Things that are items, in someone's order, split where the phone's bar
- * ends: up to and including the last item on the bar, and the rest, which
- * are in the menu behind its button. The bar takes the first items shown;
- * a hidden one takes no place on it, and one before the bar's end stays in
- * the first part, so the order reads the same. When everything shown fits
- * on the bar, there is no menu, and the rest is empty.
+ * Items in the user's order, split where the phone bar ends: up to and
+ * including its last item, and the rest (in the menu behind its button). The
+ * bar takes the first shown items; hidden ones take no slot but stay in the
+ * first part if before the bar's end, so the order reads the same. When
+ * everything shown fits, the rest is empty and there's no menu.
  */
 export const splitAtNavBar = <T extends { id: NavItem }>(
   items: readonly T[],
@@ -146,13 +132,15 @@ export const splitAtNavBar = <T extends { id: NavItem }>(
   return [items.slice(0, end), items.slice(end)];
 };
 
-/** How someone arranged their menu, as saved in their user settings. */
+/** A user's menu arrangement, as saved in their user settings. */
 export interface NavLayout {
   order: readonly string[];
   hidden: readonly string[];
 }
 
-/** A saved arrangement ready to edit: every item in order, hidden cleaned. */
+/**
+ * A saved arrangement ready to edit: every item in order, hidden list cleaned.
+ */
 export const editableNavLayout = (
   saved: Partial<NavLayout> | undefined
 ): { order: NavItem[]; hidden: NavItem[] } => ({
@@ -160,7 +148,7 @@ export const editableNavLayout = (
   hidden: cleanNavHidden(saved?.hidden ?? []) ?? [],
 });
 
-/** Whether two arrangements give the same menu. */
+/** Whether two arrangements produce the same menu. */
 export const sameNavLayout = (a: NavLayout, b: NavLayout): boolean => {
   const x = editableNavLayout(a);
   const y = editableNavLayout(b);

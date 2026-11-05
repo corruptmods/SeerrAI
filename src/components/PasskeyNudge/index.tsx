@@ -37,8 +37,7 @@ const messages = defineMessages('components.PasskeyNudge', {
 
 const SNOOZE_DAYS = 14;
 
-// Per person: someone else saying "not now" on this device is not an answer
-// for them.
+// Per user: another user's "not now" on this device doesn't count.
 const snoozeKey = (userId: number) => `passkeyNudgeSnoozedAt:${userId}`;
 
 const snoozed = (userId: number): boolean => {
@@ -53,9 +52,8 @@ const snoozed = (userId: number): boolean => {
 };
 
 /**
- * Asks someone signed in without a passkey to add one, on a device that can
- * make one itself. "Not now" asks again in two weeks; adding one, here or in
- * settings, ends it.
+ * Prompts a user without a passkey to add one on a capable device. "Not now"
+ * snoozes two weeks; adding one anywhere ends it.
  */
 const PasskeyNudge = () => {
   const intl = useIntl();
@@ -65,7 +63,7 @@ const PasskeyNudge = () => {
   const { onThisDevice } = usePasskeySupport();
   const on = useFeature('passkeyPrompt');
   const router = useRouter();
-  // Not on the page where passkeys are added anyway.
+  // Not on the passkeys page itself.
   const onPasskeyPage = router.pathname.endsWith('/settings/passkeys');
   const [isSnoozed, setSnoozed] = useState<boolean>();
   const [adding, setAdding] = useState(false);
@@ -106,7 +104,7 @@ const PasskeyNudge = () => {
     try {
       localStorage.setItem(snoozeKey(userId), String(Date.now()));
     } catch {
-      // Snoozed for this visit only.
+      // Storage failed: snoozed for this visit only.
     }
     setSnoozed(true);
   }, [userId]);
@@ -115,7 +113,7 @@ const PasskeyNudge = () => {
     return null;
   }
 
-  // The servers they can sign in with now, by an account of theirs.
+  // Servers they can currently sign in with.
   const signInWith = signInServers(currentSettings);
   const signInNames = user
     ? accountServers(user)
@@ -154,8 +152,7 @@ const PasskeyNudge = () => {
         </p>
         <p className="mt-1 text-sm text-gray-300">
           {
-            // What they sign in with now: their accounts on the connected
-            // media servers, or a password of their own here.
+            // Their current sign-in: connected media server accounts, or a password.
             signInNames.length === 0
               ? intl.formatMessage(messages.bodyPassword)
               : intl.formatMessage(messages.body, {

@@ -30,7 +30,7 @@ const messages = defineMessages('components.Settings.SettingsBazarr', {
 
 /*
  * Bazarr, laid out like Maintainerr and the download clients: its tile with
- * Edit and Delete once it is set up, a dashed tile to add it before.
+ * Edit and Delete once set up, else a dashed tile to add it.
  */
 const SettingsBazarr = () => {
   const intl = useIntl();

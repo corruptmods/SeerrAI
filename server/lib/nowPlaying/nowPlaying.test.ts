@@ -12,11 +12,10 @@ import http from 'node:http';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * What someone is watching, from a stand-in Plex and Jellyfin answering
- * /status/sessions and /Sessions as the real ones do: Plex lists only what
- * is playing, with its owner as user "1"; Jellyfin and Emby list every
- * device, NowPlayingItem only on those playing, and Seerr's own devices
- * with no user at all (as an Emby 4.10 did when tried by hand).
+ * Fake Plex and Jellyfin answer /status/sessions and /Sessions like the
+ * real ones: Plex lists only playing items, owner as user "1"; Jellyfin and
+ * Emby list every device, NowPlayingItem only when playing, and Seerr's own
+ * devices with no user (as Emby 4.10 does).
  */
 
 setupTestDb();
@@ -167,7 +166,7 @@ describe('Now playing', () => {
 
   it('reads Jellyfin’s sessions, matching ids with or without dashes', async () => {
     jellyfinSessions = [
-      // Seerr's own device, as a real server listed it: no user, nothing on.
+      // Seerr's own device as a real server lists it: no user, nothing on.
       { Id: 'x', Client: 'Seerr', DeviceName: 'Seerr', PlayState: {} },
       {
         UserId: '6f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0',

@@ -1,7 +1,7 @@
 /*
- * MusicBrainz's answers (https://musicbrainz.org/doc/MusicBrainz_API), only
- * the parts Seerr reads. Dates are as precise as MusicBrainz knows them:
- * "2004", "2004-03" or "2004-03-15".
+ * MusicBrainz response fields Seerr reads
+ * (https://musicbrainz.org/doc/MusicBrainz_API). Dates are as precise as
+ * known: "2004", "2004-03" or "2004-03-15".
  */
 
 export interface MbLifeSpan {
@@ -34,7 +34,7 @@ export interface MbArtist {
   genres?: MbGenre[];
   aliases?: { name: string; 'sort-name'?: string; type?: string | null }[];
   relations?: MbUrlRelation[];
-  /** Search results only: the tags people gave it, with their votes. */
+  /** Search results only: user tags with vote counts. */
   tags?: MbGenre[];
   /** Search results only: how well it matched, out of 100. */
   score?: number;
@@ -67,7 +67,7 @@ export interface MbReleaseGroup {
   'artist-credit'?: MbArtistCredit[];
   releases?: MbReleaseSummary[];
   genres?: MbGenre[];
-  /** Search results only: how many releases it has. */
+  /** Search results only: release count. */
   count?: number;
   /** Search results only: how well it matched, out of 100. */
   score?: number;
@@ -96,15 +96,15 @@ export interface MbRelease extends MbReleaseSummary {
   media?: MbMedium[];
 }
 
-/** A release a recording is on, as a recording search gives it. */
+/** A release of a recording, as a recording search returns it. */
 export interface MbRecordingRelease extends MbReleaseSummary {
-  /** Whom the release is by: Various Artists on a compilation. */
+  /** Release credit; Various Artists for compilations. */
   'artist-credit'?: MbArtistCredit[];
   'release-group'?: Pick<
     MbReleaseGroup,
     'id' | 'title' | 'primary-type' | 'secondary-types'
   >;
-  /** The medium and track the recording is on: `track`, not `tracks`. */
+  /** Medium and track of the recording: `track`, not `tracks`. */
   media?: {
     position?: number;
     format?: string | null;
@@ -113,13 +113,13 @@ export interface MbRecordingRelease extends MbReleaseSummary {
 }
 
 /**
- * One recording: a song as recorded once, in one version. A radio edit
- * and the album take are different recordings of the same song.
+ * One recorded version of a song; a radio edit and the album take are
+ * separate recordings.
  */
 export interface MbRecording {
   id: string;
   title: string;
-  /** What tells it apart: "radio edit", "live, 2013-05-31: …". */
+  /** Disambiguation: "radio edit", "live, 2013-05-31: …". */
   disambiguation?: string;
   /** Milliseconds. */
   length?: number | null;
@@ -156,7 +156,7 @@ export interface MbReleaseGroupBrowseResponse {
   'release-groups': MbReleaseGroup[];
 }
 
-/** The website's Wikipedia extract for an artist, with its HTML. */
+/** The website's Wikipedia extract for an artist, as HTML. */
 export interface MbWikipediaExtractResponse {
   wikipediaExtract?: {
     url?: string;

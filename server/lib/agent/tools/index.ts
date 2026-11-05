@@ -57,18 +57,15 @@ export type { MadeCall } from '@server/lib/agent/tools/search';
 export { lookups } from '@server/lib/agent/tools/titles';
 
 /*
- * What the admin agent can do: look titles up, read what they lack, search
- * the way Sonarr, Radarr and Lidarr do (with their reasons for turning
- * results down) and the way Prowlarr does, open a release to see its files,
- * and start a download of exactly the files it chose, mapped to the
- * episodes they are (an album's files are matched to its tracks by
- * Backfill). Downloads go through Backfill, which waits for disk space,
- * fetches only those files and has Sonarr, Radarr or Lidarr import each one
- * as what it was mapped to.
+ * The admin agent's tools: look titles up, read what they lack, search via
+ * Sonarr, Radarr and Lidarr (with their rejection reasons) and Prowlarr,
+ * list a release's files, and download exactly the chosen files mapped to
+ * episodes (Backfill matches an album's files to tracks). Backfill waits for
+ * disk space, fetches only those files and has the *arr import each as
+ * mapped.
  *
  * Releases and titles are named by short references ("r3",
- * "series:1:1283"); links, keys and paths on the server never reach the
- * model.
+ * "series:1:1283"); server links, keys and paths never reach the model.
  */
 
 export const TOOLS: AgentTool[] = [
@@ -89,24 +86,21 @@ export const TOOLS: AgentTool[] = [
 ];
 
 /**
- * Why a run with no admin in it may not use a tool on this title, or null.
- * Such a run (started on its own, or for someone's report) is about its one
- * title: what it reads (release names, file paths) cannot send it to work
- * on another.
+ * Why a run without an admin may not use a tool on this title, or null.
+ * Such a run (automatic, or from a report) is confined to its own title, so
+ * what it reads (release names, file paths) cannot steer it to another.
  */
 const elsewhere = (
   run: AgentRun,
   input: Record<string, unknown>
 ): string | null => {
-  if (adminPresent(run) || run.arrId === null || run.arrId === undefined) {
-    return null;
-  }
+  if (adminPresent(run) || run.arrId == null) return null;
   if (input.title === undefined) return null;
   let asked: TitleRef;
   try {
     asked = readTitleRef(input.title);
   } catch {
-    // Not a reference at all: the tool says so itself.
+    // Not a reference: the tool reports that itself.
     return null;
   }
   const own = titleRef({
@@ -119,7 +113,7 @@ const elsewhere = (
     : `This conversation is only about ${run.title ?? 'its title'} (${own}). No admin is in it, so no other title is looked at or changed.`;
 };
 
-/** Runs one tool for the model: its answer, or why it could not. */
+/** Runs one tool for the model, returning its output or why it failed. */
 export const runTool = async (
   state: AgentState,
   name: string,

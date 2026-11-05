@@ -159,7 +159,7 @@ export const RunMeta = ({ run }: { run: AgentRunSummary }) => {
   );
 };
 
-/** One run in a list; on a title's page, by what was asked instead. */
+/** One run in a list; on a title's page it is labelled by what was asked. */
 export const RunRow = ({
   run,
   byAsk = false,
@@ -229,7 +229,7 @@ export const RunRow = ({
   );
 };
 
-/** What the agent is doing, refreshed often while it works. */
+/** Agent overview, polled while it works. */
 export const useAgent = (page = 0) =>
   useSWR<AgentOverview>(`/api/v1/agent${page ? `?page=${page}` : ''}`, {
     refreshInterval: (latest) =>
@@ -246,8 +246,8 @@ export interface AgentTitle {
 }
 
 /**
- * The box an admin asks the agent in; the new run opens to watch. From a
- * title's page it is about that title, and may be sent empty.
+ * Ask box; opens the new run. With `title` it is about that title and may be
+ * sent empty.
  */
 export const AskAgent = ({
   problem,
@@ -262,7 +262,7 @@ export const AskAgent = ({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string>();
   const ready = !!title || text.trim().length >= 3;
-  // The example does not fit on a phone.
+  // The example placeholder does not fit on phones.
   const wide = useMediaQuery('(min-width: 640px)');
 
   const submit = async (e: React.FormEvent) => {
@@ -329,7 +329,7 @@ export const AskAgent = ({
   );
 };
 
-/** On the Backfill page: ask, and the latest few runs. */
+/** Backfill page panel: ask box and the latest runs. */
 export const AgentPanel = () => {
   const intl = useIntl();
   const { data } = useAgent();
@@ -376,26 +376,23 @@ export const AgentPanel = () => {
   );
 };
 
-/**
- * On a title's page, for admins: ask the agent about this title, and its
- * earlier conversations about it.
- */
+/** Admin panel on a title's page: ask about the title and see earlier runs. */
 export const AgentForTitle = ({
   title,
   card,
   autoRanAt,
 }: {
   title: AgentTitle;
-  /** Framed as a card, among a Backfill page's sections. */
+  /** Render as a card among Backfill page sections. */
   card?: boolean;
-  /** When it looked on its own: it does that once per title. */
+  /** When it last ran unprompted; it does so once per title. */
   autoRanAt?: string | null;
 }) => {
   const intl = useIntl();
   const { data } = useSWR<AgentOverview>(
     `/api/v1/agent?kind=${title.kind}&serverId=${title.serverId}&arrId=${title.arrId}`
   );
-  // Nothing at all on the page when the agent cannot run.
+  // Render nothing when the agent cannot run.
   if (!data || data.problem) return null;
   return (
     <div

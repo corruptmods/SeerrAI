@@ -4,12 +4,12 @@ import type { Request } from 'express';
 
 /*
  * What a passkey is bound to. A passkey belongs to one site name (the
- * "relying party"), and a browser only offers it on that site.
+ * "relying party"), and browsers offer it only on that site.
  *
- * When Seerr's Application URL is set, that address is the only one passkeys
- * work on: a passkey made there cannot be presented anywhere else, and no
- * other Host header is trusted. Without it, the address the browser used is
- * taken, which is how most setups without a configured URL are reached.
+ * With the Application URL set, passkeys work only there: one made there
+ * can't be used elsewhere, and no other Host header is trusted. Without it,
+ * the address the browser used is taken, which is how most such setups are
+ * reached.
  */
 export const relyingParty = (
   req: Request
@@ -26,10 +26,9 @@ export const relyingParty = (
     }
   }
 
-  // Without an Application URL, the address the browser used. Behind an
-  // HTTPS proxy that Seerr is not told to trust, the request arrives as plain
-  // http, so accept either scheme for this exact host: browsers only offer
-  // passkeys on secure pages, so the scheme adds nothing to check.
+  // No Application URL: use the browser's address. Behind an HTTPS proxy Seerr
+  // isn't told to trust, requests arrive as plain http, so accept either scheme
+  // for this exact host; browsers offer passkeys only on secure pages anyway.
   const host = req.get('host') ?? req.hostname;
   return {
     rpID: req.hostname,
@@ -38,7 +37,7 @@ export const relyingParty = (
   };
 };
 
-/** What a passkey list shows: never the key itself. */
+/** A passkey as lists show it: never the key itself. */
 export const passkeySummary = (passkey: UserPasskey) => ({
   id: passkey.id,
   name: passkey.name,
@@ -47,7 +46,7 @@ export const passkeySummary = (passkey: UserPasskey) => ({
   lastUsedAt: passkey.lastUsedAt ?? null,
 });
 
-/** How long a sign-in or setup has to finish once started. */
+/** Time allowed to finish a started sign-in or setup. */
 export const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 export type ChallengePurpose = 'register' | 'login';
@@ -60,9 +59,8 @@ interface ChallengeSession {
   };
 }
 
-// A request made with an API key has no session (server/index.ts), so
-// there is nowhere to keep a challenge and none to take: passkeys are set up
-// and used in a browser.
+// API-key requests have no session (server/index.ts), so nowhere to store or
+// take a challenge: passkeys are set up and used in a browser.
 export const rememberChallenge = (
   session: ChallengeSession | undefined,
   value: string,
@@ -74,8 +72,8 @@ export const rememberChallenge = (
 };
 
 /**
- * The challenge this browser was given, used once: a response can never be
- * replayed against it, and one issued for setup cannot finish a sign-in.
+ * The challenge this browser was given, single-use: a response can't be
+ * replayed, and a setup challenge can't finish a sign-in.
  */
 export const takeChallenge = (
   session: ChallengeSession | undefined,
@@ -96,10 +94,10 @@ export const takeChallenge = (
 };
 
 /*
- * Password managers identify themselves by AAGUID (from the community list at
- * github.com/passkeydeveloper/passkey-authenticator-aaguids). Where one is
- * known, the passkey is named after it ("Apple Passwords"), since it lives on
- * every device signed in to it; otherwise after the device it was made on.
+ * Password managers identify themselves by AAGUID (community list at
+ * github.com/passkeydeveloper/passkey-authenticator-aaguids). Known ones name
+ * the passkey ("Apple Passwords"), since it lives on every device signed in;
+ * otherwise it is named after the device it was made on.
  */
 const PROVIDERS: Record<string, string> = {
   'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': 'Apple Passwords',
@@ -143,7 +141,7 @@ export const passkeyName = (
   return device ? device[1] : 'Passkey';
 };
 
-/** Names are shown back in settings; kept short and single-line. */
+/** Names are shown in settings; kept short and single-line. */
 export const cleanPasskeyName = (name: unknown): string | undefined => {
   if (typeof name !== 'string') {
     return undefined;

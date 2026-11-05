@@ -83,13 +83,13 @@ export interface SubtitleSearchModalProps {
   tmdbId: number;
   seasonNumber?: number;
   episodeNumber?: number;
-  /** What is being searched for: the title, or the episode. */
+  /** The title or episode searched for. */
   subTitle: string;
   heading: string;
-  /** Show this language's results first, when there are any. */
+  /** This language's results go first. */
   language?: string;
   onClose: () => void;
-  /** After a subtitle was downloaded, or a transcription asked for. */
+  /** After a download, or a transcription request. */
   onDone: () => void;
 }
 
@@ -112,8 +112,8 @@ const SubtitleSearchModal = ({
     kind === 'movie'
       ? subtitlesKey('movie', tmdbId)
       : `${subtitlesKey('tv', tmdbId)}/season/${seasonNumber}/episode/${episodeNumber}`;
-  // Each opening is a new search: one that finds nothing may start a
-  // transcription, and its answer is about that moment.
+  // A fresh search per opening: an empty result may start a transcription,
+  // so cached answers can't be reused.
   const [opened] = useState(() => Date.now());
   const { data: answer, error } = useSWR<SubtitleSearchResponse>(
     `${base}/search?transcribeIfNone=true&at=${opened}`,
@@ -133,8 +133,8 @@ const SubtitleSearchModal = ({
   const { mutate } = useSWRConfig();
   const transcriptionKey = `${subtitlesKey(kind, tmdbId)}/transcription`;
 
-  // When Whisper took over, the page follows it; with nothing else to
-  // choose from, the dialog has done its job.
+  // Whisper took over: the page tracks it, and with no other results the
+  // dialog closes.
   const told = useRef(false);
   useEffect(() => {
     if (told.current || !noneFound) {

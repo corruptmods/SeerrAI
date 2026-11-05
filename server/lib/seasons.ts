@@ -1,23 +1,21 @@
 /*
  * Seasonal themes: for a few days a year Seerr AI dresses up for a season
- * (Halloween, the December holidays, New Year, and Lunar New Year if an
- * admin turns it on), on top of each person's own look, and goes back to it by itself when
- * the dates pass.
+ * (Halloween, December holidays, New Year, and Lunar New Year if an admin
+ * enables it) over each user's own look, reverting by itself when the dates
+ * pass.
  *
- * An admin chooses which seasons run and when (Settings → Appearance); each
- * person can switch them off for themselves (Profile → Settings →
- * Appearance), or turn off one season when its note first shows. The days
- * are counted on each person's own calendar: a season starts at midnight
- * where they are.
+ * Admins choose which seasons run and when (Settings → Appearance); each user
+ * can turn them off (Profile → Settings → Appearance) or turn one season off
+ * when its note first shows. Days follow each user's own calendar: a season
+ * starts at their local midnight.
  *
- * Nothing here touches the server or the database, so pages use it too.
+ * No server or database access, so pages use it too.
  */
 
 /*
- * Diwali and Pride Month were seasons once. What was saved for them is
- * cleared when the server starts (settings migration 0013, and the
- * ClearRetiredSeasonNotes database migration), and anything else naming
- * them reads as a season that doesn't exist.
+ * Diwali and Pride Month were once seasons. Their saved data is cleared at
+ * startup (settings migration 0013 and the ClearRetiredSeasonNotes database
+ * migration); anything else naming them reads as an unknown season.
  */
 export const SEASON_IDS = [
   'halloween',
@@ -28,9 +26,8 @@ export const SEASON_IDS = [
 export type SeasonId = (typeof SEASON_IDS)[number];
 
 /**
- * One season as an admin set it. Days of the year are 'MM-DD'. A season
- * whose dates move (Lunar New Year) may leave them out, to have them
- * worked out each year.
+ * One season as an admin set it. Days of the year are 'MM-DD'. A moving
+ * season (Lunar New Year) may omit them to have them computed each year.
  */
 export interface SeasonSetting {
   enabled: boolean;
@@ -47,22 +44,22 @@ export const SEASON_DEFAULTS: SeasonsSettings = {
   lunarnewyear: { enabled: false },
 };
 
-/** A season whose day moves from year to year, and the days around it. */
+/** A season whose day moves each year, and the days around it. */
 interface MovingSeason {
   /** The day itself, 'MM-DD', by year. */
   days: Record<number, string>;
-  /** How many days the season starts before it and ends after it. */
+  /** Days the season starts before it and ends after it. */
   before: number;
   after: number;
-  /** Where the days come from. */
+  /** Source of the dates. */
   source: string;
 }
 
 export const MOVING_SEASONS: Record<'lunarnewyear', MovingSeason> = {
-  // The first day of the first lunar month, as China (and Hong Kong)
-  // keep it. Countries a time zone away can differ by a day in some
-  // years (Vietnam's Tết in 2030 is 2 February). The season runs from
-  // New Year's Eve to the Lantern Festival, the fifteenth day.
+  // First day of the first lunar month as China (and Hong Kong) observe it.
+  // Countries a time zone away can differ by a day some years (Vietnam's Tết
+  // in 2030 is 2 February). Runs from New Year's Eve to the Lantern Festival,
+  // the fifteenth day.
   lunarnewyear: {
     days: {
       2025: '01-29',
@@ -95,10 +92,7 @@ export const isMovingSeason = (
   id: SeasonId
 ): id is keyof typeof MOVING_SEASONS => id in MOVING_SEASONS;
 
-/**
- * What pages are told: the seasons that run, in order, with their days if
- * an admin set them.
- */
+/** Sent to pages: the enabled seasons in order, with admin-set days if any. */
 export interface SeasonCalendarEntry {
   id: SeasonId;
   start?: string;
@@ -106,13 +100,13 @@ export interface SeasonCalendarEntry {
 }
 export type SeasonCalendar = SeasonCalendarEntry[];
 
-/** One time a season runs: its first and last days, 'YYYY-MM-DD'. */
+/** One run of a season: first and last days, 'YYYY-MM-DD'. */
 export interface SeasonDates {
   start: string;
   end: string;
 }
 
-/** The season running today. `key` names this time it runs, for its note. */
+/** Today's season. `key` identifies this run, for its note. */
 export interface ActiveSeason extends SeasonDates {
   id: SeasonId;
   key: string;
@@ -123,7 +117,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** A day of the year that exists (in a leap year, for 29 February). */
+/** A valid day of the year (29 February counts, as in a leap year). */
 const isDayOfYear = (value: unknown): value is string => {
   if (typeof value !== 'string' || !/^\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -149,7 +143,7 @@ const cleanSeason = (
     return undefined;
   }
   if (value.start === undefined && value.end === undefined) {
-    // Only a season whose dates are worked out can go without them.
+    // Only a computed-date season may omit its dates.
     return isMovingSeason(id) ? { enabled: value.enabled } : undefined;
   }
   return isDayOfYear(value.start) && isDayOfYear(value.end)
@@ -158,9 +152,9 @@ const cleanSeason = (
 };
 
 /**
- * What an admin sends, as it is kept: any of the seasons, each switched on
- * or off with its days; the rest stay as they were (or their defaults).
- * Undefined if anything in it is unknown or not a day.
+ * Cleans an admin's update: any seasons, each enabled or not with its days;
+ * the rest keep their current values (or defaults). Undefined if anything is
+ * unknown or not a day.
  */
 export const cleanSeasons = (
   value: unknown,
@@ -184,8 +178,8 @@ export const cleanSeasons = (
 };
 
 /**
- * The seasons as kept in settings.json, which can be edited by hand: each
- * one that reads is used, anything else is its default.
+ * Seasons from settings.json, which may be hand-edited: each valid entry is
+ * used, anything else falls back to its default.
  */
 export const seasonSettings = (stored: unknown): SeasonsSettings =>
   Object.fromEntries(
@@ -195,14 +189,14 @@ export const seasonSettings = (stored: unknown): SeasonsSettings =>
     ])
   ) as SeasonsSettings;
 
-/** The seasons that run, for pages. */
+/** The enabled seasons, for pages. */
 export const seasonCalendar = (seasons: SeasonsSettings): SeasonCalendar =>
   SEASON_IDS.filter((id) => seasons[id].enabled).map((id) => {
     const { start, end } = seasons[id];
     return start && end ? { id, start, end } : { id };
   });
 
-/** 'YYYY-MM-DD' for a date counted in whole days (as UTC, which has no gaps). */
+/** 'YYYY-MM-DD' for a whole-day date (as UTC, which has no gaps). */
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
 const addDays = (day: string, days: number): string => {
@@ -212,7 +206,7 @@ const addDays = (day: string, days: number): string => {
 };
 
 /**
- * A day of the year in a given year. 29 February in a year without one is
+ * A day of the year in a given year. 29 February in a non-leap year becomes
  * the 28th, so a season ending on it still ends in February.
  */
 const inYear = (dayOfYear: string, year: number): string => {
@@ -224,15 +218,15 @@ const inYear = (dayOfYear: string, year: number): string => {
 };
 
 /**
- * The time a season runs that starts in the given year, or undefined if it
- * has none (a moving season beyond its table).
+ * The run of a season starting in the given year; undefined if none (a moving
+ * season past its table).
  */
 export const seasonDates = (
   season: SeasonCalendarEntry,
   year: number
 ): SeasonDates | undefined => {
   if (season.start && season.end) {
-    // An end earlier in the year than the start is in the next year.
+    // An end earlier in the year than the start falls in the next year.
     const crosses = season.end < season.start;
     return {
       start: inYear(season.start, year),
@@ -254,7 +248,7 @@ export const seasonDates = (
   };
 };
 
-/** Each time a season runs that could include the given day. */
+/** Runs of a season that could include a day in the given year. */
 const timesAround = (season: SeasonCalendarEntry, year: number) =>
   [year - 1, year, year + 1].flatMap((startYear) => {
     const dates = seasonDates(season, startYear);
@@ -262,9 +256,9 @@ const timesAround = (season: SeasonCalendarEntry, year: number) =>
   });
 
 /**
- * The season running on a day ('YYYY-MM-DD'). When two meet, the one that
- * started most recently shows (New Year at the end of a long Holidays); on
- * the same day, the first in order.
+ * The season on a day ('YYYY-MM-DD'). When two overlap, the most recently
+ * started wins (New Year at the end of a long Holidays); on the same day, the
+ * first in order.
  */
 export const activeSeason = (
   calendar: SeasonCalendar,
@@ -295,8 +289,8 @@ export const activeSeason = (
 };
 
 /**
- * The time a season is running on a day, or the next time it will: what
- * the Appearance pages show beside it.
+ * The current run of a season on a day, or its next: shown on the Appearance
+ * pages.
  */
 export const upcomingDates = (
   season: SeasonCalendarEntry,
@@ -307,9 +301,8 @@ export const upcomingDates = (
     .find((dates) => today <= dates.end);
 
 /**
- * Today's date, 'YYYY-MM-DD', on the calendar of a time zone: the device's
- * own in a browser, the server's on the server. An unknown time zone falls
- * back to the clock's own.
+ * Today as 'YYYY-MM-DD' in a time zone: the device's in a browser, the
+ * server's on the server. An unknown time zone falls back to the clock's.
  */
 export const localDay = (now: Date, timeZone?: string): string => {
   const format = (zone?: string) =>
@@ -334,10 +327,10 @@ export const localDay = (now: Date, timeZone?: string): string => {
 };
 
 /*
- * The note a season shows the first time someone sees it asks them to keep
- * it or turn it off. Their answer is kept with their account as
- * '<season>-<year it started>:keep|off', so it holds on every device and
- * is asked again the next time the season comes round.
+ * A season's note asks the user, the first time they see it, to keep it or
+ * turn it off. The answer is stored on their account as
+ * '<season>-<start year>:keep|off', so it applies on every device and is
+ * asked again the next time the season comes round.
  */
 export type SeasonChoice = 'keep' | 'off';
 
@@ -351,7 +344,7 @@ export const cleanSeasonNote = (value: unknown): string | undefined =>
 export const seasonNoteValue = (key: string, choice: SeasonChoice): string =>
   `${key}:${choice}`;
 
-/** Their answer for this time the season runs, if they have given one. */
+/** The user's answer for this run of the season, if any. */
 export const noteChoice = (
   season: ActiveSeason,
   note: string | null | undefined
@@ -361,8 +354,8 @@ export const noteChoice = (
 };
 
 /**
- * The season a person sees: the one running today, unless they switched
- * seasonal themes off, or turned this one off when its note showed.
+ * The season a user sees: today's, unless they turned seasonal themes off or
+ * turned this one off from its note.
  */
 export const shownSeason = ({
   calendar,

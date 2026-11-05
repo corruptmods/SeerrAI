@@ -4,9 +4,9 @@ import type {
   AccessSet,
 } from '@server/interfaces/api/libraryAccessInterfaces';
 
-/** Someone on a server, with what the server needs to change them. */
+/** A server account plus the handle needed to change it. */
 export interface ServerPerson extends AccessPerson {
-  /** The server's handle for their access: Plex's share id. */
+  /** Server handle for their access (Plex share id). */
   ref: string;
 }
 
@@ -15,19 +15,17 @@ export interface ServerAccess {
   people: ServerPerson[];
 }
 
-/** Reads and changes who sees which library on one media server. */
+/** Reads and changes library sharing on one media server. */
 export interface AccessServer {
   /**
-   * Every library and everyone it may be shared with. With `only`, just
-   * that person (by their id on the server), where the server allows it.
+   * All libraries and people; `only` limits to one server id where supported.
    */
   read(only?: string): Promise<ServerAccess>;
   /**
-   * Whether "every library, new ones too" can be given: Jellyfin and Emby
-   * keep it as a switch, Plex only by inviting again.
+   * Whether "all libraries, including future ones" can be set (not on Plex).
    */
   canGiveAll: boolean;
-  /** Gives someone exactly these libraries, or every one. */
+  /** Sets someone's libraries, or all. */
   write(
     person: ServerPerson,
     to: AccessSet,
@@ -35,7 +33,7 @@ export interface AccessServer {
   ): Promise<void>;
 }
 
-/** Why a change to library access was refused, with the status to answer. */
+/** A refused library access change, with its HTTP status. */
 export class LibraryAccessError extends Error {
   constructor(
     public readonly status: number,

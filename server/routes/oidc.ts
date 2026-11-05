@@ -23,10 +23,9 @@ import type { CookieOptions, Request, Response } from 'express';
 import { Router } from 'express';
 
 /*
- * Signing in, and linking an account, through a single sign-on provider.
- * Each is a page the browser goes to (not a call the page makes): it goes
- * on to the provider, and the provider sends it back to the callback, which
- * ends on the sign-in page or Linked Accounts with how it went (`?sso=`).
+ * SSO sign-in and account linking. Each is a browser navigation, not an API
+ * call: on to the provider, back to the callback, which ends on the sign-in
+ * page or Linked Accounts with the outcome (`?sso=`).
  */
 const oidcRoutes = Router();
 
@@ -35,9 +34,9 @@ const limiter = new SignInLimiter('oidc');
 const LINKED_ACCOUNTS = '/profile/settings/linked-accounts';
 
 /**
- * The correlation cookie: only sent back to these routes, with the
- * provider's redirect back here (a top-level link from another site, which
- * SameSite=Lax still lets through), and over https only when Seerr is.
+ * Correlation cookie: scoped to these routes, sent with the provider's
+ * cross-site top-level redirect back (SameSite=Lax allows it), https-only when
+ * Seerr is.
  */
 const cookieOptions = (req: Request): CookieOptions => ({
   httpOnly: true,
@@ -63,12 +62,10 @@ const escapeHtml = (value: string) =>
   );
 
 /**
- * Sends the browser on to a page here from the callback. A page that moves
- * on by itself rather than a redirect: the provider's redirect back was a
- * link from another site, and a redirect would carry that on, so the new
- * session's cookie (SameSite=Strict while CSRF protection is on) would not
- * be sent with the page it lands on. The code in the address is kept from
- * being passed on as the referrer.
+ * Navigate from the callback with a self-advancing page, not a redirect: the
+ * provider's return was cross-site, and a redirect keeps that, so the new
+ * session cookie (SameSite=Strict with CSRF protection on) wouldn't be sent.
+ * Also keeps the code in the URL out of the referrer.
  */
 const relay = (res: Response, path: string) => {
   const target = escapeHtml(path);
@@ -85,7 +82,7 @@ const relay = (res: Response, path: string) => {
     );
 };
 
-/** The page a sign-in that did not go through ends on. */
+/** Where a failed sign-in ends. */
 const signInFailed = (
   outcome: OidcOutcome,
   providerId: string,
@@ -97,15 +94,14 @@ const signInFailed = (
   return page.pathname + page.search;
 };
 
-/** Linked Accounts, saying how linking went. */
+/** Linked Accounts with the linking outcome. */
 const linkOutcome = (outcome: OidcOutcome, providerId: string) =>
   `${LINKED_ACCOUNTS}?sso=${outcome}&provider=${encodeURIComponent(providerId)}`;
 
 /**
- * What a failed code exchange means for the person: a state, nonce or
- * issuer that does not match, or a code already used, is a sign-in started
- * elsewhere or gone stale; anything else is the provider (or its settings
- * here) at fault.
+ * Map a failed code exchange to an outcome: mismatched state, nonce or issuer,
+ * or a reused code, means a sign-in started elsewhere or gone stale; anything
+ * else is the provider (or its settings here).
  */
 const exchangeOutcome = (e: unknown): OidcOutcome => {
   const code = errorCode(e);
@@ -125,7 +121,7 @@ const exchangeOutcome = (e: unknown): OidcOutcome => {
   return 'provider';
 };
 
-/** Sends the browser to the provider, with the cookie that ties it together. */
+/** Redirect to the provider with the correlation cookie. */
 const goToProvider = async (
   req: Request<{ providerId: string }>,
   res: Response,
@@ -176,12 +172,12 @@ oidcRoutes.get<{ providerId: string }>(
 oidcRoutes.get<{ providerId: string }>(
   '/:providerId/link',
   async (req, res) => {
-    // Linking is for someone signed in, to their own account.
+    // Linking requires being signed in, and only to your own account.
     if (!req.user) {
       return res.redirect(loginUrl(LINKED_ACCOUNTS));
     }
-    // Not with an API key: a link is a way to sign in, and a key, which
-    // might have leaked, must not be able to make itself one.
+    // Not with an API key: a link is a sign-in method, and a possibly leaked
+    // key must not create one for itself.
     if (req.authMethod !== 'session') {
       return res.status(403).json({
         status: 403,
@@ -203,16 +199,15 @@ oidcRoutes.get<{ providerId: string }>(
     const correlation: Correlation | undefined = openCorrelation(
       req.cookies?.[CORRELATION_COOKIE]
     );
-    // Used once, whatever happens next.
+    // Single use, whatever happens next.
     clearCorrelation(req, res);
 
     const linking = correlation?.userId !== undefined;
     const returnTo = safeRedirect(correlation?.returnTo);
-    // The limit on failed attempts only covers sign-ins this browser
-    // started here with this provider: the genuine cookie proves it. A
-    // callback anyone can make up (no cookie, or one for another provider)
-    // is refused without counting, so it can never hold up other people
-    // who share an address, such as everyone behind one proxy.
+    // The failed-attempt limit only counts sign-ins this browser started here
+    // with this provider, proven by the genuine cookie. Forged callbacks (no
+    // cookie, or another provider's) are refused uncounted, so they can't lock
+    // out others sharing an IP, e.g. behind one proxy.
     const started = correlation?.provider === providerId;
     const failed = (
       outcome: OidcOutcome,
@@ -254,13 +249,13 @@ oidcRoutes.get<{ providerId: string }>(
     if (!provider) {
       return failed('unavailable');
     }
-    // The cookie is missing, out of date, not genuine, or for another
-    // provider: started in another browser, or too long ago.
+    // Cookie missing, expired, forged or for another provider: started in
+    // another browser or too long ago.
     if (!correlation || correlation.provider !== provider.id) {
       return failed('expired', 'no matching sign-in in progress');
     }
-    // Someone else signed in here meanwhile (CSRF protection off sends the
-    // session along): the link was for the account that asked for it.
+    // Someone else signed in meanwhile (with CSRF protection off the session is
+    // sent): the link belongs to the account that asked for it.
     if (linking && req.user && req.user.id !== correlation.userId) {
       return failed('expired', 'signed in as someone else meanwhile');
     }
@@ -286,9 +281,9 @@ oidcRoutes.get<{ providerId: string }>(
       return failed(exchangeOutcome(e), errorCode(e) ?? 'exchange failed');
     }
 
-    // Who may sign in, checked every time: signing in, a new account and
-    // linking alike. Without userinfo the claims may be missing some the
-    // provider only sends there, so nobody is let in on half of them.
+    // Required claims are checked every time: sign-in, new account and linking.
+    // Without userinfo some claims the provider only sends there may be
+    // missing, so nobody is admitted on partial claims.
     const rules = provider.requiredClaims;
     if (rules.length > 0) {
       if (userinfoFailed) {
@@ -297,7 +292,7 @@ oidcRoutes.get<{ providerId: string }>(
           'userinfo, needed to check who may sign in, could not be read'
         );
       }
-      // Only the names: the values are the person's (their groups, say).
+      // Log only claim names: values are personal (e.g. groups).
       const failing = failedClaims(rules, claims);
       if (failing.length > 0) {
         return failed('not-allowed', 'claims do not meet the rules', {

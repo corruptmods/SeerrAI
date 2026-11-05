@@ -2,11 +2,6 @@ import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
 
-/*
- * Small helpers the music pages share: where pictures are, and how albums
- * are grouped on an artist's page.
- */
-
 /** Hosts the image proxy fetches music pictures from, by proxy source. */
 const PROXIED = [
   ['caa', 'https://coverartarchive.org/'],
@@ -14,16 +9,14 @@ const PROXIED = [
   ['tadb', 'https://r2.theaudiodb.com/'],
 ] as const;
 
-/** The server's address for a picture of an artist (see artistImageUrl). */
+/** The server's artist-picture URL (see artistImageUrl). */
 const ARTIST_IMAGE =
   /^\/api\/v1\/music\/artist\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/image(\?kind=backdrop)?$/;
 
 /**
- * A cover or picture's address: through the image proxy when the server
- * caches images (Settings → General), else straight from its host. A
- * picture of an artist has an address of its own at the proxy, kept like
- * any other picture; without caching, the server sends the browser to the
- * picture's host.
+ * A picture's URL: through the image proxy when the server caches images
+ * (Settings → General), else direct. Artist pictures have their own proxy
+ * path; uncached, the server redirects to the picture's host.
  */
 export const musicImageSrc = (url: string, cacheImages: boolean): string => {
   if (!cacheImages) {
@@ -41,14 +34,14 @@ export const musicImageSrc = (url: string, cacheImages: boolean): string => {
   return url;
 };
 
-/** An album's cover, small, by its release-group id. */
+/** A small album cover by release-group id. */
 export const albumCoverUrl = (albumMbid: string, cacheImages: boolean) =>
   musicImageSrc(
     `https://coverartarchive.org/release-group/${albumMbid}/front-250`,
     cacheImages
   );
 
-/** A picture of an artist: the server finds one, or answers 404. */
+/** An artist picture URL; the server finds one or answers 404. */
 export const artistImageUrl = (
   artistId: string,
   kind: 'photo' | 'backdrop' = 'photo'
@@ -57,7 +50,7 @@ export const artistImageUrl = (
     kind === 'backdrop' ? '?kind=backdrop' : ''
   }`;
 
-/** The year of a date as MusicBrainz gives it ("2004", "2004-03"...). */
+/** The year of a MusicBrainz date ("2004", "2004-03"...). */
 export const yearOf = (date?: string): string | undefined =>
   date && /^\d{4}/.test(date) ? date.slice(0, 4) : undefined;
 
@@ -66,9 +59,8 @@ export type AlbumGroup = 'albums' | 'eps' | 'singles' | 'other';
 export const ALBUM_GROUPS: AlbumGroup[] = ['albums', 'eps', 'singles', 'other'];
 
 /**
- * Where an album goes on its artist's page: studio albums, EPs and singles
- * by themselves; live albums, compilations, soundtracks, remixes and
- * anything else under Other.
+ * An album's group on its artist's page: albums, EPs and singles; anything
+ * with a secondary type (live, compilation, soundtrack...) under Other.
  */
 export const albumGroup = (album: MusicAlbumResult): AlbumGroup => {
   if (album.secondaryTypes.length) {
@@ -86,11 +78,7 @@ export const albumGroup = (album: MusicAlbumResult): AlbumGroup => {
   }
 };
 
-/**
- * What a card calls an album in its corner, as films' say Movie: an album,
- * an EP or a single by its primary type, live albums and compilations
- * included; a broadcast or anything else, a release.
- */
+/** The card's corner label by primary type alone: album, EP, single, release. */
 export const albumKind = (
   album: Pick<MusicAlbumResult, 'primaryType'>
 ): 'album' | 'ep' | 'single' | 'release' => {
@@ -124,16 +112,16 @@ export const trackLength = (ms?: number | null): string | undefined => {
     : `${minutes}:${seconds}`;
 };
 
-/** The kinds of release a Lidarr metadata profile lists, as Lidarr names them. */
+/** A Lidarr metadata profile's allowed release types, in Lidarr's names. */
 export interface AlbumKinds {
   primaryTypes: string[];
   secondaryTypes: string[];
 }
 
 /**
- * Whether a Lidarr metadata profile lists an album, as Lidarr decides it:
- * its primary type allowed, and every secondary type too ("Studio" stands
- * for an album with none). What the request window ticks to begin with.
+ * Whether a Lidarr metadata profile allows an album, as Lidarr decides: its
+ * primary type and every secondary type ("Studio" means none). Sets the
+ * request window's initial ticks.
  */
 export const allowedByProfile = (
   album: Pick<MusicAlbumResult, 'primaryType' | 'secondaryTypes'>,
@@ -149,18 +137,18 @@ export const allowedByProfile = (
     : has(kinds.secondaryTypes, 'Studio');
 };
 
-/** An album that can still be asked for: not here, and not on its way. */
+/** Whether it can still be requested: not here, not in progress. */
 export const requestable = (status?: MediaStatus): boolean =>
   !status ||
   status === MediaStatus.UNKNOWN ||
   status === MediaStatus.DELETED ||
-  // The rest of it: songs taken from it, or what Lidarr has of it.
+  // Partly here (some songs, or part in Lidarr): the rest is requestable.
   status === MediaStatus.PARTIALLY_AVAILABLE;
 
 /**
- * How far along a music request is, as a title's status, for its badge:
- * waiting for approval, on its way, or here as far as its albums are. An
- * artist being here says nothing about the albums one request asked for.
+ * A music request's progress as a media status for its badge: pending,
+ * processing, or as available as its albums. The artist's own status
+ * doesn't count.
  */
 export const musicRequestStatus = (request: {
   status: MediaRequestStatus;
@@ -194,10 +182,7 @@ export const musicRequestStatus = (request: {
     : MediaStatus.PROCESSING;
 };
 
-/**
- * Of an artist's downloads, those for these albums (by their MusicBrainz
- * ids): an album's page, card or request shows its own.
- */
+/** The artist's downloads for these albums (MusicBrainz ids). */
 export const albumDownloads = (
   downloads: DownloadingItem[] | undefined,
   albumMbids: string | string[]
@@ -208,7 +193,7 @@ export const albumDownloads = (
   );
 };
 
-/** Downloads bringing any of these songs, taken from their albums. */
+/** Downloads carrying any of these songs, taken from their albums. */
 export const songDownloads = (
   downloads: DownloadingItem[] | undefined,
   recordingMbids: string[]
@@ -219,6 +204,6 @@ export const songDownloads = (
   );
 };
 
-/** A song as it is named: "Song (radio edit)", or just "Song". */
+/** A song's display name: "Song (radio edit)", or just "Song". */
 export const songName = (title: string, version?: string | null): string =>
   version ? `${title} (${version})` : title;

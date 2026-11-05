@@ -1,11 +1,10 @@
 /**
- * What a search shows. Everything is films, series, collections and
- * people; music is on its own, unless an admin chose to have artists and
- * albums below the films and series too (Settings → Music).
+ * Search scope. All is films, series, collections and people; music is
+ * separate unless an admin adds it below (Settings → Music).
  */
 export type SearchType = 'all' | 'movie' | 'tv' | 'music';
 
-/** The kind of search in the address, if it is one this person can use. */
+/** The URL's search type, if this user can use it. */
 export const searchType = (
   value: string | string[] | undefined,
   musicOn: boolean
@@ -15,9 +14,8 @@ export const searchType = (
     : 'all';
 
 /**
- * Whether this person's All has music below the films and series: when an
- * admin chose it, and never with music off for everyone or for themselves.
- * A server that does not say leaves it out, as it was before the choice.
+ * Whether All includes music below films and series: when an admin enabled
+ * it and music isn't off globally or for the user. Off if the server doesn't say.
  */
 export const musicInAll = (
   musicOn: boolean,
@@ -25,9 +23,8 @@ export const musicInAll = (
 ): boolean => musicOn && (chosen?.inAll ?? false);
 
 /**
- * Whether artists and albums go below a search's films and series: in All
- * only, and only once the films and series are there, so music (which
- * MusicBrainz answers slowly) never holds them up or comes before them.
+ * Whether to show music below the titles: All only, and only once titles
+ * have loaded, so slow MusicBrainz results never delay or precede them.
  */
 export const musicBelowTitles = (
   type: SearchType,

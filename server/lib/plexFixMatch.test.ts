@@ -21,9 +21,9 @@ import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * A wrong Plex match fixed from Seerr AI: looked up in Plex by the id
- * Radarr has, never by name, matched, and read back. A match Plex then
- * shows as another title is put back, and every fix can be undone.
+ * A wrong Plex match fixed from Seerr AI: searched in Plex by Radarr's id,
+ * never by name, matched, and read back. A match Plex then shows as another
+ * title is restored, and every fix can be undone.
  */
 
 setupTestDb();
@@ -31,12 +31,12 @@ setupTestDb();
 const WRONG = 'plex://movie/wrong';
 const RIGHT = 'plex://movie/right';
 
-/** Border Feud (2024) in Radarr, matched by Plex to another film. */
+/** Static Garden (2024) in Radarr, matched by Plex to another film. */
 const problem = (change: Partial<PlexMatchProblem> = {}): PlexMatchProblem => ({
   kind: 'movie',
-  folder: 'Border Feud (2024)',
+  folder: 'Static Garden (2024)',
   expected: {
-    title: 'Border Feud',
+    title: 'Static Garden',
     year: 2024,
     tmdbId: 846213,
     imdbId: 'tt18381507',
@@ -46,7 +46,7 @@ const problem = (change: Partial<PlexMatchProblem> = {}): PlexMatchProblem => ({
   },
   mediaServer: 'Plex',
   matched: {
-    title: 'Guerra Fronteriza',
+    title: 'Jardín Estático',
     year: 2024,
     key: '70',
     tmdbId: 1427986,
@@ -55,12 +55,12 @@ const problem = (change: Partial<PlexMatchProblem> = {}): PlexMatchProblem => ({
   ...change,
 });
 
-/** What each title Plex can be matched to is, by its guid. */
+/** Each title Plex can match to, by guid. */
 const TITLES: Record<string, { title: string; year: number; ids: string[] }> = {
-  [WRONG]: { title: 'Guerra Fronteriza', year: 2024, ids: ['tmdb://1427986'] },
-  [RIGHT]: { title: 'Border Feud', year: 2024, ids: ['tmdb://846213'] },
+  [WRONG]: { title: 'Jardín Estático', year: 2024, ids: ['tmdb://1427986'] },
+  [RIGHT]: { title: 'Static Garden', year: 2024, ids: ['tmdb://846213'] },
   'plex://movie/other': {
-    title: 'Border Feud',
+    title: 'Static Garden',
     year: 2024,
     ids: ['tmdb://5'],
   },
@@ -78,12 +78,11 @@ const asItem = (guid: string): PlexLibraryItem =>
     Media: [],
   }) as unknown as PlexLibraryItem;
 
-/** A Plex with item 70 matched to `guid`, offering `results` by search. */
 /**
- * A Plex with item 70 matched to `guid`, offering `results` by search. As
- * Plex does, a new match shows its guid, name and year at once, but keeps
- * the old title's ids for `lag` reads (forever, with Infinity) while it
- * fetches the new title's details.
+ * A Plex with item 70 matched to `guid`, offering `results` by search. Like
+ * Plex, a new match shows its guid, name and year at once but keeps the old
+ * title's ids for `lag` reads (forever with Infinity) while it fetches the
+ * new title's details.
  */
 const plexWith = (
   guid: string,
@@ -180,10 +179,10 @@ describe('fixing a wrong Plex match', () => {
     assert.equal(fix.confirmed, true, 'read back with the TMDB id');
     assert.deepEqual(fix.from, {
       guid: WRONG,
-      title: 'Guerra Fronteriza',
+      title: 'Jardín Estático',
       year: 2024,
     });
-    assert.equal(fix.to.title, 'Border Feud');
+    assert.equal(fix.to.title, 'Static Garden');
 
     const undone = await undoFix(fix.id, 2);
     assert.ok(undone.undoneAt);

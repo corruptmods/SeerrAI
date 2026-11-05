@@ -33,10 +33,9 @@ const messages = defineMessages('components.Seasonal.UserSeasons', {
 });
 
 /**
- * The Seasonal themes part of Profile → Settings → Appearance: the switch,
- * and the seasons this server runs with their next dates. On one's own
- * page each can be previewed on top of the look being chosen; a season
- * turned off from its note can be brought back.
+ * Seasonal themes in Profile → Settings → Appearance: the switch and each
+ * season's next dates. On one's own page seasons can be previewed, and one
+ * turned off from its note can be restored.
  */
 const UserSeasons = ({
   seasonal,
@@ -45,7 +44,7 @@ const UserSeasons = ({
 }: {
   seasonal: boolean;
   onToggle: () => void;
-  /** Their own page: previews show on their screen. */
+  /** The viewer's own page, so previews apply to their screen. */
   isOwn: boolean;
 }) => {
   const intl = useIntl();

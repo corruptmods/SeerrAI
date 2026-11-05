@@ -331,7 +331,7 @@ export interface TmdbTvDetails {
 export interface TmdbTvScanDetails {
   id: number;
   name: string;
-  /** Always sent; read to tell anime apart. */
+  /** Always sent; used for anime detection. */
   genres: TmdbGenre[];
   original_language: string;
   origin_country: string[];
@@ -342,7 +342,7 @@ export interface TmdbTvScanDetails {
   };
 }
 
-/** The little of a movie Anime Check reads: what tells anime apart. */
+/** The movie fields Anime Check reads. */
 export interface TmdbMovieScanDetails {
   id: number;
   title: string;
@@ -506,7 +506,7 @@ export interface TmdbKeywordSearchResponse extends TmdbPaginatedResponse {
   results: TmdbKeyword[];
 }
 
-// We have production companies, but the company search results return less data
+// Company search results carry fewer fields than production companies.
 export interface TmdbCompany {
   id: number;
   logo_path?: string;

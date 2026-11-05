@@ -3,9 +3,9 @@ import { getSettings } from '@server/lib/settings';
 import { Router } from 'express';
 
 /*
- * Settings → Appearance → Server CSS: styles for everyone, the sign-in
- * page included, and whether people may add their own CSS for their own
- * screens (server/constants/customCss.ts).
+ * Settings → Appearance → Server CSS: styles for everyone (sign-in page
+ * included) and whether users may add their own CSS
+ * (server/constants/customCss.ts).
  */
 
 const serverCssRoutes = Router();

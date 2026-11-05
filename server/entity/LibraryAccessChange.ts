@@ -9,20 +9,20 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-/** One person a change touched: what they had, and what they were given. */
+/** One user a change affected: what they had and what they were given. */
 export interface LibraryAccessEntry {
   /** Their id on the server. */
   id: string;
   name: string;
   before: AccessSet;
   after: AccessSet;
-  /** Why the server refused it; the rest went through. */
+  /** Why the server rejected it; the rest went through. */
   error?: string;
 }
 
 /**
- * One change to who sees which library on a media server, made from
- * Seerr AI: for its history and Undo.
+ * One change to library access on a media server, made from Seerr AI, for
+ * history and Undo.
  */
 @Entity()
 export class LibraryAccessChange {
@@ -33,7 +33,7 @@ export class LibraryAccessChange {
   @Column({ type: 'varchar' })
   public serverKind: MediaServerKind;
 
-  /** remove or add for everyone, or person for one person's libraries. */
+  /** remove or add for everyone, or person for one user's libraries. */
   @Column({ type: 'varchar' })
   public action: 'remove' | 'add' | 'person';
 

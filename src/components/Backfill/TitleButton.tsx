@@ -20,16 +20,14 @@ const messages = defineMessages('components.Backfill.TitleButton', {
 const loadStart = () => import('@app/components/Backfill/StartSearchModal');
 
 /*
- * Backfill on a series', movie's or album's page, for admins: opens the title's
- * Backfill page (its downloads are listed there and in the page's Backfill
- * box), or starts a search for a title it isn't following yet. The
- * dialog's code loads only when it is opened.
+ * Admin button on a title's page: opens its Backfill page, or starts a search
+ * if not followed. The dialog loads on open.
  */
 const BackfillTitleButton = ({
   id,
   target,
 }: {
-  /** The TMDB id; an album's MusicBrainz id. */
+  /** TMDB id, or MusicBrainz id for an album. */
   id: number | string;
   target: LibraryTitle;
 }) => {

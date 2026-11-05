@@ -1,14 +1,13 @@
 import type { PlexLibraryItem } from '@server/api/plexapi';
 
 /*
- * Titles the recently added scan could not place yet. Plex adds a file
- * before its agent has matched it (no TMDB or TVDB id yet), and a lookup
- * can fail for a moment; the scan window moves on regardless, so without
- * a second look such a title waited for the nightly full scan. Each is
- * tried again, less often each time, for a day.
+ * Titles the recently added scan couldn't place yet. Plex lists a file
+ * before its agent matches it (no TMDB or TVDB id), and lookups can fail
+ * briefly; the scan window moves on regardless, so each is retried with
+ * backoff for a day instead of waiting for the nightly full scan.
  */
 
-/** How long a title is tried again before the full scan is left to it. */
+/** How long a title is retried before leaving it to the full scan. */
 export const RETRY_FOR_MS = 24 * 60 * 60 * 1000;
 const FIRST_RETRY_MS = 5 * 60 * 1000;
 const LONGEST_RETRY_MS = 2 * 60 * 60 * 1000;
@@ -37,14 +36,14 @@ export class RecentRetries {
     return entries;
   }
 
-  /** The titles due another look now. */
+  /** Titles due for a retry now. */
   public due(libraryId: string, now = Date.now()): RetryEntry[] {
     return [...this.of(libraryId).values()].filter((e) => e.nextAt <= now);
   }
 
   /**
-   * A title that could not be placed. Answers true once it has been tried
-   * for a day: it is dropped, and the full scan is left to it.
+   * Records a failed title. Returns true once it has been retried for a day:
+   * it is dropped and left to the full scan.
    */
   public failed(
     libraryId: string,

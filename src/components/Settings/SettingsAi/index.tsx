@@ -103,16 +103,14 @@ const SettingsAi = () => {
   const { mutate: globalMutate } = useSWRConfig();
   const { data, mutate } = useSWR<AiSettingsForm>('/api/v1/settings/ai');
   const [form, setForm] = useState<AiSettingsForm>();
-  // The list belongs to one provider and address, and is not shown for any
-  // other.
+  // The list is for one provider and address; hidden for any other.
   const [models, setModels] = useState<{ for: string; list: ModelInfo[] }>({
     for: '',
     list: [],
   });
   const [modelsProblem, setModelsProblem] = useState<string>();
   const [listing, setListing] = useState(false);
-  // A typed key is used to list models once it has been entered, not on
-  // every keystroke.
+  // A typed key lists models once entered, not on every keystroke.
   const [enteredKey, setEnteredKey] = useState('');
   const [replacing, setReplacing] = useState(false);
   const [busy, setBusy] = useState<'save' | 'test'>();
@@ -124,8 +122,7 @@ const SettingsAi = () => {
     }
   }, [data, form]);
 
-  // Which list the current choices call for: the provider and address, and
-  // the key it would be fetched with.
+  // The list the current choices call for: provider, address and key.
   const listFor = form
     ? [
         form.provider,
@@ -178,9 +175,8 @@ const SettingsAi = () => {
     [intl]
   );
 
-  // The list loads by itself whenever there is a key it can be fetched with:
-  // on opening the page with one saved, after a key is entered, or when the
-  // provider or address changes. Typing an address waits for a pause.
+  // Load the list whenever a key can fetch it: on open with a saved key, after
+  // one is entered, or on a provider or address change (debounced while typing).
   useEffect(() => {
     if (!form || !listable || models.for === listFor) {
       return;
@@ -260,9 +256,8 @@ const SettingsAi = () => {
   };
 
   const changeProvider = (provider: 'anthropic' | 'openai') => {
-    // Models are named differently by each provider, and a key only works
-    // with its own: what was chosen or typed for the other one is cleared
-    // rather than left to fail, or sent where it does not belong.
+    // Model names and keys are per provider: clear the other one's choice rather
+    // than let it fail or send it where it doesn't belong.
     setForm({
       ...form,
       provider,
@@ -511,8 +506,7 @@ const SettingsAi = () => {
               </span>
             </label>
             <div className="form-input-area">
-              {/* A text field with a number pad, as elsewhere in settings:
-                  the theme styles text fields, not number fields. */}
+              {/* Text field with a number pad: the theme styles text inputs, not number ones. */}
               <input
                 id="aiDailyLimit"
                 type="text"

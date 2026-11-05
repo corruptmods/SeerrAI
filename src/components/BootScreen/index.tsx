@@ -1,23 +1,16 @@
 /**
- * The screen shown while the installed app starts.
+ * Startup screen for the installed app.
  *
- * iOS draws a static splash image before Seerr runs at all; nothing can
- * animate that. This takes over from it: the first frame is identical — the
- * same background, and the same logo at 40% of the screen width, centred,
- * which is where every apple-splash image places it — and then it animates
- * until the app is ready, when _app fades it out.
+ * Takes over from iOS's static splash with an identical first frame (same
+ * background, logo centred at 40% width as in every apple-splash image), then
+ * animates until _app fades it out.
  *
- * It is plain markup and CSS in the document, not a React component in the
- * app tree, so it paints before any JavaScript has run. The animations use
- * only transform and opacity, which the browser runs on the compositor, so
- * they keep moving while the main thread is busy starting the app — the slow
- * part of a cold start.
+ * Plain markup and CSS in the document, so it paints before any JavaScript.
+ * Animations use only transform and opacity, which run on the compositor and
+ * keep moving while the main thread starts the app.
  *
- * Its background is the page's, in the person's own look.
- *
- * Shown only in the installed app (display-mode: standalone). If the app
- * never starts, it hides itself after 12 seconds rather than covering the
- * page for good. Reduce Motion leaves the logo still.
+ * Uses the user's page background. Standalone display mode only; hides
+ * itself after 12 seconds if the app never starts. Still under Reduce Motion.
  */
 const BOOT_CSS =
   '#boot-screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgb(var(--page));animation:boot-failsafe .3s ease 12s forwards}\n#boot-screen.boot-done{opacity:0;transition:opacity .35s ease;pointer-events:none}\n#boot-screen .boot-mark{position:relative;width:min(40vw,560px);height:min(40vw,560px)}\n#boot-screen .boot-logo{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:boot-breathe 2.4s ease-in-out infinite;will-change:transform}\n#boot-screen .boot-glow{position:absolute;inset:-22%;border-radius:50%;background:radial-gradient(closest-side,rgba(139,92,246,0) 58%,rgba(139,92,246,.4) 72%,rgba(99,102,241,0) 100%);opacity:0;animation:boot-glow 2.4s ease-in-out infinite;will-change:opacity,transform}\n#boot-screen .boot-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(167,139,250,.6);opacity:0;animation:boot-ripple 2.4s cubic-bezier(.2,.6,.3,1) infinite;will-change:transform,opacity}\n#boot-screen .boot-ring.boot-ring-2{animation-delay:1.2s}\n@keyframes boot-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}\n@keyframes boot-glow{0%,100%{opacity:0;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}\n@keyframes boot-ripple{0%{opacity:0;transform:scale(1)}15%{opacity:.6}100%{opacity:0;transform:scale(1.7)}}\n@keyframes boot-failsafe{to{opacity:0;visibility:hidden}}\n@media not all and (display-mode:standalone){#boot-screen{display:none}}\n@media (prefers-reduced-motion:reduce){#boot-screen .boot-logo{animation:none}#boot-screen .boot-glow,#boot-screen .boot-ring{display:none}}';
@@ -42,7 +35,7 @@ const BootScreen = () => (
   </>
 );
 
-/** Fades the startup screen out once the app is ready, then removes it. */
+/** Fades out and removes the startup screen. */
 export const dismissBootScreen = (): (() => void) => {
   const boot = document.getElementById('boot-screen');
 

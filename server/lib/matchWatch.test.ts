@@ -49,11 +49,10 @@ import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * A title just requested and imported is looked for on each media server a
- * couple of minutes later, by its folder, and its ids compared with
- * Radarr's, Sonarr's or Lidarr's. A wrong match is told to admins once,
- * gathered with others found close by, within a few messages a day; one
- * put right is cleared without a word.
+ * A requested title, once imported, is looked up on each media server a few
+ * minutes later by folder and its ids compared with the *arr's. A wrong match
+ * is reported to admins once, batched with nearby ones, within a few messages
+ * a day; a fixed one clears silently.
  */
 
 setupTestDb();
@@ -62,7 +61,7 @@ const MIN = 60_000;
 const T0 = new Date('2026-10-19T12:00:00.000Z');
 const at = (minutes: number) => new Date(T0.getTime() + minutes * MIN);
 
-/** Replaces a method an API client sets on each instance, for one test. */
+/** Replaces a method an API client sets per instance, for one test. */
 const stub = (
   target: { prototype: object },
   name: string,
@@ -71,7 +70,7 @@ const stub = (
   Object.defineProperty(target.prototype, name, {
     configurable: true,
     set() {
-      // The constructor's own assignment is swallowed.
+      // Swallow the constructor's own assignment.
     },
     get() {
       return fn;
@@ -141,7 +140,7 @@ afterEach(async () => {
 
 const requester = () => getRepository(User).findOneByOrFail({ id: 2 });
 
-/** A film someone requested, that Radarr has as `radarrId`. */
+/** A requested film that Radarr has as `radarrId`. */
 const requestedMovie = async (tmdbId: number, radarrId: number) => {
   const media = await dataSource.manager.save(
     new Media({
@@ -192,7 +191,7 @@ const imported = (
   },
 });
 
-/** Radarr's films, by Radarr's id. */
+/** Radarr's films by Radarr id. */
 const radarrHas = (
   movies: Record<
     number,
@@ -246,7 +245,7 @@ const plexMovie = (
     ],
   }) as unknown as PlexLibraryItem;
 
-/** What Plex lists as newly added, and its items by key. */
+/** Plex's recently added list and its items by key. */
 const plexHas = (
   movies: () => PlexLibraryItem[],
   shows: PlexLibraryItem[] = []
@@ -272,23 +271,23 @@ const plexHas = (
 };
 
 const borderFeud = {
-  title: 'Border Feud',
+  title: 'Static Garden',
   year: 2024,
   tmdbId: 846213,
   imdbId: 'tt18381507',
-  folder: 'Border Feud (2024)',
+  folder: 'Static Garden (2024)',
   runtime: 109,
   file: 'Guerra.Fronteriza.2024.1080p.mkv',
   fileRuntime: '1:49:01',
 };
 const guerraCivil = () =>
-  plexMovie('70', 'Guerra Fronteriza', 2024, 'Border Feud (2024)', [
+  plexMovie('70', 'Jardín Estático', 2024, 'Static Garden (2024)', [
     'tmdb://1427986',
   ]);
 
 /**
- * Fix Match in Plex turned on to work by itself: a search for Border
- * Feud's TMDB id finds it, and matching item 70 to it makes it so.
+ * Plex Fix Match set to run automatically: a search for Static Garden's TMDB id
+ * finds it, and matching item 70 to it succeeds.
  */
 const fixesByItself = async (item: { current: PlexLibraryItem }) => {
   setFixTimingForTests(50, 1);
@@ -305,7 +304,7 @@ const fixesByItself = async (item: { current: PlexLibraryItem }) => {
     'findMatches',
     async (_key: string, term: string): Promise<PlexMatchResult[]> =>
       term === 'tmdb-846213'
-        ? [{ guid: 'plex://movie/right', name: 'Border Feud', year: 2024 }]
+        ? [{ guid: 'plex://movie/right', name: 'Static Garden', year: 2024 }]
         : []
   );
   mock.method(
@@ -313,7 +312,7 @@ const fixesByItself = async (item: { current: PlexLibraryItem }) => {
     'setMatch',
     async (key: string, to: { guid: string }) => {
       item.current = {
-        ...plexMovie(key, 'Border Feud', 2024, 'Border Feud (2024)', [
+        ...plexMovie(key, 'Static Garden', 2024, 'Static Garden (2024)', [
           'tmdb://846213',
         ]),
         guid: to.guid,
@@ -387,7 +386,7 @@ describe('looking at new requests as they are imported', () => {
       ],
       T0
     );
-    // A later episode of the same series, while it waits: still one.
+    // A later episode of the same series while it waits: still one check.
     await matchWatch.noteImports([imported('series', 20)], at(1));
 
     const rows = await pending();
@@ -406,7 +405,7 @@ describe('looking at new requests as they are imported', () => {
       'first looked at a couple of minutes after the import'
     );
 
-    // Switched off: nothing new is looked at.
+    // Turned off: nothing new is checked.
     await getRepository(MatchWatch).clear();
     getSettings().main.matchCheckOnImport = false;
     await matchWatch.noteImports([imported('movie', 10)], T0);
@@ -448,7 +447,7 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(problem.notice, 'waiting', 'told as soon as it is certain');
     assert.equal(sent.length, 0, 'but others found soon after join it');
 
-    // The requester's request keeps waiting for the server, saying so.
+    // The request keeps waiting for the server and says so.
     const [waiting] = downloadTracker.getMovieProgress(0, 10);
     assert.equal(waiting.stage, 'imported');
     assert.equal(waiting.matching, 'Plex');
@@ -459,8 +458,8 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(message.notifyAdmin, true);
     assert.equal(message.notifyUser, undefined, 'never the requester');
     assert.equal(message.event, 'Wrong match');
-    assert.match(message.subject, /^Border Feud \(2024\): Plex matched/);
-    assert.match(message.subject, /Guerra Fronteriza \(2024\)/);
+    assert.match(message.subject, /^Static Garden \(2024\): Plex matched/);
+    assert.match(message.subject, /Jardín Estático \(2024\)/);
     assert.match(
       message.message ?? '',
       /Fix Match in Plex, searching tmdb-846213/
@@ -468,7 +467,7 @@ describe('looking at new requests as they are imported', () => {
     assert.match(message.message ?? '', /rename the file in Radarr/);
     assert.equal(message.actionUrl, `/movie/${film.tmdbId}`);
 
-    // Looked at again in its window, and imported again later: never again.
+    // Rechecked in its window and imported again later: never reported again.
     for (const minute of [22, 52, 112]) await matchWatch.run(at(minute));
     await matchWatch.noteImports([imported('movie', 10)], at(300));
     for (const minute of [302, 307, 330]) await matchWatch.run(at(minute));
@@ -498,7 +497,7 @@ describe('looking at new requests as they are imported', () => {
       assert.equal(sent.length, 1, 'still told');
       assert.match(
         sent[0].message ?? '',
-        /Fixed in Plex by itself: it is now Border Feud \(2024\)/
+        /Fixed in Plex by itself: it is now Static Garden \(2024\)/
       );
       const [fix] = await recentFixes();
       assert.equal(fix.by, 'auto');
@@ -511,7 +510,7 @@ describe('looking at new requests as they are imported', () => {
     await requestedMovie(846213, 10);
     radarrHas({ 10: borderFeud });
     plexHas(() => [
-      plexMovie('70', 'Border Feud', undefined, 'Border Feud (2024)', []),
+      plexMovie('70', 'Static Garden', undefined, 'Static Garden (2024)', []),
     ]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
 
@@ -526,7 +525,7 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(sent.length, 1);
     assert.match(
       sent[0].subject,
-      /Plex has not matched "Border Feud \(2024\)"/
+      /Plex has not matched "Static Garden \(2024\)"/
     );
   });
 
@@ -542,13 +541,13 @@ describe('looking at new requests as they are imported', () => {
         folder: 'Orvane (2025)',
       },
     });
-    // Plex lists only what was added since the time it is asked for.
+    // Plex lists only what was added since the requested time.
     const addedAt: Record<string, number> = {
       '70': at(1).getTime(),
       '71': at(110).getTime(),
     };
     const library = [
-      plexMovie('70', 'Border Feud', undefined, 'Border Feud (2024)', []),
+      plexMovie('70', 'Static Garden', undefined, 'Static Garden (2024)', []),
       plexMovie('71', 'Orvane', 2025, 'Orvane (2025)', ['tmdb://1000']),
     ];
     mock.method(
@@ -563,7 +562,7 @@ describe('looking at new requests as they are imported', () => {
     for (const minute of [2, 7, 22, 52]) await matchWatch.run(at(minute));
     assert.equal((await problems()).length, 0, 'not matched, but not yet');
 
-    // Imported later, its first look falls just before the other's last.
+    // Imported later, its first check falls just before the other's last.
     await matchWatch.noteImports([imported('movie', 12)], at(109));
     await matchWatch.run(at(112));
     const found = await problems();
@@ -600,7 +599,7 @@ describe('looking at new requests as they are imported', () => {
     await matchWatch.run(at(12));
     assert.equal(sent.length, 1);
     assert.equal(sent[0].subject, '2 wrong matches');
-    assert.match(sent[0].message ?? '', /Border Feud/);
+    assert.match(sent[0].message ?? '', /Static Garden/);
     assert.match(sent[0].message ?? '', /Orvane/);
     assert.match(
       sent[0].message ?? '',
@@ -639,7 +638,7 @@ describe('looking at new requests as they are imported', () => {
       ['sent', 'sent', 'sent', 'sent', 'sent', 'held', 'held']
     );
 
-    // A day after the first message, the next one says how many more.
+    // A day after the first message, the next says how many more.
     await found(8, 24 * 60 + 61);
     await matchWatch.run(at(24 * 60 + 71));
     assert.equal(sent.length, DAILY_MESSAGES + 1);
@@ -656,7 +655,7 @@ describe('looking at new requests as they are imported', () => {
     let fixed = false;
     plexHas(() => [
       fixed
-        ? plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+        ? plexMovie('70', 'Static Garden', 2024, 'Static Garden (2024)', [
             'tmdb://846213',
           ])
         : guerraCivil(),
@@ -683,8 +682,7 @@ describe('looking at new requests as they are imported', () => {
     await matchWatch.noteImports([imported('movie', 10)], T0);
     await matchWatch.run(at(2));
 
-    // A restart: nothing is held in memory but the waiting lines, which
-    // start empty.
+    // A restart: only the waiting lines live in memory, and they start empty.
     downloadTracker.setMatchWaits([]);
     assert.equal(downloadTracker.getMovieProgress(0, 10).length, 0);
     await matchWatch.run(at(12));
@@ -704,17 +702,17 @@ describe('looking at new requests as they are imported', () => {
     await requestedMovie(846213, 10);
     radarrHas({ 10: borderFeud });
     plexHas(() => [
-      plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+      plexMovie('70', 'Static Garden', 2024, 'Static Garden (2024)', [
         'tmdb://846213',
       ]),
     ]);
     mock.method(JellyfinAPI.prototype, 'getMatchItems', async () => [
       {
         Id: 'jf-1',
-        Name: 'Guerra Fronteriza',
+        Name: 'Jardín Estático',
         Type: 'Movie',
         ProductionYear: 2024,
-        Path: '/media/films/Border Feud (2024)/f.mkv',
+        Path: '/media/films/Static Garden (2024)/f.mkv',
         ProviderIds: { Tmdb: '1427986' },
       },
     ]);
@@ -847,7 +845,7 @@ describe('looking at new requests as they are imported', () => {
       { id: 1, path: `/music/Glasswing/${albums[id].title}/01.flac` },
     ]) as never);
     const plexAlbums: PlexMusicItem[] = [
-      // Fog B's folder, matched to another album entirely.
+      // Fog B's folder, matched to a different album entirely.
       {
         ratingKey: 'p40',
         type: 'album',
@@ -905,7 +903,7 @@ describe('looking at new requests as they are imported', () => {
       [40],
       'Static Garden is right'
     );
-    // The requester's album waits for the server; the other does not.
+    // The requester's album waits for the server; the other doesn't.
     assert.deepEqual(
       downloadTracker.getMusicProgress(0, 30).map((i) => i.album?.id),
       [40]
@@ -919,7 +917,7 @@ describe('looking at new requests as they are imported', () => {
 
 describe('sharing what is found with the nightly Match Check', () => {
   afterEach(async () => {
-    // The nightly report is kept in memory too: an empty run clears it.
+    // The nightly report is cached in memory too: an empty run clears it.
     mock.method(SonarrAPI.prototype, 'getSeries', async () => []);
     stub(RadarrAPI, 'getMovies', (async () => []) as never);
     mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
@@ -980,7 +978,7 @@ describe('sharing what is found with the nightly Match Check', () => {
     assert.equal(still.resolvedAt, null);
 
     await nightlyFinds([
-      plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+      plexMovie('70', 'Static Garden', 2024, 'Static Garden (2024)', [
         'tmdb://846213',
       ]),
     ]);
@@ -1000,7 +998,7 @@ describe('sharing what is found with the nightly Match Check', () => {
       assert.equal(item.current.guid, 'plex://movie/right');
       assert.equal((await plexMatchCheck.lastReport()).problems.length, 0);
       const [fix] = await recentFixes();
-      assert.equal(fix.folder, 'Border Feud (2024)');
+      assert.equal(fix.folder, 'Static Garden (2024)');
       assert.equal(fix.by, 'auto');
       assert.equal(sent.length, 0, 'the nightly list is not told');
     } finally {

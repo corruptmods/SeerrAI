@@ -18,10 +18,7 @@ import {
   THEME_GALLERY,
 } from './themeFile';
 
-/*
- * Theme files on the page: what a file's colours change, what exporting
- * one writes, what importing one does to a look, and the built-in gallery.
- */
+/* Theme file colours, export, import, and the built-in gallery. */
 
 const classic = appearanceFromDefaults(SERVER_THEME_DEFAULTS);
 const look = (changes: Partial<Appearance>): Appearance => ({
@@ -49,11 +46,11 @@ describe('a theme file’s colours', () => {
     assert.equal(dark['text-muted'], channels('#a8a29e'));
     assert.equal(dark['accent-text'], channels('#fb7185'));
     assert.equal(dark.accent, channels('#be123c'));
-    // What it leaves out is the look's own.
+    // Omitted values come from the look.
     assert.equal(dark.surface, plain.surface);
     assert.equal(dark['gray-800'], plain['gray-800']);
     assert.equal(dark['success-text'], plain['success-text']);
-    // A file with nothing for light leaves light as it was, but its accent.
+    // A file without light values changes only light's accent.
     const light = themeVariables(
       look({ mode: 'light', theme: ember }),
       'light'

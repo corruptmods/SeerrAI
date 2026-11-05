@@ -1,11 +1,9 @@
 /*
- * Colour arithmetic for themes: contrast as WCAG measures it, and a whole
- * accent scale made from one colour someone picks.
+ * Theme colour maths: WCAG contrast, and accent scales from one colour.
  *
- * Scales are made in OKLCH, where equal steps of lightness look equal to the
- * eye whatever the hue, so a picked colour gets steps that sit like the
- * built-in ones. The lightness of each step, and how colourful it is next
- * to the most colourful one, follow Tailwind's own indigo.
+ * Scales are built in OKLCH, whose lightness steps look even across hues, so
+ * custom scales match the built-in ones. Step lightness and relative chroma
+ * follow Tailwind's indigo.
  */
 
 export type Rgb = [number, number, number];
@@ -16,10 +14,10 @@ export const SCALE_STEPS = [
 export type ScaleStep = (typeof SCALE_STEPS)[number];
 export type Scale = Record<ScaleStep, string>;
 
-/** Dark text for light colours: the darkest Classic grey. */
+/** Dark text for light colours (Classic's darkest grey). */
 export const DARK_INK = '#111827';
 
-/** Every surface text sits on, in every dark background and in light. */
+/** Every text surface across all dark backgrounds and light. */
 const DARK_SURFACES = [
   '#111827',
   '#1f2937',
@@ -70,8 +68,8 @@ export const contrastRatio = (a: string, b: string): number => {
 };
 
 /**
- * Text for a colour: white when it is readable on it (4.5:1), otherwise
- * dark, otherwise black. One of white and black always reaches 4.5:1.
+ * Text for a fill: white if 4.5:1, else dark, else black. White or black
+ * always reaches 4.5:1.
  */
 export const pickInk = (fill: string): string =>
   ['#ffffff', DARK_INK, '#000000'].find(
@@ -97,7 +95,7 @@ export const toOklch = (rgb: Rgb): Oklch => {
   return { l, c: Math.hypot(a, bb), h: h < 0 ? h + 360 : h };
 };
 
-/** Linear sRGB, possibly outside 0–1 when the colour can't be shown. */
+/** Linear sRGB; outside 0–1 when out of gamut. */
 const oklchToLinear = ({ l, c, h }: Oklch): [number, number, number] => {
   const a = c * Math.cos((h * Math.PI) / 180);
   const b = c * Math.sin((h * Math.PI) / 180);
@@ -120,7 +118,7 @@ export const fromOklch = (colour: Oklch): Rgb =>
 const inGamut = (colour: Oklch): boolean =>
   oklchToLinear(colour).every((value) => value >= -1e-4 && value <= 1 + 1e-4);
 
-/** The colour, made less colourful until a screen can show it. */
+/** Reduces chroma until the colour is in gamut. */
 const clipped = (colour: Oklch): string => {
   if (inGamut(colour)) {
     return rgbToHex(fromOklch(colour));
@@ -137,7 +135,7 @@ const clipped = (colour: Oklch): string => {
   return rgbToHex(fromOklch({ ...colour, c: low }));
 };
 
-/** Lightness of each step, and its colourfulness next to step 600's. */
+/** Each step's lightness and chroma relative to step 600. */
 const LADDER: Record<ScaleStep, [number, number]> = {
   50: [0.962, 0.07],
   100: [0.93, 0.13],
@@ -153,8 +151,8 @@ const LADDER: Record<ScaleStep, [number, number]> = {
 };
 
 /**
- * A 50–950 scale with the colour at the step whose lightness is nearest
- * its own, exactly as given; the other steps share its hue.
+ * A 50–950 scale with the colour, unchanged, at its nearest-lightness step;
+ * other steps share its hue.
  */
 export const accentScale = (
   hex: string
@@ -181,7 +179,7 @@ export const accentScale = (
   return { scale, anchor };
 };
 
-/** The same scale turned round the colour wheel, for gradients. */
+/** The scale rotated in hue, for gradients. */
 export const turnedScale = (scale: Scale, degrees: number): Scale =>
   Object.fromEntries(
     SCALE_STEPS.map((step) => {
@@ -192,30 +190,30 @@ export const turnedScale = (scale: Scale, degrees: number): Scale =>
 
 /** What an accent needs in one mode. */
 export interface AccentModeColours {
-  /** The fill on hover: a neighbour of the fill the button text still reads on. */
+  /** Hover fill: the nearest step the button text still reads on. */
   hover: string;
-  /** Links and highlights on the page: at least 4.5:1 on every surface. */
+  /** Links and highlights: at least 4.5:1 on every surface. */
   text: string;
-  /** A tint behind highlighted things, used see-through. */
+  /** Translucent tint behind highlights. */
   soft: string;
-  /** The gradient partner of the fill, and of its hover. */
+  /** Gradient partner of the fill and hover. */
   alt: string;
   altHover: string;
-  /** Small labels in the accent (badges), and their text. */
+  /** Badge colour and its text. */
   chip: string;
   onChip: string;
 }
 
 export interface AccentColours {
   scale: Scale;
-  /** The scale turned a little, for gradients with the accent. */
+  /** Hue-rotated scale for accent gradients. */
   alt: Scale;
   /** Buttons and switches. */
   fill: string;
   fillStep: ScaleStep;
   /** Text on the fill. */
   ink: string;
-  /** The text on buttons had to be dark to stay readable. */
+  /** Button text is dark for readability. */
   inkIsDark: boolean;
   dark: AccentModeColours;
   light: AccentModeColours;
@@ -223,7 +221,7 @@ export interface AccentColours {
 
 const stepIndex = (step: ScaleStep) => SCALE_STEPS.indexOf(step);
 
-/** Steps from the fill outwards, towards light (-1) or dark (+1). */
+/** Steps outward from the fill, towards light (-1) or dark (+1). */
 const stepsFrom = (step: ScaleStep, direction: -1 | 1): ScaleStep[] => {
   const steps =
     direction < 0
@@ -236,10 +234,9 @@ const readableOn = (hex: string, surfaces: string[]) =>
   surfaces.every((surface) => contrastRatio(hex, surface) >= 4.5);
 
 /**
- * One mode's colours, from a scale and the step the fill is at. Hover goes
- * lighter in dark mode and darker in light, unless that would leave the
- * button text unreadable, when it goes the other way. Text is the step
- * nearest the fill that reads on every surface of that mode.
+ * One mode's colours from a scale and fill step. Hover lightens in dark mode
+ * and darkens in light, reversing if the button text would become
+ * unreadable. Text is the nearest step readable on every surface.
  */
 export const accentModeColours = (
   scale: Scale,
@@ -270,13 +267,10 @@ export const accentModeColours = (
   };
 };
 
-/** How far round the colour wheel the gradient partner sits. */
+/** Hue offset of the gradient partner, in degrees. */
 const ALT_TURN = 30;
 
-/**
- * An accent from one colour: the colour fills buttons as it is, with text
- * on it chosen to stay readable (inkIsDark says when that meant dark text).
- */
+/** An accent from one colour, used as-is for fills with readable ink. */
 export const accentFromColour = (hex: string): AccentColours => {
   const { scale, anchor } = accentScale(hex);
   const alt = turnedScale(scale, ALT_TURN);
@@ -293,7 +287,7 @@ export const accentFromColour = (hex: string): AccentColours => {
   };
 };
 
-/** A built-in accent from a known scale, the fill at one of its steps. */
+/** A built-in accent from a known scale, filled at one step. */
 export const accentFromScale = (
   scale: Scale,
   fillStep: ScaleStep,

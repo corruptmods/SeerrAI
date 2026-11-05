@@ -14,31 +14,22 @@ const messages = defineMessages('components.Music.MusicStatusBadge', {
 
 interface MusicStatusBadgeProps {
   status?: MediaStatus;
-  /** What Lidarr is downloading of it, each naming its album. */
+  /** Lidarr downloads, each naming its album. */
   downloads?: DownloadingItem[];
-  /** Lidarr has its files and no media server lists it yet. */
+  /** Lidarr has the files but no media server lists it yet. */
   addingToLibrary?: boolean;
-  /** The artist's MusicBrainz id, whose page manages it. */
+  /** The managing artist's MusicBrainz id. */
   artistId?: string;
-  /** What the downloads are of, for their details. */
+  /** Names the downloads in their details. */
   title?: string;
   serviceUrl?: string;
-  /**
-   * Words only, no details on hover or link: for a badge inside a card
-   * that is itself a link.
-   */
+  /** Text only, no hover details or link: for a badge inside a link. */
   plain?: boolean;
-  /**
-   * The small round badge in a card's corner, as a film's or a series' card
-   * has: the status's icon, turning while it is on its way.
-   */
+  /** The round corner badge, as on film cards; spins while in progress. */
   mini?: boolean;
 }
 
-/**
- * Lidarr has the files and no media server lists them yet, as a download
- * that has just been imported is shown: "Adding to Plex".
- */
+/** A pseudo-download for files Lidarr has but no media server lists yet. */
 const beingAdded = (title?: string): DownloadingItem => ({
   mediaType: MediaType.MUSIC,
   externalId: 0,
@@ -52,9 +43,8 @@ const beingAdded = (title?: string): DownloadingItem => ({
 });
 
 /**
- * Whether Seerr has an album or artist yet, as a small badge; while Lidarr
- * is downloading it, or it is on its way into the library, the pill shows
- * how far along it is, as a film's or a series' does.
+ * An album or artist's status badge; while downloading or being added to the
+ * library, it shows progress as a film's does.
  */
 const MusicStatusBadge = ({
   status,

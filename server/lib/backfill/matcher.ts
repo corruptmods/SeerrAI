@@ -29,10 +29,9 @@ import type {
 } from '@server/lib/backfill/sonarr';
 
 /*
- * Judging a pack against one series, file by file. Every file is checked
- * twice with Sonarr: once as named, to learn which show it says it is, and
- * once renamed for Sonarr (see naming.ts) to map it to an episode and score
- * it as the release it really is.
+ * Judges a pack against one series, file by file. Sonarr parses each file
+ * twice: as named, to learn which show it claims, and renamed (see
+ * naming.ts) to map it to an episode and score it as the real release.
  */
 
 export interface SeriesContext {
@@ -40,10 +39,10 @@ export interface SeriesContext {
   episodes: SonarrEpisode[];
   files: SonarrEpisodeFile[];
   profile: SonarrQualityProfile;
-  /** The names the show goes by: Sonarr's title, its aliases, added ones. */
+  /** Sonarr's title, its aliases, and added names. */
   names: string[];
   sonarr: BackfillSonarr;
-  /** Asked about the files nothing else could place, when set up. */
+  /** Asked about files nothing else placed, if set up. */
   secondOpinion?: SecondOpinion;
 }
 
@@ -53,11 +52,11 @@ export interface PackFile {
   size: number;
 }
 
-/** Below this a video is a sample or an extra, not an episode. */
+/** Below this a video is a sample or extra. */
 const MIN_EPISODE_BYTES = 20 * 1024 * 1024;
-/** More episodes than any real pack: each is a question to Sonarr. */
+/** More than any real pack; each file costs Sonarr parse calls. */
 const MAX_PACK_FILES = 2000;
-/** Sonarr is local and quick; four at a time keeps it that way. */
+/** Sonarr is local and quick; four at a time keeps it so. */
 const PARSE_CONCURRENCY = 4;
 
 export const normalize = (value: string): string =>
@@ -69,15 +68,15 @@ export const normalize = (value: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, '');
 
 /**
- * A normalized name without a trailing year ("ninefoldsky2021"), unless
- * the year is all there is to it ("1863", "2034").
+ * A normalized name without its trailing year ("ninefoldsky2021"), unless
+ * under 3 characters would remain ("1863", "2034").
  */
 const withoutYear = (normalized: string): string => {
   const bare = normalized.replace(/(19|20)\d{2}$/, '');
   return bare.length >= 3 ? bare : normalized;
 };
 
-/** Whether a title's name, as a file or pack gives it, is this one. */
+/** Whether a name from a file or pack is this title. */
 export const sameShow = (name: string, names: string[]): boolean => {
   const n = normalize(name);
   if (!n) return false;
@@ -87,7 +86,7 @@ export const sameShow = (name: string, names: string[]): boolean => {
   });
 };
 
-/** A release that mentions the title at all, before anything is fetched. */
+/** Whether a release title mentions the title at all, before any fetch. */
 export const mentionsShow = (title: string, names: string[]): boolean => {
   const t = normalize(title);
   return names.some((name) => {
@@ -96,7 +95,7 @@ export const mentionsShow = (title: string, names: string[]): boolean => {
   });
 };
 
-/** How much a result looks like a pack, so packs are opened first. */
+/** How pack-like a result looks, so packs are opened first. */
 export const packScore = (release: ProwlarrRelease): number => {
   const t = release.title;
   let score = 0;
@@ -108,7 +107,7 @@ export const packScore = (release: ProwlarrRelease): number => {
   return score;
 };
 
-/** `fn` over `items`, at most `limit` at a time, results in order. */
+/** Maps `fn` over `items`, at most `limit` at once, keeping order. */
 export const mapLimit = async <T, R>(
   items: T[],
   limit: number,
@@ -129,7 +128,6 @@ export const mapLimit = async <T, R>(
   return results;
 };
 
-/** One file, judged. */
 export const judgeFile = async (
   file: PackFile,
   packTitle: string,
@@ -160,8 +158,8 @@ export const judgeFile = async (
   if (season === 0 && !episode) season = undefined;
 
   if (anime && absolute === undefined && season !== undefined && episode) {
-    // An anime file with only SxxEyy: take the absolute number of that
-    // TVDB episode, so the canonical name is in absolute numbering too.
+    // Anime with only SxxEyy: use that TVDB episode's absolute number, so
+    // the canonical name is absolute too.
     absolute = ctx.episodes.find(
       (ep) => ep.seasonNumber === season && ep.episodeNumber === episode
     )?.absoluteEpisodeNumber;
@@ -175,9 +173,8 @@ export const judgeFile = async (
           ? { absolute }
           : undefined;
   if (!number) {
-    // Named by its title alone, as specials often are.
-    // Only for a missing episode: an extra that happens to carry a title
-    // must not be planned over the file there.
+    // Named by title alone, as specials often are. Only for a missing
+    // episode, so a titled extra isn't planned over an existing file.
     const named = episodeNamedIn(name, ctx.episodes, ctx.names);
     const titled = named && !named.hasFile ? named : undefined;
     const unnumbered = { ...base, problem: 'No episode number in the name' };
@@ -185,7 +182,7 @@ export const judgeFile = async (
       ? byItsTitle(unnumbered, base, { name, packTitle, ctx, numbers }, titled)
       : unnumbered;
   }
-  // A file holding several episodes keeps all of them: S01E01E02, 01-02.
+  // Multi-episode files keep every episode: S01E01E02, 01-02.
   const many =
     'absolute' in number ? info?.absoluteEpisodeNumbers : info?.episodeNumbers;
   const through =
@@ -199,31 +196,24 @@ export const judgeFile = async (
     through ? { ...number, through } : number,
     { name, packTitle, ctx, numbers }
   );
-  // A file of several episodes keeps what its numbers say: one title
-  // can't speak for all of them.
+  // Multi-episode files trust their numbers; one title can't cover them all.
   if (through || judged.episodeIds.length > 1) return judged;
   return byItsTitle(judged, base, { name, packTitle, ctx, numbers });
 };
 
 /**
- * A file whose name carries the very title of another episode than the one
- * its number makes it (or has no number at all, `titled` then). Some
- * groups number a special as S03E01, and a series Sonarr numbers by the
- * scene (TheXEM) reads S08E01 as the scene's S08E01, another library
- * episode. The title says which it is, so the file is judged again as that
- * episode: by the scene's numbers when they differ, else by the library's.
- * When Sonarr won't read it as that episode either way, it is turned down.
- * A name whose title fits the episode its number gives is left alone.
+ * Re-judges a file whose name has the exact title of a different episode
+ * than its number gives (or has no number; `titled` then). Some groups
+ * number a special as S03E01, and Sonarr reads S08E01 of a scene-numbered
+ * (TheXEM) series as the scene's S08E01, a different library episode. The
+ * file is judged again as the titled episode, by scene numbers if they
+ * differ, else library numbers, and rejected if Sonarr won't read it as
+ * that episode. A title that fits its numbered episode is left alone.
  */
 const byItsTitle = async (
   judged: Judgement,
   base: Judgement,
-  options: {
-    name: string;
-    packTitle: string;
-    ctx: SeriesContext;
-    numbers: { version?: number };
-  },
+  options: JudgeOptions,
   titled = episodeTitled(options.name, options.ctx.episodes)
 ): Promise<Judgement> => {
   const { ctx } = options;
@@ -272,9 +262,16 @@ type Judgement = Omit<PlanEntry, 'action' | 'reason' | 'replaces'> & {
   problem?: string;
 };
 
+interface JudgeOptions {
+  name: string;
+  packTitle: string;
+  ctx: SeriesContext;
+  numbers: { version?: number };
+}
+
 /**
- * A file judged as the episode a number points at: renamed for Sonarr, then
- * checked that Sonarr maps it to this series and that episode.
+ * Judges a file as the episode a number points at: renamed for Sonarr, then
+ * checked that Sonarr maps it to this series and episode.
  */
 const judgeNumber = async (
   base: Judgement,
@@ -284,12 +281,7 @@ const judgeNumber = async (
     episode?: number;
     through?: number;
   },
-  options: {
-    name: string;
-    packTitle: string;
-    ctx: SeriesContext;
-    numbers: { version?: number };
-  }
+  options: JudgeOptions
 ): Promise<Judgement> => {
   const { name, packTitle, ctx, numbers } = options;
   const anime = ctx.series.seriesType === 'anime';
@@ -341,9 +333,9 @@ const judgeNumber = async (
 };
 
 /**
- * Asks the second opinion about the files nothing else placed, and judges
- * each answer with Sonarr like any other file. A match Sonarr reads as a
- * different episode is turned down. Returns the files it placed.
+ * Asks the second opinion about unplaced files and judges each answer with
+ * Sonarr like any other file. A match Sonarr reads as a different episode
+ * is rejected. Returns the new judgements by file index.
  */
 const askAbout = async (
   judged: Judgement[],
@@ -417,8 +409,7 @@ const askAbout = async (
       anime && first.seasonNumber > 0 && first.absoluteEpisodeNumber
         ? { absolute: first.absoluteEpisodeNumber }
         : { season: first.seasonNumber, episode: first.episodeNumber };
-    // The AI read the name without its title; a title that is another
-    // episode is the stronger reading.
+    // A title naming another episode outranks the AI's reading.
     const titled = episodeTitled(baseName(before.path), ctx.episodes);
     if (titled && !opinion.episodeIds.includes(titled.id)) {
       placed.set(opinion.index, {
@@ -453,9 +444,9 @@ const askAbout = async (
 
 /**
  * Sonarr's scene numbering can read one file as two episodes (a two-part
- * finale the scene released as one, "S03E12"), while the pack has its own
- * file for the second part. Then each such file is taken as the one
- * episode its name gives; a file whose name gives none is turned down.
+ * finale released as one, "S03E12") while the pack has its own file for the
+ * second part. Each such file then takes the one episode its name gives; a
+ * file whose name gives none is rejected.
  */
 const settleOverlaps = (
   judged: Judgement[],
@@ -467,7 +458,7 @@ const settleOverlaps = (
     for (const id of j.episodeIds) claims.set(id, (claims.get(id) ?? 0) + 1);
   }
   const anime = ctx.series.seriesType === 'anime';
-  /** The one episode a file's own name gives, before any scene mapping. */
+  /** The one episode a file's own name gives, before scene mapping. */
   const namedIn = (j: Judgement) => {
     const n = readNumbers(baseName(j.path));
     if (n.through) return undefined;
@@ -499,7 +490,7 @@ const settleOverlaps = (
   });
 };
 
-/** A pack's files, judged and decided, and what they add up to. */
+/** Judges and decides a pack's files, with a summary. */
 export const judgePack = async (
   files: PackFile[],
   packTitle: string,
@@ -540,7 +531,7 @@ export const judgePack = async (
   return { plan, summary: note ? { ...summary, aiNote: note } : summary };
 };
 
-/** The most common reason a pack's files were turned down. */
+/** The most common reason a pack's files were rejected or skipped. */
 export const mainReason = (plan: PlanEntry[]): string | undefined => {
   const counts = new Map<string, number>();
   for (const entry of plan) {

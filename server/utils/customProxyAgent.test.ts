@@ -32,7 +32,7 @@ class TestExternalAPI extends ExternalAPI {
   }
 }
 
-// constructed before any test configures the proxy, like BaseScanner.tmdb
+// Constructed before any test configures the proxy, like BaseScanner.tmdb.
 const preProxyClient = new TestExternalAPI();
 
 const proxySettings: ProxySettings = {

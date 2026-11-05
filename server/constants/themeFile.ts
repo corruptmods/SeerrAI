@@ -1,8 +1,8 @@
 /*
- * Theme files: a look that can be shared, exported from one Appearance page
- * and imported on another (or by an admin, as the server's default). A file
- * holds colours and a few known settings, nothing else, so an update can't
- * break one and one can't carry anything but colours onto the page:
+ * Theme files: a shareable look, exported from one Appearance page and
+ * imported on another (or by an admin as the server default). Only colours
+ * and a few known settings, so updates can't break one and one can't carry
+ * anything else onto the page:
  *
  *   {
  *     "seerrTheme": 1,
@@ -16,10 +16,10 @@
  *     "extras": { "mode", "spacing", "corners", "blur", "solidPanels" }
  *   }
  *
- * Every part is optional: whatever a file leaves out comes from the look it
- * is used with. The colour names are those of src/utils/theme/palette.ts
- * (Neutrals) and colour.ts (AccentColours); docs/seerr-ai/themes.md lists
- * them for people writing one by hand.
+ * Every part is optional; omitted parts come from the look it's applied to.
+ * Colour names are those of src/utils/theme/palette.ts (Neutrals) and
+ * colour.ts (AccentColours); docs/seerr-ai/themes.md lists them for hand
+ * authors.
  */
 import type { Appearance, ThemeMode } from '@server/constants/theme';
 import {
@@ -29,13 +29,13 @@ import {
   cleanHexColour,
 } from '@server/constants/theme';
 
-/** The version of the format this server reads. */
+/** The format version this server reads. */
 export const THEME_FILE_VERSION = 1;
 
-/** The largest theme file taken, as JSON. An exported one is about 5 KB. */
+/** Max theme file size as JSON. An exported one is about 5 KB. */
 export const THEME_FILE_MAX_BYTES = 16 * 1024;
 
-/** The longest name or author. */
+/** Max name or author length. */
 export const THEME_FILE_NAME_MAX = 60;
 
 export const THEME_FILE_STEPS = [
@@ -53,7 +53,7 @@ export const THEME_FILE_STEPS = [
 ] as const;
 type Step = (typeof THEME_FILE_STEPS)[number];
 
-/** The colours of the page in one mode (palette.ts's Neutrals). */
+/** Page colours in one mode (palette.ts's Neutrals). */
 export const THEME_FILE_NEUTRALS = [
   'page',
   'surface',
@@ -73,7 +73,7 @@ export const THEME_FILE_NEUTRALS = [
 ] as const;
 export type ThemeFileNeutral = (typeof THEME_FILE_NEUTRALS)[number];
 
-/** The accent's colours in one mode (colour.ts's AccentModeColours). */
+/** Accent colours in one mode (colour.ts's AccentModeColours). */
 export const THEME_FILE_ACCENT_MODE = [
   'hover',
   'text',
@@ -88,12 +88,12 @@ export type ThemeFileAccentModeKey = (typeof THEME_FILE_ACCENT_MODE)[number];
 export type ThemeFileScale = Partial<Record<Step, string>>;
 
 export type ThemeFileMode = Partial<Record<ThemeFileNeutral, string>> & {
-  /** The grey scale, which pages not yet given their own colours use. */
+  /** The grey scale, used by pages without their own colours yet. */
   gray?: ThemeFileScale;
 };
 
 export interface ThemeFileAccent {
-  /** Buttons and switches; the other colours are made from it. */
+  /** Buttons and switches; the other colours derive from it. */
   fill?: string;
   /** Text on the fill. */
   ink?: string;
@@ -104,7 +104,7 @@ export interface ThemeFileAccent {
   light?: Partial<Record<ThemeFileAccentModeKey, string>>;
 }
 
-/** Settings a file can bring with it; used when it is imported. */
+/** Settings a file can carry, applied on import. */
 export type ThemeFileExtras = Partial<
   Pick<Appearance, 'mode' | 'spacing' | 'corners' | 'blur' | 'solidPanels'>
 >;
@@ -119,7 +119,7 @@ export interface ThemeFile {
   extras?: ThemeFileExtras;
 }
 
-/** Why a file could not be used, for the person importing it. */
+/** Why a file can't be used, for the importer. */
 export type ThemeFileProblem =
   | { problem: 'tooLarge' | 'notJson' | 'notThemeFile' | 'newerVersion' }
   | { problem: 'name' }
@@ -136,11 +136,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const byteLength = (text: string): number =>
   new TextEncoder().encode(text).length;
 
-/** Control characters and line breaks, which a name never needs. */
+/** Control characters and line breaks, never needed in a name. */
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 
-/** A name or author: plain text on one line, not too long. */
+/** A name or author: plain single-line text within the length limit. */
 const cleanLabel = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
     return undefined;
@@ -152,7 +152,7 @@ const cleanLabel = (value: unknown): string | undefined => {
     : undefined;
 };
 
-/** An object of colours, every key one of `keys`. */
+/** An object of colours whose keys are all in `keys`. */
 const checkColours = <K extends string>(
   value: unknown,
   keys: readonly K[],
@@ -261,9 +261,8 @@ const TOP_KEYS = [
 ];
 
 /**
- * A theme file as it is kept, or what is wrong with it. Strict: a key this
- * server doesn't know, or a value that isn't what it should be, fails the
- * whole file rather than being skipped.
+ * A theme file as stored, or its problem. Strict: an unknown key or invalid
+ * value fails the whole file rather than being skipped.
  */
 export const checkThemeFile = (
   value: unknown
@@ -321,13 +320,13 @@ export const checkThemeFile = (
   return { theme };
 };
 
-/** A theme file as it is kept, or undefined if it can't be used. */
+/** A theme file as stored, or undefined if unusable. */
 export const cleanThemeFile = (value: unknown): ThemeFile | undefined => {
   const checked = checkThemeFile(value);
   return 'theme' in checked ? checked.theme : undefined;
 };
 
-/** A theme file from the text of the file someone chose. */
+/** Parses a theme file from the chosen file's text. */
 export const readThemeFile = (
   text: string
 ): { theme: ThemeFile } | ThemeFileProblem => {
@@ -344,8 +343,8 @@ export const readThemeFile = (
 };
 
 /**
- * A look without its theme file: what safe mode shows, and the copy kept
- * on the device (a cookie, which has to stay small).
+ * A look without its theme file: what safe mode shows, and the on-device copy
+ * (a cookie, which must stay small).
  */
 export const withoutThemeFile = <T extends { theme?: ThemeFile }>(
   look: T

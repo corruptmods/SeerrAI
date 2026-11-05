@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * The one line a scan ends with when the media server had titles it has
- * not identified yet, instead of an error for each.
+ * The single summary line a scan ends with for titles the media server
+ * hasn't identified yet, instead of an error each.
  */
 
 const emby = {

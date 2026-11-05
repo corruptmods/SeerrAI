@@ -1,7 +1,7 @@
 import { checkDiscoverNetworks } from '@server/constants/discoverNetworks';
 import { ApiErrorCode } from '@server/constants/error';
 
-/** A Networks list refused; its message is the code the page translates. */
+/** A refused Networks list; its message is the code the page translates. */
 export class DiscoverNetworksError extends Error {
   constructor(
     code:
@@ -14,9 +14,9 @@ export class DiscoverNetworksError extends Error {
 }
 
 /**
- * The Networks row's data as it is kept: null (or nothing) for the default
- * list, otherwise the list re-written from what was checked, never the text
- * as sent. An empty list is kept: it shows "No networks selected".
+ * The Networks row's data to store: null for the default list, else the
+ * checked list re-serialized, never the raw text. An empty list is kept; it
+ * shows "No networks selected".
  */
 export const sanitizeDiscoverNetworks = (
   data: string | null | undefined

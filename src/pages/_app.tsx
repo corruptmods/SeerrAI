@@ -123,9 +123,8 @@ const importLocale = (locale: AvailableLocale): Promise<any> => {
 };
 
 /**
- * A locale's messages. A JSON import is a module: its strings are both its
- * named exports and its `default`, so passing the module on would put every
- * string in the page twice. Only the strings are wanted.
+ * A locale's messages. Returns only `default`: the JSON module also exposes
+ * each string as a named export, which would double them in the page.
  */
 const loadLocaleData = async (
   locale: AvailableLocale
@@ -135,10 +134,9 @@ const loadLocaleData = async (
 };
 
 /**
- * In the browser, the first page's strings, loaded before the app starts so
- * it starts in that language. They come as one of the build's files, which
- * the browser and the service worker keep, instead of in every page's HTML
- * (about 400 KB). If they can't be loaded, the app starts in English.
+ * The first page's strings in the browser, loaded before start. Fetched as a
+ * cached build file rather than inlined in every page (about 400 KB). English
+ * if they fail to load.
  */
 const startStrings: MessagesType | undefined =
   typeof window === 'undefined'
@@ -147,46 +145,40 @@ const startStrings: MessagesType | undefined =
         (window.__NEXT_DATA__?.props?.locale as AvailableLocale) ?? 'en'
       ).catch(() => undefined);
 
-// Custom types so we can correctly type our GetInitialProps function
-// with our combined user prop
-// This is specific to _app.tsx. Other pages will not need to do this!
+// Types getInitialProps with the combined user prop. Only _app needs this.
 type NextAppComponentType = typeof App;
 type MessagesType = Record<string, string>;
 
-/** What the server gives the app with the first page of a visit. */
+/** Props the server sends with the first page of a visit. */
 interface FirstPageProps {
   user?: User;
   /**
-   * Its strings, for the server's render: they are taken out of the page
-   * itself (see _document), and the browser loads them as a file it keeps
-   * (startStrings, below).
+   * Strings for the server render only; _document strips them from the page
+   * and the browser loads them as a file (startStrings).
    */
   messages?: MessagesType;
   locale: AvailableLocale;
   currentSettings: PublicSettingsResponse;
-  /** The look kept on this device, for pages before anyone signs in. */
+  /** This device's appearance, for pages before sign-in. */
   deviceAppearance?: Appearance;
-  /** The day the page is made for, for seasonal themes. */
+  /** The page's date, for seasonal themes. */
   seasonDay?: string;
 }
 
 /**
- * A move to another page in the browser brings only that page's props (see
- * getInitialProps): the app goes on with what its first page gave it.
+ * Client-side navigations bring only page props (see getInitialProps); the
+ * app keeps what its first page gave it.
  */
 type ExtendedAppProps = AppProps & Partial<FirstPageProps>;
 
-// Every API request carries the build this page is running, so the server
-// can recognise a client stranded on an old build (see /api/v1/status).
+// Lets the server spot clients stranded on an old build (see /api/v1/status).
 axios.defaults.headers.common['X-Seerr-Build'] =
   process.env.commitTag ?? 'local';
 if (typeof window !== 'undefined') {
-  // And which tab or window it is, so one tab's music search never drops
-  // another's as typed past.
+  // Per tab, so one tab's music search never cancels another's.
   axios.defaults.headers.common['X-Seerr-Tab'] = Math.random()
     .toString(36)
     .slice(2, 12);
-  // A browser without Intl.Locale gets it as the app starts.
   void polyfillIntl();
 }
 
@@ -196,9 +188,8 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   router,
   ...given
 }: ExtendedAppProps) => {
-  // Kept from the first page for the whole visit. The signed-in user and the
-  // settings are only where the app starts: its own copies of them are kept
-  // fresh from there.
+  // Fixed for the visit; user and settings are only starting values, kept
+  // fresh by the app afterwards.
   const [firstPage] = useState(given as FirstPageProps);
   const {
     user,
@@ -214,14 +205,11 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   );
   const [currentLocale, setLocale] = useState<AvailableLocale>(locale);
 
-  // The app is up: back to the page the installed app was on, if iOS
-  // restarted it, then the startup screen fades out.
+  // Restore the page iOS was on if it restarted the installed app.
   useResumePage(router);
 
-  // The page arrives with the strings for its locale already in it; load
-  // others only when the locale actually changes. Loading them again on
-  // every start meant downloading and parsing them a second time and then
-  // re-rendering the whole app with an identical copy.
+  // The page already has its locale's strings; load only on a real change,
+  // or every start re-downloads them and re-renders the app.
   const loadedLocale = useRef(locale);
   useEffect(() => {
     if (currentLocale === loadedLocale.current) {
@@ -240,8 +228,8 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   }, [currentLocale]);
 
   const { hasPermission } = useUser();
-  // A yes or no, not the function: that is new on every render, and as a
-  // dependency it re-ran the effect below, and its request, each time.
+  // A boolean, not the function, which is new each render and would re-run
+  // the effect below.
   const isAdmin = hasPermission(Permission.ADMIN);
 
   useEffect(() => {
@@ -250,8 +238,7 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
       return response.data;
     };
 
-    // Cast navigator to a type that includes setAppBadge and clearAppBadge
-    // to avoid TypeScript errors while ensuring these methods exist before calling them.
+    // The badge methods aren't in the DOM typings.
     const newNavigator = navigator as unknown as {
       setAppBadge?: (count: number) => Promise<void>;
       clearAppBadge?: () => Promise<void>;
@@ -259,8 +246,7 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
 
     const handleBadgeUpdate = () => {
       if ('setAppBadge' in newNavigator) {
-        // The badge is a nicety: a failed count or a refused badge is
-        // left alone rather than surfacing as an unhandled error.
+        // Badge failures are ignored rather than surfacing as unhandled errors.
         if (!router.pathname.match(/(login|setup|resetpassword)/) && isAdmin) {
           requestsCount()
             .then((data) =>
@@ -298,11 +284,9 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
     <SWRConfig
       value={{
         fetcher: (url) => axios.get(url).then((res) => res.data),
-        // Switching back to an installed web app fires a focus event, and by
-        // default every mounted hook refetches on it — the home page alone
-        // is 20+ requests. Throttle so a focus refetches at most once a
-        // minute; navigating still refetches on mount, and anything
-        // time-sensitive (download progress) has its own polling.
+        // Returning to the installed app fires focus, which refetches every
+        // mounted hook (20+ on home). At most once a minute; time-sensitive
+        // data has its own polling.
         focusThrottleInterval: 60000,
         dedupingInterval: 5000,
         fallback: {
@@ -365,13 +349,9 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
 };
 
 CoreApp.getInitialProps = async (initialProps) => {
-  // A move to another page in the browser: the app already has what its
-  // first page brought (see CoreApp). Making it again here gave the app a
-  // signed-out, unconfigured copy whenever its own checks were still on
-  // their way, so the session was taken as ended or the settings as unset
-  // (posters no longer through Seerr AI, music and AI hidden) for the rest
-  // of the visit; and it loaded the English strings on the first move, for
-  // nothing.
+  // Client-side navigation: the app already has its first page's props (see
+  // CoreApp). Rebuilding them here would hand it a signed-out, unconfigured
+  // copy while its checks are in flight.
   if (typeof window !== 'undefined') {
     return App.getInitialProps(initialProps);
   }
@@ -421,11 +401,8 @@ CoreApp.getInitialProps = async (initialProps) => {
   };
 
   if (ctx.res) {
-    // Both loopback calls are independent — the user lookup only needs the
-    // settings for the redirect decision afterwards, not for the request
-    // itself — so run them together. On a cold launch this is on the critical
-    // path before anything paints, and the user lookup crosses to the
-    // database host.
+    // Independent loopback calls, run together: this is on the cold-launch
+    // critical path and the user lookup hits the database host.
     const cookieHeaders =
       ctx.req && ctx.req.headers.cookie
         ? { cookie: ctx.req.headers.cookie }
@@ -444,9 +421,8 @@ CoreApp.getInitialProps = async (initialProps) => {
 
     currentSettings = settingsResponse.data;
 
-    // Who this page was rendered for. The service worker compares it with
-    // whose Discover rows it is holding, so a sign-in it never saw (on a
-    // page it did not control) still cannot show one person another's.
+    // The service worker compares this with the owner of its cached Discover
+    // rows, so an unseen sign-in can't show one user another's rows.
     ctx.res.setHeader('X-Seerr-User', String(userResponse?.data?.id ?? 0));
 
     const initialized = settingsResponse.data.initialized;
@@ -462,8 +438,7 @@ CoreApp.getInitialProps = async (initialProps) => {
       user = userResponse.data;
 
       if (router.pathname.match(/(setup|login)/)) {
-        // Already signed in: on to the page sign-in was asked to return to,
-        // if there is one.
+        // Already signed in: go to the requested return page, if any.
         ctx.res.writeHead(307, {
           Location:
             router.pathname === '/login'
@@ -473,9 +448,7 @@ CoreApp.getInitialProps = async (initialProps) => {
         ctx.res.end();
       }
     } else if (!router.pathname.match(/(login|setup|resetpassword)/)) {
-      // No user and not already on an auth route: redirect to /login with a
-      // 307 before anything actually renders, remembering the page asked for
-      // so signing in comes back to it.
+      // Not signed in: 307 to /login before rendering, keeping the return page.
       ctx.res.writeHead(307, {
         Location: loginUrl(ctx.asPath),
       });
@@ -483,7 +456,6 @@ CoreApp.getInitialProps = async (initialProps) => {
     }
   }
 
-  // Run the default getInitialProps for the main nextjs initialProps
   const appInitialProps: AppInitialProps =
     await App.getInitialProps(initialProps);
 
@@ -491,7 +463,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     ? user.settings.locale
     : currentSettings.locale;
 
-  // The polyfill check does not depend on which locale is chosen.
+  // The polyfill check doesn't depend on the locale.
   const [messages] = await Promise.all([
     loadLocaleData(locale as AvailableLocale),
     polyfillIntl(),

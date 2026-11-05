@@ -8,7 +8,7 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/* Anime seasons are the calendar's quarters, named as anime fans do. */
+// Anime seasons are calendar quarters, named as anime fans do.
 
 describe('anime seasons', () => {
   it('names the quarter a day falls in', () => {

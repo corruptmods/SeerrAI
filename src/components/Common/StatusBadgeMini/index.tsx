@@ -13,7 +13,7 @@ interface StatusBadgeMiniProps {
   status: MediaStatus;
   is4k?: boolean;
   inProgress?: boolean;
-  // Should the badge shrink on mobile to a smaller size? (TitleCard)
+  // Smaller on mobile (TitleCard).
   shrink?: boolean;
 }
 
@@ -23,9 +23,9 @@ const StatusBadgeMini = ({
   inProgress = false,
   shrink = false,
 }: StatusBadgeMiniProps) => {
-  // On posters: see-through in dark (/fill), solid and darker in light so
-  // the light icon still reads. Processing takes the accent's chip colours,
-  // chosen so their text reads in every accent (Indigo's are today's).
+  // On posters: see-through in dark (/fill), solid and darker in light so the
+  // light icon reads. Processing uses the accent's chip colours, which read
+  // in every accent.
   const badgeStyle = [
     `rounded-full shadow-md ${
       shrink ? 'w-4 sm:w-5 border p-0' : 'w-5 ring-1 p-0.5'

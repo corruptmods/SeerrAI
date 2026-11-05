@@ -24,10 +24,9 @@ import {
 } from 'node:test';
 
 /*
- * A song asked for through its single, when Lidarr's search for the single
- * grabs nothing: Seerr takes it from the artist's album with the same
- * recording, or from the single itself, and Lidarr stops looking for the
- * single.
+ * When Lidarr's single search grabs nothing, Seerr takes the song from an
+ * album with the recording (or the single itself) and Lidarr stops
+ * searching for the single.
  */
 
 setupTestDb();
@@ -44,7 +43,7 @@ const group = (id: string, title: string, type: string) => ({
   'secondary-types': [],
 });
 
-/** The recording, on the single and, unless `onAlbum` is false, an album. */
+/** The recording on the single and, unless `onAlbum` is false, an album. */
 const recording = (onAlbum = true): MbRecording => {
   const credit = [
     { name: 'Glasswing', artist: { id: IDS.artist, name: 'Glasswing' } },
@@ -133,14 +132,14 @@ after(() => {
 });
 
 let onAlbum: boolean;
-/** The fallback's own clock, moved on by hand. */
+/** Manually advanced clock passed to the fallback. */
 let clock: number;
 const run = () => singleFallback.run(clock);
-/** Long enough after Lidarr's search for its queue to list a grab. */
+/** Advances past QUEUE_SETTLE_MS. */
 const settle = () => (clock += 3 * 60_000);
 
 beforeEach(async () => {
-  // Nothing waiting: it forgets what it knew of earlier tests' singles.
+  // With nothing waiting, it clears earlier tests' search state.
   await singleFallback.run();
   clock = Date.now();
   lidarr.reset();
@@ -174,7 +173,7 @@ describe('a single Lidarr finds nothing for', () => {
     });
     assert.equal(now.singleMbid, SINGLE, 'not before the search is over');
 
-    // Over, but Lidarr's queue may not list a grab yet.
+    // Search over, but the queue may not show a grab yet.
     await run();
     now = await getRepository(SongRequest).findOneByOrFail({ id: song.id });
     assert.equal(now.singleMbid, SINGLE, 'not before the queue would show it');

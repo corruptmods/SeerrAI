@@ -28,15 +28,13 @@ const messages = defineMessages('components.Music.ArtistCard', {
 
 interface ArtistCardProps {
   artist: MusicArtistResult;
-  /** Fills a grid cell rather than taking a row's width. */
+  /** Fills a grid cell instead of a row's fixed width. */
   canExpand?: boolean;
 }
 
 /**
- * An artist, as a film's or a series' card: their picture filling the
- * tile, and on hover or a tap their name and what sets them apart from
- * namesakes, with Request (which opens the choice of their albums) while
- * Seerr has none of them.
+ * An artist card: their picture, and on hover or tap their name and
+ * disambiguation, with Request (album picker) while Seerr has none of them.
  */
 const ArtistCard = ({ artist, canExpand }: ArtistCardProps) => {
   const intl = useIntl();
@@ -46,7 +44,7 @@ const ArtistCard = ({ artist, canExpand }: ArtistCardProps) => {
   const [requesting, setRequesting] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [missing, setMissing] = useState(false);
-  // Shown at once after a request from the card, before the row reloads.
+  // Shown right after a request from the card, before the row reloads.
   const [requestedStatus, setRequestedStatus] = useState<MediaStatus>();
   const status = requestedStatus ?? artist.status;
 

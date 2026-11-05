@@ -11,8 +11,7 @@ interface CollectionPageProps {
 
 const CollectionPage: NextPage<CollectionPageProps> = ({ collection }) => {
   const router = useRouter();
-  // Keyed by the collection, so going from one straight to another starts
-  // afresh instead of keeping the first one's state.
+  // Keyed by collection so navigating between collections resets state.
   return (
     <CollectionDetails
       key={String(router.query.collectionId)}

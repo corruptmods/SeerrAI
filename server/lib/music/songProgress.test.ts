@@ -8,9 +8,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
 /*
- * What a playlist's page says of each requested song on its way: Lidarr
- * looking for its single, or Seerr's search for its album, its wait to
- * search again, its download and its import.
+ * Per-song progress on a playlist page: single search, album search, retry
+ * wait, download and import.
  */
 
 setupTestDb();

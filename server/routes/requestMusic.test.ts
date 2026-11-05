@@ -45,9 +45,8 @@ import {
 } from 'node:test';
 
 /*
- * Requesting music: the routes behind the real OpenAPI validator, with
- * MusicBrainz stubbed and a Lidarr on localhost for the requests that are
- * approved at once.
+ * Music requests through the real OpenAPI validator, with MusicBrainz stubbed
+ * and a localhost Lidarr for auto-approved requests.
  */
 
 setupTestDb();
@@ -106,7 +105,7 @@ const call = async (
 const requestMusic = (body: Record<string, unknown>) =>
   call('POST', '/request/music', { artistMbid: ARTIST, ...body });
 
-/** Someone with exactly these permissions, acting from now on. */
+/** Act as someone with exactly these permissions from now on. */
 const actAs = async (permissions: number, email = 'listener@test.local') => {
   const repository = getRepository(User);
   const existing = await repository.findOneBy({ email });
@@ -382,7 +381,7 @@ describe('POST /request/music', () => {
       'Music Quota exceeded.'
     );
 
-    // A declined request gives its albums back.
+    // A declined request releases its albums.
     await getRepository(MediaRequest).update(
       { type: MediaType.MUSIC },
       { status: MediaRequestStatus.DECLINED }
@@ -487,12 +486,12 @@ describe('music requests in the lists', () => {
 
     list = await call('GET', '/request?mediaType=movie%2Ctv');
     assert.equal((list.body as { results: unknown[] }).results.length, 0);
-    // A comma written plainly is refused before the route sees it: the
-    // pages send it encoded.
+    // An unencoded comma is refused before the route; the client sends it
+    // encoded.
     list = await call('GET', '/request?mediaType=movie,tv');
     assert.equal(list.status, 400);
 
-    // Music's own row: its requests, and the playlists they came from.
+    // Music's own row: its requests and their source playlists.
     list = await call('GET', '/request?mediaType=music&playlists=group');
     assert.equal(list.status, 200);
     assert.deepEqual((list.body as { playlists: unknown[] }).playlists, []);
@@ -518,7 +517,7 @@ describe('music requests in the lists', () => {
     let count = await call('GET', '/request/count');
     assert.equal((count.body as { music: number }).music, 1);
 
-    // Without Lidarr, music leaves the counts as it leaves the lists.
+    // Without Lidarr, music is left out of counts as of lists.
     getSettings().lidarr = [];
     mine = await call('GET', `/user/${listener.id}/requests`);
     assert.equal((mine.body as { results: unknown[] }).results.length, 0);
@@ -850,7 +849,7 @@ describe('requesting songs', () => {
     assert.equal(song.title, 'Lantern Song');
     assert.equal(song.version, 'radio edit');
     assert.equal(song.length, 214_000);
-    // Best known from its single, ahead of a compilation.
+    // Attributed to its single, ahead of a compilation.
     assert.equal(song.albumMbid, SINGLE);
     assert.equal(song.albumTitle, 'Lantern Song');
     assert.deepEqual(song.releaseGroups, [SINGLE, HITS]);
@@ -995,7 +994,7 @@ describe('requesting songs', () => {
     assert.equal((quota.body as { song?: unknown }).song, undefined);
     assert.equal((await requestMusic({ albums: [FOG_B] })).status, 403);
 
-    // A limit of their own: albums and songs each count apart.
+    // A separate limit: albums and songs count separately.
     getSettings().music.songQuota = { quotaLimit: 3, quotaDays: 7 };
     quota = await call('GET', `/user/${user.id}/quota`);
     assert.deepEqual((quota.body as { song: unknown }).song, {
@@ -1096,7 +1095,7 @@ describe('requesting songs', () => {
   it('is refused while the release it is on is asked for whole', async () => {
     const whole = await requestMusic({ albums: [STATIC_GARDEN] });
     assert.equal(whole.status, 201);
-    // Partly here already: a song of it was taken before.
+    // Partly available: one of its songs was fetched before.
     await getRepository(MusicAlbum).update(
       { mbId: STATIC_GARDEN },
       { status: MediaStatus.PARTIALLY_AVAILABLE }
@@ -1133,7 +1132,7 @@ describe('requesting songs', () => {
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
     await call('POST', `/request/${id}/approve`);
     await lidarr.waitFor(() => false);
-    // The album came anyway; the song's single didn't.
+    // The album arrived; the song's single didn't.
     await getRepository(AlbumRequest).update(
       { request: { id } },
       { status: MediaRequestStatus.COMPLETED }
@@ -1172,7 +1171,7 @@ describe('requesting songs', () => {
       songs: [RADIO_EDIT],
     });
     const id = (res.body as { id: number }).id;
-    // On its way, as a send to Lidarr leaves it, and its album now here.
+    // In progress, as a send to Lidarr leaves it, with its album now available.
     await getRepository(MediaRequest).update(id, {
       status: MediaRequestStatus.APPROVED,
     });
@@ -1199,7 +1198,7 @@ describe('requesting songs', () => {
     assert.equal(request.status, MediaRequestStatus.APPROVED);
   });
 
-  /** A song request on its way, as a send to Lidarr leaves it. */
+  /** A song request in progress, as a send to Lidarr leaves it. */
   const songOnItsWay = async (songs: string[]) => {
     const res = await requestSongs(songs);
     const id = (res.body as { id: number }).id;
@@ -1248,7 +1247,7 @@ describe('requesting songs', () => {
     assert.equal(request.status, MediaRequestStatus.COMPLETED);
     assert.equal(availableSent().length, 1);
 
-    // Here now, through its single: not asked for again.
+    // Available now via its single: not requested again.
     await actAs(Permission.REQUEST, 'second@x');
     const again = await requestSongs([RADIO_EDIT]);
     assert.equal(again.status, 409);
@@ -1316,7 +1315,7 @@ describe('requesting songs', () => {
       { mbId: SINGLE },
       { status: MediaStatus.AVAILABLE }
     );
-    // Lidarr's edition has its own recording, named alike, a minute longer.
+    // Lidarr's edition has its own recording, same name, a minute longer.
     lidarr.tracks.set(7, [
       {
         id: 3,
@@ -1396,7 +1395,7 @@ describe('requesting songs', () => {
       }
     ).mock.calls;
     assert.equal(sent.length, 2);
-    // The real notification text, from the requests the hook was given.
+    // The real notification text, from the requests the hook received.
     mock.restoreAll();
     const notified: { subject: string; message: string }[] = [];
     mock.method(
@@ -1534,7 +1533,7 @@ describe('songs in search and on album pages', () => {
     });
     assert.equal(take?.status, MediaStatus.PENDING);
     assert.equal(edit?.version, 'radio edit');
-    // Only on an album: not asked for alone. The radio edit has its single.
+    // Only on an album: not requestable alone. The radio edit has its single.
     assert.equal(take?.onlyOnAlbums, true);
     assert.equal(edit?.onlyOnAlbums, undefined);
     assert.equal(edit?.status, MediaStatus.PENDING);

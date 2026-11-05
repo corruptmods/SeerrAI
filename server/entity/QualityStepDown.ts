@@ -9,9 +9,9 @@ import {
 } from 'typeorm';
 
 /**
- * A movie or series moved to a looser preset because nothing was grabbed
- * for it in a long while (lib/quality/stepDown); it goes back to its own
- * profile once something is.
+ * A movie or series moved to a looser preset because nothing was grabbed for a
+ * long while (lib/quality/stepDown); it returns to its own profile once
+ * something is.
  */
 @Entity()
 @Unique('UNIQUE_QUALITY_STEP_DOWN', ['serverKind', 'serverId', 'arrId'])

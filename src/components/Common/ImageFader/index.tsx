@@ -36,8 +36,8 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
     };
   }, [backgroundImages, rotationSpeed]);
 
-  // Both follow the look (globals.css): the darker one fades into the page
-  // as a title page's backdrop does.
+  // Both follow the theme (globals.css); the darker one fades into the page
+  // like a title page's backdrop.
   let gradient =
     'linear-gradient(180deg, rgb(var(--backdrop-fade-from) / var(--backdrop-fade-start)) 0%, rgb(var(--backdrop-fade-to)) 100%)';
 
@@ -74,7 +74,7 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
               src={imageUrl}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               fill
-              // The first is at the top of the page as it opens.
+              // The first is above the fold on load.
               priority={i === 0}
               {...overrides}
             />

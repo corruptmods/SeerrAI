@@ -10,8 +10,8 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 
-// Its form library is only needed by the few who are asked for an email, and
-// only once they open it, so it is not part of every page.
+// Loaded on open: its form library is needed only by the few asked for an
+// email.
 const AddEmailModal = dynamic(
   () => import('@app/components/Login/AddEmailModal'),
   { ssr: false }
@@ -44,9 +44,9 @@ const UserWarnings: React.FC = () => {
         warningText = intl.formatMessage(messages.emailRequired);
         showSetEmail = true;
         break;
-      // Plex rejected their token, so the watchlist has stopped syncing.
-      // Signing in again stores a fresh one; signing out goes through the
-      // shared flow so this device's push subscription is cleaned up too.
+      // Plex rejected the token, so watchlist sync stopped. Signing in again
+      // stores a fresh one; sign-out uses the shared flow so this device's
+      // push subscription is removed too.
       case 'plexTokenExpired':
         warningTitle = intl.formatMessage(messages.plexSignInExpired);
         warningText = intl.formatMessage(messages.plexSignInExpiredDetail);
@@ -55,9 +55,8 @@ const UserWarnings: React.FC = () => {
     }
   }
 
-  // The add-email dialog only makes sense while an email is still missing.
-  // If that is sorted out some other way while it is open, close it, or it
-  // would hold its turn in the notice queue with nothing on screen.
+  // Close the add-email dialog if the email gets set elsewhere, or it holds
+  // its notice-queue turn with nothing on screen.
   const emailDialogOpen = showEmailModal && showSetEmail;
   useEffect(() => {
     if (showEmailModal && !showSetEmail) {
@@ -65,7 +64,7 @@ const UserWarnings: React.FC = () => {
     }
   }, [showEmailModal, showSetEmail]);
 
-  // The dialog stays up while it is open, whatever the queue says.
+  // An open dialog stays up whatever the queue says.
   const myTurn = useNotice(
     'accountWarning',
     warningText || emailDialogOpen ? 'show' : 'hide'

@@ -27,55 +27,47 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Closing the loop on music requests: once the albums asked for are here,
- * the request is done and whoever asked is told.
+ * Completes music requests once their albums and songs arrive, and notifies.
  *
- * Done here, by the music scans after they have saved what they found,
- * rather than in a save hook: albums change through update(), which the
- * hooks never see, and an artist's own status says nothing about which of
- * their albums arrived.
+ * Runs from the music scans after they save, not a save hook: albums change
+ * via update(), which hooks never see, and an artist's status doesn't say
+ * which albums arrived.
  *
- * Each album asked for is done once it is here, or gone again (deleted, as
- * a series' season is). So is each song, by the single it was fetched
- * through: once the single is here, or partly here with this very song
- * among the tracks Lidarr has files for. A request is done once all of
- * them are. Only a request whose albums and songs are all here says so;
- * one finished by albums being deleted says nothing. Every notification is claimed first, so nothing is
- * announced twice, whichever of this and the catch-up pass gets there
- * first.
+ * An album is done when available or deleted (like a series' season). A
+ * song is done when its source is available, or partly available with this
+ * song on file in Lidarr. Only fully available requests notify, not ones
+ * finished by deletion. Notifications are claimed first so this and the
+ * catch-up pass never both send.
  */
 
 const DONE = [MediaStatus.AVAILABLE, MediaStatus.DELETED];
 
-/** Requests that can still be done: on their way, or failed to send. */
+/** Requests that can still complete: approved, or failed to send. */
 const OPEN = [MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED];
 
-/** The albums of a request that count: all but those declined. */
+/** A request's non-declined albums. */
 const wantedAlbums = (request: Pick<MediaRequest, 'albums'>): AlbumRequest[] =>
   (request.albums ?? []).filter(
     (album) => album.status !== MediaRequestStatus.DECLINED
   );
 
-/** The songs of a request that count: all but those declined. */
+/** A request's non-declined songs. */
 const wantedSongs = (request: Pick<MediaRequest, 'songs'>): SongRequest[] =>
   (request.songs ?? []).filter(
     (song) => song.status !== MediaRequestStatus.DECLINED
   );
 
-/**
- * What a song comes on: the single it is fetched through, or the album it
- * is taken from.
- */
+/** The single a song is fetched through, or the album it's taken from. */
 const sourceOf = (
   song: Pick<SongRequest, 'singleMbid' | 'sourceAlbumMbid'>
 ): string | null => song.singleMbid ?? song.sourceAlbumMbid;
 
-/** A single that has arrived, all of it or some. */
+/** Source statuses that count as arrived for a completed song. */
 const HERE = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
 
 /**
- * Whether every album a request asked for is here, from the artist's
- * album rows, and every song too: done, with its single here.
+ * True when every requested album is available and every song is completed
+ * with its source arrived.
  */
 export const musicRequestAvailable = (
   request: Pick<MediaRequest, 'albums' | 'songs'>,
@@ -98,17 +90,15 @@ export const musicRequestAvailable = (
   );
 };
 
-/** How far a track's length may be from the song's and still be it. */
+/** Max length difference between a track and the song. */
 const SAME_LENGTH_MS = 10_000;
 
 /**
- * Whether Lidarr has a file for this very song on what it came on: its
- * recording among the tracks, or else a track of its name and length (an
- * edition whose recording ids differ; not a live take or an edit of the
- * same name). Undefined when that can't be told: no Lidarr to ask, or no
- * file of the album at all, which a media server may list without Lidarr
- * ever having it. Null when Lidarr couldn't be asked: asked again next
- * scan.
+ * Whether Lidarr has a file for this song on its source: by recording id,
+ * else by name and length (an edition with other recording ids; not a live
+ * take or edit of the same name). Undefined when unknowable: no Lidarr, or
+ * no album files at all (a media server may list it without Lidarr). Null
+ * when Lidarr fails, so the next scan retries.
  */
 const songOnFile = async (
   song: SongRequest,
@@ -146,13 +136,13 @@ const songOnFile = async (
   }
 };
 
-/** A song as its track is named: "Song (radio edit)". */
+/** Track name for a song: "Song (radio edit)". */
 const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
   song.version ? `${song.title} (${song.version})` : song.title;
 
 /**
- * Tells whoever asked, and everyone watching, that a music request is
- * here: only when every album it asked for is, and only once.
+ * Notifies the requester and watchers once, only when the whole request is
+ * available.
  */
 export const notifyAvailableMusic = async (
   request: MediaRequest
@@ -186,7 +176,7 @@ export const notifyAvailableMusic = async (
     event
   );
   if (!sent) {
-    // Already logged; the catch-up pass tries again.
+    // Already logged; the catch-up pass retries.
     await releaseDelivery(request.id, Notification.MEDIA_AVAILABLE);
     return;
   }
@@ -203,13 +193,13 @@ export const notifyAvailableMusic = async (
   );
 };
 
-/** Ids looked up at once; well under SQLite's 999 bound parameters. */
+/** Ids per query; well under SQLite's 999 bound parameters. */
 const CHUNK = 400;
 
 /**
- * Marks done what the albums now here (or gone) finish, for these
- * artists, then says so for each request that is now done. Each artist's
- * changes are written together. Returns the requests completed.
+ * Completes albums, songs and requests for these artists and notifies for
+ * finished requests. Each request's changes are written in one transaction.
+ * Returns the completed request ids.
  */
 export const completeMusicRequests = async (
   mediaIds: Iterable<number>
@@ -229,6 +219,7 @@ export const completeMusicRequests = async (
     if (!requests.length) {
       continue;
     }
+    const artistIds = [...new Set(requests.map((r) => r.media.id))];
     const rows = await getRepository(MusicAlbum).find({
       select: {
         id: true,
@@ -237,14 +228,14 @@ export const completeMusicRequests = async (
         status: true,
         lidarrAlbumId: true,
       },
-      where: { mediaId: In([...new Set(requests.map((r) => r.media.id))]) },
+      where: { mediaId: In(artistIds) },
     });
-    // Each artist's Lidarr, to ask about singles only partly here.
+    // Each artist's Lidarr, to check partly available sources.
     const servers = new Map(
       (
         await getRepository(Media).find({
           select: { id: true, serviceId: true },
-          where: { id: In([...new Set(requests.map((r) => r.media.id))]) },
+          where: { id: In(artistIds) },
         })
       ).map((media) => [media.id, media.serviceId])
     );
@@ -260,14 +251,13 @@ export const completeMusicRequests = async (
           album.status !== MediaRequestStatus.COMPLETED &&
           DONE.includes(statusOf(album.albumMbid) as MediaStatus)
       );
-      // Songs it asked for too keep it open until they are here.
       const songs = wantedSongs(request);
       const server = settings.lidarr.find(
         (s) => s.id === servers.get(request.media.id)
       );
       const lidarr = server ? lidarrApi(server) : undefined;
       const songsFinished: SongRequest[] = [];
-      // Here, but Lidarr took an edition without this version.
+      // Source available, but Lidarr's edition lacks this version.
       const songsMissing: SongRequest[] = [];
       for (const song of songs) {
         if (song.status === MediaRequestStatus.COMPLETED || !sourceOf(song)) {
@@ -290,8 +280,8 @@ export const completeMusicRequests = async (
             song.status === MediaRequestStatus.APPROVED &&
             !songFetchProblem()
           ) {
-            // Lidarr took an edition of its single without it: Seerr takes
-            // it from an album with it instead (lib/music/singleFallback).
+            // Lidarr's edition of the single lacks it; singleFallback takes
+            // it from an album instead.
             continue;
           } else if (song.status !== MediaRequestStatus.FAILED) {
             songsMissing.push(song);

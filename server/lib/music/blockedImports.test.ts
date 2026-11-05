@@ -13,9 +13,8 @@ import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * A single's download with only the song, held back by Lidarr because the
- * single's edition has an instrumental too: the requested song is imported
- * on its own, into its track.
+ * Lidarr blocks a single's download that has only the song (the edition
+ * also has an instrumental); the requested song is imported into its track.
  */
 
 setupTestDb();
@@ -156,7 +155,7 @@ describe('a download Lidarr held back', () => {
       [[`${FOLDER}/01 Lantern Song.mp3`, [601], 90, 'HASH1']]
     );
 
-    // Tried once: not again straight after.
+    // Not retried straight away.
     await blockedImports.run();
     assert.equal(imports().length, 1);
   });
@@ -206,7 +205,7 @@ describe('a download Lidarr held back', () => {
       },
     ];
 
-    // Tagged as another take, or far longer: not the song.
+    // Another take, or far longer: not the song.
     lidarr.folders.set(FOLDER, file('Lantern Song (Live)', '00:03:21.0'));
     lidarr.queue = [tooFar('HASH5')];
     await blockedImports.run();
@@ -222,7 +221,7 @@ describe('a download Lidarr held back', () => {
     await blockedImports.run();
     assert.equal(imports().length, 0);
 
-    // As long as the track, and the same take: it is the song.
+    // Same take and length: the song.
     lidarr.folders.set(FOLDER, file('Lantern Song', '00:03:21.4'));
     lidarr.queue = [tooFar('HASH7')];
     await blockedImports.run();

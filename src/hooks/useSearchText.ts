@@ -2,43 +2,37 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 
 /*
- * What titles on a page can be filtered by — cast, characters, who made them
- * — fetched only while a filter is in use, in batches, and remembered for the
- * rest of the visit so paging back and forth never asks twice.
+ * Filterable text for titles (cast, characters, crew), fetched in batches
+ * only while a filter is active and cached for the visit.
  *
- * The server answers within a few seconds with what it has and says which
- * titles it is still looking up; those are asked for again shortly. A request
- * that fails is retried a few times before its titles fall back to matching
- * by name.
+ * The server returns what it has within seconds and lists titles still being
+ * looked up, which are re-asked shortly. Failed batches retry a few times,
+ * then fall back to name matching.
  */
 
 const BATCH = 30;
-/** Batches in flight at once. */
+/** Concurrent batches. */
 const CONCURRENCY = 2;
-/** How soon to ask again about titles the server is still looking up. */
+/** Delay before re-asking for titles still being looked up. */
 const PENDING_RETRY_MS = 1500;
-/** Attempts after a failed request before matching those titles by name. */
+/** Retries after a failure before falling back to name matching. */
 const FAILURE_RETRIES = 3;
 
 const known = new Map<string, string>();
 const inFlight = new Set<string>();
-/** Titles the server could not describe: matched by name alone. */
+/** Titles the server couldn't describe; matched by name only. */
 const unavailable = new Set<string>();
-/** Not to be asked about again before this time. */
+/** Earliest time each title may be re-asked. */
 const notBefore = new Map<string, number>();
 const failures = new Map<string, number>();
 
-/**
- * Searchable text for the titles given, keyed as "movie:603". `pending` is
- * true while any of them is still being looked up.
- */
+/** Searchable text per title, keyed "movie:603". `pending` while any is still being looked up. */
 const useSearchText = (
   keys: string[],
   enabled: boolean
 ): { text: Map<string, string>; pending: boolean } => {
   const [, setVersion] = useState(0);
-  // A batch outlives the render that started it (the next render no longer
-  // counts its titles as wanted), so only leaving the page stops the update.
+  // A batch outlives its render, so only unmounting cancels its update.
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -56,7 +50,7 @@ const useSearchText = (
   );
   const wantedKey = wanted.join(',');
 
-  // Titles waiting out a retry delay: look again when the earliest is due.
+  // Re-check when the earliest retry delay ends.
   const nextDue = Math.min(
     ...outstanding
       .filter((key) => !inFlight.has(key) && (notBefore.get(key) ?? 0) > now)
@@ -97,8 +91,7 @@ const useSearchText = (
                   text: Record<string, string>;
                   pending?: string[];
                   // Built by hand: axios leaves ":" and "," unescaped in
-                  // params, and Seerr's API validator refuses a query with
-                  // reserved characters (400), so no request ever succeeded.
+                  // params, which the API validator rejects (400).
                 }>(
                   `/api/v1/discover/search-text?ids=${encodeURIComponent(
                     batch.join(',')

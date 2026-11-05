@@ -21,12 +21,12 @@ import type { Server } from 'node:http';
 import http from 'node:http';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 
-// Saving a request fires the subscriber, which hydrates from TMDB to build its
+// Saving a request fires the subscriber, which loads TMDB data for its
 // notification. The suite blocks outbound requests, so stub it.
 const stubTmdb = () => {
   // The client assigns these as instance properties in its constructor, so the
-  // prototype stub needs a setter that swallows that write — the same shape
-  // the Sonarr scanner tests use.
+  // prototype stub needs a setter that swallows that write (as in the Sonarr
+  // scanner tests).
   const stub = (name: string, value: unknown) =>
     Object.defineProperty(TheMovieDb.prototype, name, {
       configurable: true,
@@ -216,8 +216,8 @@ describe('request list filtering', () => {
   });
 
   it('keeps each filter its own condition pair', async () => {
-    // 2, not 3: the failed-but-available request must not be matched by
-    // crossing "available"'s media status with "pending"'s request status.
+    // 2, not 3: the failed-but-available request must not match by crossing
+    // "available"'s media status with "pending"'s request status.
     assert.equal(await count('filter=available,pending'), 2);
   });
 
@@ -243,8 +243,8 @@ describe('request list filtering', () => {
 
     beforeEach(() => {
       searched = [];
-      // What TMDB finds for the words: a film, a series, and an id that is
-      // a series here but a film there.
+      // TMDB's matches for the words: a film, a series, and an id that's a
+      // series here but a film there.
       Object.defineProperty(TheMovieDb.prototype, 'searchMulti', {
         configurable: true,
         set() {},
@@ -341,10 +341,10 @@ describe('request list filtering', () => {
           .sort((a, b) => a - b);
       assert.deepEqual(await ids('glass'), [garden]);
       assert.deepEqual(await ids('LANTERN'), [lantern]);
-      // The album's name, and TMDB's films and series alongside.
+      // The album's name, plus TMDB's films and series.
       assert.equal((await ids('static')).length, 3);
       assert.ok((await ids('static')).includes(garden));
-      // A wildcard is only a character.
+      // A wildcard is a literal character.
       assert.deepEqual(await ids('%'), []);
     });
   });

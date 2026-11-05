@@ -1,19 +1,17 @@
 import { isAxiosError } from 'axios';
 import type { Response } from 'express';
 
-/*
- * Radarr 7 (and the apps built like it) can be told which host names to
- * answer to: Allowed Hosts, in its General settings, which it asks for on
- * first run. A request for any other name gets ASP.NET's own "Bad Request -
- * Invalid Hostname" page, which says nothing of where to fix it.
- */
+// Radarr 7 (and apps built like it) can restrict which host names it answers to
+// (Allowed Hosts in General settings, asked on first run). Other names get
+// ASP.NET's "Bad Request - Invalid Hostname" page, which doesn't say where to
+// fix it.
 
-/** ASP.NET's page for a host name it does not answer to. */
+/** ASP.NET's page for a host name it doesn't answer to. */
 const REFUSED_PAGE = /Invalid Hostname|request hostname is invalid/i;
 
 /**
- * The host name an app turned the request away for, when that is why it
- * failed (looking through the errors it was wrapped in), else undefined.
+ * The host name an app rejected the request for, if that's why it failed
+ * (searching wrapped causes), else undefined.
  */
 export const refusedHost = (e: unknown): string | undefined => {
   let at: unknown = e;
@@ -36,15 +34,15 @@ export const refusedHost = (e: unknown): string | undefined => {
   return undefined;
 };
 
-/** What to do about it, in words. */
+/** How to fix it, in words. */
 export const hostRefusedMessage = (app: string, host: string): string =>
   host
     ? `${app} doesn't answer to "${host}": add ${host} to Allowed Hosts in ${app} (Settings → General), or connect to it by a name it allows.`
     : `${app} doesn't answer to the name Seerr AI uses for it: add that name to Allowed Hosts in ${app} (Settings → General).`;
 
 /**
- * A connection test turned away for its host name: answered 502 with what
- * to do, and true. Any other failure: false, for the caller to answer.
+ * If a connection test was rejected for its host name, answers 502 with how to
+ * fix it and returns true. Otherwise returns false for the caller to answer.
  */
 export const answerHostRefused = (
   res: Response,

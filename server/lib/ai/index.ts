@@ -17,15 +17,13 @@ import { LessThan } from 'typeorm';
 import type { z } from 'zod';
 
 /*
- * Every AI feature goes through here: whether it is available to this
- * person, which model it uses, the daily limit, and a cache so asking the
- * same thing twice costs nothing.
+ * Every AI feature goes through here: availability per user, the model,
+ * the daily limit, and a cache so a repeat question costs nothing.
  */
 
 /**
- * Something to show the person asking, with the HTTP status to send. The
- * code, when there is one, lets the page show it in the person's language;
- * the message is the English, for anything that has no translation of it.
+ * An error shown to the user, with its HTTP status. `code` lets the page
+ * translate it; the message is the English fallback.
  */
 export class AiError extends Error {
   constructor(
@@ -38,7 +36,7 @@ export class AiError extends Error {
   }
 }
 
-/** Set up by an admin, and not turned off for everyone or by this person. */
+/** Set up by an admin, and not turned off for everyone or by this user. */
 export const aiFeatureOn = (feature: AiFeature, user?: User | null) =>
   aiReady(getSettings().ai) && featureEnabled(feature, user);
 
@@ -49,7 +47,7 @@ export const modelFor = (feature: AiFeature): string => {
 
 // ---- the daily limit ------------------------------------------------------
 
-// Today in the server's time zone, as the limit resets at local midnight.
+// Server-local day, since the limit resets at local midnight.
 export { today };
 
 const isUnlimited = (user: User) =>
@@ -62,17 +60,16 @@ export const usedToday = async (user: User): Promise<number> =>
     })
   )?.uses ?? 0;
 
-/** What is left today, or null for no limit. */
+/** Answers left today, or null for no limit. */
 export const remainingToday = async (user: User): Promise<number | null> =>
   isUnlimited(user)
     ? null
     : Math.max(0, getSettings().ai.dailyLimit - (await usedToday(user)));
 
 /**
- * Takes one of today's answers for this person before the model is asked,
- * or refuses if none are left. Taken in a single conditional update, so
- * requests made at the same moment cannot all get through. Returns a
- * refund for when the provider fails and no answer comes of it.
+ * Takes one of today's answers before the model is asked, or throws if none
+ * are left. One conditional update, so concurrent requests cannot all get
+ * through. Returns a refund for when the provider fails.
  */
 export const reserveUse = async (user: User): Promise<() => Promise<void>> => {
   if (isUnlimited(user)) {
@@ -85,7 +82,7 @@ export const reserveUse = async (user: User): Promise<() => Promise<void>> => {
 
   try {
     await repository.insert({ ...where, uses: 0 });
-    // Only today's count matters; a week is kept in case the clock moves.
+    // Only today's row matters; a week is kept in case the clock moves.
     const weekAgo = today(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
     await repository.delete({ day: LessThan(weekAgo) });
   } catch (e) {
@@ -140,19 +137,19 @@ const cached = (key: string): string | undefined => {
 
 const remember = (key: string, value: string, ms: number) => {
   if (cache.size >= CACHE_LIMIT) {
-    // The oldest entry: a Map keeps insertion order.
+    // Evict the oldest; a Map keeps insertion order.
     cache.delete(cache.keys().next().value as string);
   }
   cache.set(key, { until: Date.now() + ms, value });
 };
 
-/** Forget every cached answer, as when the model changes. */
+/** Clears every cached answer, as when the model changes. */
 export const clearAiCache = () => {
   cache.clear();
   forgetRecentActivity();
 };
 
-/** A short, stable key for anything worth caching on. */
+/** A short, stable cache key from any parts. */
 export const cacheKey = (...parts: unknown[]) =>
   createHash('sha256').update(JSON.stringify(parts)).digest('base64url');
 
@@ -163,23 +160,22 @@ export interface AiRequest {
   user: User;
   system: string;
   prompt: string;
-  /** A picture for the model to look at; its hash belongs in the cache key. */
+  /** An image for the model; include its hash in the cache key. */
   image?: CompletionImage;
   maxTokens: number;
-  /** Same key, same answer, for this long, without asking again. */
+  /** Reuse the answer for this key for `ms`. */
   cache?: { key: string; ms: number };
   /**
-   * The refund for one of today's answers already taken with reserveUse,
-   * for a feature that has work to do before it can ask (reading a photo).
-   * It is handed back if the answer comes from the cache or the provider
-   * fails, as an answer taken here would be.
+   * Refund for an answer already reserved with reserveUse, by a feature
+   * with work to do first (reading a photo). Called if the answer comes
+   * from the cache or the provider fails.
    */
   paid?: () => Promise<void>;
 }
 
 /**
- * One answer from the model. `charge` is false for the second try of an
- * answer already paid for.
+ * One answer from the model. `charge` is false for a retry already paid
+ * for.
  */
 const ask = async (
   req: AiRequest,
@@ -196,7 +192,7 @@ const ask = async (
   const key = req.cache && `${req.feature}:${model}:${req.cache.key}`;
   const hit = key ? cached(key) : undefined;
   if (hit !== undefined) {
-    // A repeat costs nothing.
+    // A cached repeat costs nothing.
     await paid?.();
     return hit;
   }
@@ -226,8 +222,8 @@ const ask = async (
     outputTokens: answer.outputTokens,
   });
 
-  // An empty answer still counts: the provider billed for it, and handing it
-  // back would let anyone ask for empty answers without end.
+  // An empty answer still counts: the provider billed it, and refunding it
+  // would allow endless free empty answers.
   if (!answer.text) {
     throw new AiError(
       'The model gave an empty answer. Try again.',
@@ -259,11 +255,10 @@ const isShownError = (e: unknown) =>
   typeof (e as { status?: number })?.status === 'number';
 
 /**
- * A JSON answer, checked against a schema. A reply that cannot be read is
- * never cached, and is asked for once more at no extra charge. If that fails
- * too, the answer still counts: the provider billed for both replies, and
- * handing it back would let someone word every question so the reply cannot
- * be read, and never use up their answers.
+ * A JSON answer checked against `schema`. An unreadable reply is never
+ * cached and is retried once at no charge. If that fails too, the answer
+ * still counts: both replies were billed, and refunding would let anyone
+ * dodge the limit by wording questions so replies can't be read.
  */
 export const askAiJson = async <T>(
   schema: z.ZodType<T>,

@@ -1,9 +1,8 @@
 import Image from 'next/image';
 
 /**
- * The Seerr logo with "AI" beside it, in the logo mark's own gradient. The
- * logo file is left as it is; "AI" is live text, so it stays sharp at any
- * size. Its wordmark is white, so light mode has the dark one, with "AI".
+ * The Seerr logo with "AI" as live text in the mark's gradient, sharp at any
+ * size. The wordmark is white, so light mode uses the dark one.
  */
 const BrandLogo = ({ eager = false }: { eager?: boolean }) => (
   <>
@@ -31,10 +30,7 @@ const BrandLogo = ({ eager = false }: { eager?: boolean }) => (
   </>
 );
 
-/**
- * The stacked logo of the sign-in and setup pages, filling the box it is
- * put in: the white wordmark on a dark page, the dark one on a light page.
- */
+/** The sign-in and setup pages' stacked logo, filling its box, per theme. */
 export const StackedLogo = () => (
   <>
     <Image

@@ -31,8 +31,8 @@ import schedule from 'node-schedule';
 import request from 'supertest';
 import authRoutes from './auth';
 
-// Settings → Users' media server sign-in switch, which turns every
-// connected server's own switch on or off.
+// Settings → Users' media server sign-in switch, which toggles every connected
+// server's own switch.
 const setMediaServerLogin = (on: boolean): void => {
   getSettings().main.mediaServerLogin = on;
   applyMediaServerLogin(on);
@@ -131,13 +131,13 @@ function createApp() {
   );
   app.use(checkUser);
   app.use('/auth', authRoutes);
-  // Error handler matching how next({ status, message }) calls are handled
+  // Error handler matching how next({ status, message }) is handled.
   app.use(
     (
       err: { status?: number; message?: string },
       _req: express.Request,
       res: express.Response,
-      // We must provide a next function for the function signature here even though its not used
+      // Express only treats four-argument handlers as error handlers.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: express.NextFunction
     ) => {
@@ -155,7 +155,7 @@ before(async () => {
 
 setupTestDb();
 
-/** Create a supertest agent that is logged in as the given user. */
+/** Supertest agent signed in as the given user. */
 async function authenticatedAgent(email: string, password: string) {
   const agent = request.agent(app);
   const settings = getSettings();
@@ -167,7 +167,7 @@ async function authenticatedAgent(email: string, password: string) {
   return agent;
 }
 
-/** Configure Jellyfin settings for testing QC */
+/** Configure Jellyfin for Quick Connect tests. */
 function configureJellyfin() {
   const settings = getSettings();
   settings.main.mediaServerType = MediaServerType.JELLYFIN;
@@ -382,10 +382,10 @@ describe('POST /auth/jellyfin/quickconnect/authenticate', () => {
   });
 
   it('returns 403 when no users exist in the database', async () => {
-    // Clear all users to simulate initial setup
+    // Clear all users to simulate initial setup.
     const userRepo = getRepository(User);
     // clear() issues TRUNCATE, which Postgres refuses while other tables
-    // reference users. A plain delete empties it on either engine.
+    // reference users; delete works on both engines.
     await userRepo.createQueryBuilder().delete().execute();
 
     const res = await request(app)
@@ -637,7 +637,7 @@ describe('GET /auth/me', () => {
     assert.strictEqual(res.status, 200);
     assert.ok('id' in res.body);
     assert.strictEqual(res.body.displayName, 'admin');
-    // Their own email, which is left out wherever they appear to others.
+    // Their own email, hidden wherever others see them.
     assert.strictEqual(res.body.email, 'admin@seerr.dev');
   });
 
@@ -669,7 +669,7 @@ describe('GET /auth/me', () => {
     const settings = getSettings();
     settings.notifications.agents.email.options.userEmailRequired = true;
 
-    // Change the user's email to something invalid
+    // Make the user's email invalid.
     const userRepo = getRepository(User);
     const user = await userRepo.findOneOrFail({
       where: { email: 'admin@seerr.dev' },
@@ -677,7 +677,6 @@ describe('GET /auth/me', () => {
     user.email = 'not-an-email';
     await userRepo.save(user);
 
-    // Log in with the changed email
     const agent = request.agent(app);
     settings.main.localLogin = true;
     const loginRes = await agent
@@ -732,7 +731,7 @@ describe('POST /auth/local', () => {
 
     assert.strictEqual(res.status, 200);
     assert.ok('id' in res.body);
-    // filter() strips sensitive fields like password
+    // filter() strips sensitive fields like password.
     assert.ok(!('password' in res.body));
   });
 
@@ -809,7 +808,7 @@ describe('POST /auth/local', () => {
       .post('/auth/local')
       .send({ email: 'admin@seerr.dev', password: 'test1234' });
 
-    // Session should persist — /me should succeed
+    // Session persists: /me succeeds.
     const meRes = await agent.get('/auth/me');
     assert.strictEqual(meRes.status, 200);
   });
@@ -826,7 +825,6 @@ describe('POST /auth/logout', () => {
   it('destroys session and returns 200 when logged in', async () => {
     const agent = await authenticatedAgent('admin@seerr.dev', 'test1234');
 
-    // Verify session is active
     const meBeforeRes = await agent.get('/auth/me');
     assert.strictEqual(meBeforeRes.status, 200);
 
@@ -834,7 +832,7 @@ describe('POST /auth/logout', () => {
     assert.strictEqual(logoutRes.status, 200);
     assert.strictEqual(logoutRes.body.status, 'ok');
 
-    // Session should be invalidated — /me should fail
+    // Session invalidated: /me fails.
     const meAfterRes = await agent.get('/auth/me');
     assert.strictEqual(meAfterRes.status, 403);
   });
@@ -893,7 +891,7 @@ describe('POST /auth/reset-password', () => {
 });
 
 describe('POST /auth/reset-password/:guid', () => {
-  /** Trigger a password reset and return the guid. */
+  /** Trigger a password reset and return its guid. */
   async function getResetGuid(email: string): Promise<string> {
     await request(app).post('/auth/reset-password').send({ email });
 
@@ -917,13 +915,11 @@ describe('POST /auth/reset-password/:guid', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.status, 'ok');
 
-    // Old password no longer works
     const oldLogin = await request(app)
       .post('/auth/local')
       .send({ email: 'admin@seerr.dev', password: 'test1234' });
     assert.strictEqual(oldLogin.status, 403);
 
-    // New password works
     const newLogin = await request(app)
       .post('/auth/local')
       .send({ email: 'admin@seerr.dev', password: 'newpassword123' });
@@ -970,7 +966,6 @@ describe('POST /auth/reset-password/:guid', () => {
   it('returns 500 for an expired recovery link', async () => {
     const guid = await getResetGuid('admin@seerr.dev');
 
-    // Expire the link
     const userRepo = getRepository(User);
     const user = await userRepo.findOneOrFail({
       where: { email: 'admin@seerr.dev' },
@@ -989,13 +984,12 @@ describe('POST /auth/reset-password/:guid', () => {
   it('cannot reuse a guid after successful reset', async () => {
     const guid = await getResetGuid('admin@seerr.dev');
 
-    // First reset succeeds
     const first = await request(app)
       .post(`/auth/reset-password/${guid}`)
       .send({ password: 'newpassword123' });
     assert.strictEqual(first.status, 200);
 
-    // Second reset with same guid fails (recoveryLinkExpirationDate was cleared)
+    // recoveryLinkExpirationDate was cleared, so the same guid fails.
     const second = await request(app)
       .post(`/auth/reset-password/${guid}`)
       .send({ password: 'anotherpassword' });
@@ -1004,8 +998,8 @@ describe('POST /auth/reset-password/:guid', () => {
 });
 
 /*
- * The Plex account plex.tv answers with, and whether the owner shares the
- * server with it. Set per test.
+ * The Plex account plex.tv returns, and whether the owner shares the server
+ * with it. Set per test.
  */
 let plexAccount = { id: 3000, email: 'plexfriend@example.com' };
 let plexShared = true;
@@ -1018,7 +1012,7 @@ mock.method(PlexTvAPI.prototype, 'getUser', async () => ({
   authToken: 'plex-token',
 }));
 mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => plexShared);
-/** Plex.tv answering, or not, for whether the owner shares with someone. */
+/** Whether plex.tv is reachable for the owner's share check. */
 let plexDown = false;
 mock.method(PlexTvAPI.prototype, 'getUsers', async () => {
   if (plexDown) throw new Error('plex.tv did not answer');
@@ -1040,7 +1034,7 @@ const jellyfinAccountMock = mock.method(
   async () => ({ Policy: { IsDisabled: false } })
 );
 
-/** A password account, signed in to nowhere yet. */
+/** A password account not yet signed in anywhere. */
 const passwordUser = async (fields: Partial<User>) => {
   const user = new User({
     avatar: '',
@@ -1066,7 +1060,7 @@ describe('signing in with Plex', () => {
     request(app).post('/auth/plex').send({ authToken: 'plex-token' });
 
   it('makes Plex the primary server when the owner signs in before one is set', async () => {
-    // Settings started afresh over a database that has its people.
+    // Fresh settings over a database that has users.
     const settings = getSettings();
     settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
     settings.plex.connected = false;
@@ -1095,7 +1089,7 @@ describe('signing in with Plex', () => {
   });
 
   it('never hands a password account to a Plex account with its email', async () => {
-    // Anyone can type a Plex friend's email into their own profile.
+    // Anyone can put a Plex friend's email in their own profile.
     const mallory = await passwordUser({
       email: 'plexfriend@example.com',
       username: 'mallory',
@@ -1266,7 +1260,7 @@ describe('guessing passwords', () => {
     assert.strictEqual(blocked.status, 429);
     assert.ok(Number(blocked.headers['retry-after']) > 0);
 
-    // Other accounts are not held up.
+    // Other accounts aren't affected.
     const other = await request(app)
       .post('/auth/local')
       .send({ email: 'friend@seerr.dev', password: 'test1234' });
@@ -1330,7 +1324,7 @@ describe('guessing passwords', () => {
 
   it('answers a reset request without waiting for the email to go', async () => {
     await passwordUser({ email: 'slowmail@seerr.dev', username: 'slowmail' });
-    // A mail server that never answers.
+    // A mail server that never responds.
     emailMock.mockImplementationOnce(() => new Promise<undefined>(() => {}));
 
     const res = await request(app)
@@ -1369,7 +1363,7 @@ describe('signing in with a password, for someone the media server dropped', () 
     assert.strictEqual(refused.status, 403);
     assert.strictEqual(refused.body.message, 'Access denied.');
 
-    // Plex not answering is no answer: the password is the way in then.
+    // Plex unreachable is no answer, so password sign-in works.
     plexDown = true;
     assert.strictEqual((await signIn()).status, 200);
   });
@@ -1395,7 +1389,7 @@ describe('signing in with a password, for someone the media server dropped', () 
     assert.strictEqual((await signIn()).status, 403);
     jellyfinAccountMock.mock.mockImplementation(async () => undefined);
     assert.strictEqual((await signIn()).status, 403);
-    // Jellyfin down: the password still works.
+    // Jellyfin down: password still works.
     jellyfinAccountMock.mock.mockImplementation(async () => {
       throw new Error('connect ECONNREFUSED');
     });
@@ -1470,8 +1464,8 @@ describe('waiting on Jellyfin', () => {
 
 /*
  * Several media servers connected at once: Plex, Jellyfin and Emby in any
- * combination, the first one listed primary. Each test starts from the
- * servers it names and leaves only the primary one connected.
+ * combination, the first listed primary. Each test connects the servers it
+ * names and leaves only the primary connected afterwards.
  */
 const connectServers = (...kinds: MediaServerKind[]) => {
   const settings = getSettings();
@@ -1513,7 +1507,7 @@ describe('with several media servers', () => {
   const plexSignIn = (agent = request.agent(app)) =>
     agent.post('/auth/plex').send({ authToken: 'plex-token' });
 
-  /** The owner, as on a server set up with Jellyfin: no Plex account. */
+  /** The owner on a Jellyfin-set-up server: no Plex account. */
   const jellyfinOwner = () =>
     getRepository(User).update(1, {
       plexId: null,
@@ -1529,7 +1523,7 @@ describe('with several media servers', () => {
     await jellyfinOwner();
     plexAccount = { id: 3000, email: 'admin@seerr.dev' };
 
-    // Neither the email nor being shared with makes it the owner's.
+    // Neither matching email nor being shared makes it the owner's.
     for (const shared of [false, true]) {
       plexShared = shared;
       const agent = request.agent(app);
@@ -1717,7 +1711,7 @@ describe('with several media servers', () => {
       connectServers('plex', 'jellyfin', 'emby');
       assert.strictEqual((await signIn(MediaServerType.EMBY)).status, 200);
 
-      // Jellyfin's bob is someone new here, but bob is taken.
+      // Jellyfin's bob is new here, but the name bob is taken.
       const res = await signIn(MediaServerType.JELLYFIN);
       assert.strictEqual(res.status, 403);
       assert.strictEqual(res.body.message, ApiErrorCode.ExistingAccount);
@@ -1740,7 +1734,7 @@ describe('with several media servers', () => {
       assert.strictEqual((await signIn(MediaServerType.EMBY)).status, 500);
       assert.deepStrictEqual(servers, [], 'Emby is never asked');
 
-      // Without saying which, the first one people may sign in with.
+      // With no server named, the first one with sign-in on.
       assert.strictEqual((await signIn()).status, 200);
       assert.deepStrictEqual(servers, ['jellyfin']);
 
@@ -1786,7 +1780,7 @@ describe('with several media servers', () => {
         .post('/auth/jellyfin/quickconnect/authenticate')
         .send({ secret: 'abc123def456abc123def456' });
 
-    // Its name is taken: refused, saying to link it instead.
+    // Name taken: refused, saying to link instead.
     const taken = await passwordUser({
       email: 'quickconnectuser',
       username: 'someone',
@@ -1834,7 +1828,7 @@ describe('with several media servers', () => {
         'http://emby.local:8920/Devices emby-device',
       ]);
 
-      // Not one Seerr is no longer connected to.
+      // Not one Seerr is disconnected from.
       getSettings().emby.connected = false;
       assert.deepStrictEqual(await out(), [
         'http://jellyfin.local:8096/Devices jf-device',
@@ -1866,13 +1860,13 @@ describe('with several media servers', () => {
     }));
     assert.strictEqual(await signIn(), 403);
 
-    // Emby down: no answer, and a password is the way in then.
+    // Emby down: no answer, so password sign-in works.
     jellyfinAccountMock.mock.mockImplementation(async () => {
       throw new Error('connect ECONNREFUSED');
     });
     assert.strictEqual(await signIn(), 200);
 
-    // Emby no longer connected has no say; Plex alone refuses them.
+    // A disconnected Emby has no say; Plex alone refuses them.
     getSettings().emby.connected = false;
     assert.strictEqual(await signIn(), 403);
   });

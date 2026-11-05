@@ -51,7 +51,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FormattedTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
-/** How close to the bottom still counts as following the conversation. */
+/** Distance from the bottom that still counts as following the conversation. */
 const NEAR_BOTTOM_PX = 80;
 
 const runMessages = defineMessages('components.Backfill.Agent.Run', {
@@ -94,7 +94,7 @@ type Entry =
       at: string;
       text: string;
       who?: string;
-      /** Backfill telling it a download it started failed. */
+      /** Sent by Backfill: a download the agent started failed. */
       backfill?: boolean;
     }
   | {
@@ -107,7 +107,7 @@ type Entry =
   | { type: 'work'; at: string; steps: AgentStep[] }
   | { type: 'action'; at: string; text: string; action?: AgentAction };
 
-/** The steps as a conversation: who said what, and the work in between. */
+/** Groups a run's steps into conversation entries. */
 const conversationOf = (run: AgentRunDetail): Entry[] => {
   const entries: Entry[] = [];
   const actionFor = matchActions(run.actions);
@@ -178,7 +178,6 @@ const conversationOf = (run: AgentRunDetail): Entry[] => {
   return entries;
 };
 
-/** An icon for each kind of change: a delete is a bin, not a download. */
 const CHANGE_ICONS: Record<ChangeIcon, typeof TrashIcon> = {
   download: ArrowDownTrayIcon,
   request: PlusCircleIcon,
@@ -193,7 +192,6 @@ const CHANGE_ICONS: Record<ChangeIcon, typeof TrashIcon> = {
   done: CheckBadgeIcon,
 };
 
-/** The colour a change is shown in: stopping is neutral, deleting red. */
 const changeColour = (icon: ChangeIcon): string =>
   icon === 'stop'
     ? 'text-gray-300'
@@ -205,8 +203,7 @@ const WorkStep = ({ step }: { step: AgentStep }) => {
   const intl = useIntl();
   if (step.kind === 'tool') {
     const words = intl.formatMessage(toolMessages[toolWords(step.tool)]);
-    // What it did in words; the call itself, for an admin who wants it,
-    // small underneath.
+    // Plain words first; the raw call in small print below.
     return (
       <div className="flex gap-2">
         <WrenchScrewdriverIcon className="mt-0.5 h-4 w-4 flex-none text-gray-500" />
@@ -324,9 +321,8 @@ const EntryView = ({ entry }: { entry: Entry }) => {
     );
   }
   if (entry.type === 'action') {
-    // Where it happened, in a few words: the whole of it is under What it
-    // changed, at the top. One recorded before changes were kept by kind
-    // keeps its own words.
+    // Short form; the full change is under What it changed. Entries without
+    // a kind keep their recorded text.
     const icon = entry.action ? changeIcon(entry.action) : 'done';
     const Icon = CHANGE_ICONS[icon];
     return (
@@ -370,14 +366,13 @@ const EntryView = ({ entry }: { entry: Entry }) => {
   );
 };
 
-/** A conversation with the admin agent: what it was told, did and said. */
+/** One admin agent run shown as a conversation. */
 const RunDetail = () => {
   const intl = useIntl();
   const router = useRouter();
   const id = Number(router.query.runId);
   const [text, setText] = useState('');
-  // The reply box starts one line high and grows with what's typed, up to
-  // its max height, then scrolls.
+  // Auto-grow the reply box up to its max height.
   const replyBox = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const box = replyBox.current;
@@ -387,12 +382,11 @@ const RunDetail = () => {
   }, [text]);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string>();
-  // Said while it works, until it reads it (a reply step shows up).
+  // Messages sent while it works, shown until a reply step picks them up.
   const [pending, setPending] = useState<string[]>([]);
   const [stopping, setStopping] = useState(false);
-  // The conversation scrolls inside its own box. It follows the newest
-  // message while the admin is at the bottom, and stays put once they
-  // scroll up to read, offering a way back down instead.
+  // Follow new messages while scrolled to the bottom; otherwise stay put and
+  // flag unseen ones.
   const log = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const [unseen, setUnseen] = useState(false);
@@ -420,7 +414,7 @@ const RunDetail = () => {
       setUnseen(true);
     }
   }, [count, status]);
-  // Once it is no longer working, Stop and anything said to it are done with.
+  // Clear Stop and pending messages once the run ends.
   useEffect(() => {
     if (status !== 'running' && status !== 'queued') {
       setStopping(false);
@@ -435,8 +429,7 @@ const RunDetail = () => {
     if (pinned.current) setUnseen(false);
   };
 
-  // From a notification: its proposal (#review), or the conversation with
-  // the question and the box to answer it (#answer), once the run is drawn.
+  // Notifications link to #review or #answer; scroll once rendered.
   useScrollToHash(!!data);
 
   if (error && !data) return <ErrorPage statusCode={404} />;
@@ -508,7 +501,6 @@ const RunDetail = () => {
           : intl.formatMessage(runMessages.decideFailed)
       );
     } finally {
-      // Whatever happened, show where it stands now.
       await mutate();
       setSending(false);
     }
@@ -752,7 +744,7 @@ const RunDetail = () => {
               )}
               className="block max-h-40 min-h-[44px] min-w-0 flex-1 resize-none rounded-md border border-field-border bg-field px-3 py-[11px] text-sm leading-5 text-strong placeholder:truncate placeholder:text-gray-400 disabled:opacity-60"
             />
-            {/* Just the arrow on a phone, leaving the box the room. */}
+            {/* Icon only on phones. */}
             <Button
               buttonType="primary"
               type="submit"

@@ -12,12 +12,12 @@ import {
 import Media from './Media';
 
 /**
- * One album of an artist (a Media row of type music), as a season is one
- * part of a series. Its title, kind and date are kept here so request cards
- * and notifications need no MusicBrainz lookup.
+ * One album of an artist (a music Media row), like a season of a series. Title,
+ * kind and date are stored so request cards and notifications need no
+ * MusicBrainz lookup.
  *
- * Not loaded with the artist: music code loads albums when it needs them,
- * so queries about films and series never join them.
+ * Not loaded with the artist: music code loads albums when needed, so film and
+ * series queries never join them.
  */
 @Entity()
 @Index(['mediaId', 'mbId'], { unique: true })
@@ -36,8 +36,8 @@ class MusicAlbum {
   public mediaId: number;
 
   /**
-   * The album's MusicBrainz release-group id. Null for an album found on a
-   * media server that could not be matched to one.
+   * The MusicBrainz release-group id. Null for a media server album that
+   * couldn't be matched.
    */
   @Column({ type: 'varchar', nullable: true })
   public mbId?: string | null;
@@ -53,7 +53,7 @@ class MusicAlbum {
   @Column({ type: 'simple-array', default: '' })
   public secondaryTypes: string[];
 
-  /** As precise as MusicBrainz knows it: "2004", "2004-03" or a full date. */
+  /** As precise as MusicBrainz knows: "2004", "2004-03" or a full date. */
   @Column({ type: 'varchar', nullable: true })
   public releaseDate?: string | null;
 
@@ -65,7 +65,7 @@ class MusicAlbum {
   @Column({ type: 'int', nullable: true })
   public lidarrAlbumId?: number | null;
 
-  /** Tracks on the release Lidarr chose, and how many it has files for. */
+  /** Tracks on Lidarr's chosen release, and how many have files. */
   @Column({ type: 'int', nullable: true })
   public trackCount?: number | null;
 
@@ -82,7 +82,7 @@ class MusicAlbum {
   @Column({ type: 'varchar', nullable: true })
   public embyItemId?: string | null;
 
-  /** The album's folder name, last seen, for matching by folder. */
+  /** The album's last seen folder name, for matching by folder. */
   @Column({ type: 'varchar', nullable: true })
   public folder?: string | null;
 

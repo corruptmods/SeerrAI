@@ -12,10 +12,8 @@ import {
 } from './safeMode';
 
 /*
- * Safe mode: ?safe on any address opens Seerr AI without custom CSS or
- * theme files, and the tab remembers it until it is turned off. The script
- * runs in the page before anything is drawn, so it is run here against a
- * page made of the few things it touches.
+ * Safe mode: ?safe drops custom CSS and theme files for the tab until turned
+ * off. The script runs against a minimal page of the elements it touches.
  */
 
 interface FakeElement {
@@ -41,7 +39,7 @@ const element = (id: string, attributes: Record<string, string> = {}) => {
   return el;
 };
 
-/** A page as the server sends it with custom CSS and a theme file. */
+/** A server page with custom CSS and a theme file. */
 const page = ({
   search = '',
   remembered,
@@ -96,7 +94,7 @@ describe('safe mode', () => {
     assert.equal(root.getAttribute('data-safe'), 'on');
     assert.equal(live(SERVER_CSS_ID), undefined);
     assert.equal(live(PERSONAL_CSS_ID), undefined);
-    // The look without its theme file takes the theme's place.
+    // The theme-file-free look replaces the theme.
     const theme = live(THEME_STYLE_ID);
     assert.equal(theme, elements[1]);
     assert.equal(theme?.getAttribute('media'), null);

@@ -14,7 +14,7 @@ const messages = defineMessages('components.Ai.LogExplain', {
   sentNote: 'Keys, tokens and emails are removed before anything is sent.',
 });
 
-/** A log entry in plain English, with what to check. */
+/** Explains a log entry and what to check. */
 const LogExplain = ({ log }: { log: LogMessage }) => {
   const intl = useIntl();
   const { on } = useAi();

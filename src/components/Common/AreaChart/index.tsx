@@ -3,19 +3,19 @@ import { useId, useRef, useState } from 'react';
 export interface AreaPoint {
   /** Epoch milliseconds. */
   t: number;
-  /** Null where there is no reading: the line breaks there. */
+  /** Null for no reading; the line breaks there. */
   v: number | null;
 }
 
 interface AreaChartProps {
   points: AreaPoint[];
-  /** Top of the scale. The bottom is always zero. */
+  /** Top of the scale; the bottom is zero. */
   max: number;
   /** A level to mark across the chart, such as a limit. */
   reference?: { value: number; label: string };
   formatValue: (value: number) => string;
   formatTime: (t: number) => string;
-  /** What the chart shows, for screen readers and its data table. */
+  /** For screen readers and the data table. */
   label: string;
   height?: number;
 }
@@ -43,9 +43,8 @@ const splitRuns = (points: AreaPoint[]): AreaPoint[][] => {
 };
 
 /**
- * One series over time as a line with a light wash beneath: the app's
- * indigo on its gray, hairline grid, and a readout that follows the pointer
- * (or the arrow keys). Values are also in a hidden table for screen readers.
+ * One series over time as a filled line, with a readout that follows the
+ * pointer or arrow keys, and a hidden table for screen readers.
  */
 const AreaChart = ({
   points,
@@ -99,7 +98,7 @@ const AreaChart = ({
         ref={frame}
         className="relative touch-none outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         style={{ height }}
-        // Arrow keys move the readout through time, as a slider would.
+        // Arrow keys move the readout, as on a slider.
         role="slider"
         aria-label={label}
         aria-describedby={tableId}
@@ -183,7 +182,7 @@ const AreaChart = ({
           ))}
         </svg>
 
-        {/* Scale, in text colour: the top value and the reference level. */}
+        {/* Scale: the top value and the reference level. */}
         <span className="pointer-events-none absolute left-1 top-0.5 text-[11px] text-gray-400">
           {formatValue(max)}
         </span>
@@ -228,9 +227,8 @@ const AreaChart = ({
       </div>
 
       {/*
-        Hidden in a box, not on the table itself: a table grows to fit its
-        rows whatever height it's given, so an hour of readings made the page
-        several screens longer, all of it empty.
+        sr-only on a wrapper, not the table: a table grows to fit its rows
+        whatever its height, and would lengthen the page.
       */}
       <div className="sr-only">
         <table id={tableId}>

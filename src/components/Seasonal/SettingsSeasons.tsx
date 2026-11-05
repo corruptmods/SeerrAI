@@ -55,7 +55,7 @@ const messages = defineMessages('components.Seasonal.SettingsSeasons', {
 
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-/** A day of the year, 'MM-DD', as a day and a month to pick from. */
+/** Day and month pickers for an 'MM-DD' value. */
 const DayPicker = ({
   label,
   value,
@@ -71,7 +71,7 @@ const DayPicker = ({
   const set = (newMonth: number, newDay: number) =>
     onChange(
       `${String(newMonth).padStart(2, '0')}-${String(
-        // A day the month doesn't have becomes its last.
+        // Clamp to the month's last day.
         Math.min(newDay, DAYS_IN_MONTH[newMonth - 1])
       ).padStart(2, '0')}`
     );
@@ -106,7 +106,7 @@ const DayPicker = ({
   );
 };
 
-/** One season: on or off, and when. */
+/** One season's toggle and dates. */
 const SeasonRow = ({
   id,
   setting,
@@ -155,7 +155,7 @@ const SeasonRow = ({
           {note}
         </div>
       </div>
-      {/* Under the name on a phone, so the switch stays beside it. */}
+      {/* Below the name on phones, so the switch stays beside it. */}
       {byHand ? (
         <div className="order-last flex w-full flex-wrap items-center gap-x-3 gap-y-2 pl-[1.875rem] text-sm text-default sm:order-none sm:w-auto sm:pl-0">
           <span className="flex items-center gap-2">
@@ -192,7 +192,7 @@ const SeasonRow = ({
             buttonSize="sm"
             buttonType="ghost"
             onClick={() => {
-              // Start from the days it runs next, where they are known.
+              // Start from its next known dates.
               onChange({
                 enabled: setting.enabled,
                 start: dates?.start.slice(5) ?? '01-01',
@@ -214,9 +214,8 @@ const SeasonRow = ({
 };
 
 /**
- * Settings → Appearance → Seasonal themes: which seasons this server runs,
- * and when. Lunar New Year moves from year to year; its days come from a
- * table (server/lib/seasons) unless set by hand.
+ * Settings → Appearance → Seasonal themes: which seasons run and when. Lunar
+ * New Year's dates come from a table (server/lib/seasons) unless set by hand.
  */
 const SettingsSeasons = () => {
   const intl = useIntl();
@@ -246,7 +245,7 @@ const SettingsSeasons = () => {
         { seasons }
       );
       await mutate(response.data, { revalidate: false });
-      // Every page reads the seasons from the public settings.
+      // Pages read seasons from the public settings.
       await globalMutate('/api/v1/settings/public');
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',

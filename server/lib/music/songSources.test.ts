@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * The releases Backfill's second opinion names as holding a song: only
- * those it was shown, each once, at most three. Names are invented.
+ * AI fallback picks: only listed releases, deduplicated, at most three.
+ * Names are invented.
  */
 
 const release = (n: number): ProwlarrRelease => ({

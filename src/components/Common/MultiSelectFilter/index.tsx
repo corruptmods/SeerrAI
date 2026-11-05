@@ -15,10 +15,10 @@ export interface MultiSelectOption {
 }
 
 interface MultiSelectFilterProps {
-  /** Leading icon, matching the bordered square on the single selects. */
+  /** Leading icon, as on the single selects. */
   icon: React.ReactNode;
   options: MultiSelectOption[];
-  /** Empty means no filtering — shown as "All". */
+  /** Empty means no filtering, shown as "All". */
   selected: string[];
   onChange: (selected: string[]) => void;
   /** Label used when nothing is ticked. */
@@ -26,11 +26,7 @@ interface MultiSelectFilterProps {
   name: string;
 }
 
-/**
- * A drop-down that ticks several values at once, styled to sit beside the
- * plain selects on the request list: same bordered icon, same control height,
- * same rounded-right body.
- */
+/** A multi-select drop-down styled to match the request list's selects. */
 const MultiSelectFilter = ({
   icon,
   options,

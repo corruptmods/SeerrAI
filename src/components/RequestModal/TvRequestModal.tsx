@@ -79,7 +79,7 @@ const messages = defineMessages('components.RequestModal', {
     'The request went through, but following new seasons did not. Use Get New Seasons on the series page.',
 });
 
-/** TMDB's statuses for a series that will have no more seasons. */
+/** TMDB statuses for a series with no more seasons coming. */
 const FINISHED = ['Ended', 'Canceled'];
 
 interface RequestModalProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -89,10 +89,7 @@ interface RequestModalProps extends React.HTMLAttributes<HTMLDivElement> {
   onUpdating?: (isUpdating: boolean) => void;
   is4k?: boolean;
   editRequest?: NonFunctionProperties<MediaRequest>;
-  /**
-   * Opens with one season, or one episode of it, already ticked — from the
-   * Request buttons beside each season and episode on the series page.
-   */
+  /** Season, or one episode of it, to open already ticked. */
   preselect?: RequestPreselect;
 }
 
@@ -126,16 +123,12 @@ const TvRequestModal = ({
     animeSetting: data?.mediaInfo?.animeSetting,
     requestSeriesType: editRequest?.seriesType,
   });
-  // Choosing single episodes is for a new request, and only while partial
-  // requests are on: editing a request changes its seasons, never which
-  // episodes of them it holds, and with partial requests off every request
-  // is for whole seasons.
+  // Edits change seasons, never episodes; without partial requests every
+  // request is whole seasons.
   const pickEpisodes =
     !editRequest && settings.currentSettings.partialRequestsEnabled;
-  // Per-season episode selection. A season absent here, or mapped to an empty
-  // array, means the whole season — which is what the API expects too.
-  // A preselected episode is its season with just that episode picked; an
-  // edit starts from the request itself and ignores it.
+  // A season absent or mapped to [] means the whole season, as the API expects.
+  // Edits ignore the preselect.
   const start = !editRequest ? preselect : undefined;
   const [selectedEpisodes, setSelectedEpisodes] = useState<
     Record<number, number[]>
@@ -153,7 +146,6 @@ const TvRequestModal = ({
   const [selectedSeasons, setSelectedSeasons] = useState<number[]>(
     editRequest ? editingSeasons : start ? [start.seasonNumber] : []
   );
-  // Following the series from here on, offered alongside a new request.
   const followFeature = useFeature('newSeasons');
   const { data: followState } = useSWR<FutureSeasonsState>(
     followFeature && !editRequest && !is4k
@@ -187,12 +179,11 @@ const TvRequestModal = ({
       )
       .map((season) => season.seasonNumber)
   );
-  // Not for a request made on someone else's behalf: it would follow the
-  // series for whoever is signed in, not them.
+  // Not on someone else's behalf: it would follow for the signed-in user.
   const offerFollow =
     !!data &&
     followState?.following === false &&
-    // Someone else already gets its new seasons, so they come anyway.
+    // Someone else's follow already brings new seasons.
     !followState.othersFollow &&
     !FINISHED.includes(data.status) &&
     (!requestOverrides?.user || requestOverrides.user.id === user?.id);
@@ -202,10 +193,8 @@ const TvRequestModal = ({
     selectedSeasons.length +
     (editRequest?.seasons ?? []).length;
 
-  // The server answers 202, with only a message, when every season asked
-  // for is already requested or in the library: nothing new was asked for.
-  // That is not an error. The seasons are fetched again so the list shows
-  // what already covers them.
+  // 202: every season asked for is already requested or available. Not an
+  // error; refetch so the list shows what covers them.
   const seasonsAlreadyCovered = () => {
     addToast(intl.formatMessage(messages.noSeasonsAvailable), {
       appearance: 'info',
@@ -214,7 +203,7 @@ const TvRequestModal = ({
     globalMutate(`/api/v1/tv/${tmdbId}`);
   };
 
-  // A failed request is changed by a request manager and then retried.
+  // A failed request is edited by a manager and then retried.
   const isFailed = editRequest?.status === MediaRequestStatus.FAILED;
 
   const updateRequest = async (alsoApproveRequest = false) => {
@@ -241,8 +230,7 @@ const TvRequestModal = ({
           seasons: selectedSeasons.sort((a, b) => a - b),
         });
 
-        // The edit would leave the request with no season of its own, so
-        // the server changed nothing; there is nothing to approve either.
+        // Server changed nothing, so there is nothing to approve.
         if (response.status === 202) {
           seasonsAlreadyCovered();
           return;
@@ -356,20 +344,19 @@ const TvRequestModal = ({
       });
       globalMutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
 
-      // Nothing was requested, so nothing is put on lists or followed.
+      // Nothing requested, so skip lists and follow.
       if (response.status === 202) {
         seasonsAlreadyCovered();
         return;
       }
 
       if (response.data) {
-        // The request has already succeeded; adding to lists is a follow-on
-        // and must not be able to make it look like it failed.
+        // The request already succeeded; list errors must not undo that.
         if (listIds.length && data?.id) {
           await addToLists(listIds, data.id, 'tv', globalMutate);
         }
 
-        // Likewise a follow-on: the request stands whatever happens here.
+        // Likewise, a follow failure does not undo the request.
         if (offerFollow && follow) {
           try {
             await axios.post(`/api/v1/tv/${tmdbId}/future-seasons`);
@@ -461,12 +448,12 @@ const TvRequestModal = ({
     selectedSeasons.includes(seasonNumber);
 
   const toggleSeason = (seasonNumber: number): void => {
-    // If this season already has a pending request, don't allow it to be toggled
+    // Already requested or available.
     if (getAllRequestedSeasons().includes(seasonNumber)) {
       return;
     }
 
-    // If there are no more remaining requests available, block toggle
+    // Quota used up.
     if (
       quota?.tv.limit &&
       currentlyRemaining <= 0 &&
@@ -475,8 +462,7 @@ const TvRequestModal = ({
       return;
     }
 
-    // Toggling the season, either way, clears any partial episode selection:
-    // on means the whole season, off means none of it.
+    // Toggling clears any partial episode selection.
     setSelectedEpisodes((current) => {
       const next = { ...current };
       delete next[seasonNumber];
@@ -493,10 +479,8 @@ const TvRequestModal = ({
   };
 
   /**
-   * Called by the episode picker with the full set of episodes the user now
-   * wants from a season. Keeps the season toggle in step: none selected turns
-   * the season off, every episode selected turns it on as a whole season, and
-   * anything in between turns it on with a partial selection.
+   * Sets a season's picked episodes and keeps its toggle in step: none turns it
+   * off, all turns it on whole, some turns it on partial.
    */
   const setSeasonEpisodes = (
     seasonNumber: number,
@@ -538,8 +522,7 @@ const TvRequestModal = ({
     (season) => !getAllRequestedSeasons().includes(season)
   );
 
-  // Starts ticked when the request takes every season, or just the newest;
-  // anyone can untick it, and their choice then stands.
+  // On by default for every season or just the newest; a user choice sticks.
   const follow =
     followChoice ??
     followByDefault({
@@ -551,7 +534,7 @@ const TvRequestModal = ({
     });
 
   const toggleAllSeasons = (): void => {
-    // If the user has a quota and not enough requests for all seasons, block toggleAllSeasons
+    // Quota too small for every season.
     if (
       quota?.tv.limit &&
       (quota?.tv.remaining ?? 0) < unrequestedSeasons.length
@@ -559,15 +542,9 @@ const TvRequestModal = ({
       return;
     }
 
-    // Either way any episodes picked go: all seasons means every season
-    // whole, and none means nothing from any of them.
     setSelectedEpisodes({});
 
-    if (
-      data &&
-      selectedSeasons.length >= 0 &&
-      selectedSeasons.length < unrequestedSeasons.length
-    ) {
+    if (data && selectedSeasons.length < unrequestedSeasons.length) {
       setSelectedSeasons(unrequestedSeasons);
     } else {
       setSelectedSeasons([]);
@@ -680,8 +657,7 @@ const TvRequestModal = ({
                 )
               : selectedSeasons.length === 0
                 ? intl.formatMessage(messages.selectseason)
-                : // Name what is being asked for: episodes when every
-                  // ticked season is narrowed to some, seasons otherwise.
+                : // "Episodes" if every ticked season is narrowed.
                   selectedSeasons.every(
                       (season) => (selectedEpisodes[season] ?? []).length > 0
                     )
@@ -1100,8 +1076,7 @@ const TvRequestModal = ({
           onChange={(overrides) => setRequestOverrides(overrides)}
           requestUser={editRequest?.requestedBy}
           requestId={editRequest?.id}
-          // Its server was removed: it starts from the default server and
-          // that server's own settings, as a new request would.
+          // Server removed: start from the default server, like a new request.
           defaultOverrides={
             editRequest && !editRequest.serverIssue
               ? {

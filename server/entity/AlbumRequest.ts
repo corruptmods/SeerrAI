@@ -12,8 +12,8 @@ import {
 import { MediaRequest } from './MediaRequest';
 
 /**
- * One album asked for in a music request, as a SeasonRequest is one season
- * of a series request. Its title is kept from when it was asked for.
+ * One album in a music request, like a SeasonRequest in a series request. Its
+ * title is stored as requested.
  */
 @Entity()
 class AlbumRequest {
@@ -33,11 +33,11 @@ class AlbumRequest {
 
   /**
    * Whether the album itself is here yet (its MusicAlbum's status). Not a
-   * column: filled in where requests are listed (lib/music/albumStatuses).
+   * column: filled where requests are listed (lib/music/albumStatuses).
    */
   public albumStatus?: MediaStatus;
 
-  /** Lidarr has its files and no media server lists it yet. Not a column. */
+  /** Lidarr has its files but no media server lists it yet. Not a column. */
   public addingToLibrary?: boolean;
 
   @ManyToOne(() => MediaRequest, (request) => request.albums, {

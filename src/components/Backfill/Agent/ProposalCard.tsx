@@ -21,8 +21,8 @@ const messages = defineMessages('components.Backfill.Agent.ProposalCard', {
 });
 
 /**
- * What the agent proposed, for an admin to approve or decline. Deleting
- * files takes a second click.
+ * The agent's proposal for an admin to approve or decline; deleting files
+ * needs a second click.
  */
 const ProposalCard = ({
   proposal,

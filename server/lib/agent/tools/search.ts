@@ -51,9 +51,8 @@ import { getSettings } from '@server/lib/settings';
 import { z } from 'zod';
 
 /*
- * Searching the way Sonarr, Radarr and Lidarr do and the way Prowlarr
- * does, opening a release to see its files and what language it is in,
- * and telling what the searches never named.
+ * Searching via Sonarr, Radarr, Lidarr and Prowlarr, opening a release to
+ * see its files and language, and finding what the searches never named.
  */
 
 const MAX_LISTED_RELEASES = 30;
@@ -109,7 +108,7 @@ const releaseLine = (
     quality?: string;
     approved?: boolean;
     why?: string[];
-    /** It failed to download for this title before. */
+    /** Failed to download for this title before. */
     failed?: boolean;
     /** Which library episode it is, by its name. */
     reading?: string;
@@ -154,10 +153,10 @@ interface ArrSearch {
 }
 
 /**
- * Sonarr's and Radarr's own searches, by what was searched. A search is
- * left to finish when the tool stops waiting on it (Sonarr goes on with it
- * anyway, and an anime season can take minutes, episode by episode), so
- * asking again picks up its results rather than starting another.
+ * Sonarr's and Radarr's searches, keyed by what was searched. A search
+ * keeps running after the tool stops waiting (Sonarr continues anyway, and
+ * an anime season can take minutes), so asking again picks up its results
+ * instead of starting another.
  */
 const arrSearches = new Map<string, ArrSearch>();
 
@@ -207,7 +206,7 @@ const arrSearch = async (
     return { pending: true, forMs: Date.now() - search.startedAt };
   }
   if (search.error !== undefined) {
-    // A failed search is tried afresh next time.
+    // A failed search starts afresh next time.
     arrSearches.delete(key);
     throw search.error;
   }
@@ -215,7 +214,7 @@ const arrSearch = async (
 };
 
 /**
- * A series' episodes and the names releases call it by, to say which
+ * A series' episodes and the names releases use for it, to identify which
  * library episode a release is. Empty when the series cannot be read.
  */
 const libraryOf = async (
@@ -239,7 +238,7 @@ const libraryOf = async (
   }
 };
 
-/** What a release is by its name, when it is one of this series' at all. */
+/** What a release is by name, if it belongs to this series at all. */
 const readingOf = (
   name: string,
   library: { episodes: SonarrEpisode[]; names: string[] }
@@ -278,7 +277,7 @@ export const searchReleases: AgentTool = {
     let key: string;
     let start: () => Promise<ArrSearchRelease[]>;
     let what: string;
-    /** Said when an episode searched by its scene number finds nothing. */
+    /** Hint for when a search by scene number finds nothing. */
     let sceneHint = '';
     if (title.kind === 'album') {
       const lidarr = backfill.lidarrFor(title.serverId);
@@ -326,9 +325,9 @@ export const searchReleases: AgentTool = {
         title.kind === 'series' ? ' and season' : ''
       } for its results, and use search_indexers meanwhile.`;
     }
-    // A season's search brings back other seasons too (a long-running show
-    // fills the list with its newest): only this season's, packs that cover
-    // it, and releases Sonarr could not place, which may be collections.
+    // A season search returns other seasons too (a long-running show fills
+    // the list with its newest). Keep this season's, packs covering it, and
+    // releases Sonarr couldn't place, which may be collections.
     const placedElsewhere = (r: ArrSearchRelease) => {
       if (
         title.kind !== 'series' ||
@@ -342,7 +341,7 @@ export const searchReleases: AgentTool = {
       if (r.seasonNumbers && r.seasonNumbers.length > 1) {
         return !r.seasonNumbers.includes(season);
       }
-      if (r.mappedSeasonNumber !== undefined && r.mappedSeasonNumber !== null) {
+      if (r.mappedSeasonNumber != null) {
         return r.mappedSeasonNumber !== season;
       }
       return r.seasonNumber !== undefined && r.seasonNumber !== season;
@@ -360,16 +359,16 @@ export const searchReleases: AgentTool = {
       return `No results from any indexer${earlier}${others}.${sceneHint}`;
     }
     const failed = await failedReleases(title);
-    // The library's episodes, to say which each release is by its title as
-    // well as by Sonarr's mapping.
+    // Library episodes, to identify each release by its title as well as by
+    // Sonarr's mapping.
     const library =
       title.kind === 'series'
         ? await libraryOf(title)
         : { episodes: [] as SonarrEpisode[], names: [] as string[] };
-    // Accepted first, then what is for a missing episode (by Sonarr's
-    // mapping or the name's title), then anything Sonarr placed, then what
-    // it could not: otherwise a search Sonarr accepted nothing from shows
-    // its first 30 rows of other shows.
+    // Accepted first, then releases for a missing episode (by Sonarr's
+    // mapping or the name's title), then anything Sonarr placed, then the
+    // rest. Otherwise a search with nothing accepted shows 30 rows of other
+    // shows.
     const missingIds = new Set(
       library.episodes.filter((ep) => !ep.hasFile).map((ep) => ep.id)
     );
@@ -462,9 +461,9 @@ export const searchReleases: AgentTool = {
 };
 
 /**
- * An indexer (or Prowlarr) at its limit, told to the model in words with
- * when it can be asked again, so it tries another release or stops rather
- * than asking again at once.
+ * Reports an indexer (or Prowlarr) at its limit to the model, with when it
+ * can be asked again, so it tries another release or stops instead of
+ * retrying at once.
  */
 const atLimit = async <T>(ask: () => Promise<T>): Promise<T> => {
   try {
@@ -512,13 +511,13 @@ export const searchIndexers: AgentTool = {
       )
     );
     if (!results.length) return `Nothing for "${query}".`;
-    // Usenet has no seeders; it is as good as a well-seeded torrent.
+    // Usenet has no seeders; rank it like a well-seeded torrent.
     const rank = (r: ProwlarrRelease) =>
       r.protocol === 'usenet' ? 50 : (r.seeders ?? 0);
-    // Releases that failed for the title it is working on are marked.
+    // Mark releases that failed for the bound title.
     const bound = boundTitle(state.run);
     const failed = await failedReleases(bound);
-    // Which episode of the series it works on each one is, by its name.
+    // Which episode of the bound series each release is, by name.
     const library =
       kind === 'series' && bound?.kind === 'series'
         ? await libraryOf(bound)
@@ -557,8 +556,8 @@ export const releaseOf = (state: AgentState, value: unknown): KnownRelease => {
 export const filesOf = async (state: AgentState, known: KnownRelease) => {
   let files = state.files.get(known.ref);
   if (!files) {
-    // Opening a release fetches it from its indexer, which counts toward
-    // the indexer's download limit like any grab.
+    // Opening a release fetches it from its indexer, counting toward the
+    // indexer's download limit like any grab.
     const opened = await atLimit(() => backfill.filesOf(known));
     files = opened.files;
     if (opened.infoHash) known.infoHash = opened.infoHash;
@@ -589,8 +588,8 @@ export const releaseFiles: AgentTool = {
       return `${known.ref} "${known.title}" (${sizeOf(known.size)}) is a Usenet post ${what}. If its name is exactly one missing episode (or the movie), grab it whole: grab with whole: true and one file entry with index 0 and the season and episode its name gives. A season pack like this cannot be used.`;
     }
     const sorted = [...files].sort((a, b) => a.index - b.index);
-    // For an album, what is not music is marked; for a series or a movie,
-    // what is not video; before a title is chosen, what is neither.
+    // Mark non-audio files for an album, non-video for a series or movie,
+    // and files that are neither before a title is bound.
     const kind = boundTitle(state.run)?.kind;
     const video = (f: PackFile) => isVideo(f.path) && f.size >= MIN_VIDEO_BYTES;
     const lines = sorted.slice(0, MAX_LISTED_FILES).map((f) => {
@@ -616,7 +615,7 @@ export const releaseFiles: AgentTool = {
   },
 };
 
-/** Words in names that say what language a release or file is in. */
+/** Name tags that indicate a release's or file's language. */
 const LANGUAGE_TAGS =
   /\b(multi|dual[ .-]?audio|dubbed|dub|subbed|vostfr|truefrench|french|vf[fiq]?|german|deutsch|ita|italian|spanish|castellano|latino|portuguese|pt-?br|russian|rus|polish|pl|hindi|tamil|telugu|japanese|jpn|korean|chinese|nordic|swedish|danish|norwegian|dutch|nl|turkish|arabic|eng(lish)?)\b/gi;
 
@@ -692,7 +691,7 @@ export const checkLanguage: AgentTool = {
 
 // ---- what its searches never named ---------------------------------------------
 
-/** A tool call as the run made it, to tell what it has looked for. */
+/** A tool call the run made, to tell what it has looked for. */
 export interface MadeCall {
   name: string;
   input: Record<string, unknown>;
@@ -752,10 +751,9 @@ const searchNames = (
 };
 
 /**
- * The missing episodes of the title a run works on that it has not looked
- * for at all: no search named them (by number or title, one by one or by
- * their season), nothing was started for them, and nothing is downloading
- * them. Empty for a movie, or when it cannot be told.
+ * Missing episodes of the run's title that it never looked for: no search
+ * named them (by number, title or season), nothing was started for them,
+ * and nothing is downloading them. Empty for a movie.
  */
 export const notLookedFor = async (
   run: AgentRun,
@@ -775,7 +773,7 @@ export const notLookedFor = async (
     ...jobs.flatMap((job) => job.files.flatMap((f) => f.episodeIds)),
     ...run.actions.flatMap((a) => a.episodeIds ?? []),
   ]);
-  // Each search read once, however many episodes there are.
+  // Parse each search once, however many episodes there are.
   const anime = series.seriesType === 'anime';
   const seasonsSearched = new Set<number>();
   const episodesSearched = new Set<string>();

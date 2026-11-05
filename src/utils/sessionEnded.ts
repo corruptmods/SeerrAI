@@ -1,11 +1,9 @@
 import { isAxiosError } from 'axios';
 
 /**
- * Whether the signed-in person's session is over, from the latest check of
- * who is signed in. Only the server saying so ends it (401 or 403): a check
- * that failed for any other reason (a deploy, a proxy answering 502, a phone
- * between networks) says nothing about the session, and signing someone out
- * for it would throw away what they were doing.
+ * Whether the session has ended, from the latest user check. Only 401/403
+ * count: other failures (a deploy, a proxy 502, a network switch) say nothing
+ * about the session, and signing out would lose the user's work.
  */
 const sessionEnded = (user: unknown, error: unknown): boolean => {
   if (error) {

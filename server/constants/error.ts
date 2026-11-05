@@ -12,12 +12,12 @@ export enum ApiErrorCode {
   TooManyNetworks = 'TOO_MANY_NETWORKS',
   Unauthorized = 'UNAUTHORIZED',
   /**
-   * A media server account that is new here, but whose email or name an
-   * existing account already has: its owner signs in with that account and
-   * links the server from their profile.
+   * A media server account new here whose email or name belongs to an existing
+   * account: its owner signs in with that account and links the server from
+   * their profile.
    */
   ExistingAccount = 'EXISTING_ACCOUNT',
-  /** The media server account is switched off there. */
+  /** The media server account is disabled there. */
   AccountDisabled = 'ACCOUNT_DISABLED',
   Unknown = 'UNKNOWN',
 }

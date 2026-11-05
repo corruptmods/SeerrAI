@@ -85,7 +85,7 @@ const SingleSignOn = () => {
 
   const changed = () => {
     revalidate();
-    // The sign-in page's buttons.
+    // The sign-in page's buttons read the public settings.
     mutate('/api/v1/settings/public');
   };
 

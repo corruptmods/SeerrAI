@@ -4,20 +4,19 @@ import type {
   DownloadingItem,
 } from '@server/lib/downloadtracker';
 
-/** Where a title's downloads stand, put together, for its status badge. */
+/** A title's combined download state, for its status badge. */
 export interface DownloadSummary {
-  /** The stage the badge names. */
+  /** The stage the badge shows. */
   stage: DownloadStage;
-  /** What the download client is doing within that stage, when it says. */
+  /** The client's step within that stage, if reported. */
   step?: DownloadStep;
-  /** How much of all of it has arrived, 0 to 100, once its size is known. */
+  /** Overall progress 0–100, once the size is known. */
   percent?: number;
 }
 
 /**
- * Which stage a badge names when a title's downloads stand in different
- * places: what is happening to it before what is holding it up, and what
- * needs someone before what will sort itself out. The tooltip lists each.
+ * Badge stage priority across mixed downloads: active before blocked, and
+ * needs-attention before self-resolving. The tooltip lists each.
  */
 const BADGE_ORDER: DownloadStage[] = [
   'downloading',
@@ -29,30 +28,25 @@ const BADGE_ORDER: DownloadStage[] = [
   'queued',
   'paused',
   'waiting',
-  // Imported, the media server about to list it: only once nothing else
-  // is under way.
+  // Only once nothing else is under way.
   'imported',
 ];
 
-/** A copy saved before stages were sent counts as downloading. */
+/** A missing stage (older cached data) counts as downloading. */
 const rank = (stage?: DownloadStage) =>
   Math.max(0, BADGE_ORDER.indexOf(stage ?? 'downloading'));
 
 const finite = (value: number) => (Number.isFinite(value) ? value : 0);
 
 /**
- * Which release a queue item is part of. A season pack is one release,
- * listed once for each of its episodes; one held back before it is sent
- * (a delay, or waiting for a better copy) has no download yet, so its
- * name tells it apart.
+ * A queue item's release. A season pack is listed once per episode; a
+ * release held before sending (delay, waiting for better) has no download
+ * id, so its title identifies it.
  */
 const releaseKey = (item: DownloadingItem, index: number): string =>
   item.downloadId || (item.title ? `title:${item.title}` : `item-${index}`);
 
-/**
- * A title's queue items, one per release, each with how many episodes it
- * brings: a pack is shown once, as its season.
- */
+/** A title's queue items deduplicated by release, with episode counts. */
 export const releasesOf = (
   items: DownloadingItem[] = []
 ): { item: DownloadingItem; episodes: number }[] => {
@@ -72,16 +66,12 @@ export const releasesOf = (
   return [...releases.values()];
 };
 
-/** Whether a title's queue items are all one release, such as one pack. */
+/** Whether all queue items are one release (e.g. one pack). */
 export const isOneRelease = (items: DownloadingItem[]): boolean =>
   items.length > 0 &&
   new Set(items.map((item, index) => releaseKey(item, index))).size === 1;
 
-/**
- * Which episodes a series' badge names: the episode, when there is one; the
- * season, for a pack; the stretch of a season, for several downloads in it;
- * or the stretch of seasons.
- */
+/** Episodes a series badge names: one episode, a season (pack), an episode range, or a season range. */
 export type EpisodeSpan =
   | { kind: 'episode'; season: number; episode: number }
   | { kind: 'season'; season: number }
@@ -150,7 +140,7 @@ export const summarizeDownloads = (
   };
 };
 
-/** The badge's words for each stage and step, as message names. */
+/** Message names for each stage and step. */
 export type DownloadBadgeLabel =
   | 'downloading'
   | 'stalled'
@@ -212,9 +202,8 @@ export const downloadBadgeLabel = ({
 };
 
 /**
- * Whether something is happening to it right now (the badge spins), rather
- * than waiting or held up. A torrent getting its details or being checked
- * before it starts is busy, though queued.
+ * Whether the download is active now (the badge spins). A queued torrent
+ * fetching metadata or checking counts as busy.
  */
 export const isDownloadBusy = ({
   stage,
@@ -227,8 +216,8 @@ export const isDownloadBusy = ({
   (stage === 'queued' && (step === 'metadata' || step === 'checking'));
 
 /**
- * Seconds in Radarr's and Sonarr's "time left": "01:37:25.8878288", or
- * "1.02:00:00" for a day and two hours. Undefined for none or nonsense.
+ * Seconds in a Radarr/Sonarr "time left" ("01:37:25.8878288", or
+ * "1.02:00:00" for 1d 2h). Undefined if missing or invalid.
  */
 export const secondsLeft = (timeLeft?: string): number | undefined => {
   const match = timeLeft?.match(/^(?:(\d+)\.)?(\d+):(\d{2}):(\d{2})/);

@@ -21,21 +21,19 @@ import session from 'express-session';
 import path from 'node:path';
 import request from 'supertest';
 
-/*
- * Settings → Network → CSRF Protection with API keys. A request that says
- * who it is with an API key carries no cookie another site could ride on,
- * so it needs no CSRF token; and it is the key's alone, so a wrong key is
- * refused rather than served as whoever's session cookie came with it.
- * Requests signed in with the session cookie keep the full check.
- *
- * The app is put together in the same order as server/index.ts.
- */
+// Settings → Network → CSRF Protection with API keys. An API key request
+// carries no cookie another site could ride, so it needs no CSRF token; and it
+// belongs to the key alone, so a wrong key is rejected rather than served as
+// whoever's session cookie came along. Cookie-authenticated requests keep the
+// full check.
+//
+// The app is assembled in the same order as server/index.ts.
 
 let app: Express;
 
 function createApp() {
   const app = express();
-  // Each test's wrong keys count from its own address.
+  // Each test's wrong keys count against its own address.
   app.set('trust proxy', true);
   app.use(cookieParser());
   app.use(jsonBody);
@@ -93,7 +91,7 @@ beforeEach(() => {
   getSettings().network.csrfProtection = true;
   getSettings().main.personalApiKeys = 'everyone';
   getSettings().main.localLogin = true;
-  // As on a real server, which always has one.
+  // Real servers always have one.
   getSettings().main.apiKey = 'the-servers-own-key';
   address += 1;
   ip = `198.51.100.${address}`;
@@ -109,7 +107,7 @@ afterEach(() => {
 /** A harmless change only an admin may make. */
 const CHANGE = '/api/v1/settings/main';
 
-/** The token a browser is given, read back as the page reads it. */
+/** The token the browser gets, read back as the page reads it. */
 function tokenFrom(res: request.Response): string {
   const cookies = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
   const cookie = cookies.find((c) => c.startsWith('XSRF-TOKEN='));
@@ -117,7 +115,7 @@ function tokenFrom(res: request.Response): string {
   return decodeURIComponent(cookie.split(';')[0].split('=')[1]);
 }
 
-/** A browser signed in with a password, and the CSRF token it was given. */
+/** A browser signed in with a password, and its CSRF token. */
 async function signIn(email: string) {
   const agent = request.agent(app);
   const first = await agent.get('/api/v1/status').set('X-Forwarded-For', ip);
@@ -131,7 +129,7 @@ async function signIn(email: string) {
   return { agent, token };
 }
 
-/** A personal key for this person, made as their profile makes one. */
+/** A personal key for this user, made as their profile makes one. */
 async function personalKey(userId: number): Promise<string> {
   const { key, publicId, secretHash } = makeKey();
   await getRepository(UserApiKey).insert({
@@ -201,7 +199,7 @@ describe('a wrong API key', () => {
         .set('X-Api-Key', key);
       assert.equal(me.status, 401);
 
-      // Neither without the token nor with it: the cookie is never used.
+      // With or without the token, the cookie is never used.
       for (const withToken of [false, true]) {
         const change = agent
           .post(CHANGE)
@@ -214,7 +212,7 @@ describe('a wrong API key', () => {
         assert.equal(res.status, 401, `with token: ${withToken}`);
       }
 
-      // The browser itself is still signed in.
+      // The browser session itself is still signed in.
       const still = await agent
         .get('/api/v1/auth/me')
         .set('X-Forwarded-For', ip);
@@ -274,7 +272,7 @@ describe('a change made with the session cookie', () => {
   });
 
   it("still needs the token with the server's key in the address", async () => {
-    // Keys are only read from the X-Api-Key header, never from the address.
+    // Keys are only read from the X-Api-Key header, never the URL.
     const { agent } = await signIn('admin@seerr.dev');
     const res = await agent
       .post(`${CHANGE}?apiKey=${getSettings().main.apiKey}`)

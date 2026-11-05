@@ -38,10 +38,10 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * Backfill for albums: a release's files judged against the album's tracks
- * in the edition Lidarr imports into, and an album followed from Lidarr's
- * wanted list to its import. Lidarr, Prowlarr and qBittorrent are stubbed
- * at their API clients; Lidarr's answers have the shapes it gives.
+ * Album Backfill: a release's files judged against the tracks of the
+ * edition Lidarr imports into, and an album tracked from Lidarr's wanted
+ * list to import. Lidarr, Prowlarr and qBittorrent are stubbed at their API
+ * clients, with Lidarr's real response shapes.
  */
 
 const MB = 1024 ** 2;
@@ -351,7 +351,7 @@ describe('Backfill for albums: placing files by number', () => {
 
 describe('Backfill for albums: Lidarr’s queue', () => {
   it('counts only this album’s downloads, from the queue’s details', async () => {
-    // The flow tests stand in for it; here, the real one.
+    // The flow tests stub this; here it runs for real.
     (
       BackfillLidarr.prototype.getAlbumQueueCount as unknown as {
         mock: { restore: () => void };
@@ -530,7 +530,7 @@ beforeEach(() => {
     imports.push(list);
     return 41;
   });
-  // These two are each client's own, not the class's.
+  // Per-instance methods, not on the class.
   mock.method(BackfillLidarr, 'forServer', (server: LidarrSettings) =>
     Object.assign(forServer.call(BackfillLidarr, server), {
       getRemotePathMappings: async () => [
@@ -733,15 +733,14 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
 
   it('follows only albums someone requested, besides those an admin chose', async () => {
     await getRepository(MediaRequest).createQueryBuilder().delete().execute();
-    // Lidarr lists the artist's whole discography as wanted: none of it
-    // was asked for.
+    // Lidarr lists the whole discography as wanted; none was requested.
     await backfill.scan();
     assert.equal(
       await getRepository(BackfillSeries).count({ where: { kind: 'album' } }),
       0
     );
 
-    // Followed before this rule, with a pack waiting: let go, pack and all.
+    // Already tracked, with a pack waiting: dropped, pack and all.
     const old = await getRepository(BackfillSeries).save(
       new BackfillSeries({
         kind: 'album',
@@ -827,7 +826,7 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
     assert.equal(kept.status, 'done', 'kept for its history, not searched');
     assert.deepEqual(searchedFor, []);
 
-    // Requested again: followed once more.
+    // Requested again: tracked again.
     await requestAlbum();
     await backfill.scan();
     const again = await getRepository(BackfillSeries).findOneByOrFail({

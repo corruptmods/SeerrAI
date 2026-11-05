@@ -12,7 +12,7 @@ import {
 import type { Region } from '@server/lib/settings';
 import axios from 'axios';
 import sortBy from 'lodash/sortBy';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import Select from 'react-select';
 import useSWR, { mutate as globalMutate } from 'swr';
@@ -33,9 +33,8 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
 type Option = { value: string; label: string };
 
 /*
- * "Leave out anime made in": the countries whose anime-styled titles do not
- * count as anime unless they are in Japanese (utils/isAnime). Saved as a
- * whole list.
+ * Countries whose anime-style titles count as regular unless in Japanese
+ * (utils/isAnime). Saved as a whole list.
  */
 const AnimeSettings = () => {
   const intl = useIntl();
@@ -53,8 +52,8 @@ const AnimeSettings = () => {
     }
   }, [data, chosen]);
 
-  const countryName = useMemo(
-    () => (code: string) =>
+  const countryName = useCallback(
+    (code: string) =>
       intl.formatDisplayName(code, { type: 'region', fallback: 'none' }) ??
       regions?.find((region) => region.iso_3166_1 === code)?.english_name ??
       code,
@@ -82,7 +81,7 @@ const AnimeSettings = () => {
       );
       setChosen(saved.data.excludedCountries);
       await mutate(saved.data);
-      // Pages tell anime apart with the same setting.
+      // Public settings carry the same list for client-side anime checks.
       await globalMutate('/api/v1/settings/public');
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',

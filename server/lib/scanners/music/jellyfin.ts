@@ -8,14 +8,14 @@ import type { MusicSource } from '@server/lib/scanners/music/source';
 import type { MusicLibrary } from '@server/lib/settings';
 
 /*
- * Jellyfin's and Emby's music libraries, as albums to place. Both keep the
- * MusicBrainz ids from the files' tags: the album's (release group), one
- * release's, and the album artist's. Albums also come with their folders.
+ * Jellyfin and Emby music libraries as albums to place. Both keep the
+ * MusicBrainz ids from file tags: the album's (release group), a release's,
+ * and the album artist's. Albums include their folders.
  */
 
 const PAGE_SIZE = 500;
 
-/** A provider id, whatever its case; the first when several are given. */
+/** A provider id matched case-insensitively; the first if several match. */
 export const providerId = (
   item: JellyfinMusicItem | undefined,
   name: string

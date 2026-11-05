@@ -38,8 +38,8 @@ const TYPES: { type: SearchType; label: keyof typeof globalMessages }[] = [
 ];
 
 /**
- * Films and series (and, for everything, collections and people), with
- * music below them in All when an admin chose that.
+ * Film and series results (plus collections and people in All), with music
+ * below in All when an admin enabled it.
  */
 const TitleResults = ({
   query,
@@ -74,7 +74,7 @@ const TitleResults = ({
     <>
       <ListView
         items={titles}
-        // With music below, it says when nothing at all was found.
+        // With music below, the music results report when nothing was found.
         isEmpty={isEmpty && !music}
         isLoading={
           isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
@@ -105,8 +105,7 @@ const Search = () => {
       <div className="mb-4 mt-1">
         <Header>{intl.formatMessage(messages.searchresults)}</Header>
       </div>
-      {/* Links, so the kind is in the address: back, forward and sharing
-          keep it. */}
+      {/* Links, so the type is in the URL for history and sharing. */}
       <nav
         aria-label={intl.formatMessage(messages.show)}
         className="mb-5 flex flex-wrap gap-2"

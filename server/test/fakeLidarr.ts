@@ -6,11 +6,9 @@ import type {
 import type { LidarrSettings } from '@server/lib/settings';
 import http from 'node:http';
 
-/*
- * A Lidarr on localhost for tests: it answers the calls Seerr makes when
- * sending a music request, from what a test puts in it, and writes down
- * every call in order so a test can say what was asked and what never was.
- */
+// A local Lidarr for tests: answers the calls Seerr makes for music requests
+// from test-provided data, and records every call in order so tests can assert
+// what was and wasn't called.
 
 export interface LidarrCall {
   method: string;
@@ -31,17 +29,17 @@ export interface FakeLidarr {
   lookupAlbums: Map<string, LidarrAlbum>;
   /** Each album's tracks, by its Lidarr id. */
   tracks: Map<number, LidarrTrack[]>;
-  /** The tracks an album gets once added, by its MusicBrainz id. */
+  /** Tracks an album gets once added, by MusicBrainz id. */
   tracksOnAdd: Map<string, Omit<LidarrTrack, 'albumId'>[]>;
   /**
-   * Each release's own tracks, by its Lidarr id. An album's tracks (above)
-   * are its monitored release's; a manual import into another release
-   * makes that one monitored, as Lidarr does.
+   * Each release's tracks, by Lidarr id. An album's `tracks` are its monitored
+   * release's; a manual import into another release makes that one monitored,
+   * as Lidarr does.
    */
   releaseTracks: Map<number, LidarrTrack[]>;
-  /** Where the download client's folders are, as Lidarr sees them. */
+  /** Download client folders as Lidarr sees them. */
   remotePathMappings: { host: string; remotePath: string; localPath: string }[];
-  /** Lidarr's delay profiles; its own default prefers Usenet. */
+  /** Lidarr's delay profiles; its default prefers Usenet. */
   delayProfiles: {
     id: number;
     enableUsenet: boolean;
@@ -50,31 +48,31 @@ export interface FakeLidarr {
     order: number;
     tags: number[];
   }[];
-  /** What Lidarr is downloading, as its queue lists it. */
+  /** Lidarr's download queue. */
   queue: Record<string, unknown>[];
-  /** How every command it was given ended. */
+  /** The final status of every command. */
   commandStatus: string;
   /**
-   * Answers given once instead, by method and path ("POST /api/v1/album"),
-   * after running what `before` does (another's change landing meanwhile).
+   * One-off answers by method and path ("POST /api/v1/album"), after running
+   * `before` (e.g. a concurrent change landing).
    */
   once: Map<string, { status: number; body: unknown; before?: () => void }>;
-  /** What Lidarr finds in a folder for manual import, by folder. */
+  /** What manual import finds, by folder. */
   folders: Map<string, { path: string; size?: number }[]>;
-  /** Whether a manual import takes its files (or refuses them all). */
+  /** Whether manual import accepts its files (or rejects them all). */
   importTakes: boolean;
   tags: { id: number; label: string }[];
-  /** Answers every call with a server error while set. */
+  /** While set, every call gets a server error. */
   down: boolean;
-  /** Paths answered with a server error, the rest as usual. */
+  /** Paths that get a server error; the rest answer normally. */
   failing: Set<string>;
   settings: (overrides?: Partial<LidarrSettings>) => LidarrSettings;
   reset: () => void;
   start: () => Promise<void>;
   stop: () => void;
   /**
-   * Resolves once a call matching it has been made (or after a while), and
-   * what Seerr does after it has had a moment.
+   * Resolves once a matching call is made (or after a timeout), plus a moment
+   * for Seerr's follow-up.
    */
   waitFor: (match: (call: LidarrCall) => boolean) => Promise<void>;
 }
@@ -180,7 +178,7 @@ export const createFakeLidarr = (): FakeLidarr => {
         }
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
-      // What Seerr writes down after the call, before the test looks.
+      // Let Seerr record the outcome before the test checks.
       await new Promise((resolve) => setTimeout(resolve, 150));
     },
   };
@@ -239,7 +237,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       const given = body as unknown as LidarrAlbum & {
         artist: Partial<LidarrArtist>;
       };
-      // Lidarr's own checks: the artist whole, whether new or not.
+      // Lidarr's own validation: the full artist, new or not.
       if (
         !given.artist?.foreignArtistId ||
         !(Number(given.artist.qualityProfileId) > 0) ||
@@ -291,8 +289,8 @@ export const createFakeLidarr = (): FakeLidarr => {
       return [202, {}];
     }
     if (method === 'POST' && path === '/api/v1/command') {
-      // A manual import gives each track its file, and has Lidarr
-      // monitor the release imported into, as Lidarr does.
+      // Manual import assigns each track its file and monitors the target
+      // release, as Lidarr does.
       if (body?.name === 'ManualImport' && fake.importTakes) {
         for (const file of (body.files ?? []) as {
           albumId: number;

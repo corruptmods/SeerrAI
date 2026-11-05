@@ -104,8 +104,8 @@ router.get('/', async (req, res, next) => {
     let query = getRepository(User).createQueryBuilder('user');
 
     if (q) {
-      // Matching on email would let anyone confirm an address by searching
-      // for it, so only those who manage users search email.
+      // Searching email would let anyone confirm an address exists, so only
+      // user managers search it.
       const fields = [
         'user.username',
         'user.plexUsername',
@@ -192,8 +192,8 @@ router.get('/', async (req, res, next) => {
       .distinct(true)
       .getManyAndCount();
 
-    // Filled in explicitly rather than by a @RelationCount decorator, which
-    // ran a parallel batch of counts on one connection.
+    // Not a @RelationCount decorator: that runs parallel counts on one
+    // connection.
     await attachRequestCounts(users);
 
     return res.status(200).json({
@@ -285,21 +285,20 @@ router.post<
     userAgent: string;
   }
 >('/registerPushSubscription', async (req, res, next) => {
-  // Seerr sends notifications to this address itself, so it has to be a
-  // browser's push service, not any address someone gives it.
+  // Seerr posts to this address, so it must be a browser push service, not
+  // an arbitrary URL.
   if (!isPushServiceEndpoint(req.body.endpoint)) {
     return next({ status: 400, message: 'Not a push service address.' });
   }
   try {
-    // This prevents race conditions where two requests both pass the checks
+    // A transaction so two requests can't both pass the checks.
     await dataSource.transaction(
       async (transactionalEntityManager: EntityManager) => {
         const transactionalRepo =
           transactionalEntityManager.getRepository(UserPushSubscription);
 
-        // An endpoint is one device. When someone else registers it, it has
-        // changed hands: the previous person's notifications must stop
-        // arriving on it.
+        // An endpoint is one device. Registered by another user, it changed
+        // hands: the previous user's notifications must stop arriving on it.
         const previousOwners = await transactionalRepo.find({
           relations: { user: true },
           where: {
@@ -315,7 +314,6 @@ router.post<
           });
         }
 
-        // Check for existing subscription by endpoint within transaction
         const existingSubscription = await transactionalRepo.findOne({
           relations: { user: true },
           where: {
@@ -325,7 +323,7 @@ router.post<
         });
 
         if (existingSubscription) {
-          // If endpoint matches but auth is different, update with new keys (iOS refresh case)
+          // Same endpoint, new auth: update the keys (iOS refresh).
           if (
             existingSubscription.endpoint === req.body.endpoint &&
             existingSubscription.auth !== req.body.auth
@@ -350,9 +348,9 @@ router.post<
           return;
         }
 
-        // Clean up only true endpoint rotations. Same push-service subscription
-        // (matched by `auth`) but with a stale endpoint. Matching on `auth`
-        // avoids deleting sibling devices that only share a user agent.
+        // Delete only true endpoint rotations: same subscription (matched by
+        // `auth`), stale endpoint. Matching on `auth` spares sibling devices
+        // that merely share a user agent.
         if (req.body.auth) {
           const staleSubscriptions = await transactionalRepo.find({
             relations: { user: true },
@@ -386,11 +384,10 @@ router.post<
 
     return res.status(204).send();
   } catch (e) {
-    // Two subscribe attempts for the same device can land at once (the
-    // device-state hook and the worker setup both re-subscribe after a
-    // storage reset). Both pass the existence check, both insert, and the
-    // second trips the (endpoint, user) unique constraint. The subscription
-    // exists, which is the outcome the caller wanted — report success.
+    // Two subscribes for one device can race (the device-state hook and the
+    // worker both re-subscribe after a storage reset); the second trips the
+    // (endpoint, user) unique constraint. The subscription exists, so report
+    // success.
     const code =
       (e as { driverError?: { code?: string }; code?: string })?.driverError
         ?.code ?? (e as { code?: string })?.code;
@@ -418,7 +415,7 @@ router.post<
   }
 });
 
-// Registered before the `/:id` routes so the literal path is matched first.
+// Registered before the `/:id` routes so the literal path matches first.
 router.get(
   '/pushSubscriptionCounts',
   isAuthenticated(Permission.MANAGE_USERS),
@@ -505,8 +502,7 @@ router.delete<{ id: string; endpoint: string }>(
         },
       });
 
-      // If not found, just return 204 to prevent push disable failure
-      // (rare scenario where user push sub does not exist)
+      // Missing subscription: 204, so disabling push doesn't fail.
       if (!userPushSub) {
         return res.status(204).send();
       }
@@ -534,7 +530,7 @@ router.get<{ id: string }>('/:id', async (req, res, next) => {
       where: { id: Number(req.params.id) },
     });
 
-    // The profile page shows this; it is no longer populated by a decorator.
+    // Shown on the profile page.
     await attachRequestCount(user);
 
     const isOwnProfile = req.user?.id === user.id;
@@ -557,8 +553,7 @@ router.get<{ jellyfinUserId: string }>(
         return next({ status: 400, message: 'Invalid Jellyfin User ID.' });
       }
 
-      // An Emby account's id is looked for too: Emby's ids were kept with
-      // Jellyfin's before Emby had its own.
+      // Also match Emby ids, for callers from before Emby had its own.
       const user = await userRepository.findOneOrFail({
         where: [{ jellyfinUserId }, { embyUserId: jellyfinUserId }],
       });
@@ -601,7 +596,7 @@ router.get<{ id: string }, UserRequestsResponse>(
         });
       }
 
-      // Music only for a viewer who has it: set up, and not turned off.
+      // Music only when set up and enabled for the viewer.
       const types =
         musicReady() && featureEnabled('music', req.user)
           ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
@@ -643,7 +638,7 @@ export const canMakePermissionsChange = (
   permissions: number,
   user?: User
 ): boolean =>
-  // Only let the owner grant admin privileges
+  // Only the owner may grant admin.
   !(hasPermission(Permission.ADMIN, permissions) && user?.id !== 1);
 
 router.put<
@@ -661,8 +656,8 @@ router.put<
 
     const userRepository = getRepository(User);
 
-    // Anyone chosen whom this person may not manage (themselves, the
-    // owner, another admin unless they are the owner) is left as they are.
+    // Skip selected users this user may not manage (themselves, the owner,
+    // another admin unless they are the owner).
     const users = (
       await userRepository.find({ where: { id: In(req.body.ids) } })
     ).filter((user) => mayManageUser(req.user, user));
@@ -695,8 +690,8 @@ router.put<{ id: string }>(
         where: { id: Number(req.params.id) },
       });
 
-      // Nobody changes their own permissions, and only the owner changes
-      // another admin's.
+      // Nobody changes their own permissions; only the owner changes another
+      // admin's.
       if (!mayManageUser(req.user, user)) {
         return next({
           status: 403,
@@ -760,23 +755,15 @@ router.delete<{ id: string }>(
 
       const requestRepository = getRepository(MediaRequest);
 
-      /**
-       * Requests are usually deleted through a cascade constraint. Those however, do
-       * not trigger the removal event so listeners to not run and the parent Media
-       * will not be updated back to unknown for titles that were still pending. So
-       * we manually remove all requests from the user here so the parent media's
-       * properly reflect the change.
-       */
+      // Remove requests explicitly: cascade deletes skip removal listeners, so
+      // pending titles' Media would not revert to unknown.
       await requestRepository.remove(user.requests, {
-        /**
-         * Break-up into groups of 1000 requests to be removed at a time.
-         * Necessary for users with >1000 requests, else an SQLite 'Expression tree is too large' error occurs.
-         * https://typeorm.io/repository-api#additional-options
-         */
+        // Chunked, or over 1000 requests hits SQLite's "Expression tree is
+        // too large". https://typeorm.io/repository-api#additional-options
         chunk: user.requests.length / 1000,
       });
 
-      // Otherwise the automatic Plex import would bring them straight back.
+      // Otherwise the automatic Plex import would re-add them.
       if (user.plexId) {
         await getRepository(RemovedPlexAccount).upsert(
           { plexId: user.plexId },
@@ -813,7 +800,6 @@ router.post(
         return next({ status: 400, message: 'Plex is not connected.' });
       }
 
-      // taken from auth.ts
       const mainUser = await userRepository.findOneOrFail({
         select: { id: true, plexToken: true },
         where: { id: 1 },
@@ -839,20 +825,18 @@ router.post(
                   email: account.email.toLowerCase(),
                 })
                 .getOne();
-          // An account with this email that is not waiting for this Plex
-          // account (a password account, or one linked to another Plex
-          // account) is never taken over: its owner links Plex themselves.
+          // Never take over an account with this email that isn't waiting for
+          // this Plex account (a password account, or one linked to another
+          // Plex account): its owner links Plex themselves.
           const user =
             linked ??
             (sameEmail && plexAccountMayClaim(sameEmail) ? sameEmail : null);
 
           if (user) {
-            // Their Plex name, and their picture and email as signing in
-            // with Plex would bring them: never over a Jellyfin or Emby
-            // account's, and never an email another account has.
-            // An account found by email was waiting for this Plex account:
-            // tie it to it, as signing in with Plex would, so it is found by
-            // its Plex account from now on.
+            // Update Plex name, avatar and email as a Plex sign-in would:
+            // never over a Jellyfin or Emby account's, never to another
+            // account's email. An account found by email gets this plexId,
+            // as a Plex sign-in would.
             await userRepository.update(user.id, {
               ...(await plexProfileChanges(user, account)),
               ...(linked ? {} : { plexId: parseInt(account.id) }),
@@ -903,11 +887,10 @@ router.post(
 );
 
 /**
- * Imports people from a Jellyfin or Emby server: those not yet imported
- * (all of them, or those chosen) get an account, and those already
- * imported have their name and picture brought up to date. Someone whose
- * name there is already another account's email or name is left out, with
- * the reason: they sign in with that account and link this server.
+ * Imports Jellyfin or Emby users: new ones (all, or those chosen) get an
+ * account; existing ones get their name and avatar refreshed. A user whose
+ * name is already another account's email or name is skipped with the
+ * reason: they sign in with that account and link this server.
  */
 const importJellyfinUsers = async (
   kind: JellyfinFamilyKind,
@@ -928,7 +911,7 @@ const importJellyfinUsers = async (
     jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id),
     kind
   );
-  // With no list, everyone not yet imported is, as on Import Plex Users.
+  // No list imports everyone new, as on Import Plex Users.
   const chosen = chosenIds
     ? new Set(chosenIds.map((id) => normalizeJellyfinGuid(id)))
     : null;
@@ -938,10 +921,9 @@ const importJellyfinUsers = async (
     const user = linked.get(jellyfinUserId);
 
     if (user) {
-      // Already imported: bring what comes from the server up to date (the
-      // name, and the picture if it changed there and is theirs from this
-      // server), as Import Plex Users does. The account's own settings and
-      // permissions are left alone.
+      // Already imported: refresh the name, and the avatar if it changed and
+      // comes from this server, as Import Plex Users does. Settings and
+      // permissions are untouched.
       const ownPicture = user.userType === USER_TYPE[kind];
       const { changed } = ownPicture
         ? await checkAvatarChanged(user, kind)
@@ -1009,8 +991,8 @@ router.post(
   async (req, res, next) => {
     try {
       const body = req.body as { jellyfinUserIds?: string[] } | undefined;
-      // Jellyfin; before Emby had its own import, this also imported from
-      // an Emby server, and still does when Emby is the one connected.
+      // Jellyfin, or Emby when it is the one connected (for callers from
+      // before Emby had its own import).
       const kind = isConnected('jellyfin')
         ? 'jellyfin'
         : (jellyfinFamilyServer() ?? 'jellyfin');
@@ -1226,7 +1208,6 @@ router.get<{ id: string }, WatchlistResponse>(
       }
     }
 
-    // We will just return an empty array if the user has no Plex token
     if (!user.plexToken) {
       return res.json({
         page: 1,

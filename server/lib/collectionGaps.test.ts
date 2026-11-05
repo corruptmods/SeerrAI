@@ -8,8 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Collections the library has part of, as the health page lists them, with
- * TMDB stubbed.
+ * Partly owned collections, as the health page lists them, with TMDB stubbed.
  */
 
 setupTestDb();

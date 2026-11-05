@@ -78,7 +78,7 @@ const RequestList = () => {
   const [currentSortDirection, setCurrentSortDirection] =
     useState<SortDirection>('desc');
   const [currentPageSize, setCurrentPageSize] = useState<number>(10);
-  // What's typed, and the words searched once typing pauses.
+  // Raw input, and the debounced search term.
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
 
@@ -86,9 +86,7 @@ const RequestList = () => {
   const pageIndex = page - 1;
   const updateQueryParams = useUpdateQueryParams({ page: page.toString() });
 
-  // The user picker is only shown where the list is not already scoped to a
-  // single person, so it never conflicts with the profile view.
-  // Changing a filter returns to the first page, as the selects did.
+  // Back to page one on filter change, keeping a userId scope.
   const resetPage = () => {
     router.push({
       pathname: router.pathname,
@@ -96,8 +94,8 @@ const RequestList = () => {
     });
   };
 
-  // Only people who see everyone's requests can pick whose; everyone else
-  // only ever sees their own, and the server refuses a filter for others.
+  // The user picker is hidden when scoped to one user, and only shown to
+  // those who can view all requests; the server refuses it for others.
   const canFilterByUser =
     !router.pathname.startsWith('/profile') &&
     !router.query.userId &&
@@ -114,7 +112,6 @@ const RequestList = () => {
     if (words === search) return;
     const timer = setTimeout(() => {
       setSearch(words);
-      // New words start from the first page.
       if (router.query.page && router.query.page !== '1') resetPage();
     }, 350);
     return () => clearTimeout(timer);
@@ -135,20 +132,20 @@ const RequestList = () => {
         ? `&requestedBy=${currentUser?.id}`
         : router.query.userId
           ? `&requestedBy=${router.query.userId}`
-          : // Also ignores a filter saved on this device by someone else.
+          : // Also drops a filter another user saved on this device.
             canFilterByUser && currentRequestedBy.length
             ? `&requestedBy=${encodeURIComponent(currentRequestedBy.join(','))}`
             : ''
     }${search ? `&search=${encodeURIComponent(search)}` : ''}`,
-    // The list stays while the next search loads, and the box keeps focus.
+    // Keep the list (and the box's focus) while the next search loads.
     { keepPreviousData: true }
   );
-  // Every card's estimate in one call, rather than one per card.
+  // One ETA call for the page, not one per card.
   const etaFor = useRequestEtas(
     data?.results.map((request) => request.id) ?? []
   );
-  // Backfill's state for the titles on this page, in one call; admins only.
-  // Films and series only: Backfill knows nothing of music.
+  // Admin Backfill lookup for the page in one call. Backfill doesn't cover
+  // music.
   const tmdbIds = [
     ...new Set(
       (data?.results ?? [])
@@ -170,7 +167,7 @@ const RequestList = () => {
     }
   );
 
-  // Everyone else: whether Backfill is looking for their own requests.
+  // Non-admins: Backfill status of their own requests.
   const { data: backfillStatus } = useSWR<BackfillStatus[]>(
     !hasPermission(Permission.ADMIN) && tmdbIds.length
       ? `/api/v1/backfill-status?tmdbIds=${tmdbIds.join(',')}`
@@ -181,7 +178,6 @@ const RequestList = () => {
     }
   );
 
-  // Restore last set filter values on component mount
   useEffect(() => {
     const filterString = window.localStorage.getItem('rl-filter-settings');
 
@@ -191,7 +187,7 @@ const RequestList = () => {
       if (Array.isArray(filterSettings.currentFilters)) {
         setCurrentFilters(filterSettings.currentFilters);
       } else if (filterSettings.currentFilter) {
-        // Saved by an earlier version as a single value.
+        // Legacy single-value format.
         setCurrentFilters([filterSettings.currentFilter]);
       }
 
@@ -215,13 +211,12 @@ const RequestList = () => {
       }
     }
 
-    // If filter value is provided in query, use that instead
+    // A filter in the query overrides the saved one.
     if (Object.values(Filter).includes(router.query.filter as Filter)) {
       setCurrentFilters([router.query.filter as Filter]);
     }
   }, [router.query.filter]);
 
-  // Set filter values to local storage any time they are changed
   useEffect(() => {
     window.localStorage.setItem(
       'rl-filter-settings',

@@ -15,8 +15,8 @@ import { In } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * The admin agent, for admins: what it has done (each run with its steps)
- * and asking it to do something.
+ * Admin agent routes, admin only: its runs (each with its steps) and asking it
+ * to do something.
  */
 const agentRoutes = Router();
 
@@ -64,7 +64,7 @@ agentRoutes.get('/', async (req, res) => {
     busy: agent.isBusy(),
     runs: runs.map(summaryOf),
     total,
-    // Across every page, so Clear finished is offered whichever page is open.
+    // Across all pages, so Clear finished is offered on any page.
     finished: await getRepository(AgentRun).count({
       where: { status: In(['done', 'failed']) },
     }),
@@ -116,10 +116,7 @@ agentRoutes.get<{ id: string }>('/:id', async (req, res, next) => {
   return res.status(200).json(body);
 });
 
-/**
- * A title in Sonarr, Radarr or Lidarr, by its name there, or null if it is
- * not.
- */
+/** A title's name in Sonarr, Radarr or Lidarr, or null if absent. */
 const nameOf = async (
   title: z.infer<typeof titleSchema>
 ): Promise<string | null> => {
@@ -203,7 +200,7 @@ agentRoutes.post<{ id: string }>('/:id/reply', async (req, res, next) => {
   }
 });
 
-/** Stops a run before its next step; what it started carries on. */
+/** Stop a run before its next step; what it started carries on. */
 agentRoutes.post<{ id: string }>('/:id/stop', async (req, res, next) => {
   if (!req.user) return next({ status: 403, message: 'Sign in first.' });
   try {
@@ -217,7 +214,7 @@ agentRoutes.post<{ id: string }>('/:id/stop', async (req, res, next) => {
   }
 });
 
-/** Approving or declining what a run proposed, by the proposal's id. */
+/** Approve or decline a run's proposal, by proposal id. */
 const decision =
   (approve: boolean) =>
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {

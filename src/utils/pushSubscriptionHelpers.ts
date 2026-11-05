@@ -19,9 +19,8 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 /*
- * Whether a person chose push notifications on this device. Kept per person:
- * a device can change hands, and one person's yes is not the next person's.
- * (It was once one flag for the whole device.)
+ * Per-user push opt-in on this device: a shared device must not carry one
+ * user's consent to the next.
  */
 const optInKey = (userId: number) => `pushNotificationsEnabled:${userId}`;
 
@@ -45,7 +44,7 @@ export const setPushOptIn = (userId: number | undefined, on: boolean) => {
   try {
     localStorage.setItem(optInKey(userId), String(on));
   } catch {
-    // Not remembered on this device; they will be asked again.
+    // Not stored; they'll be asked again.
   }
 };
 
@@ -132,7 +131,7 @@ export const verifyAndResubscribePushSubscription = async (
           )}`
         );
       } catch {
-        // Ignore errors when deleting old endpoint (it might not exist)
+        // The old endpoint may not exist.
       }
     }
 
@@ -144,11 +143,9 @@ export const verifyAndResubscribePushSubscription = async (
   }
 };
 
-// Several parts of the app can decide to subscribe at the same moment — the
-// device-state hook and the worker setup both react to a missing subscription
-// after a storage reset. Sharing one in-flight attempt means a single browser
-// subscription and a single registration request, rather than a race that
-// trips the server's unique constraint.
+// The device-state hook and worker setup can both subscribe at once (e.g.
+// after a storage reset); one shared attempt avoids racing the server's
+// unique constraint.
 let inFlightSubscribe: Promise<boolean> | null = null;
 
 export const subscribeToPushNotifications = async (

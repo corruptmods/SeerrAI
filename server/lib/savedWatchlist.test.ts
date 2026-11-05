@@ -8,10 +8,7 @@ import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-/*
- * A watchlist kept here (for someone not on Plex), a page at a time, in
- * the order added.
- */
+/* A Seerr-side watchlist (for users not on Plex), paged, in added order. */
 
 setupTestDb();
 

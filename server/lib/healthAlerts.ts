@@ -5,35 +5,32 @@ import { healthEvent } from '@server/lib/notifications/eventTitles';
 import logger from '@server/logger';
 
 /*
- * Tells admins when something on the Health page newly goes wrong with a
- * connected service, so a paused WhisperAI or an indexer Prowlarr gave up
- * on is heard about without opening the page.
+ * Notifies admins when a connected service on the Health page newly has a
+ * problem (a paused WhisperAI, an indexer Prowlarr disabled).
  *
- * A problem is told once, when it has been seen on two runs in a row (a
- * moment's timeout is not worth a notification), and not again until it
- * has cleared. What has been told is kept in memory: after a restart, a
- * problem still there is told once more.
+ * Sent once after two runs in a row (a brief timeout isn't worth an alert),
+ * and not again until it clears. State is in memory, so a restart re-sends
+ * ongoing problems once.
  */
 
-/** Runs a problem must be seen on, in a row, before it is told. */
+/** Consecutive runs a problem must appear on before alerting. */
 export const RUNS_BEFORE_TELLING = 2;
 /** Problems named in one notification before "and N more". */
 const NAMED = 5;
 
 export interface HealthProblem {
   key: string;
-  /** The service's name. */
   service: string;
   title: string;
   detail?: string;
 }
 
-/** Every problem the service checks found, one per thing wrong. */
+/** One problem per thing wrong in the service checks. */
 export const problemsIn = (checks: HealthCheck[]): HealthProblem[] =>
   checks.flatMap((check) => {
     const service = check.name ?? check.id;
     if (check.status === 'ok') return [];
-    // Down, or not answering: one problem, whatever it said.
+    // Unreachable or no items: a single problem.
     if (!check.reachable || !check.items.length) {
       return [
         {
@@ -53,13 +50,13 @@ export const problemsIn = (checks: HealthCheck[]): HealthProblem[] =>
   });
 
 class HealthAlerts {
-  /** How many runs in a row each problem has been seen on. */
+  /** Consecutive runs each problem has been seen on. */
   private seen = new Map<string, number>();
-  /** Problems told, until they clear. */
+  /** Problems alerted, until they clear. */
   private told = new Set<string>();
   private running = false;
 
-  /** Checks once; tells admins what newly went wrong. */
+  /** Runs the checks once and alerts on new problems. */
   public async run(): Promise<HealthProblem[]> {
     if (this.running) return [];
     this.running = true;
@@ -83,24 +80,23 @@ class HealthAlerts {
   }
 
   /**
-   * What to tell, of what was found this run; sends it. `unread` names the
-   * services that answered but whose own report could not all be read this
-   * run: what was known of them stands, rather than counting as cleared and
-   * being told again on the next run that reads it.
+   * Sends and returns the problems newly due for an alert. `unread` lists
+   * services that answered but whose report couldn't be fully read: their
+   * known problems stand instead of clearing and re-alerting next run.
    */
   public consider(
     problems: HealthProblem[],
     unread: ReadonlySet<string> = new Set()
   ): HealthProblem[] {
     const now = new Set(problems.map((p) => p.key));
-    // It answered, so if it was down before, that has cleared.
+    // It answered, so a previous ":down" has cleared.
     const ofUnread = (key: string) =>
       [...unread].some(
         (id) => key.startsWith(`${id}:`) && key !== `${id}:down`
       );
     for (const key of [...this.seen.keys()]) {
       if (!now.has(key) && !ofUnread(key)) {
-        // Cleared: told again if it comes back.
+        // Cleared: alert again if it recurs.
         this.seen.delete(key);
         this.told.delete(key);
       }

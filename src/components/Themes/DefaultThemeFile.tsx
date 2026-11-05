@@ -20,9 +20,8 @@ const messages = defineMessages('components.Themes.DefaultThemeFile', {
 });
 
 /**
- * Settings → Appearance: a theme file as the server's default, in the
- * default's form. Importing one sets the mode and accent from it too; it
- * is kept on Save.
+ * Server default theme file field. Importing also sets mode and accent; saved
+ * on Save.
  */
 const DefaultThemeFile = () => {
   const intl = useIntl();

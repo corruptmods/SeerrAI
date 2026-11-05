@@ -48,8 +48,8 @@ const code = (text: React.ReactNode) => (
 );
 
 /**
- * Settings → Appearance → Server CSS: styles for everyone, and whether
- * people may add their own. Saved on its own, apart from the default look.
+ * Server CSS editor and the allow-personal-CSS toggle; saved separately from
+ * the default look.
  */
 const ServerCss = () => {
   const intl = useIntl();
@@ -86,7 +86,7 @@ const ServerCss = () => {
       );
       await mutate(response.data, { revalidate: false });
       setCss(response.data.css);
-      // Pages load it by the version in the public settings.
+      // The stylesheet URL is versioned from the public settings.
       await globalMutate('/api/v1/settings/public');
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',

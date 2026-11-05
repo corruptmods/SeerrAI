@@ -1,6 +1,6 @@
 /**
- * An age rating an override rule matches: a rating ("PG-13") in one
- * country's system ("US").
+ * An age rating an override rule matches: a rating ("PG-13") in a country's
+ * system ("US").
  */
 export interface RuleCertification {
   country: string;
@@ -8,8 +8,8 @@ export interface RuleCertification {
 }
 
 /**
- * The age ratings a rule matches, as kept on it: "US:G,US:PG,GB:U". Read by
- * the server to match titles and by the rule editor to show them.
+ * Parses a rule's stored age ratings ("US:G,US:PG,GB:U"). Used by the server to
+ * match titles and the rule editor to show them.
  */
 export const parseRuleCertifications = (
   value: string | null | undefined
@@ -23,7 +23,7 @@ export const parseRuleCertifications = (
       : [];
   });
 
-/** The other way: nothing to match is no condition at all. */
+/** The inverse; an empty list means no condition. */
 export const formatRuleCertifications = (
   entries: RuleCertification[]
 ): string | null =>

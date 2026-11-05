@@ -35,17 +35,17 @@ class SonarrScanner
   private sonarrApi: SonarrAPI;
   private scannedTvdbIds: Set<number> = new Set();
   private scanned4kTvdbIds: Set<number> = new Set();
-  // The titles Sonarr has, whatever TVDB id it has them under: after TheTVDB
-  // merges or renumbers a series, Sonarr's id is not the one Seerr kept.
+  // Keyed by TMDB id: after TheTVDB merges or renumbers a series, Sonarr's
+  // TVDB id differs from the one Seerr stored.
   private scannedTmdbIds: Set<number> = new Set();
   private scanned4kTmdbIds: Set<number> = new Set();
   // Season numbers keyed on tmdbId, as media.tvdbId can be null. Excludes unmonitored seasons.
   private processingTmdbIds: Map<number, Set<number>> = new Map();
   private processing4kTmdbIds: Map<number, Set<number>> = new Map();
-  // Series Sonarr lists no seasons for: it cannot say they were given up on.
+  // Series Sonarr lists no seasons for, so it can't say they were abandoned.
   private unlistedTmdbIds: Set<number> = new Set();
   private unlisted4kTmdbIds: Set<number> = new Set();
-  // A lookup can fail before its tmdbId is known, so failures are matched through other servers' lookups.
+  // A lookup can fail before its tmdbId is known, so failures are matched via other servers' lookups.
   private failedTvdbIds: Set<number> = new Set();
   private failed4kTvdbIds: Set<number> = new Set();
   private tmdbIdsByTvdbId: Map<number, number> = new Map();
@@ -136,10 +136,9 @@ class SonarrScanner
         }
       }
 
-      // Only run cleanup if all servers of this profile type have sync enabled.
-      // If any server is skipped, we can't distinguish truly orphaned media from
-      // media that exists on an unscanned server (e.g. separate instances for
-      // anime, regional content, or different languages).
+      // Clean up only if every server of this type syncs; otherwise orphaned
+      // media can't be told from media on an unscanned server (e.g. separate
+      // instances for anime, regional content or languages).
       const allStandardScanned = this.servers
         .filter((s) => !this.enable4kShow || !s.is4k)
         .every((s) => s.syncEnabled);
@@ -228,9 +227,9 @@ class SonarrScanner
 
       const settings = getSettings();
 
-      // A series just added to Sonarr can have no seasons yet, until Sonarr
-      // hears of them from TheTVDB. Its seasons are on their way if the series
-      // is monitored; read as unmonitored, its request would be declined.
+      // A series just added to Sonarr may have no seasons until TheTVDB
+      // supplies them. If monitored, treat them as coming; reading them as
+      // unmonitored would decline its request.
       const seasonsNotListedYet =
         sonarrSeries.seasons.length === 0 && sonarrSeries.monitored;
 
@@ -274,8 +273,8 @@ class SonarrScanner
         ? this.processing4kTmdbIds
         : this.processingTmdbIds;
 
-      // With no seasons listed at all, Sonarr cannot say the series was given
-      // up on, so its request is never declined for it.
+      // With no seasons listed, Sonarr can't say the series was abandoned, so
+      // its request is never declined for that.
       if (sonarrSeries.seasons.length === 0) {
         (server4k ? this.unlisted4kTmdbIds : this.unlistedTmdbIds).add(tmdbId);
       }

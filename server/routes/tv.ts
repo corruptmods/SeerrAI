@@ -35,7 +35,7 @@ import { mapSeasonWithEpisodes, mapTvDetails } from '@server/models/Tv';
 import { Router } from 'express';
 import { In } from 'typeorm';
 
-/** Which of an episode's downloads to show: the furthest along. */
+/** Rank of an episode's download stages; the furthest along is shown. */
 const STAGE_ORDER: Record<DownloadStage, number> = {
   failed: 0,
   needsAttention: 1,
@@ -83,7 +83,8 @@ tvRoutes.get('/:id', async (req, res, next) => {
       onUserWatchlist
     );
 
-    // TMDB issue where it doesnt fallback to English when no overview is available in requested locale.
+    // TMDB doesn't fall back to English when the requested locale has no
+    // overview.
     if (!data.overview) {
       const tvEnglish = await metadataProvider.getTvShow({
         tvId: Number(req.params.id),
@@ -121,7 +122,7 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
 
-    // Per-episode availability, when episode tracking has populated it.
+    // Per-episode availability, once episode tracking has populated it.
     const availability = new Map<
       number,
       { available: boolean; available4k: boolean }
@@ -149,9 +150,9 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
       }
     }
 
-    // Which episodes active requests already cover, so a Request button is
-    // never offered for one that is on its way. A season request without
-    // episodes covers the whole season.
+    // Episodes active requests already cover, so no Request button is offered
+    // for one on its way. A season request without episodes covers the whole
+    // season.
     const requested: SeasonRequestCoverage = {
       wholeSeason: false,
       episodes: new Set(),
@@ -192,7 +193,7 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
     }
 
     const mapped = mapSeasonWithEpisodes(season, availability, requested);
-    // What is downloading now, from Sonarr's queue and Backfill's own.
+    // Current downloads, from Sonarr's queue and Backfill's own.
     if (media) {
       const progress = [
         ...(media.serviceId != null && media.externalServiceId != null
@@ -370,8 +371,8 @@ tvRoutes.get('/:id/ratings', async (req, res, next) => {
 });
 
 /**
- * Rotten Tomatoes and IMDb together, as for movies. Either source can be
- * down or not know the series; the other is still returned.
+ * Rotten Tomatoes and IMDb together, as for movies. If either source is down or
+ * lacks the series, the other is still returned.
  */
 tvRoutes.get('/:id/ratingscombined', async (req, res, next) => {
   const tmdb = new TheMovieDb();
@@ -431,16 +432,14 @@ tvRoutes.get('/:id/ratingscombined', async (req, res, next) => {
   }
 });
 
-/*
- * Getting a series' new seasons as they premiere, for the signed-in user.
- */
+/* Follow a series' new seasons as they premiere, for the signed-in user. */
 tvRoutes.get<{ id: string }>('/:id/future-seasons', async (req, res, next) => {
   try {
     const userId = req.user?.id as number;
     const tmdbId = Number(req.params.id);
     const subscription = await getSubscription(userId, tmdbId);
-    // Others following show the series as followed for everyone; only those
-    // who look after requests see who they are.
+    // Other followers mark the series followed for everyone; only request
+    // managers see who they are.
     const others = await otherFollowers(userId, tmdbId);
     return res.status(200).json({
       ...(subscription

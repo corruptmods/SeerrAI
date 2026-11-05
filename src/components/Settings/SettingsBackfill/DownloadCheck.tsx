@@ -30,8 +30,8 @@ export type DownloadCheckMode = 'off' | 'report' | 'on';
 const MODES: DownloadCheckMode[] = ['off', 'report', 'on'];
 
 /**
- * Download Check's switch, saved as soon as it's changed, apart from the
- * form above: it needs nothing else of Backfill's.
+ * Download Check's switch, saved on change apart from the form above: it needs
+ * nothing else from Backfill.
  */
 const DownloadCheck = ({ initial }: { initial: DownloadCheckMode }) => {
   const intl = useIntl();

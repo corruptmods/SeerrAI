@@ -1,10 +1,10 @@
 import type { HealthItem } from '@server/lib/health';
 
 /*
- * A key for each item in a check's list, from what the item is rather than
- * where it sits. Keyed by position, a "Search now" already pressed stayed
- * pressed on whichever title moved into its place, on the next page or
- * after Check Again. The same item twice gets a number after the first.
+ * A key per check item from what it is, not where it sits: keyed by position,
+ * a pressed "Search now" would carry over to whichever title moves into its
+ * place (next page, Check Again). A repeated item gets a number after the
+ * first.
  */
 export const itemKeys = (items: HealthItem[]): string[] => {
   const seen = new Map<string, number>();

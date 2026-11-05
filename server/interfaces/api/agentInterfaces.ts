@@ -5,7 +5,7 @@ import type {
   AgentTrigger,
 } from '@server/entity/AgentRun';
 
-/** Changes the agent proposed, as an admin sees them to decide on. */
+/** Changes the agent proposed, for an admin to decide on. */
 export interface AgentProposal {
   id: string;
   at: string;
@@ -26,7 +26,7 @@ export interface AgentRunSummary {
   kind: 'series' | 'movie' | 'album' | null;
   summary: string | null;
   error: string | null;
-  /** What it asked an admin, while it waits. */
+  /** Its pending question to an admin. */
   question: string | null;
   actions: AgentAction[];
   steps: number;
@@ -37,11 +37,11 @@ export interface AgentRunSummary {
 
 export interface AgentRunDetail extends Omit<AgentRunSummary, 'steps'> {
   steps: AgentStep[];
-  /** Changes it proposed, waiting for an admin to approve or decline. */
+  /** Proposed changes awaiting admin approval. */
   proposal: AgentProposal | null;
-  /** The Backfill row for its title, for a link, once known. */
+  /** Its title's Backfill row id, once known. */
   backfillId: number | null;
-  /** The title's own page here, once known. */
+  /** Its title's page path, once known. */
   titlePage: string | null;
   inputTokens: number;
   outputTokens: number;
@@ -54,6 +54,6 @@ export interface AgentOverview {
   busy: boolean;
   runs: AgentRunSummary[];
   total: number;
-  /** How many finished runs there are, on any page. */
+  /** Total finished runs across all pages. */
   finished: number;
 }

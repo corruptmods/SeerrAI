@@ -25,8 +25,7 @@ import { connectedKindsOf, getSettings } from '@server/lib/settings';
 
 /*
  * Which media servers Seerr is connected to, and where each keeps its
- * settings and its ids. Code that works with a media server asks here
- * rather than reading main.mediaServerType itself.
+ * settings and ids. Ask here instead of reading main.mediaServerType.
  */
 
 export {
@@ -41,38 +40,37 @@ export {
 };
 export type { JellyfinFamilyKind, MediaServerKind };
 
-/** The kind of account a person signing in with each server gets. */
+/** The account type a user signing in with each server gets. */
 export const USER_TYPE: Record<MediaServerKind, UserType> = {
   plex: UserType.PLEX,
   jellyfin: UserType.JELLYFIN,
   emby: UserType.EMBY,
 };
 
-/** The server a kind of account is for; undefined for a local account. */
+/** The server an account type belongs to; undefined for local accounts. */
 export const kindOfUserType = (
   userType: UserType | undefined
 ): MediaServerKind | undefined =>
   MEDIA_SERVER_KINDS.find((kind) => USER_TYPE[kind] === userType);
 
 /**
- * The primary server: the one chosen at setup (or made primary since). It
- * gives titles their default play link and is listed first. Undefined
- * before setup.
+ * The server chosen at setup (or made primary since). It supplies titles'
+ * default play link and is listed first. Undefined before setup.
  */
 export const primaryServer = (): MediaServerKind | undefined =>
   kindOfType(getSettings().main.mediaServerType);
 
-/** The connected servers, the primary one first, then Plex, Jellyfin, Emby. */
+/** Connected servers: primary first, then Plex, Jellyfin, Emby. */
 export const connectedServers = (): MediaServerKind[] =>
   connectedKindsOf(getSettings());
 
-/** Seerr is connected to this server. The primary one always is. */
+/** Whether Seerr is connected to this server; the primary always is. */
 export const isConnected = (kind: MediaServerKind): boolean =>
   connectedServers().includes(kind);
 
 /**
- * The connected Jellyfin or Emby server, the primary one first: what the
- * routes and pages that know one Jellyfin-family server work with.
+ * The connected Jellyfin or Emby server, primary first, for routes and pages
+ * that handle a single Jellyfin-family server.
  */
 export const jellyfinFamilyServer = (): JellyfinFamilyKind | undefined =>
   connectedServers().find(isJellyfinFamily);
@@ -105,15 +103,15 @@ export const hostnameFor = (kind: MediaServerKind): string =>
   hostnameOf(kind === 'plex' ? getSettings().plex : jellyfinFamily(kind));
 
 /**
- * The address people reach a Jellyfin or Emby server at, for links: the
- * external address when one is set.
+ * The user-facing Jellyfin or Emby address for links: the external one when
+ * set.
  */
 export const externalHostFor = (kind: JellyfinFamilyKind): string =>
   jellyfinFamily(kind).externalHostname || hostnameFor(kind);
 
 /**
- * Where people open one item on a server: its page in the server's web
- * app, and for Plex the iPhone and iPad app too.
+ * Links to open one item: its page in the server's web app, plus the iOS app
+ * for Plex.
  */
 export const serverItemLinks = (
   kind: MediaServerKind,
@@ -137,9 +135,9 @@ export const serverItemLinks = (
 };
 
 /**
- * Where to play an album: one link for each connected server that has it,
- * the primary server first. An album is kept once per artist it is under;
- * every row's ids count.
+ * Play links for an album, one per connected server that has it, primary
+ * first. An album is stored once per artist it is under, so every row's ids
+ * count.
  */
 export const albumPlayLinks = (
   albums: Pick<MusicAlbum, 'ratingKey' | 'jellyfinItemId' | 'embyItemId'>[]
@@ -160,18 +158,18 @@ export const albumPlayLinks = (
   });
 
 /**
- * People may sign in with their account on this server: it is connected
- * and its own switch (Settings → Media Servers) is on. The old single
- * switch, main.mediaServerLogin, only follows these (lib/mediaServerAdmin).
+ * Whether users may sign in with this server: connected and its own switch
+ * (Settings → Media Servers) on. The legacy main.mediaServerLogin only
+ * mirrors these (lib/mediaServerAdmin).
  */
 export const signInAllowed = (kind: MediaServerKind): boolean =>
   isConnected(kind) && getSettings()[kind]?.signIn !== false;
 
 /**
- * Makes a server the primary one and connects it, at setup. Its sign-in
- * follows the switch for media server sign-in. For Jellyfin and Emby,
- * `adminUserId` is the administrator account set up with, which Seerr reads
- * the libraries as from then on (jellyfinAdmin). The caller saves.
+ * At setup, makes a server primary and connects it; its sign-in follows the
+ * media server sign-in switch. For Jellyfin and Emby, `adminUserId` is the
+ * setup admin account, used to read libraries from then on (jellyfinAdmin).
+ * The caller saves.
  */
 export const connectAsPrimary = (
   kind: MediaServerKind,
@@ -186,13 +184,13 @@ export const connectAsPrimary = (
   }
 };
 
-/** The servers a person has an account linked from. */
+/** Servers a user has a linked account from. */
 export const linkedServers = (
   user: Partial<Pick<User, 'plexId' | 'jellyfinUserId' | 'embyUserId'>>
 ): MediaServerKind[] =>
   MEDIA_SERVER_KINDS.filter((kind) => !!user[USER_ID[kind]]);
 
-/** A person's account on a Jellyfin or Emby server, as Seerr keeps it. */
+/** A user's Jellyfin or Emby account as Seerr stores it. */
 export interface JellyfinAccountColumns {
   userId?: string | null;
   username?: string | null;
@@ -200,7 +198,7 @@ export interface JellyfinAccountColumns {
   authToken?: string | null;
 }
 
-/** Reads a person's account on a Jellyfin or Emby server. */
+/** Reads a user's Jellyfin or Emby account. */
 export const jellyfinAccountOf = (
   user: Partial<User>,
   kind: JellyfinFamilyKind
@@ -212,8 +210,8 @@ export const jellyfinAccountOf = (
 });
 
 /**
- * The columns that hold a person's account on a Jellyfin or Emby server,
- * to save or update. Only the fields given are included.
+ * The columns holding a user's Jellyfin or Emby account, for save or update.
+ * Only given fields are included.
  */
 export const jellyfinAccountColumns = (
   kind: JellyfinFamilyKind,
@@ -234,9 +232,9 @@ export const jellyfinAccountColumns = (
 };
 
 /**
- * The account Seerr reads a Jellyfin or Emby server's libraries as: the
- * one chosen for it, else the owner's (user 1's) linked account. Undefined
- * when there is neither.
+ * The account Seerr reads a Jellyfin or Emby server's libraries as: the one
+ * chosen for it, else the owner's (user 1) linked account. Undefined if
+ * neither.
  */
 export const jellyfinAdmin = async (
   kind: JellyfinFamilyKind
@@ -256,11 +254,10 @@ export const jellyfinAdmin = async (
 };
 
 /**
- * Servers set up before the account Seerr reads them as was kept with
- * them relied on the owner's linked account, and stopped working once the
- * owner unlinked it. Each connected Jellyfin or Emby server without one
- * keeps the owner's account from now on. Run at startup; saves when it
- * changes anything.
+ * Servers set up before the library account was stored with them relied on
+ * the owner's linked account and broke when the owner unlinked it. Stores the
+ * owner's account on each connected Jellyfin or Emby server lacking one. Runs
+ * at startup; saves only on change.
  */
 export const rememberJellyfinAdmins = async (): Promise<void> => {
   const settings = getSettings();
@@ -288,9 +285,8 @@ export const rememberJellyfinAdmins = async (): Promise<void> => {
 };
 
 /**
- * A client for a Jellyfin or Emby server with its API key. As the admin
- * account (jellyfinAdmin) when asked, for calls that list a user's
- * libraries or items.
+ * A Jellyfin or Emby client with the server's API key; optionally as the admin
+ * account (jellyfinAdmin), for calls that list a user's libraries or items.
  */
 export const jellyfinClient = async (
   kind: JellyfinFamilyKind,

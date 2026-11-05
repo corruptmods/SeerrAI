@@ -14,7 +14,7 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * The release calendar, against fake Radarr and Sonarr calendars, behind the
+ * The release calendar against fake Radarr and Sonarr calendars, behind the
  * real API validator.
  */
 
@@ -138,7 +138,7 @@ const calendar = (query = '') =>
               try {
                 body = JSON.parse(raw);
               } catch {
-                // An error page: the status is what matters.
+                // An error page: only the status matters.
               }
               resolve({ status: res.statusCode ?? 0, body });
             });
@@ -148,8 +148,8 @@ const calendar = (query = '') =>
     }
   );
 
-// The server caches a calendar for ten minutes per range, so each test asks
-// for a range of its own.
+// The server caches a calendar ten minutes per range, so each test uses its own
+// range.
 describe('the release calendar', () => {
   it('lists each release a film has in range, once, even with a 4K server', async () => {
     const film = {
@@ -324,8 +324,8 @@ describe('the release calendar', () => {
   });
 
   it('refuses a fractional week count rather than asking every server for it', async () => {
-    // Each range is cached on its own: weeks=7.0001 and the like would
-    // otherwise each ask every Radarr and Sonarr.
+    // Each range is cached separately: otherwise weeks=7.0001 and the like
+    // would each query every Radarr and Sonarr.
     for (const weeks of ['7.0001', '7.5']) {
       assert.equal((await calendar(`?weeks=${weeks}`)).status, 400);
     }

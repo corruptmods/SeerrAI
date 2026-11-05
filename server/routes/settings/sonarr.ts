@@ -7,6 +7,15 @@ import { Router } from 'express';
 
 const sonarrRoutes = Router();
 
+// One default per type (4K or not): clear the others of that type.
+const clearDefaults = (servers: SonarrSettings[], is4k: boolean) => {
+  servers
+    .filter((sonarrInstance) => sonarrInstance.is4k === is4k)
+    .forEach((sonarrInstance) => {
+      sonarrInstance.isDefault = false;
+    });
+};
+
 sonarrRoutes.get('/', (_req, res) => {
   const settings = getSettings();
 
@@ -17,18 +26,11 @@ sonarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newSonarr = req.body as SonarrSettings;
-  // Never a removed server's id: titles keep the id of the server they are on.
+  // Never reuse a removed server's id: titles keep the id of their server.
   newSonarr.id = settings.newId('sonarr');
 
-  // If we are setting this as the default, clear any previous defaults for the same type first
-  // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true
-  // and are the default
   if (req.body.isDefault) {
-    settings.sonarr
-      .filter((sonarrInstance) => sonarrInstance.is4k === req.body.is4k)
-      .forEach((sonarrInstance) => {
-        sonarrInstance.isDefault = false;
-      });
+    clearDefaults(settings.sonarr, req.body.is4k);
   }
 
   settings.sonarr = [...settings.sonarr, newSonarr];
@@ -70,7 +72,7 @@ sonarrRoutes.post('/test', async (req, res, next) => {
       message: e.message,
     });
 
-    // Turned away for the name it was reached by: say how to let it in.
+    // Refused for the hostname used: tell the admin how to allow it.
     if (answerHostRefused(res, 'Sonarr', e)) return;
     next({ status: 500, message: 'Failed to connect to Sonarr' });
   }
@@ -89,15 +91,8 @@ sonarrRoutes.put<{ id: string }>('/:id', async (req, res) => {
       .json({ status: '404', message: 'Settings instance not found' });
   }
 
-  // If we are setting this as the default, clear any previous defaults for the same type first
-  // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true
-  // and are the default
   if (req.body.isDefault) {
-    settings.sonarr
-      .filter((sonarrInstance) => sonarrInstance.is4k === req.body.is4k)
-      .forEach((sonarrInstance) => {
-        sonarrInstance.isDefault = false;
-      });
+    clearDefaults(settings.sonarr, req.body.is4k);
   }
 
   settings.sonarr[sonarrIndex] = {

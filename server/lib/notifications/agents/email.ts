@@ -97,7 +97,7 @@ class EmailAgent
   ): EmailOptions | undefined {
     const intl = getIntl(locale);
     const { applicationUrl, applicationTitle } = getSettings().main;
-    // The settings being tested, which may not be saved yet, or the saved ones.
+    // The settings under test (maybe unsaved), else the saved ones.
     const { embedPoster, options } = this.getSettings();
     const logoUrl = emailLogoUrl(options);
 
@@ -118,8 +118,7 @@ class EmailAgent
       };
     }
 
-    // Backfill's, and several notifications gathered into one, say
-    // everything themselves: a subject, a few lines and a page to open.
+    // These and digests carry their own subject, text and page to open.
     if (
       type === Notification.BACKFILL ||
       type === Notification.HEALTH ||
@@ -230,7 +229,7 @@ class EmailAgent
         locals: {
           event: eventText(payload, intl),
           body,
-          // Escaped by the template, like every other value in it.
+          // The template escapes it.
           declineReason,
           declineReasonLabel: declineReason
             ? intl.formatMessage(globalMessages.declineReason)
@@ -330,8 +329,7 @@ class EmailAgent
     type: Notification,
     payload: NotificationPayload
   ): Promise<boolean> {
-    // Held while a burst to this person is gathered into one (see the
-    // notification manager): only the admin and channel copies go now.
+    // holdUser: the user's copy goes out later in a digest.
     if (payload.notifyUser && !payload.holdUser) {
       if (
         !payload.notifyUser.settings ||

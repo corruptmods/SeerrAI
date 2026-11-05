@@ -11,8 +11,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Bazarr in settings, against a stand-in that checks its API key as the
- * real one does, behind the real OpenAPI validator.
+ * Bazarr settings against a stand-in that checks the API key like the real
+ * one, behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -161,7 +161,7 @@ describe('Bazarr in settings', () => {
       ['', 'the-key']
     );
 
-    // With the key entered again, the new address is saved.
+    // Re-entering the key saves the new address.
     await call('PUT', '', { ...bazarr('the-key'), urlBase: '/bazarr' });
     assert.equal(getSettings().bazarr.urlBase, '/bazarr');
   });

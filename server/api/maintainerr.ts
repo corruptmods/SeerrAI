@@ -3,22 +3,21 @@ import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 
 /*
- * The small part of Maintainerr's API that Seerr uses. Shapes and meanings
- * come from Maintainerr's own source (apps/server/src/modules/collections and
- * packages/contracts), not guesswork:
+ * Shapes and semantics follow Maintainerr's source
+ * (apps/server/src/modules/collections and packages/contracts):
  *
  * - A collection deletes its items only when it is active, has a deletion
  *   window (deleteAfterDays), and its action removes files.
- * - An item is due at addDate + deleteAfterDays days, which is how
- *   Maintainerr computes it for its own countdowns.
- * - Postponing is Maintainerr's own "keep": it restarts the countdown, or
- *   pushes it out by a number of days.
+ * - An item is due at addDate + deleteAfterDays days, as Maintainerr's own
+ *   countdowns compute it.
+ * - Postponing is Maintainerr's "keep": it restarts the countdown or extends
+ *   it by some days.
  *
- * Maintainerr's API is unauthenticated. A key is sent only if one is set, for
- * a proxy in front of it.
+ * Maintainerr's API is unauthenticated; a key is sent only if set, for a
+ * proxy in front of it.
  */
 
-/** Maintainerr's ServarrAction, in its order. */
+/** Maintainerr's ServarrAction; order matters. */
 export enum MaintainerrAction {
   DELETE = 0,
   UNMONITOR_DELETE_ALL = 1,
@@ -31,9 +30,8 @@ export enum MaintainerrAction {
 }
 
 /**
- * The actions that remove files. Unmonitor, change quality profile and do
- * nothing leave the title in place; Maintainerr's own handler treats exactly
- * these as the ones that free disk.
+ * Actions that remove files, matching Maintainerr's own handler. Unmonitor,
+ * change quality profile and do nothing leave the title in place.
  */
 export const DELETING_ACTIONS = new Set<number>([
   MaintainerrAction.DELETE,
@@ -55,14 +53,14 @@ export interface MaintainerrCollection {
 export interface MaintainerrCollectionMedia {
   id: number;
   collectionId: number;
-  /** The media server's id for the item, which postponing needs. */
+  /** Media server item id; postponing needs it. */
   mediaServerId: string;
   tmdbId?: number | null;
   tvdbId?: number | null;
   addDate: string;
 }
 
-/** Long enough for a busy Maintainerr, short enough never to hang a page. */
+/** Long enough for a busy Maintainerr, short enough not to hang a page. */
 const TIMEOUT_MS = 10_000;
 
 export const maintainerrBaseUrl = (
@@ -118,8 +116,8 @@ class MaintainerrAPI {
   }
 
   /**
-   * Postpones one item's deletion. Without days, restarts the collection's
-   * whole grace period; with days, pushes the deadline out by that many.
+   * Postpones one item's deletion: without days, restarts the collection's
+   * grace period; with days, extends the deadline by that many.
    */
   public async postpone(
     collectionId: number,

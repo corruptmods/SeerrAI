@@ -186,8 +186,7 @@ const SettingsNetwork = () => {
                 csrfProtection: values.csrfProtection,
                 forceIpv4First: values.forceIpv4First,
                 trustProxy: values.trustProxy,
-                // Only while they are shown: hidden, they are left as saved
-                // and can't stop the rest from saving.
+                // Only while shown: hidden, they stay as saved and can't block saving.
                 ...(values.trustProxy
                   ? {
                       trustCloudflare: values.trustCloudflare,
@@ -219,8 +218,7 @@ const SettingsNetwork = () => {
                 appearance: 'success',
               });
             } catch (e) {
-              // The server names an entry in Also Trust These Proxies that
-              // is not an address or range.
+              // The server names a non-address entry in Also Trust These Proxies.
               const invalidProxy = isAxiosError(e)
                 ? (e.response?.data as { invalidProxy?: string } | undefined)
                     ?.invalidProxy

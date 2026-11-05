@@ -11,17 +11,15 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
-/*
- * Settings → Network → Enable Proxy Support: which proxies' word on
- * someone's address is taken. The sign-in limits count by address, so an
- * address anyone can make up would let them guess without limit.
- */
+// Settings → Network → Enable Proxy Support: whose forwarded client address is
+// trusted. Sign-in limits count by address, so a spoofable one would allow
+// unlimited guessing.
 
 const CLOUDFLARE_ADDRESS = '172.68.1.5';
 
 /**
- * An app set up the way the server sets itself up from the settings, with
- * one page that says which address it took for the request.
+ * An app configured as the server configures itself from settings, with one
+ * route returning the address it used.
  */
 const appFor = (network: NetworkSettings) => {
   const app = express();
@@ -139,7 +137,7 @@ describe('an address or range of a proxy', () => {
 describe('the address a request is taken to come from', () => {
   it('is the one a proxy on this machine or network passes on', async () => {
     assert.equal(await ipFor('198.51.100.7'), '198.51.100.7');
-    // Two proxies on the local network, one behind the other.
+    // Two local proxies, one behind the other.
     assert.equal(
       await ipFor('198.51.100.7, 10.0.0.2, 172.17.0.1'),
       '198.51.100.7'
@@ -147,8 +145,8 @@ describe('the address a request is taken to come from', () => {
   });
 
   it('is never one the person sending the request made up', async () => {
-    // What someone outside puts in the header comes first; the proxy adds
-    // the address it really saw after it.
+    // A client's own header entries come first; the proxy appends the address
+    // it actually saw.
     assert.equal(await ipFor('203.0.113.1, 198.51.100.7'), '198.51.100.7');
     assert.equal(
       await ipFor('203.0.113.1, 203.0.113.2, 198.51.100.7, 10.0.0.2'),
@@ -166,7 +164,7 @@ describe('the address a request is taken to come from', () => {
       await ipFor('fake, 203.0.113.9, 100.127.255.254'),
       '203.0.113.9'
     );
-    // Just outside the shared address space: an address on the internet.
+    // Just outside the shared address space: an internet address.
     assert.equal(await ipFor('fake, 203.0.113.9, 100.128.0.1'), '100.128.0.1');
   });
 

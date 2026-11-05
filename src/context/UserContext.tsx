@@ -7,16 +7,12 @@ import { useRouter } from 'next/dist/client/router';
 import { useEffect, useRef } from 'react';
 
 interface UserContextProps {
-  /** Who the first page was made for: no one, on the sign-in pages. */
+  /** The first page's user; none on sign-in pages. */
   initialUser?: User;
   children?: React.ReactNode;
 }
 
-/**
- * This UserContext serves the purpose of just preparing the useUser hooks
- * cache on server side render. It also will handle redirecting the user to
- * the login page if their session ever becomes invalid.
- */
+/** Seeds the useUser cache from SSR and redirects to login if the session becomes invalid. */
 export const UserContext = ({ initialUser, children }: UserContextProps) => {
   const { user, error, revalidate } = useUser({
     initialData: initialUser,
@@ -36,12 +32,11 @@ export const UserContext = ({ initialUser, children }: UserContextProps) => {
       !routing.current
     ) {
       routing.current = true;
-      // The session ended without anyone signing out (it expired, or was
-      // ended elsewhere): clear what it left here before the next person.
+      // The session ended without sign-out (expired or ended elsewhere):
+      // clear its data before the next user.
       forgetSession().finally(() => {
-        // A full page load on purpose: nothing held in memory for the last
-        // person (cached rows, their settings) survives into the next.
-        // Signing in again comes back to this page.
+        // Full page load so nothing in memory survives to the next user.
+        // Signing in returns to this page.
         location.href = loginUrl(
           location.pathname + location.search + location.hash
         );

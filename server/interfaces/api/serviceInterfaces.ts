@@ -29,17 +29,17 @@ export interface LidarrServer extends ServiceCommonServer {
   activeMetadataProfileId: number;
 }
 
-/** Which kinds of release a metadata profile has Lidarr list. */
+/** Release kinds a Lidarr metadata profile allows. */
 export interface LidarrMetadataProfileSummary {
   id: number;
   name: string;
-  /** Album, EP, Single, Broadcast, Other: the allowed ones. */
+  /** Allowed among Album, EP, Single, Broadcast, Other. */
   primaryTypes: string[];
-  /** Live, Compilation, Studio and so on: the allowed ones. */
+  /** Allowed among Live, Compilation, Studio, etc. */
   secondaryTypes: string[];
 }
 
-/** An artist already in Lidarr: its folder and profiles stay its own. */
+/** An artist already in Lidarr, which keeps its own folder and profiles. */
 export interface LidarrArtistSummary {
   id: number;
   path?: string;
@@ -56,6 +56,6 @@ export interface LidarrServerWithDetails {
   metadataProfiles: LidarrMetadataProfileSummary[];
   rootFolders: Partial<RootFolder>[];
   tags: Tag[];
-  /** With `?artist=`: the artist, if this Lidarr has them. */
+  /** With `?artist=`: the artist, if this Lidarr has it. */
   artist: LidarrArtistSummary | null;
 }

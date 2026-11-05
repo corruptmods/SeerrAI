@@ -1,4 +1,4 @@
-/** Requests newest first, without reordering the page's own copy. */
+/** Requests newest first, without mutating the input. */
 export const newestFirst = <T extends { id: number; createdAt: Date }>(
   requests: T[]
 ): T[] =>
@@ -9,8 +9,8 @@ export const newestFirst = <T extends { id: number; createdAt: Date }>(
   );
 
 /**
- * The seasons a request is for, written short: runs of seasons as first and
- * last ("1–3, 5"). Specials (season 0) are kept apart, to be named in words.
+ * A request's seasons as ranges ("1–3, 5"). Specials (season 0) are
+ * separate, to be named in words.
  */
 export const seasonGroups = (
   seasonNumbers: number[]

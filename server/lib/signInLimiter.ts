@@ -2,17 +2,15 @@ import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
 
 /*
- * How many times someone may get a password wrong, or ask for a password
- * reset email, before being asked to wait. Counted per account and address
- * together: a guesser is slowed down on the account they are guessing,
- * while the account's owner, signing in from somewhere else, is not held up
- * by them. Kept in memory: a restart forgets the counts, which only ever
- * lets someone in sooner.
+ * How many wrong passwords or password reset emails before a wait. Counted per
+ * account and address together, so a guesser is slowed on the account they
+ * target while its owner, signing in elsewhere, is not. In memory: a restart
+ * drops the counts, which only ever lets someone in sooner.
  */
 
 const WINDOW_MS = 15 * 60 * 1000;
 const LIMIT = 10;
-/** Past this many entries, expired ones are cleared out on the next count. */
+/** Past this many entries, expired ones are pruned on the next count. */
 const PRUNE_AT = 1000;
 
 interface Attempts {
@@ -34,9 +32,9 @@ const prune = (now: number) => {
 };
 
 /**
- * The account goes in as a hash: it is whatever was typed, from people not
- * signed in, and a key as long as the body allows, kept for the whole
- * window, would let anyone fill the memory.
+ * The account is hashed: it is arbitrary unauthenticated input, and a key as
+ * long as the body allows, kept for the whole window, would let anyone fill
+ * memory.
  */
 const keyFor = (kind: string, req: Request, account: unknown) =>
   `${kind}:${createHash('sha256')
@@ -47,9 +45,8 @@ export class SignInLimiter {
   constructor(private readonly kind: string) {}
 
   /**
-   * Whether this account may be tried again from this address. When not,
-   * the answer is sent (429, with how many seconds to wait) and the caller
-   * stops there.
+   * Whether this account may be tried again from this address. If not, sends
+   * 429 with the seconds to wait, and the caller stops.
    */
   public allow(req: Request, res: Response, account: unknown): boolean {
     const wait = this.retryAfter(req, account);
@@ -64,8 +61,8 @@ export class SignInLimiter {
   }
 
   /**
-   * How many seconds until this account may be tried again from this
-   * address; 0 when it may be now. For callers that answer in their own way.
+   * Seconds until this account may be tried again from this address; 0 if now.
+   * For callers that respond their own way.
    */
   public retryAfter(req: Request, account: unknown): number {
     const now = Date.now();
@@ -76,7 +73,7 @@ export class SignInLimiter {
     return Math.ceil((entry.resetAt - now) / 1000);
   }
 
-  /** Counts a wrong password, a reset email sent, or a failed sign-in. */
+  /** Counts a wrong password, a sent reset email, or a failed sign-in. */
   public count(req: Request, account: unknown): void {
     const now = Date.now();
     prune(now);
@@ -89,7 +86,7 @@ export class SignInLimiter {
     }
   }
 
-  /** Signed in: whatever went wrong before is forgotten. */
+  /** Clears the count after a successful sign-in. */
   public clear(req: Request, account: unknown): void {
     attempts.delete(keyFor(this.kind, req, account));
   }

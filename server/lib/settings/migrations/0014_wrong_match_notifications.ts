@@ -4,10 +4,9 @@ const HEALTH = 65536;
 const WRONG_MATCH = 131072;
 
 /**
- * The Wrong Match notification is new, so the bit is missing from every
- * channel that chose its types, which would read as "off". A channel that
- * sends Health is given Wrong Match too; one that sends everything (no
- * types chosen) gets it anyway. Run once, so turning it off later sticks.
+ * Channels with chosen types lack the Wrong Match bit, which reads as off.
+ * Those sending Health get it; channels with no types chosen send all
+ * anyway. Runs once, so turning it off later sticks.
  */
 const migrateWrongMatchNotifications = (settings: any): AllSettings => {
   if (

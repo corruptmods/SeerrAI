@@ -7,14 +7,11 @@ import {
 } from 'node:crypto';
 import http from 'node:http';
 
-/*
- * An OpenID Connect provider on localhost for tests, standing in for
- * Authentik, Keycloak and the like: discovery, an authorization endpoint
- * that signs in whoever a test chooses, a token endpoint that checks the
- * client's secret and the PKCE verifier, ID tokens signed with a test key
- * (published as JWKS), and userinfo. Seerr talks to it over real HTTP with
- * the real openid-client.
- */
+// A local OpenID Connect provider for tests, standing in for Authentik,
+// Keycloak and the like: discovery, an authorization endpoint signing in
+// whoever the test picks, a token endpoint checking the client secret and PKCE
+// verifier, ID tokens signed with a test key (published as JWKS), and userinfo.
+// Seerr reaches it over real HTTP with the real openid-client.
 
 export interface FakeOidcAccount {
   sub: string;
@@ -29,33 +26,33 @@ export interface FakeOidcProvider {
   issuer: string;
   clientId: string;
   clientSecret: string;
-  /** How many times the discovery document was fetched. */
+  /** Discovery document fetch count. */
   discoveryCalls: number;
   /** Every token request, as received. */
   tokenRequests: URLSearchParams[];
-  /** Answers discovery with a server error while set. */
+  /** While set, discovery returns a server error. */
   down: boolean;
   /**
-   * The issuer discovery and ID tokens give, when not `issuer` itself:
-   * with a slash at the end, as Authentik's has, or another address.
+   * The issuer that discovery and ID tokens report, when not `issuer`: with a
+   * trailing slash (as Authentik's has) or another address.
    */
   issuerSaid?: string;
-  /** Puts these claims only in userinfo, not in the ID token. */
+  /** Put the account's claims only in userinfo, not the ID token. */
   claimsInUserinfoOnly: boolean;
-  /** More claims for the ID token, as a provider's mappers would add. */
+  /** Extra ID token claims, as a provider's mappers would add. */
   idTokenClaims: Record<string, unknown>;
-  /** More claims for userinfo only. */
+  /** Extra claims for userinfo only. */
   userinfoClaims: Record<string, unknown>;
-  /** Answers userinfo with a server error while set. */
+  /** While set, userinfo returns a server error. */
   userinfoDown: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   reset: () => void;
   /**
-   * The browser arriving at the authorization URL Seerr sent it to, signed
-   * in there as `account`: where the provider sends it back to (the
-   * callback, with a code and the state). `nonce` replaces the nonce the
-   * ID token will carry; `state` replaces the state sent back.
+   * Simulates the browser visiting Seerr's authorization URL and signing in as
+   * `account`; returns the redirect back (the callback, with code and state).
+   * `nonce` overrides the ID token's nonce; `state` overrides the returned
+   * state.
    */
   authorize: (
     authorizationUrl: string,
@@ -164,7 +161,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       const back = new URL(params.get('redirect_uri') as string);
       back.searchParams.set('code', code);
       back.searchParams.set('state', tamper.state ?? params.get('state') ?? '');
-      // Keycloak sends this as well; Seerr has no use for it.
+      // Keycloak sends this too; Seerr ignores it.
       back.searchParams.set('session_state', 'abc');
       return back;
     },
@@ -182,8 +179,8 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
-    // Everything is under the realm, as with Keycloak (or under the
-    // application, with Authentik): nothing answers at the host itself.
+    // Everything lives under the realm, as with Keycloak (or the application,
+    // with Authentik): nothing answers at the host root.
     const path = url.pathname.startsWith('/realms/test/')
       ? url.pathname.slice('/realms/test'.length)
       : '';

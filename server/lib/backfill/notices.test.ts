@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
 /*
- * Backfill's news, gathered: a burst of downloads finishing is one
+ * Backfill notices are batched: a burst of finished downloads is one
  * notification, grouped by title, sent once things go quiet.
  */
 

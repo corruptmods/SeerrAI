@@ -70,10 +70,7 @@ const useDiscover = <
     hideAvailable?: boolean;
     hideBlocklisted?: boolean;
     hideRequested?: boolean;
-    /**
-     * The server's pages can hold fewer than 20 titles without being the
-     * last, so only its page count says where the list ends.
-     */
+    /** Pages may hold fewer than 20 without being last, so only the page count marks the end. */
     shortPages?: boolean;
   } = {}
 ): DiscoverResult<T, S> => {
@@ -110,15 +107,14 @@ const useDiscover = <
     }
   );
 
-  // After a request from one of these cards, reload only the pages that
-  // hold the title, so its badge changes without reloading the whole row.
+  // After a request, reload only the pages holding the title.
   useTitleChanged((title) => {
     if (data?.some((page) => pageHolds(page, title))) {
       mutate(undefined, { revalidate: (page) => pageHolds(page, title) });
     }
   });
 
-  // A film and a series can share a TMDB number: both are kept.
+  // A film and a series can share a TMDB id; keep both.
   const resultIds = new Set<string>();
 
   const isLoadingInitialData = !data && !error;
@@ -130,7 +126,7 @@ const useDiscover = <
       isValidating);
 
   let titles = (data ?? []).reduce((a, v) => {
-    // A page without its list is passed over, as in MediaSlider.
+    // Skip pages without results, as in MediaSlider.
     if (!Array.isArray(v?.results)) {
       return a;
     }
@@ -189,23 +185,21 @@ const useDiscover = <
     shortPages,
   });
 
-  // The first page is shown; the rest the list starts with are asked for.
+  // Once the first page shows, request the rest of the initial pages.
   useEffect(() => {
     if (starting && size < START_PAGES) {
       setSize(START_PAGES);
     }
   }, [starting, size, setSize]);
 
-  // Those pages count as loading more, so scrolling waits for them rather
-  // than asking for the second page a second time.
+  // Initial pages count as loading more, so scrolling doesn't re-request page 2.
   const isLoadingMore = loadingPages || (starting && !error);
 
   const fetchMore = () => {
     setSize(starting ? Math.max(size, START_PAGES) : size + 1);
   };
 
-  // Too few titles to scroll by: the next page is asked for straight away,
-  // as scrolling could never ask for it (a few pages at most).
+  // Too few titles to scroll: request the next page now (a few pages at most).
   useEffect(() => {
     if (
       shortPages &&

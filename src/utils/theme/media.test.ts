@@ -13,10 +13,7 @@ import type { ShownMode } from './index';
 import { themeAttributes, themeVariables } from './index';
 import { LIGHT } from './palette';
 
-/*
- * Pictures in every look: the fades over title pages, posters and the
- * sign-in page's slideshow (globals.css), and the logos.
- */
+/* Image fades (title pages, posters, sign-in slideshow) and logos in every look. */
 
 const root = path.join(__dirname, '../../..');
 const css = readFileSync(path.join(root, 'src/styles/globals.css'), 'utf8');
@@ -27,7 +24,7 @@ const look = (changes: Partial<Appearance>): Appearance => ({
   ...changes,
 });
 
-/** The custom properties set by the rule starting at `at` in globals.css. */
+/** Custom properties set by the globals.css rule starting at `at`. */
 const propertiesAt = (at: number): Record<string, string> =>
   Object.fromEntries(
     [
@@ -37,14 +34,14 @@ const propertiesAt = (at: number): Record<string, string> =>
     ].map((m) => [m[1], m[2]])
   );
 
-/** The custom properties a rule with exactly this selector sets. */
+/** Custom properties set by the rule with exactly this selector. */
 const rule = (selector: string) => {
   const at = css.indexOf(`${selector} {`);
   assert.ok(at >= 0, `globals.css has ${selector}`);
   return propertiesAt(at);
 };
 
-/** The :root rule that starts the fades (globals.css has several). */
+/** The :root rule holding the fades (globals.css has several). */
 const fadeRoot = () => {
   const at = css.indexOf(':root {\n  --title-fade');
   assert.ok(at >= 0, 'globals.css has the fades');
@@ -52,9 +49,8 @@ const fadeRoot = () => {
 };
 
 /**
- * The fades' variables as the page has them for a look: the rules of
- * globals.css that match its <html>, with var() looked up among the look's
- * own colours.
+ * Resolved fade variables for a look: matching globals.css rules, with var()
+ * resolved against the look's colours.
  */
 const fades = (appearance: Appearance, mode: ShownMode) => {
   const theme = themeAttributes(appearance)['data-theme'];
@@ -83,7 +79,7 @@ const hex = (channels: string) =>
     .map((n) => Number(n).toString(16).padStart(2, '0'))
     .join('')}`;
 
-/** A colour laid over another at an opacity. */
+/** Composites a colour over another at an opacity. */
 const over = (top: string, alpha: number, under: string) =>
   `#${[1, 3, 5]
     .map((i) =>
@@ -100,14 +96,14 @@ describe('the fades over pictures', () => {
   it('are today’s colours in Classic dark', () => {
     const values = fades(classic, 'dark');
     const page = themeVariables(classic, 'dark').page;
-    // A title page's backdrop: rgba(17, 24, 39, 0.47) into the page.
+    // Title backdrop: rgba(17, 24, 39, 0.47) into the page.
     assert.equal(page, '17 24 39');
     assert.equal(values['title-fade'], '0.47');
-    // A poster pointed at: rgba(45, 55, 72).
+    // Hovered poster: rgba(45, 55, 72).
     assert.equal(values['card-scrim'], '45 55 72');
-    // The collection banner and the genre cards: rgb(31, 41, 55).
+    // Collection banner and genre cards: rgb(31, 41, 55).
     assert.equal(values['media-scrim-raised'], '31 41 55');
-    // The sign-in page's slideshow: rgba(45, 55, 72, 0.47) into #1a202e.
+    // Sign-in slideshow: rgba(45, 55, 72, 0.47) into #1a202e.
     assert.equal(values['backdrop-fade-from'], '45 55 72');
     assert.equal(values['backdrop-fade-to'], '26 32 46');
     assert.equal(values['backdrop-fade-start'], '0.47');
@@ -156,20 +152,18 @@ describe('the fades over pictures', () => {
     const appearance = look({ mode: 'light' });
     const values = fades(appearance, 'light');
     const alpha = Number(values['title-fade']);
-    // Over the darkest picture there is, the top of the page is still
-    // light enough for the title, its details and the muted hints.
+    // Over a black image the page top still reads for title, details and hints.
     const top = over(LIGHT.page, alpha, '#000000');
     assert.ok(contrastRatio(LIGHT.textStrong, top) >= 7, top);
     assert.ok(contrastRatio(LIGHT.textDefault, top) >= 4.5, top);
     assert.ok(contrastRatio(LIGHT.textMuted, top) >= 4.5, top);
-    // The sign-in page's slideshow fades into the light page too.
+    // The sign-in slideshow fades into the light page too.
     assert.equal(hex(values['backdrop-fade-to']), LIGHT.page);
   });
 
   it('let dark text be read over the sign-in page’s slideshow in light', () => {
     const values = fades(look({ mode: 'light' }), 'light');
-    // The heading, and the language button's muted icon at the very top,
-    // over the darkest picture there is.
+    // Heading and the muted language icon, over a black image.
     const top = over(
       hex(values['backdrop-fade-from']),
       Number(values['backdrop-fade-start']),

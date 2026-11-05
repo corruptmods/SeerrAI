@@ -15,21 +15,19 @@ import axios, { isAxiosError } from 'axios';
 import { parseStringPromise } from 'xml2js';
 
 /*
- * The part of rTorrent's XML-RPC Seerr reads: every torrent in its main
- * view, of which the ones Radarr and Sonarr sent are kept, by hash, which is
- * how they record a torrent as its download id. rTorrent is reached through
- * whatever web server exposes its XML-RPC (ruTorrent's, usually at "RPC2"),
- * with that server's basic auth when it has one.
+ * Reads every torrent in rTorrent's main view and keeps those Radarr and
+ * Sonarr sent, by hash (their download id). XML-RPC is reached through
+ * whatever web server exposes it (ruTorrent's, usually "RPC2"), with its
+ * basic auth if any.
  *
- * For Backfill it also adds, picks the files of, and removes torrents.
- * Backfill's category is the label ruTorrent shows (custom1). rTorrent's
- * RPC cannot delete a torrent's files; they are deleted through its
- * "execute" command, one known file at a time, as ruTorrent's own
- * "erase data" does. rTorrent cannot stop a magnet link once its file list
- * is in; Backfill watches it closely until it is.
+ * For Backfill it also adds torrents, picks their files and removes them.
+ * Backfill's category is ruTorrent's label (custom1). The RPC cannot delete
+ * files, so they are deleted via "execute", one known file at a time, as
+ * ruTorrent's "erase data" does. rTorrent cannot stop a magnet once its file
+ * list is in; Backfill polls it closely until then.
  */
 
-/** One torrent, in the order FIELDS asks for them. */
+/** One torrent, fields in FIELDS order. */
 export interface RtorrentTorrent {
   hash: string;
   /** 0 stopped, 1 started. */
@@ -45,7 +43,7 @@ export interface RtorrentTorrent {
   isHashChecking: number;
   peersConnected: number;
   chunkSize: number;
-  /** Chunks still to come of the files wanted (once it's been opened). */
+  /** Chunks of wanted files still to come (once opened). */
   wantedChunks: number;
 }
 
@@ -65,11 +63,11 @@ const FIELDS = [
 ];
 
 /**
- * What is wanted of a torrent, and what of it is still to come. rTorrent's
- * sizes count files that were skipped, and it calls a torrent complete only
- * once every file is in, so a torrent with files skipped is measured by
- * the chunks of the wanted files still to come. Until it is first opened,
- * rTorrent counts every chunk as wanted, which is no harm: nothing is in.
+ * Wanted and remaining size of a torrent. rTorrent's sizes include skipped
+ * files and it calls a torrent complete only once every file is in, so a
+ * torrent with skipped files is measured by its wanted chunks still to come.
+ * Before first open every chunk counts as wanted, which is harmless: nothing
+ * is in yet.
  */
 export const rtorrentWanted = (torrent: {
   sizeBytes: number;
@@ -165,7 +163,7 @@ const toValue = (param: XmlParam): string => {
     .join('')}</struct>`;
 };
 
-/** An XML-RPC call. */
+/** Builds an XML-RPC call body. */
 export const xmlRpcCall = (method: string, params: XmlParam[]): string =>
   `<?xml version="1.0"?><methodCall><methodName>${escape(method)}</methodName><params>${params
     .map((p) => `<param><value>${toValue(p)}</value></param>`)
@@ -173,7 +171,7 @@ export const xmlRpcCall = (method: string, params: XmlParam[]): string =>
 
 type Node = Record<string, unknown[]> | string;
 
-/** One parsed <value>, as xml2js gives it (every child in an array). */
+/** Decodes one <value> as xml2js parses it (every child in an array). */
 const fromValue = (value: Node): XmlValue => {
   if (typeof value === 'string') return value; // untyped means string
   const [type, inner] = Object.entries(value).find(([key]) => key !== '$') ?? [
@@ -209,7 +207,7 @@ const fromValue = (value: Node): XmlValue => {
   }
 };
 
-/** The result of an XML-RPC answer, or the fault it reports. */
+/** An XML-RPC response's result; throws its fault. */
 export const xmlRpcResult = async (xml: string): Promise<XmlValue> => {
   const doc = await parseStringPromise(xml);
   const response = doc?.methodResponse;
@@ -228,7 +226,7 @@ export const xmlRpcResult = async (xml: string): Promise<XmlValue> => {
   return fromValue(response.params?.[0]?.param?.[0]?.value?.[0] ?? '');
 };
 
-/** What Backfill reads of each torrent, in the order the values come. */
+/** Fields Backfill reads per torrent, in response order. */
 const INFO_FIELDS = [
   'd.hash=',
   'd.name=',
@@ -261,14 +259,14 @@ export interface RtorrentInfo {
   downRate: number;
   isHashChecking: number;
   message: string;
-  /** A multi-file torrent's own folder; a single file's parent folder. */
+  /** A multi-file torrent's own folder; a single file's parent. */
   directory: string;
   isMultiFile: number;
   label: string;
-  /** When Seerr added it, in seconds; empty for another's. */
+  /** When Seerr added it, in seconds; empty if Seerr didn't. */
   addedBySeerr: string;
   chunkSize: number;
-  /** Chunks still to come of the files wanted (once it's been opened). */
+  /** Chunks of wanted files still to come (once opened). */
   wantedChunks: number;
 }
 
@@ -322,7 +320,7 @@ const decodeLabel = (label: string) => {
   }
 };
 
-/** A magnet link's stand-in until its file list is in: "<HASH>.meta". */
+/** A magnet's placeholder name until its file list is in: "<HASH>.meta". */
 const isMeta = (name: string) => /^[0-9a-f]{40}\.meta$/i.test(name);
 
 const parentOf = (path: string) => path.replace(/\/+[^/]*\/*$/, '') || '/';
@@ -330,11 +328,10 @@ const lastPart = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() ?? '';
 
 /**
- * What deleting a torrent's data removes, by the names of its files: each
- * file, then the folders of a multi-file torrent, deepest first. A name
- * that would lead out of the torrent's folder (a ".." part, or a path from
- * the root) is refused rather than deleted, as is every name when rTorrent
- * gives no folder.
+ * Paths to delete for a torrent's data: each file, then a multi-file
+ * torrent's folders, deepest first. A name that escapes the torrent's folder
+ * (a ".." part or an absolute path) is refused, as is every name when
+ * rTorrent gives no folder.
  */
 export const rtorrentRemovals = (
   info: Pick<RtorrentInfo, 'directory' | 'isMultiFile'>,
@@ -371,15 +368,14 @@ export const rtorrentTorrent = (info: RtorrentInfo): ClientTorrent => {
     progress: size ? (size - left) / size : 0,
     speed,
     secondsLeft: speed > 0 && left > 0 ? Math.round(left / speed) : undefined,
-    // Files are named with a multi-file torrent's folder in front, so they
-    // sit under the folder that holds it.
+    // Multi-file names start with the torrent's folder, so use its parent.
     savePath: info.isMultiFile ? parentOf(info.directory) : info.directory,
     addedAt: added > 0 ? added * 1000 : undefined,
   };
   if (isMeta(info.name)) return { ...base, state: 'metadata' };
   if (info.isHashChecking) return { ...base, state: 'checking' };
   if (done) return { ...base, state: 'done' };
-  // rTorrent closes a torrent it hits an error with, and says why.
+  // rTorrent closes a torrent on error and sets its message.
   if (!info.state && info.message && !/tracker/i.test(info.message)) {
     return { ...base, state: 'error', error: info.message };
   }
@@ -429,7 +425,7 @@ class RtorrentAPI implements TorrentClient {
     }
   }
 
-  /** Several calls in one; throws on the first that fails. */
+  /** Batches calls; throws on the first that fails. */
   private async multicall(
     calls: { method: string; params: XmlParam[] }[]
   ): Promise<XmlValue[]> {
@@ -478,7 +474,7 @@ class RtorrentAPI implements TorrentClient {
     }
   }
 
-  /** A label needs no setting up. */
+  /** Labels need no setup. */
   public async ensureCategory(): Promise<void> {
     return;
   }
@@ -549,8 +545,8 @@ class RtorrentAPI implements TorrentClient {
   }
 
   /**
-   * Removes the torrent, then deletes its files one by one, and the folders
-   * of a multi-file torrent that are left empty: never anything else.
+   * Removes the torrent, then deletes its files one by one and a multi-file
+   * torrent's emptied folders; never anything else.
    */
   public async deleteTorrent(hash: string): Promise<void> {
     const info = await this.info(hash);
@@ -569,7 +565,7 @@ class RtorrentAPI implements TorrentClient {
         (e) => failed.push((e as Error).message)
       );
     }
-    // rmdir leaves a folder alone unless it is empty.
+    // rmdir only removes empty folders.
     for (const dir of removals.folders) {
       await this.call('execute.throw', ['', 'rmdir', '--', dir]).catch(
         () => undefined
@@ -605,7 +601,7 @@ class RtorrentAPI implements TorrentClient {
     if (!mine.size) {
       return found;
     }
-    // rTorrent has no "these hashes only": the whole view is read, once.
+    // rTorrent can't filter by hash, so read the whole view once.
     const rows = await this.call('d.multicall2', ['', 'main', ...FIELDS]);
     for (const row of Array.isArray(rows) ? rows : []) {
       if (!Array.isArray(row)) continue;

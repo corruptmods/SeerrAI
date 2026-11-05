@@ -24,18 +24,17 @@ import { after, before, describe, it } from 'node:test';
 import { crc32 } from 'node:zlib';
 
 /*
- * The download clients' code against the real clients, not stand-ins: a
- * stand-in only answers what its writer believed, which is how Deluge 2's
- * missing daemon.info, rTorrent never finishing a torrent with files
- * skipped, and SABnzbd refusing to delete a finished job each got by.
+ * Client code against real clients, not stand-ins: stand-ins only encode
+ * their author's beliefs, which missed Deluge 2 lacking daemon.info, rTorrent
+ * never finishing a torrent with skipped files, and SABnzbd refusing to
+ * delete a finished job.
  *
- * Skipped unless REAL_CLIENTS is set: "all", or some of deluge,
- * qbittorrent, transmission, rtorrent, nzbget, sabnzbd. CI's "Real
- * download clients" workflow starts each one first; where each one is,
- * and how it signs in, can be set by REAL_<CLIENT>_{HOST,PORT,USER,PASS}
- * (and REAL_SABNZBD_KEY). A client in a container names its own paths:
- * REAL_<CLIENT>_PATHS ("/downloads=/srv/deluge,…") says where they are
- * here. A tiny news server is run here for the Usenet clients.
+ * Skipped unless REAL_CLIENTS is "all" or lists some of deluge, qbittorrent,
+ * transmission, rtorrent, nzbget, sabnzbd. CI's "Real download clients"
+ * workflow starts them. REAL_<CLIENT>_{HOST,PORT,USER,PASS} (and
+ * REAL_SABNZBD_KEY) set address and sign-in. REAL_<CLIENT>_PATHS
+ * ("/downloads=/srv/deluge,…") maps a containerised client's paths to local
+ * ones. A tiny news server runs here for the Usenet clients.
  */
 
 const wanted = (process.env.REAL_CLIENTS ?? '').toLowerCase();
@@ -53,7 +52,7 @@ const where = (name: string, port: number) => ({
   apiKey: '',
 });
 
-/** A client's own path, as it is here. */
+/** Maps a client's path to the local one. */
 const local = (client: string, path: string) => {
   const pairs = [
     process.env[`REAL_${client.toUpperCase()}_PATHS`],
@@ -70,7 +69,7 @@ const local = (client: string, path: string) => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Asks until `ok`, for up to `ms`; a request that fails is asked again. */
+/** Retries until `ok` for up to `ms`; failed requests are retried. */
 const until = async <T>(
   what: string,
   read: () => Promise<T>,
@@ -121,7 +120,7 @@ const PIECE = 256 * 1024;
 const FILES = [
   { path: ['Real.Check.S01E01.mkv'], size: 3 * 1024 * 1024 + 123 },
   { path: ['Real.Check.S01E02.mkv'], size: 2 * 1024 * 1024 + 77 },
-  // Skipped: its first bytes share the second episode's last piece.
+  // Skipped; its first bytes share the second episode's last piece.
   { path: ['Extras', 'Real.Check.Sample.mkv'], size: 1024 * 1024 + 5 },
 ];
 const CONTENT = FILES.map((file) => randomBytes(file.size));
@@ -138,7 +137,7 @@ const INFO = {
   ),
   files: FILES.map((file) => ({ length: file.size, path: file.path })),
 };
-// A tracker nobody answers: rTorrent won't take a torrent with none.
+// A dead tracker: rTorrent rejects a torrent without one.
 const TRACKER = 'http://127.0.0.1:1/announce';
 const TORRENT = bencode({ announce: TRACKER, info: INFO });
 const HASH = createHash('sha1').update(bencode(INFO)).digest('hex');
@@ -148,10 +147,9 @@ const CATEGORY = 'seerr-backfill-check';
 const EPISODES = FILES[0].size + FILES[1].size;
 
 /**
- * The pack's files under `folder`; the skipped one only in part. A client
- * removes a deleted torrent's files a moment after the torrent itself, so
- * the last check's copy is waited out first: laid too soon, some of these
- * would go with it.
+ * Writes the pack's files under `folder`, the skipped one partially. Clients
+ * delete a removed torrent's files a moment after the torrent, so wait out
+ * the previous check's copy first or these would be deleted too.
  */
 const lay = async (folder: string, sample: 'all' | 'shared' | 'none') => {
   const pack = join(folder, PACK);
@@ -299,8 +297,8 @@ const nzbOf = (messageId: string, fileName: string) =>
 const deluge = (password?: string) =>
   new DelugeAPI({
     ...where('DELUGE', 8112),
-    // A wrong password is tried at another address, so the session the
-    // right one has is not reused.
+    // Try a wrong password at another address so the right one's session
+    // isn't reused.
     ...(password ? { hostname: 'localhost' } : {}),
     password: password ?? env('DELUGE_PASS', 'deluge'),
   });
@@ -350,7 +348,7 @@ const usenetClients: [string, () => UsenetClient][] = [
   ['SABnzbd', () => new SabnzbdAPI(sabnzbdAt())],
 ];
 
-/** NZBGet's and SABnzbd's own APIs, for what the checks set up. */
+/** Raw NZBGet and SABnzbd APIs for test setup. */
 const nzbgetRpc = async (method: string, params: unknown[] = []) => {
   const at = nzbgetAt();
   return (
@@ -372,15 +370,15 @@ const sabnzbdApi = (params: Record<string, string | number>) => {
 };
 
 /**
- * Holds every download back, or lets them go: from the news server here a
- * job is done before it could be paused.
+ * Pauses or resumes all downloads: from the local news server a job would
+ * finish before it could be paused.
  */
 const holdDownloads: Record<string, (hold: boolean) => Promise<unknown>> = {
   NZBGet: (hold) => nzbgetRpc(hold ? 'pausedownload' : 'resumedownload'),
   SABnzbd: (hold) => sabnzbdApi({ mode: hold ? 'pause' : 'resume' }),
 };
 
-/** Points a Usenet client at the news server here, through its own API. */
+/** Points a Usenet client at the local news server via its API. */
 const useNewsServer: Record<string, () => Promise<void>> = {
   NZBGet: async () => {
     const at = nzbgetAt();
@@ -395,10 +393,10 @@ const useNewsServer: Record<string, () => Promise<void>> = {
       'Server1.Connections': '2',
       'Server1.Username': '',
       'Server1.Password': '',
-      // Twice the same post in one run is no duplicate here.
+      // The same post twice in one run isn't a duplicate here.
       DupeCheck: 'no',
-      // Signed in to, even from this machine, so a wrong password is turned
-      // away as it is for anyone else.
+      // Require sign-in even locally, so a wrong password is rejected as for
+      // anyone else.
       ControlUsername: at.username,
       ControlPassword: at.password,
       AuthorizedIP: '',
@@ -459,8 +457,8 @@ describe('the real download clients', { skip }, () => {
 
       before(async () => {
         if (name === 'Deluge') {
-          // Its Label plugin, which Backfill's category needs, as a set-up
-          // Deluge has it.
+          // Enable the Label plugin, which Backfill's category needs, as a
+          // configured Deluge has.
           const at = where('DELUGE', 8112);
           const url = `http://${at.hostname}:${at.port}/json`;
           const login = await axios.post(url, {
@@ -537,7 +535,7 @@ describe('the real download clients', { skip }, () => {
           await api.getDownloads([HASH.toUpperCase(), 'not-ours'])
         ).get(HASH);
         assert.ok(live, 'followed');
-        // The files chosen, in whole pieces, as the clients count them.
+        // The chosen files, in whole pieces, as clients count them.
         assert.equal(live.size, Math.ceil(EPISODES / PIECE) * PIECE);
         await api.stopTorrent(HASH);
         await until(
@@ -664,7 +662,7 @@ describe('the real download clients', { skip }, () => {
         } finally {
           await holdDownloads[name](false);
         }
-        // Paused itself: let go with the rest, it stays where it is.
+        // Paused individually: resuming the rest leaves it paused.
         await sleep(3000);
         const paused = await until(
           'paused',
@@ -686,8 +684,8 @@ describe('the real download clients', { skip }, () => {
           90_000
         );
         assert.match(done!.status, /^completed$/i, JSON.stringify(done));
-        // A folder, or the one file (SABnzbd, for a single file); Sonarr's
-        // and Radarr's manual import take either.
+        // A folder, or the single file (SABnzbd); Sonarr's and Radarr's
+        // manual import accept either.
         const storage = local(name, done!.storage ?? '');
         const file = storage.endsWith(POSTED_FILE)
           ? storage

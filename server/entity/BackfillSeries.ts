@@ -27,18 +27,18 @@ export type BackfillSeriesStatus =
   /** Nothing missing any more. */
   | 'done';
 
-/** Something the admin agent did for a title, kept for the next time. */
+/** Something the admin agent did for a title, kept for next time. */
 export interface AgentNote {
-  /** When, as an ISO date. */
+  /** ISO date. */
   at: string;
   kind: 'searched' | 'grabbed' | 'failed' | 'refused';
-  /** The search's words, or the release's name. */
+  /** The search query, or the release name. */
   what: string;
   /** The episodes it was for: "S08E01". */
   episodes?: string[];
-  /** Why it failed or was turned down. */
+  /** Why it failed or was refused. */
   why?: string;
-  /** How many results a search found. */
+  /** Result count of a search. */
   results?: number;
 }
 
@@ -83,9 +83,9 @@ export class BackfillSeries {
   public artistArrId: number | null;
 
   /**
-   * An admin chose to follow it (from its page, Start search, or the admin
-   * agent), rather than a scan finding it. An album nobody requested is
-   * only followed when an admin chose to.
+   * Followed by admin choice (its page, Start search, or the admin agent)
+   * rather than found by a scan. An unrequested album is only followed this
+   * way.
    */
   @Column({ default: false })
   public byHand: boolean;
@@ -126,18 +126,17 @@ export class BackfillSeries {
   public searchError: string | null;
 
   /**
-   * When the admin agent looked for this title on its own. It does that
-   * once per title, to spare tokens; after that only an admin starts it.
-   * Kept here rather than with the conversation, which is cleared out
-   * after a while.
+   * When the admin agent last searched this title on its own. It does so once
+   * per title to save tokens; after that only an admin starts it. Stored here
+   * because conversations are pruned.
    */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public agentAutoRunAt: Date | null;
 
   /**
-   * What the admin agent tried for this title, oldest first: told to its
-   * next conversation about it (see agent/notes.ts). Read only when asked
-   * for, as nothing else needs it.
+   * What the admin agent tried for this title, oldest first, given to its next
+   * conversation about it (see agent/notes.ts). Not selected by default; only
+   * read when needed.
    */
   @Column({ type: 'simple-json', default: '[]', select: false })
   public agentNotes: AgentNote[];

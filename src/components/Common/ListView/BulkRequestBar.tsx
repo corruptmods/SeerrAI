@@ -25,8 +25,8 @@ interface BulkRequestBarProps {
 }
 
 /**
- * Along the bottom while choosing titles: how many are chosen, and the one
- * action. Requesting asks once more first, as it may be a lot at once.
+ * Bottom bar while selecting titles: the count and the request action, which
+ * confirms first as it may be a lot at once.
  */
 const BulkRequestBar = ({
   count,
@@ -40,7 +40,7 @@ const BulkRequestBar = ({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    // Clear of the sidebar on a wide screen, and above the tab bar on a phone.
+    // Clears the sidebar on wide screens and the tab bar on phones.
     <div className="safe-shift-edit-menu fixed left-0 right-0 z-50 border-t border-gray-700 bg-gray-800/90 p-3 backdrop-blur sm:bottom-0 lg:left-64">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
         {progress ? (

@@ -295,8 +295,8 @@ describe('Plex Scanner', () => {
         })
       );
 
-      // sendToSonarr runs on insert and only bails when no server is configured,
-      // so leftover settings from another test would reach TMDB and fail the request.
+      // sendToSonarr runs on insert and bails only with no server configured,
+      // so leftover settings from another test would reach TMDB and fail.
       const settings = getSettings();
       settings.radarr = [];
       settings.sonarr = [];
@@ -412,8 +412,8 @@ describe('Plex Scanner', () => {
   });
 
   /*
-   * Plex lists a file before its agent has matched it. Such a title is
-   * skipped quietly and counted; the scan says once, at the end, how many.
+   * Plex lists a file before its agent matches it. Such titles are skipped
+   * quietly and counted; the scan reports once, at the end, how many.
    */
   describe('titles Plex has not matched yet', () => {
     type Line = {
@@ -491,9 +491,9 @@ describe('Plex Scanner', () => {
         items: [
           // Never matched (the "none" agent): no id at all.
           item('901', 'Home Video', 'local://901', 2020),
-          // The new agent before it has matched: no Guid list yet.
+          // The new agent before matching: no Guid list yet.
           item('902', 'Brine', 'plex://movie/5d776'),
-          // Matched, but TMDB can't be asked: a real failure.
+          // Matched, but TMDB is unreachable: a real failure.
           item('903', 'Gone Film', 'imdb://tt0000003', 1999),
           { ...fakePlexMovieItem('904', 6210, ['1080']), title: 'Fine' },
         ],
@@ -544,7 +544,7 @@ describe('Plex Scanner', () => {
         ]
       );
 
-      // What is stored is as before.
+      // Stored media is unchanged.
       const media = await getRepository(Media).find();
       assert.deepEqual(
         media.map((m) => m.tmdbId),

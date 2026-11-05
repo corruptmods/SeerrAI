@@ -129,8 +129,7 @@ const BackfillDashboard = () => {
   const intl = useIntl();
   const line = useCandidateLine();
   const router = useRouter();
-  // The tab and the search live in the address too, so coming back from a
-  // title finds the list as it was left.
+  // Tab and search live in the URL so coming back from a title restores them.
   const [filter, setFilter] = useState<Filter>(() =>
     FILTERS.includes(router.query.tab as Filter)
       ? (router.query.tab as Filter)
@@ -149,10 +148,9 @@ const BackfillDashboard = () => {
       search ? `&q=${encodeURIComponent(search)}` : ''
     }`,
     {
-      // Switching tabs keeps the page in place: emptied while the next tab
-      // loads, it would shrink and jump to the top.
+      // Keep old data while switching tabs so the page doesn't shrink and jump.
       keepPreviousData: true,
-      // Live while anything downloads; the server reads the client each time.
+      // Poll fast while downloading; the server reads the client on each call.
       refreshInterval: (latest) =>
         latest?.jobs.some((j) => j.status === 'downloading')
           ? 2000
@@ -165,7 +163,7 @@ const BackfillDashboard = () => {
     }
   );
 
-  // From a notification (#awaiting): the packs waiting for approval.
+  // Notifications link to #awaiting.
   useScrollToHash(!!data);
 
   useEffect(() => {
@@ -256,8 +254,7 @@ const BackfillDashboard = () => {
         >
           {intl.formatMessage(messages.backfill)}
         </Header>
-        {/* One even row at any width: three equal buttons on a phone,
-            their names wrapping inside rather than the row wrapping. */}
+        {/* Three equal buttons on phones; labels wrap, the row doesn't. */}
         <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-none">
           <Button
             buttonType="default"
@@ -501,8 +498,7 @@ const BackfillDashboard = () => {
                 )}
               </div>
             </div>
-            {/* One even row at any width: the count goes under the name on
-                a phone, beside it on wider screens. */}
+            {/* One row at any width; counts sit under the name on phones. */}
             <div
               className="grid grid-cols-4 border-b border-gray-700"
               role="tablist"

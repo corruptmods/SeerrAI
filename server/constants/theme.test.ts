@@ -10,10 +10,8 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * How a person's look (Profile → Settings → Appearance) and the server's
- * default (Settings → Appearance) are checked before they are kept.
- */
+// Validation of a user's look (Profile → Settings → Appearance) and the server
+// default (Settings → Appearance) before storing.
 
 const mine = {
   mode: 'light',
@@ -166,8 +164,8 @@ describe('the server’s default look', () => {
 });
 
 describe('blur behind title pages', () => {
-  // Title pages looked sharp before there were looks to choose; upgrading
-  // must not soften them for anyone who never asked for it.
+  // Title pages were sharp before looks existed; upgrading must not blur them
+  // for anyone who didn't opt in.
   it('is off for someone who has not chosen it', () => {
     assert.equal(appearanceFromDefaults(SERVER_THEME_DEFAULTS).blur, false);
     assert.equal(

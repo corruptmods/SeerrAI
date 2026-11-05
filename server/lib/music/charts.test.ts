@@ -17,8 +17,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
 /*
- * How a chart's names are read before they are looked for on MusicBrainz,
- * and how much of what was found is held in memory.
+ * Chart name parsing before MusicBrainz lookup, and the in-memory match
+ * cache.
  */
 
 setupTestDb();
@@ -145,7 +145,7 @@ describe('a song a playlist names', () => {
       196_000
     ),
   ];
-  /** MusicBrainz's phrase search: its words in a row, "&" dropped. */
+  /** Mimics MusicBrainz phrase search: consecutive words, "&" dropped. */
   const words = (text: string) =>
     plainName(text.replace(/&/g, ' ')).split(' ').filter(Boolean).join(' ');
   const asked: string[] = [];
@@ -174,7 +174,7 @@ describe('a song a playlist names', () => {
     useMusicBrainz();
     const song = await songNamed('Harbour Girl (Tide Me Over)', 'Glasswing');
     assert.equal(song?.versions[0].title, 'Harbour Girl (Tide Me Over)');
-    // Kept as found: asking for it next needs no second lookup.
+    // Cached, so requesting it needs no second lookup.
     assert.equal(
       (await musicBrainz().keptRecording(song!.versions[0].mbId))?.title,
       'Harbour Girl (Tide Me Over)'
@@ -191,7 +191,7 @@ describe('a song a playlist names', () => {
       song?.versions.map((v) => v.title),
       ['Glass Road (remix)']
     );
-    // Named plainly: the version titled plainly.
+    // A plain title picks the plain version.
     const plain = await songNamed('Glass Road', 'Glasswing');
     assert.deepEqual(
       plain?.versions.map((v) => v.title),

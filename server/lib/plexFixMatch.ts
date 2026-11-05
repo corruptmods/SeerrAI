@@ -13,12 +13,11 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 /*
- * Fixing a wrong Plex match from Seerr AI, as Plex Web's Fix Match does.
- * The title is looked up in Plex by the id Radarr or Sonarr has for it
- * ("tmdb-123"), never by its name, as two films can share a name and a
- * year. The item is matched to what that finds, then read back: if Plex
- * now has it as another title, the old match is put back. Each fix is
- * kept, so it can be undone.
+ * Fixes a wrong Plex match from Seerr AI, like Plex Web's Fix Match. The title
+ * is searched in Plex by the *arr's id ("tmdb-123"), never by name, since two
+ * films can share a name and year. The item is matched to the result, then
+ * read back: if Plex now has it as another title, the old match is restored.
+ * Each fix is stored so it can be undone.
  */
 
 const LABEL = 'Match Check';
@@ -30,7 +29,7 @@ export const FIXES_PATH = process.env.CONFIG_DIRECTORY
 /** Fixes kept, newest first. */
 const KEEP = 50;
 const TIMEOUT_MS = 20_000;
-/** How long Plex gets to show the new match, and how often it's read. */
+/** How long Plex gets to show the new match, and how often it's polled. */
 let confirmMs = 25_000;
 let pollMs = 2_000;
 
@@ -40,7 +39,7 @@ export const setFixTimingForTests = (confirm: number, poll: number) => {
   pollMs = poll;
 };
 
-/** Who fixed it: an admin's user id, or Seerr AI by itself. */
+/** Who fixed it: an admin's user id, or Seerr AI automatically. */
 export type FixBy = 'auto' | number;
 
 interface Titled {
@@ -67,21 +66,21 @@ export interface MatchFix {
 
 export type FixOutcome =
   | { state: 'fixed'; fix: MatchFix }
-  /** Plex has it right already. */
+  /** Plex already has it right. */
   | { state: 'right' }
   /** The item is no longer on Plex. */
   | { state: 'gone' }
-  /** Plex found nothing by the ids searched for. */
+  /** Plex found nothing for the searched ids. */
   | { state: 'notFound'; searched: string[] }
-  /** Plex took it as another title, so the old match was put back. */
+  /** Plex took it as another title, so the old match was restored. */
   | { state: 'putBack'; to: Titled }
   /** Plex didn't show the new match in time. */
   | { state: 'unchanged' };
 
 /**
- * Whether Seerr AI can fix a problem: a film or series on Plex, with an id
- * to look it up by. A film whose file is far off the film's length is
- * likely another film, which fixing the match would only hide.
+ * Whether Seerr AI can fix a problem: a film or series on Plex with an id to
+ * search by. A film whose file length is far off is likely a different film,
+ * which fixing the match would only hide.
  */
 export const canFix = (p: PlexMatchProblem): boolean =>
   (p.mediaServer ?? 'Plex') === 'Plex' &&
@@ -93,7 +92,7 @@ export const canFix = (p: PlexMatchProblem): boolean =>
   ) &&
   !!fixSearch(p.kind, p.expected).want;
 
-/** Whether fixing is turned on (Health → Match Check). */
+/** Whether fixing is on (Health → Match Check). */
 export const fixingOn = (): boolean => getSettings().main.matchFix !== false;
 
 /** Whether new problems are fixed without an admin. */
@@ -111,7 +110,7 @@ const plexClient = async (): Promise<PlexAPI> => {
   return new PlexAPI({ plexToken: admin.plexToken, timeout: TIMEOUT_MS });
 };
 
-/** The agent and language of the item's library, for Fix Match's search. */
+/** The library's agent and language, for Fix Match's search. */
 const libraryOf = async (
   plex: PlexAPI,
   item: PlexLibraryItem
@@ -129,7 +128,7 @@ const libraryOf = async (
   }
 };
 
-/** A result whose year agrees, give or take one, when both have one. */
+/** A result whose year agrees within one, when both have one. */
 const pick = (
   results: PlexMatchResult[],
   expected: Titled
@@ -144,17 +143,16 @@ const pick = (
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** The same ids, all of them: Plex hasn't fetched the new title's yet. */
+/** All ids equal: Plex hasn't fetched the new title's yet. */
 const sameIds = (a: MatchIds, b: MatchIds): boolean =>
   a.tmdbId === b.tmdbId && a.tvdbId === b.tvdbId && a.imdbId === b.imdbId;
 
 /**
- * The item once Plex has fetched the new title's details. Plex shows the
- * new match (its guid, name and year) at once, but its ids (tmdb://,
- * imdb://) stay the old title's until it has fetched the new one's, which
- * takes a few seconds or more: until then they say nothing about the new
- * match. `fresh` is whether they had changed by the time it stopped
- * looking.
+ * The item once Plex has fetched the new title's details. Plex shows the new
+ * guid, name and year at once, but its ids (tmdb://, imdb://) stay the old
+ * title's until the fetch finishes, seconds or more later, and until then say
+ * nothing about the new match. `fresh` is whether they changed before polling
+ * stopped.
  */
 const readBack = async (
   plex: PlexAPI,
@@ -178,7 +176,7 @@ const readBack = async (
   return { item, fresh: freshNow(item) };
 };
 
-/** Puts an item back as it was: its old match, or none. */
+/** Restores an item's old match, or none. */
 const putBack = async (
   plex: PlexAPI,
   ratingKey: string,
@@ -223,16 +221,16 @@ const saveFixes = (next: MatchFix[]): Promise<void> => {
   return writing;
 };
 
-/** For tests: forgets the fixes kept in memory. */
+/** For tests: clears fixes kept in memory. */
 export const forgetFixesForTests = () => {
   fixes = undefined;
 };
 
-/** The fixes made lately, newest first. */
+/** Recent fixes, newest first. */
 export const recentFixes = async (limit = 10): Promise<MatchFix[]> =>
   (await readFixes()).slice(0, limit);
 
-/** Fixes one problem in Plex: looked up by id, matched, read back. */
+/** Fixes one problem in Plex: search by id, match, read back. */
 export const fixMatch = async (
   problem: PlexMatchProblem,
   by: FixBy
@@ -276,8 +274,8 @@ export const fixMatch = async (
     plexIds(item)
   );
   if (!after || after.guid !== chosen.guid) return { state: 'unchanged' };
-  // Judged by its ids only once they are the new title's: the old title's
-  // would always read as another title.
+  // Judge by ids only once they are the new title's: the old title's would
+  // always read as another title.
   const same = fresh ? sameTitle(kind, expected, plexIds(after)) : undefined;
   if (same === false) {
     await putBack(plex, ratingKey, from);
@@ -312,16 +310,16 @@ export const fixMatch = async (
   return { state: 'fixed', fix };
 };
 
-/** Problems an automatic fix didn't put right, and when: not tried daily. */
+/** When an automatic fix last failed per problem, so it isn't retried daily. */
 const autoTried = new Map<string, number>();
 const AUTO_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** For tests: forgets which problems were tried. */
+/** For tests: clears which problems were tried. */
 export const forgetAutoTriedForTests = () => autoTried.clear();
 
 /**
- * A fix made without an admin, for a problem with `key`: one that didn't
- * work isn't tried again for a week, and a failure is logged, not thrown.
+ * A fix without an admin for the problem `key`: a failed one isn't retried
+ * for a week, and failures are logged, not thrown.
  */
 export const autoFix = async (
   problem: PlexMatchProblem,
@@ -348,7 +346,7 @@ export const autoFix = async (
   }
 };
 
-/** Puts a fix back as Plex had it before. */
+/** Restores the match Plex had before a fix. */
 export const undoFix = async (id: string, by: FixBy): Promise<MatchFix> => {
   const all = await readFixes();
   const fix = all.find((f) => f.id === id);

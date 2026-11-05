@@ -68,10 +68,10 @@ import {
 } from 'node:test';
 
 /*
- * Taking a song from its album: a release found through Prowlarr, only the
- * song's file downloaded, Lidarr's manual import of that one track into
- * the album (unmonitored), and the download removed. Prowlarr and
- * qBittorrent are stood in for; Lidarr is the fake one on localhost.
+ * Taking a song from its album: Prowlarr finds a release, only the song's
+ * file downloads, Lidarr imports that track into the unmonitored album, and
+ * the download is removed. Prowlarr and qBittorrent are mocked; Lidarr is
+ * the local fake.
  */
 
 setupTestDb();
@@ -114,7 +114,7 @@ const RECORDINGS: Record<string, MbRecording> = {
   [OPENING]: recording(OPENING, 'Opening'),
 };
 
-// A torrent of the album: two songs and a cover.
+// Minimal bencode encoder for the test torrent.
 const ben = (value: unknown): Buffer => {
   if (typeof value === 'number') return Buffer.from(`i${value}e`);
   if (typeof value === 'string' || Buffer.isBuffer(value)) {
@@ -147,6 +147,7 @@ const INFO = {
     { length: 1 * MB, path: ['cover.jpg'] },
   ],
 };
+// A torrent of the album: two songs and a cover.
 const TORRENT = ben({ announce: 'udp://tracker', info: INFO });
 const HASH = createHash('sha1').update(ben(INFO)).digest('hex');
 const RELEASE: ProwlarrRelease = {
@@ -180,7 +181,7 @@ const actAs = async (permissions: number, email = 'listener@test.local') => {
 const requestSongs = (songs: string[]) =>
   MediaRequest.requestMusic({ artistMbid: ARTIST, songs }, actingAs);
 
-/** Adds the artist, then (next minute) the album, and starts. */
+/** Two ticks: adds the artist, then the album, and starts. */
 const startFetching = async () => {
   await songFetcher.tick();
   await songFetcher.tick();
@@ -193,7 +194,6 @@ const searches = () =>
     }
   ).mock.callCount();
 
-/** The latest fetch. */
 const fetchOf = () =>
   getRepository(SongFetch).findOneOrFail({ where: {}, order: { id: 'DESC' } });
 
@@ -372,7 +372,7 @@ describe('taking a song from its album', () => {
     assert.equal(song.sourceAlbumMbid, STATIC_GARDEN);
     assert.equal(request.status, MediaRequestStatus.APPROVED);
 
-    // The artist is added first; Lidarr lists their albums itself.
+    // The artist is added first; Lidarr lists its albums itself.
     await songFetcher.tick();
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'queued');
@@ -388,7 +388,7 @@ describe('taking a song from its album', () => {
     fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
     assert.deepEqual(fetch.recordings, [LANTERN]);
-    // The artist and album are added, the album unmonitored and unsearched.
+    // Album added unmonitored and unsearched.
     const added = lidarr.calls.find(
       (c) => c.method === 'POST' && c.path === '/api/v1/album'
     );
@@ -443,12 +443,11 @@ describe('taking a song from its album', () => {
     assert.equal(fetch.status, 'done');
     assert.deepEqual(removed, [HASH]);
 
-    // The scans see the album partly here; the song is done.
+    // Scans mark the album partly available; the song completes.
     await getRepository(MusicAlbum).update(row.id, {
       status: MediaStatus.PARTIALLY_AVAILABLE,
     });
-    // The fetch told Seerr which Lidarr has the artist, so the music
-    // scans follow the album.
+    // The artist is linked to Lidarr so the music scans follow the album.
     const media = await getRepository(Media).findOneByOrFail({
       mediaType: MediaType.MUSIC,
       foreignId: ARTIST,
@@ -464,8 +463,7 @@ describe('taking a song from its album', () => {
     assert.equal(after.songs[0].status, MediaRequestStatus.COMPLETED);
     assert.equal(after.status, MediaRequestStatus.COMPLETED);
 
-    // On the album's page, the song itself is here, though the album is
-    // only partly.
+    // The song shows available though the album is only partly.
     const standing = await songStandings([
       {
         mbId: LANTERN,
@@ -476,8 +474,8 @@ describe('taking a song from its album', () => {
   });
 
   it('takes the song into the album Lidarr keeps under another of its artists', async () => {
-    // A duet: Lidarr has the album under the artist credited first, and
-    // won't add it again ("This album has already been added").
+    // A duet: Lidarr files the album under the first-credited artist and
+    // refuses to add it again ("This album has already been added").
     lidarr.artists.push({
       id: 900,
       artistName: 'Harbour Lights',
@@ -539,7 +537,7 @@ describe('taking a song from its album', () => {
         c.path === '/api/v1/command' &&
         c.body?.name === 'ManualImport'
     );
-    // Into the album's own artist, as Lidarr files it.
+    // Imported under the album's artist, as Lidarr files it.
     assert.deepEqual(
       (imported?.body?.files as { artistId: number; albumId: number }[]).map(
         (f) => [f.artistId, f.albumId]
@@ -568,7 +566,7 @@ describe('taking a song from its album', () => {
       ]),
       [['downloading', STATIC_GARDEN, [LANTERN], HASH]]
     );
-    // Only the song's file counts, none of it in yet.
+    // Size counts only the song's file, none downloaded yet.
     const song = fetch.files.reduce((n, file) => n + file.size, 0);
     assert.deepEqual([shown[0].size, shown[0].sizeLeft], [song, song]);
 
@@ -589,7 +587,7 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     await songFetcher.tick();
     assert.equal((await fetchOf()).status, 'done');
-    // As an older Seerr AI left it: the song on file, the artist unlinked.
+    // Legacy state: song on file, artist unlinked.
     await getRepository(Media).update(request.media.id, {
       serviceId: null,
       externalServiceId: null,
@@ -614,14 +612,14 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     await songFetcher.tick();
     assert.equal((await fetchOf()).status, 'done');
-    // As an older Seerr AI left it: the whole album taken as here.
+    // Legacy state: whole album marked available.
     await getRepository(MusicAlbum).update(
       { mbId: STATIC_GARDEN },
       { status: MediaStatus.AVAILABLE }
     );
     const album = lidarr.albums.find((a) => a.foreignAlbumId === STATIC_GARDEN);
     assert.ok(album);
-    // Lidarr has the song's file only, as it says of an unmonitored album.
+    // Lidarr reports only the song's file, as for an unmonitored album.
     album.statistics = {
       trackCount: 1,
       trackFileCount: 1,
@@ -680,13 +678,13 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     assert.equal((await fetchOf()).status, 'done');
     const first = await fetchOf();
-    // The scans see the album partly here: one song of it.
+    // Scans mark the album partly available.
     await getRepository(MusicAlbum).update(
       { mbId: STATIC_GARDEN },
       { status: MediaStatus.PARTIALLY_AVAILABLE }
     );
 
-    // The album's other song, asked for afterwards.
+    // Then the album's other song is requested.
     done = false;
     priorities = [];
     const second = await requestSongs([OPENING]);
@@ -697,7 +695,7 @@ describe('taking a song from its album', () => {
     assert.notEqual(fetch.id, first.id, 'a fetch of its own');
     assert.deepEqual(fetch.recordings, [OPENING]);
     assert.equal(fetch.status, 'downloading');
-    // Into the same edition the first went into, only its own file.
+    // Same edition as the first, only its own file.
     assert.equal(fetch.lidarrReleaseId, first.lidarrReleaseId);
     assert.deepEqual(
       fetch.files.map((f) => f.trackId),
@@ -707,7 +705,7 @@ describe('taking a song from its album', () => {
       { indexes: [1, 2], priority: 0 },
       { indexes: [0], priority: 1 },
     ]);
-    // Lidarr already had the artist and album: neither added again.
+    // Artist and album aren't added again.
     assert.equal(
       lidarr.calls.filter(
         (c) => c.method === 'POST' && c.path !== '/api/v1/command'
@@ -722,7 +720,7 @@ describe('taking a song from its album', () => {
     const first = await fetchOf();
     assert.equal(first.status, 'downloading');
 
-    // Asked for mid-download: no second fetch of the album meanwhile.
+    // Requested mid-download: no second fetch for the album.
     await requestSongs([OPENING]);
     await songFetcher.tick();
     assert.equal(await getRepository(SongFetch).count(), 1);
@@ -762,7 +760,7 @@ describe('taking a song from its album', () => {
 
     await startFetching();
 
-    // Indexers come and go: nothing found is looked for again, later.
+    // Nothing found: searched again later.
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'searching');
     assert.equal(fetch.searches, 1);
@@ -776,7 +774,7 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     assert.equal(searches(), searched, 'not before its time');
 
-    // Its last time, still nothing: the song fails, saying why.
+    // Last search still empty: the song fails with a reason.
     await getRepository(SongFetch).update(fetch.id, {
       searches: 5,
       searchAgainAt: new Date(Date.now() - 1000),
@@ -796,8 +794,8 @@ describe('taking a song from its album', () => {
   });
 
   it('takes the song into an edition with it, not the one Lidarr picked', async () => {
-    // Lidarr already has the artist and album, monitoring a bootleg box
-    // without the song; the usual official edition has it.
+    // Lidarr monitors a bootleg box without the song; the usual official
+    // edition has it.
     const artist = {
       id: 7,
       artistName: 'Glasswing',
@@ -877,7 +875,7 @@ describe('taking a song from its album', () => {
       files.map((f) => [f.trackIds, f.albumReleaseId]),
       [[[702], 32]]
     );
-    // Neither the album nor the artist was changed to get there.
+    // Neither album nor artist was saved to switch editions.
     assert.equal(
       lidarr.calls.filter(
         (c) =>
@@ -894,7 +892,7 @@ describe('taking a song from its album', () => {
   it('uses the album Lidarr listed for the new artist, not a second one', async () => {
     await requestSongs([LANTERN]);
     await songFetcher.tick();
-    // Lidarr's refresh of the new artist lists the album meanwhile.
+    // Lidarr's artist refresh lists the album in the meantime.
     const artist = lidarr.artists[0];
     lidarr.albums.push({
       ...lidarr.lookupAlbums.get(STATIC_GARDEN)!,
@@ -938,7 +936,7 @@ describe('taking a song from its album', () => {
   });
 
   it('carries on with a request’s other songs when one of them fails', async () => {
-    // Lidarr’s album lacks one of the two songs asked for together.
+    // Lidarr's album lacks one of two songs requested together.
     lidarr.tracksOnAdd.set(STATIC_GARDEN, [
       {
         id: 502,
@@ -967,7 +965,7 @@ describe('taking a song from its album', () => {
       ].sort((a, b) => String(a[0]).localeCompare(String(b[0])))
     );
 
-    // The other song still comes: imported, not dropped with its request.
+    // The other song is still imported.
     done = true;
     await songFetcher.tick();
     fetch = await fetchOf();
@@ -976,7 +974,7 @@ describe('taking a song from its album', () => {
     fetch = await fetchOf();
     assert.equal(fetch.status, 'done');
 
-    // Retried once Lidarr lists it, the failed song is fetched afresh.
+    // Once Lidarr lists it, a retry fetches the failed song afresh.
     const albumId = fetch.lidarrAlbumId!;
     const listed = [
       ...(lidarr.tracks.get(albumId) ?? []),
@@ -1055,7 +1053,7 @@ describe('taking a song from its album', () => {
 
   it('takes a song no edition of its albums has from its single', async () => {
     const OWN_SINGLE = '4e8b2d61-9a37-4c15-b0f4-7d2e6a9c1b38';
-    // Asked for from the album; its single only known since.
+    // Requested from the album; the single becomes known later.
     let singleKnown = false;
     mock.method(MusicBrainz.prototype, 'getRecording', async (id: string) => {
       const base = RECORDINGS[id];
@@ -1134,7 +1132,7 @@ describe('taking a song from its album', () => {
     const fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
     assert.equal(fetch.release?.guid, PACK.guid);
-    // Only the song, from the album's own folder: not the live album's.
+    // Only the song from the album's folder, not the live album's.
     assert.deepEqual(
       fetch.files.map((f) => f.index),
       [1]
@@ -1179,7 +1177,7 @@ describe('taking a song from its album', () => {
         ],
         infoHash: HASH,
       }));
-      // The model, stubbed at its HTTP call.
+      // Stub the model's HTTP call.
       mock.method(
         axios,
         'post',
@@ -1218,7 +1216,7 @@ describe('taking a song from its album', () => {
         prompts[0],
         /^1\. Glasswing - Harbour Lights \(2003\) FLAC/m
       );
-      // A live album is never offered, nor Prowlarr's links.
+      // Live albums and Prowlarr links never reach the prompt.
       assert.ok(!prompts[0].includes('Live at the Pier'));
       assert.ok(!prompts[0].includes('download'));
       const fetch = await fetchOf();
@@ -1268,7 +1266,7 @@ describe('taking a song from its album', () => {
   });
 
   it('searches again on its own schedule for a song the chosen release lacks', async () => {
-    // Only Lantern Song is in the release opened.
+    // The opened release has only Lantern Song.
     mock.method(backfill, 'filesOf', async () => ({
       files: [{ index: 0, path: 'A/02 - Lantern Song.flac', size: 40 * MB }],
       infoHash: HASH,
@@ -1289,7 +1287,7 @@ describe('taking a song from its album', () => {
     const getFiles = qbit.getFiles;
     let refused = false;
     mock.method(qbit, 'getFiles', async function (this: unknown, hash: string) {
-      // The client fails the first time it is asked for the file list.
+      // The first file-list request fails.
       if (!refused) {
         refused = true;
         throw new Error('qBittorrent is restarting');
@@ -1317,7 +1315,7 @@ describe('taking a song from its album', () => {
     const getFiles = qbit.getFiles;
     mock.method(qbit, 'getFiles', async function (this: unknown, hash: string) {
       const files = await getFiles.call(this, hash);
-      // Once finished, the client names the song's file out of the folder.
+      // Once finished, the client reports a path escaping the folder.
       return done
         ? files.map((f) => ({ ...f, name: `${INFO.name}/../../${f.name}` }))
         : files;
@@ -1337,7 +1335,7 @@ describe('taking a song from its album', () => {
     );
   });
 
-  /** A Usenet client for Backfill, and a post of the album on Usenet. */
+  /** Sets up a Backfill Usenet client and a Usenet post of the album. */
   const useUsenet = (packed: boolean) => {
     const settings = getSettings();
     settings.backfill = { ...settings.backfill, usenetClientId: 2 };
@@ -1410,7 +1408,7 @@ describe('taking a song from its album', () => {
     return { usenet, opened };
   };
 
-  /** The files handed to Lidarr's manual import. */
+  /** Paths sent to Lidarr's manual import. */
   const importedPaths = () =>
     (
       lidarr.calls.find(
@@ -1435,7 +1433,7 @@ describe('taking a song from its album', () => {
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
     assert.equal(fetch.release?.protocol, 'usenet');
-    // The unshared torrent's file list, slow to come, isn't even asked for.
+    // The unseeded torrent's file list isn't requested.
     assert.deepEqual(opened, [usenet.guid]);
 
     done = true;
@@ -1567,7 +1565,7 @@ describe('taking a song from its album', () => {
 
   it('finds the song by its name when the download renamed its files', async () => {
     const { usenet } = useUsenet(false);
-    // Posted under other names than the files have once downloaded.
+    // Post names differ from the downloaded file names.
     mock.method(backfill, 'filesOf', async () => ({
       files: [
         {
@@ -1648,7 +1646,7 @@ describe('taking a song from its album', () => {
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'searching');
     assert.equal(fetch.searches ?? 0, 0);
-    // Minutes, not the next minute, and not the hours of nothing found.
+    // Minutes, not the next tick nor the empty-search hours.
     const wait = (fetch.searchAgainAt?.getTime() ?? 0) - Date.now();
     assert.ok(wait > 5 * 60_000 && wait <= 10 * 60_000, String(wait));
     const asked = searches();
@@ -1695,7 +1693,7 @@ describe('taking a song from its album', () => {
     assert.equal(fetch.release?.guid, RELEASE.guid);
     assert.deepEqual(opened.slice(0, 2), [resting.guid, RELEASE.guid]);
 
-    // Only the resting one has it: searched again in minutes, not counted.
+    // Only the resting indexer has it: retry in minutes, uncounted.
     await getRepository(SongFetch).clear();
     found = [resting];
     await songFetcher.tick();
@@ -1745,10 +1743,10 @@ describe('taking a song from its album', () => {
     assert.equal(await albumsWaitingToSearch([LANTERN]), 0);
     const searched = searches();
     await songFetcher.tick();
-    // Both of the album's, and the artist's for packs of their releases.
+    // Both album searches, plus the artist search for packs.
     assert.equal(searches(), searched + 3, 'its searches, now');
     fetch = await fetchOf();
-    // Found nothing again: waits as long as the first time did.
+    // Empty again: waits as long as the first time.
     assert.equal(fetch.searches, 1);
     assert.ok(fetch.searchAgainAt!.getTime() > Date.now());
   });
@@ -1811,7 +1809,7 @@ describe('choosing a release of an album', () => {
       ]).map((r) => r.guid),
       ['many', 'few', 'unknown', 'nzb', 'dead']
     );
-    // Lidarr preferring Usenet: Usenet first, unshared torrents still last.
+    // Lidarr prefers Usenet: Usenet first, unseeded torrents still last.
     assert.deepEqual(
       rankReleases(
         [
@@ -1940,7 +1938,7 @@ describe('reading a release of an album', () => {
   });
 
   it('is not fooled by a compilation, or by the file a post is of', () => {
-    // Another artist's song with the title's word in it, on a compilation.
+    // A compilation track by another artist sharing a title word.
     assert.equal(
       namesAlbum(
         'Various Artists - 2011 - Road Hits "22-other_singer-thank_you_for_lantern_nights.mp3"',
@@ -1953,7 +1951,7 @@ describe('reading a release of an album', () => {
       namesAlbum('VA - Road Hits - Lantern Mix (2CD)', 'Lantern', 'Glasswing'),
       false
     );
-    // A post of one file of another album, the file named for the album.
+    // A single-file post from another album, the file named for this one.
     assert.equal(
       namesAlbum(
         'Glasswing - 2010 - Live at the Pier (2CD) %22101-glasswing-static_garden.mp3%22',
@@ -1970,7 +1968,7 @@ describe('reading a release of an album', () => {
       ),
       true
     );
-    // An album of Various Artists still goes by VA.
+    // A Various Artists album may use VA.
     assert.equal(
       namesAlbum('VA - Road Hits (2011) MP3', 'Road Hits', 'Various Artists'),
       true
@@ -2050,7 +2048,7 @@ describe('reading a release of an album', () => {
       assert.equal(namesCatalog(title, 'Glasswing'), true, title);
     }
     for (const title of [
-      // Another artist's, featuring them.
+      // Another artist's pack featuring them.
       'Other Band (with Glasswing) - Discography - 1991 - 2023',
       // An album, not a pack.
       'Glasswing - Static Garden (1997) [FLAC]',
@@ -2086,7 +2084,7 @@ describe('reading a release of an album', () => {
       fileInCatalog(files, 'Lantern Song', 'Static Garden', 'Glasswing')?.index,
       2
     );
-    // Without the album's folder: any other, but the live album's.
+    // No album folder: any other folder except the live album's.
     const other = fileInCatalog(
       files.slice(0, 2),
       'Lantern Song',
@@ -2132,7 +2130,7 @@ describe('reading a release of an album', () => {
       ),
       true
     );
-    // A version the album itself is.
+    // A version word that is part of the album title.
     assert.equal(
       namesAlbum(
         'Glasswing - Live at the Pier (2010) FLAC',
@@ -2149,9 +2147,13 @@ describe('reading a release of an album', () => {
       ),
       true
     );
-    // A band whose name is such a word.
+    // A band named with a version word.
     assert.equal(
-      namesAlbum('Live - Throwing Copper (1994)', 'Throwing Copper', 'Live'),
+      namesAlbum(
+        'Glasswing - Static Garden (1994)',
+        'Static Garden',
+        'Glasswing'
+      ),
       true
     );
   });
@@ -2255,7 +2257,7 @@ describe('taking a song from Soulseek', () => {
       apiKey: 'k',
       downloadsPath: '/data/soulseek/complete',
     };
-    // Prowlarr has no release of the album, nor of the artist's.
+    // Prowlarr has no album or artist releases.
     found = [];
     answers = [
       sharer('lantern-fan', [
@@ -2329,7 +2331,7 @@ describe('taking a song from Soulseek', () => {
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
     assert.equal(fetch.release?.protocol, 'soulseek');
-    // The album's own take, not the live album's.
+    // The album take, not the live album's.
     assert.deepEqual(
       asked.map((a) => [a.username, a.files]),
       [['collector', [SHARED]]]
@@ -2378,7 +2380,7 @@ describe('taking a song from Soulseek', () => {
     ];
     await requestSongs([LANTERN]);
     await startFetching();
-    // The first is offline: the next search passes over them.
+    // The first sharer is offline and skipped next time.
     let fetch = await fetchOf();
     assert.ok(fetch.tried.includes('soulseek:offline-one'));
     await songFetcher.tick();
@@ -2412,8 +2414,8 @@ describe('taking a song from Soulseek', () => {
     await requestSongs([LANTERN]);
     await startFetching();
     const folder = asked[0].folder;
-    // slskd ended the transfer as it shut down, and asked for the file
-    // again itself once back, outside the batch.
+    // slskd ended the transfer on shutdown and re-requested the file itself
+    // outside the batch.
     const batches: Record<string, SlskdTransfer> = {
       'batch-1': {
         id: 't-1',
@@ -2460,7 +2462,7 @@ describe('taking a song from Soulseek', () => {
     assert.equal(fetch.stage, 'Asked for on Soulseek again: slskd restarted');
     assert.equal(fetch.downloadId, 'batch-1,batch-2');
     assert.ok(!fetch.tried.includes('soulseek:collector'));
-    // slskd's own copy, headed for the wrong folder, is stopped.
+    // slskd's own retry, bound for the wrong folder, is removed.
     assert.deepEqual(removedTransfers, ['t-own']);
     assert.deepEqual(asked.at(-1), {
       username: 'collector',

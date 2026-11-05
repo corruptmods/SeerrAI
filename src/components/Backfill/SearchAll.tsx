@@ -32,8 +32,8 @@ const messages = defineMessages('components.Backfill.SearchAll', {
 });
 
 /**
- * Searching every stuck title at a steady pace: the button, what it does
- * before it starts, and how far it has got while it runs.
+ * Search-all button: rate-limited search of every stuck title, with a
+ * confirm step and progress.
  */
 export const SearchAllButton = ({
   disabled,
@@ -98,7 +98,7 @@ const SearchAllPanel = ({
               try {
                 await axios.delete('/api/v1/backfill/search-all');
               } catch (e) {
-                // Still running: offer Stop again, and say why it didn't.
+                // Still running: re-offer Stop and show why.
                 setStopping(false);
                 setProblem(
                   axios.isAxiosError(e) && e.response?.data?.message

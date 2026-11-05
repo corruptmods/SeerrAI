@@ -17,7 +17,7 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * Auto-import: who gets an account, and that nobody existing is touched.
+ * Auto-import: who gets an account, and that existing accounts are untouched.
  */
 
 const MACHINE = 'this-server';
@@ -102,7 +102,7 @@ describe('Plex user auto-import', () => {
     const user = await byEmail('new@example.com');
     assert.equal(user?.settings?.watchlistSyncMovies, true);
     assert.equal(user?.settings?.watchlistSyncTv, true);
-    // Someone already here keeps their own choice.
+    // An existing user keeps their own choice.
     const after = await byEmail('friend@seerr.dev');
     assert.equal(
       !!after?.settings?.watchlistSyncMovies,

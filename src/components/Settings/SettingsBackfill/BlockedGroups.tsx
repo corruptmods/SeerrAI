@@ -31,10 +31,9 @@ const messages = defineMessages(
 const GROUP_NAME = /^[\w][\w.\- ]{0,59}$/;
 
 /**
- * The blocked release groups, changed one at a time: each change is saved
- * and sent to Radarr and Sonarr at once, apart from the form's Save. The
- * list is kept here, from each answer, so the settings form above is not
- * reloaded under unsaved edits.
+ * Blocked release groups, changed one at a time: each change is saved and sent
+ * to Radarr and Sonarr at once, apart from the form's Save. The list is kept
+ * here from each response, so the form above isn't reloaded over unsaved edits.
  */
 const BlockedGroups = ({ initial }: { initial: string[] }) => {
   const intl = useIntl();

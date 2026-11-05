@@ -10,10 +10,7 @@ import { LibraryAccessError } from '@server/lib/libraryAccess/types';
 import { getSettings } from '@server/lib/settings';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 
-/*
- * Plex: who a server is shared with, and which libraries, as plex.tv keeps
- * it, read and changed with the owner's token. The owner is never listed.
- */
+// Plex shares via plex.tv with the owner's token. The owner is never listed.
 
 const TYPES: Record<string, AccessLibraryType> = {
   movie: 'movie',
@@ -22,7 +19,7 @@ const TYPES: Record<string, AccessLibraryType> = {
   photo: 'photo',
 };
 
-/** Shares read at once. */
+/** Parallel share reads. */
 const CONCURRENCY = 4;
 
 export const plexAccess = async (): Promise<AccessServer> => {

@@ -8,18 +8,16 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { EntityManager, QueryRunner } from 'typeorm';
 
-/*
- * Nested transactions opened side by side on one connection, called
- * directly rather than through any save hook. A nested transaction is a
- * savepoint, and TypeORM names a savepoint after a depth counter it reads
- * and bumps across an await: two opened at once got the same name, undid
- * each other and aborted the whole transaction on Postgres.
- */
+// Concurrent nested transactions on one connection, called directly rather than
+// via save hooks. A nested transaction is a savepoint, and TypeORM names it
+// after a depth counter it reads and bumps across an await: two opened at once
+// got the same name, undid each other and aborted the whole transaction on
+// Postgres.
 
 setupTestDb();
 
-// Two queries with an await between them, so work opened side by side
-// really does interleave on the connection.
+// Two queries with an await between them, so concurrent work really interleaves
+// on the connection.
 const write = async (manager: EntityManager, ...tmdbIds: number[]) => {
   for (const tmdbId of tmdbIds) {
     await manager.insert(MediaEvent, {
@@ -30,7 +28,7 @@ const write = async (manager: EntityManager, ...tmdbIds: number[]) => {
   }
 };
 
-// A write the database refuses: the media type is required.
+// A write the database rejects: the media type is required.
 const refusedWrite = (manager: EntityManager) =>
   manager.insert(MediaEvent, {
     tmdbId: 999,
@@ -43,8 +41,7 @@ const written = async () =>
     (event) => event.tmdbId
   );
 
-// The transaction's connection is left exactly as it was found: no
-// transaction open, no savepoint counted.
+// The connection is left as found: no open transaction, no savepoint counted.
 const assertClean = (runner: QueryRunner | undefined) => {
   assert.ok(runner);
   assert.equal(runner.isTransactionActive, false, 'no transaction left open');
@@ -102,9 +99,8 @@ describe('nested transactions on one connection', () => {
         await Promise.all([
           withNestedTransaction(em, async (inner) => {
             await write(inner, 1);
-            // Opened inside this one: through its own manager, and through the
-            // outer one as a save hook does (it is handed the outer
-            // transaction's manager). Neither may wait for the one it is in.
+            // Nested inside this one, via its own manager and via the outer one
+            // as a save hook gets it. Neither may wait for its parent.
             await Promise.all([
               withNestedTransaction(inner, (m) => write(m, 2, 3)),
               withNestedTransaction(em, async (m) => {
@@ -140,7 +136,7 @@ describe('nested transactions on one connection', () => {
         }),
         withNestedTransaction(em, (m) => write(m, 4)),
       ]);
-      // After a refused write the outer transaction still takes more work.
+      // After a rejected write the outer transaction still accepts work.
       await write(em, 5);
       return settled.map((outcome) => outcome.status);
     });
@@ -152,7 +148,7 @@ describe('nested transactions on one connection', () => {
       'fulfilled',
     ]);
     // Postgres undoes a failed one's own work. SQLite has no savepoints here
-    // (see nestedTransaction.ts), so there it stays, as it always has.
+    // (see nestedTransaction.ts), so it stays.
     assert.deepEqual(await written(), isPgsql ? [1, 4, 5] : [1, 2, 3, 4, 5]);
     assertClean(runner);
   });
@@ -184,8 +180,8 @@ describe('nested transactions on one connection', () => {
       runner = em.queryRunner;
       await withNestedTransaction(em, async (inner) => {
         await write(inner, 1);
-        // Not awaited: it still belongs to this one, and has to be done
-        // before this one's savepoint is released.
+        // Not awaited: it still belongs to this one and must finish before this
+        // savepoint is released.
         void withNestedTransaction(inner, async (m) => {
           await new Promise((resolve) => setTimeout(resolve, 20));
           await write(m, 2);
@@ -223,7 +219,7 @@ describe('a connection handed back to the pool', () => {
       const connection = await runner.connect();
       await runner.startTransaction();
       await assert.rejects(runner.query('SELECT 1/0'));
-      // Handed back without a rollback, its transaction aborted.
+      // Released without a rollback, its transaction aborted.
       await runner.release();
 
       const next = dataSource.createQueryRunner();

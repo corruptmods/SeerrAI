@@ -29,10 +29,10 @@ export const getAppVersion = (): string => {
 };
 
 /**
- * Where a development build stands against its branch's newest commits
- * (newest first). build.sh tags builds with the short commit hash, the
- * release workflow with the full one, so either matches. commitsBehind is
- * -1 when this build's commit isn't among them.
+ * A development build's position against its branch's newest commits (newest
+ * first). build.sh tags builds with the short hash, the release workflow with
+ * the full one, so either matches. commitsBehind is -1 when this build's commit
+ * isn't among them.
  */
 export const devBuildStatus = (
   shas: string[],

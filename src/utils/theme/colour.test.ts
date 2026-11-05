@@ -13,12 +13,9 @@ import {
   toOklch,
 } from './colour';
 
-/*
- * The colour arithmetic behind a custom accent: a whole scale made from one
- * colour, and text on it that stays readable.
- */
+/* Custom accents: a scale from one colour, with readable text on it. */
 
-// The surfaces text sits on in every dark background, and in light mode.
+// Text surfaces in every dark background and light mode.
 const DARK_SURFACES = [
   '#111827',
   '#1f2937',

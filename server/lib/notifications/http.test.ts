@@ -11,10 +11,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 
-/*
- * A notification service that takes the connection and never answers: the
- * notification gives up instead of waiting for good, and the log says why.
- */
+// A service that accepts the connection and never answers: the send times out
+// and logs why.
 
 let silentPort = 0;
 const silent = http.createServer(() => {
@@ -39,7 +37,7 @@ describe('a notification service that never answers', () => {
   });
 
   it('is given up on, and logged as such', async (t) => {
-    // The real limit is 15 seconds; a test needn't wait that long.
+    // Shorter than the real 15 s limit.
     t.after(() => {
       notificationHttp.defaults.timeout = NOTIFICATION_TIMEOUT_MS;
     });
@@ -77,7 +75,7 @@ describe('a notification service that never answers', () => {
       meta.errorMessage,
       `No answer from 127.0.0.1:${silentPort} within 0.2 seconds; gave up`
     );
-    // The token in the address stays out of the log.
+    // The token in the URL stays out of the log.
     assert.doesNotMatch(JSON.stringify(meta), /secret-token/);
   });
 });

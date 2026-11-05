@@ -57,10 +57,8 @@ const readSearch = (): string => {
 };
 
 /**
- * The Music page's own search: artists and albums only, shown in place of
- * the rows while there is something in it. Kept for the rest of the visit,
- * like the filter on the Movies and Series pages, so it is still there
- * after opening an artist and coming back.
+ * The Music page's artist and album search, shown in place of the rows while
+ * non-empty. Kept for the session, like the Movies and Series filter.
  */
 const useMusicSearch = (): [string, (value: string) => void] => {
   const [search, setSearch] = useState('');
@@ -76,7 +74,7 @@ const useMusicSearch = (): [string, (value: string) => void] => {
         sessionStorage.removeItem(SEARCH_KEY);
       }
     } catch {
-      // Not kept past this page, which is all that is lost.
+      // Storage unavailable: the search just isn't kept.
     }
   }, []);
   return [search, update];
@@ -84,7 +82,7 @@ const useMusicSearch = (): [string, (value: string) => void] => {
 
 type Item = MusicAlbumResult | MusicArtistResult | MusicSongResult;
 
-/** One row's whole list, a page at a time as the page is scrolled. */
+/** One row's full list, paged on scroll. */
 const MusicGrid = ({ url }: { url: string }) => {
   const intl = useIntl();
   const { data, error, size, setSize, isValidating, mutate } = useSWRInfinite<
@@ -136,11 +134,7 @@ const MusicGrid = ({ url }: { url: string }) => {
   );
 };
 
-/**
- * Said in place of the rows when none of them has anything, so the page is
- * not blank below its search box: search above, and, for admins, what
- * would fill it.
- */
+/** Shown when every row is empty: a pointer to search, and admin hints. */
 const NothingYet = ({ hints }: { hints: MusicPageHint[] }) => {
   const intl = useIntl();
   const said: Record<MusicPageHint, ReactNode> = {
@@ -177,13 +171,10 @@ const NothingYet = ({ hints }: { hints: MusicPageHint[] }) => {
   );
 };
 
-/** Each person's own rows first, then everyone's. */
+/** Personal rows first, then shared ones. */
 const PAGE_ROWS = [...PERSONAL_MUSIC_ROWS, ...MUSIC_ROWS];
 
-/**
- * Music to discover: every music row, or one of them in full
- * (/discover/music?show=new-releases).
- */
+/** Every music row, or one in full (/discover/music?show=new-releases). */
 const DiscoverMusic = () => {
   const intl = useIntl();
   const router = useRouter();
@@ -194,7 +185,7 @@ const DiscoverMusic = () => {
   const [search, setSearch] = useMusicSearch();
   const searching = !!search.trim();
 
-  // How many each row came back with, to tell when every one is empty.
+  // Each row's count, to tell when all are empty.
   const [rowCounts, setRowCounts] = useState<Record<string, number>>({});
   const rowLoaded = useCallback(
     (show: string, count: number) =>
@@ -207,7 +198,7 @@ const DiscoverMusic = () => {
     loaded: r.show in rowCounts,
     count: rowCounts[r.show] ?? 0,
   }));
-  // Only asked for once every row is empty, and only admins may read it.
+  // Fetched only when every row is empty; admin-only.
   const { data: sources } = useSWR<{ listenBrainz: boolean }>(
     admin && emptyMusicPage(rowStates, false, undefined)
       ? '/api/v1/settings/music'

@@ -5,12 +5,12 @@ import logger from '@server/logger';
 import { IsNull } from 'typeorm';
 
 /**
- * Records that Plex rejected this user's token, and tells them — once.
+ * Records that Plex rejected this user's token, and tells them once.
  *
- * A rejected token silently stops the user's watchlist from syncing, and they
- * have no reason to open Seerr to find out. The flag is set with a
- * conditional update, so only the run that actually flips it sends the
- * notification: every later sync while the token stays broken is a no-op.
+ * A rejected token silently stops their watchlist sync, and they have no
+ * reason to open Seerr to notice. The flag is set with a conditional update,
+ * so only the run that flips it notifies; later syncs while the token stays
+ * broken are no-ops.
  */
 export const markPlexTokenRejected = async (user: User): Promise<void> => {
   const result = await getRepository(User)
@@ -40,9 +40,9 @@ export const markPlexTokenRejected = async (user: User): Promise<void> => {
 };
 
 /**
- * Clears the flag once Plex accepts the user's token again — after they sign
- * in, or if the rejection was transient. Written only when the flag is set,
- * so a healthy sync costs no write.
+ * Clears the flag once Plex accepts the token again (after sign-in, or a
+ * transient rejection). Writes only when the flag is set, so a healthy sync
+ * costs no write.
  */
 export const clearPlexTokenRejected = async (user: User): Promise<void> => {
   if (!user.plexTokenExpiredAt) {

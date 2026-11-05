@@ -81,7 +81,7 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
-  // Kept while the dialog closes, so it does not change as it fades out.
+  // Kept while the dialog fades out so its content doesn't change.
   const [declining, setDeclining] = useState<{
     show: boolean;
     requests: MediaRequest[];
@@ -89,7 +89,6 @@ const RequestButton = ({
   const declineRequests = (requests: MediaRequest[]) =>
     setDeclining({ show: true, requests });
 
-  // All pending requests
   const activeRequests = media?.requests.filter(
     (request) => request.status === MediaRequestStatus.PENDING && !request.is4k
   );
@@ -97,14 +96,11 @@ const RequestButton = ({
     (request) => request.status === MediaRequestStatus.PENDING && request.is4k
   );
 
-  // Any request that has not finished yet: a user wants notifying whether it
-  // is still awaiting approval or already downloading. `activeRequest` below
-  // is pending-only, which is not the right set for this.
+  // Any unfinished request, pending or downloading (`activeRequest` is
+  // pending-only).
   const watchableRequest = useMemo(
     () =>
-      // Nothing to wait for once it is here. A request can sit at APPROVED
-      // after the media has landed, which is why the request status alone is
-      // not enough to decide this.
+      // A request can stay APPROVED after the media arrives, so check media status.
       media?.status === MediaStatus.AVAILABLE
         ? undefined
         : media?.requests.find(
@@ -116,7 +112,7 @@ const RequestButton = ({
     [media]
   );
 
-  // Current user's pending request, or the first pending request
+  // The current user's pending request, else the first pending one.
   const activeRequest = useMemo(() => {
     return activeRequests && activeRequests.length > 0
       ? (activeRequests.find(
@@ -141,8 +137,7 @@ const RequestButton = ({
       globalMutate('/api/v1/request/count');
     });
 
-  // One after another, as declining them is, and what did go through is
-  // shown even when one of them could not be approved.
+  // Sequential, like declining; successes still show if one fails.
   const approveRequests = (requests: MediaRequest[]) =>
     run(async () => {
       const errors = await oneAfterAnother(requests, (request) =>
@@ -162,10 +157,9 @@ const RequestButton = ({
   }>(watchableRequest ? `/api/v1/request/${watchableRequest.id}/watch` : null);
 
   const isWatching = watchState?.watching ?? false;
-  // The offer to watch never depends on this fetch: if it is slow or fails,
-  // the button still appears. The fetch only refines it — flipping to
-  // "You Will Be Notified" once watching, or to the enable prompt when the
-  // server has positively reported the user has no notification channel.
+  // The watch button never waits on this fetch; it only refines it (to
+  // "You Will Be Notified", or the enable prompt when the server reports no
+  // notification channel).
   const isUnreachable = watchState?.reachable === false;
   const { state: pushState, subscribe: subscribeToPush } = usePushDeviceState();
 
@@ -173,8 +167,7 @@ const RequestButton = ({
     try {
       await axios.post(`/api/v1/request/${requestId}/watch`);
     } catch (e) {
-      // 400 means no notification channel; let the reachability state take
-      // over so the button becomes the enable prompt.
+      // 400: no notification channel; reachability state shows the enable prompt.
       if (axios.isAxiosError(e) && e.response?.status === 400) {
         revalidateWatch();
         return;
@@ -195,17 +188,14 @@ const RequestButton = ({
 
   const buttons: ButtonOption[] = [];
 
-  // Someone else already requested this, so a second request is refused.
-  // Offer to be notified alongside the original requester instead.
+  // Already requested by someone else: offer to be notified instead.
   if (watchableRequest && user?.id && isUnreachable) {
     buttons.push({
       id: 'enable-notifications',
       text: intl.formatMessage(messages.enablenotifications),
       action: async () => {
-        // This device can be asked for notifications right here. Otherwise
-        // (already asked and refused, not installed, not supported) it is
-        // set up on their notification settings, where every way of being
-        // told is offered.
+        // Ask for push here if possible; otherwise (refused, not installed,
+        // unsupported) send them to notification settings.
         if (pushState === 'prompt') {
           const subscribed = await subscribeToPush();
 
@@ -245,7 +235,7 @@ const RequestButton = ({
     );
   }
 
-  // If there are pending requests, show request management options first
+  // Pending requests: show management options first.
   if (activeRequest || active4kRequest) {
     if (
       activeRequest &&

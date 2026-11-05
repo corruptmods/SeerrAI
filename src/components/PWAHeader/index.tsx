@@ -269,9 +269,8 @@ const PWAHeader = ({ applicationTitle = 'Seerr AI' }: PWAHeaderProps) => {
 };
 
 /**
- * The browser's bar in the top bar's colour, for each mode the look can
- * show ("Match my device" has one for each). Its own <Head>, as it reads
- * the look, which only the app's components can.
+ * theme-color metas matching the top bar, per mode the look can show. A
+ * separate <Head> because it reads the theme context.
  */
 export const ThemeColour = () => {
   const { appearance, season } = useTheme();

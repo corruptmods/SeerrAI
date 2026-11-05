@@ -41,13 +41,13 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 
 /*
- * Settings → Media Servers: connecting Plex, Jellyfin and Emby, removing
- * them, choosing the primary one, and whether people may sign in with each.
- * Editing a connected server stays at /settings/plex, /settings/jellyfin and
+ * Settings → Media Servers: connecting and removing Plex, Jellyfin and Emby,
+ * choosing the primary, and whether users may sign in with each. Editing a
+ * connected server is at /settings/plex, /settings/jellyfin and
  * /settings/emby.
  */
 
-/** Seerr's own device id on a Jellyfin or Emby server, as at setup. */
+/** Seerr's device id on a Jellyfin or Emby server, as used at setup. */
 const OWNER_DEVICE_ID = 'BOT_seerr';
 
 const mediaServerRoutes = Router();
@@ -94,10 +94,9 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
   });
 };
 
-/** Answers with every server's summary. */
 const listed = async (res: Response) => res.status(200).json(await summaries());
 
-/** Passes a refused change on with its status, anything else as a 500. */
+/** Forwards a refused change with its status, anything else as a 500. */
 const failed = (next: NextFunction, e: unknown) => {
   if (e instanceof MediaServerChangeError) {
     return next({ status: e.status, message: e.message });
@@ -113,12 +112,12 @@ const kindParam = (req: Request): MediaServerKind | undefined =>
   MEDIA_SERVER_KINDS.find((kind) => kind === req.params.kind);
 
 /**
- * Only the owner can link their own account: it is user 1's that is
- * linked, and Plex's access goes through it.
+ * Only the owner may link their account: user 1's is the one linked, and
+ * Plex access goes through it.
  */
 const isOwner = (req: Request): boolean => req.user?.id === 1;
 
-/** Connecting a server: a newly connected one starts scanning at once. */
+/** After connecting a server: starts its scans at once. */
 const connected = async (kind: MediaServerKind) => {
   deriveMediaServerLogin();
   await getSettings().save();
@@ -135,9 +134,9 @@ mediaServerRoutes.get('/', async (_req, res, next) => {
 });
 
 /*
- * Connecting Plex, step one: the owner signs in with Plex, and that Plex
- * account is linked to their own (user 1). Seerr reaches Plex with it.
- * Their email and the rest of their account are left as they are.
+ * Connecting Plex, step one: the owner signs in with Plex and that account is
+ * linked to user 1, which Seerr uses to reach Plex. Their email and the rest
+ * of their account are unchanged.
  */
 mediaServerRoutes.post('/plex/account', async (req, res, next) => {
   if (!isOwner(req)) {
@@ -179,8 +178,7 @@ mediaServerRoutes.post('/plex/account', async (req, res, next) => {
     plexUsername: account.username,
     plexToken: account.authToken,
     plexTokenExpiredAt: null,
-    // Linking an account changes the kind of account only for one that
-    // had none.
+    // Only a local account becomes a Plex account.
     ...(owner.userType === UserType.LOCAL ? { userType: UserType.PLEX } : {}),
   });
 
@@ -204,8 +202,8 @@ interface ConnectBody {
 
 /*
  * Connecting Plex, step two: the server the owner chose (from
- * /settings/plex/devices/servers), reached with their Plex account. Its
- * libraries are then synced and chosen at /settings/plex/library.
+ * /settings/plex/devices/servers), reached with their Plex account.
+ * Libraries are then synced and chosen at /settings/plex/library.
  */
 const connectPlex = async (
   req: Request,
@@ -253,7 +251,7 @@ const connectPlex = async (
     return false;
   }
 
-  // Another server's libraries are not this one's.
+  // A different server: drop the old server's libraries.
   if (settings.plex.machineId && settings.plex.machineId !== machineId) {
     settings.plex.libraries = [];
     settings.plex.musicLibraries = [];
@@ -268,7 +266,7 @@ const connectPlex = async (
   return true;
 };
 
-/** Signing in to a Jellyfin or Emby server as one of its administrators. */
+/** Signs in to a Jellyfin or Emby server as an administrator. */
 const adminLogin = async (
   kind: JellyfinFamilyKind,
   hostname: string,
@@ -279,7 +277,7 @@ const adminLogin = async (
   if (!account.User.Policy?.IsAdministrator) {
     throw new ApiError(403, ApiErrorCode.NotAdmin);
   }
-  // An API key of Seerr's own, made with the administrator's sign-in.
+  // Create Seerr's own API key with the administrator's sign-in.
   const apiKey = await new JellyfinAPI(
     hostname,
     account.AccessToken,
@@ -295,7 +293,7 @@ const adminLogin = async (
   };
 };
 
-/** An API key given by hand, and the administrator chosen to read as. */
+/** Connects with a supplied API key and the administrator to read as. */
 const apiKeyAdmin = async (
   kind: JellyfinFamilyKind,
   hostname: string,
@@ -319,7 +317,7 @@ const apiKeyAdmin = async (
   };
 };
 
-/** The address of a Jellyfin or Emby server from what was typed. */
+/** A Jellyfin or Emby server's address from the form. */
 const familyAddress = (body: ConnectBody) => ({
   ip: body.hostname ?? '',
   port: Number(body.port ?? 8096),
@@ -328,10 +326,10 @@ const familyAddress = (body: ConnectBody) => ({
 });
 
 /*
- * Connecting Jellyfin or Emby: signing in as one of its administrators
- * (Seerr makes itself an API key), or an API key and the administrator to
- * read libraries as. "This is my account" links that administrator to the
- * owner. Libraries are then synced and chosen at /settings/{kind}/library.
+ * Connecting Jellyfin or Emby: as an administrator (Seerr creates its own
+ * API key), or with an API key and the administrator to read libraries as.
+ * "This is my account" links that administrator to the owner. Libraries are
+ * then synced and chosen at /settings/{kind}/library.
  */
 const connectJellyfinFamily = async (
   req: Request,
@@ -413,7 +411,7 @@ const connectJellyfinFamily = async (
     });
   }
 
-  // Another server's libraries are not this one's.
+  // A different server: drop the old server's libraries.
   if (settings[kind].serverId && settings[kind].serverId !== found.serverId) {
     settings[kind].libraries = [];
     settings[kind].musicLibraries = [];
@@ -459,8 +457,8 @@ mediaServerRoutes.post<{ kind: string }>(
 );
 
 /*
- * The administrators of a Jellyfin or Emby server, for choosing whom Seerr
- * reads libraries as when it is connected with an API key.
+ * A Jellyfin or Emby server's administrators, for choosing whom Seerr reads
+ * libraries as when connected with an API key.
  */
 mediaServerRoutes.post<{ kind: string }>(
   '/:kind/admins',
@@ -506,7 +504,7 @@ mediaServerRoutes.post<{ kind: string }>(
   }
 );
 
-/** How many people removing this server would leave with fewer ways in. */
+/** How many users would lose a sign-in method if this server were removed. */
 mediaServerRoutes.get<{ kind: string }>(
   '/:kind/removal',
   async (req, res, next) => {

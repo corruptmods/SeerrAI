@@ -4,23 +4,19 @@ import type {
   ArrRelease,
 } from '@server/lib/autofix/arr';
 
-/*
- * Telling releases apart when one replaces another: which of Sonarr's or
- * Radarr's results may be taken, and whether a result is the very release
- * a file on disk came from.
- */
+// Choosing replacement releases: which results are takeable, and which is the
+// current file's source.
 
-/** Rejections that only say the file on disk is as good: fine to replace. */
+/**
+ * Rejections that only mean "existing file is as good"; fine when replacing.
+ */
 export const ONLY_EXISTING =
   /existing file|equal or higher preference|not an upgrade|cutoff (has been |already )?(met|reached)|already meets cutoff/i;
 
 const rejectionText = (r: string | { reason?: string }) =>
   typeof r === 'string' ? r : (r.reason ?? '');
 
-/**
- * Whether Sonarr or Radarr would take a release, but for a file already
- * being there.
- */
+/** Whether the *arr would take a release if no file existed. */
 export const acceptedBut = (r: ArrRelease) =>
   r.downloadAllowed !== false &&
   (!r.rejected ||
@@ -46,10 +42,9 @@ export const grabbedFrom = (release: ArrRelease) =>
   `${release.title}${release.indexer ? ` from ${release.indexer}` : ''}`;
 
 /**
- * The best other release for one episode or movie: one Sonarr or Radarr
- * would only turn down because a file is already there, for that episode
- * alone (a release holding others too would not import over their files),
- * never the release the current file came from, a different group first.
+ * Best replacement for one episode or movie: rejected only for the existing
+ * file, for that episode alone (multi-episode releases won't import over
+ * other files), never the current source, preferring a different group.
  */
 export const pickReplacement = (
   releases: ArrRelease[],
@@ -83,7 +78,7 @@ export const pickReplacement = (
   )[0];
 };
 
-/** Where the file on disk came from: the release's own name, if known. */
+/** The source release name of the file on disk, if known. */
 export const originOf = (
   file: ArrFile | undefined,
   history: ArrHistoryRecord[]

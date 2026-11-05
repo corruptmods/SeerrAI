@@ -35,12 +35,12 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * An indexer's download limit, as Tabula Rasa's was reached on a real
- * server: a Usenet pack for two missing TruthTesters episodes, whose NZB
- * Prowlarr could not hand over ("Request failed with status code 429").
- * Backfill tried again every minute, gave the job up after ten, offered
- * the pack again, and it was approved again: all day. Prowlarr, Sonarr and
- * SABnzbd are stubbed at their API clients; time is the mocked clock.
+ * An indexer's download limit, modelled on a real case: Tabula Rasa's limit
+ * blocked the NZB of a Usenet pack for two missing TruthTesters episodes
+ * ("Request failed with status code 429"). Backfill retried every minute,
+ * failed the job after ten, re-offered the pack, and it was re-approved, all
+ * day. Prowlarr, Sonarr and SABnzbd are stubbed at their API clients; time
+ * is the mocked clock.
  */
 
 const MINUTE = 60_000;
@@ -317,7 +317,7 @@ describe('an indexer’s limit, read from its answer', () => {
     });
     assert.equal(limitOf(answered(503), at), null);
     assert.equal(limitOf(answered(500), at), null);
-    // Sonarr's and Radarr's own calls carry it as the cause.
+    // Arr API wrappers carry it as the cause.
     assert.deepEqual(
       limitOf(new Error('[Sonarr] failed', { cause: answered(429) }), at),
       { until: undefined }

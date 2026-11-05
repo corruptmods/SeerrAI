@@ -18,9 +18,9 @@ export async function runWithMockTimers<T>(
       await new Promise((resolve) => setImmediate(resolve));
       mock.timers.tick(tickMs);
     }
-    // The final tick may have settled runPromise, but `settled` only updates
-    // in a microtask; yield once more before the guard check to avoid false
-    // negatives when the resolving tick lands on the last iteration.
+    // The final tick may have settled runPromise, but `settled` updates in a
+    // microtask; yield once more so a resolve on the last iteration isn't
+    // missed.
     await new Promise((resolve) => setImmediate(resolve));
     if (!settled) {
       throw new Error(

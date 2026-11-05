@@ -15,29 +15,28 @@ import { In } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * What Maintainerr is about to delete, for badges and the home page row, and
- * the Keep button. Open to anyone signed in: seeing what is leaving and
- * asking to keep it are not admin actions. A Keep postpones rather than
- * excludes, so nobody can permanently shield a title from the rules.
+ * What Maintainerr is about to delete (badges, home page row) and the Keep
+ * button. Open to anyone signed in: seeing what's leaving and asking to keep it
+ * aren't admin actions. Keep postpones rather than excludes, so nobody can
+ * permanently shield a title from the rules.
  */
 const maintainerrRoutes = Router();
 
-/** TMDB ids looked up at once; well under SQLite's 999 bound parameters. */
+/** TMDB ids per lookup; well under SQLite's 999 bound parameters. */
 const LOOKUP_CHUNK = 500;
 
 maintainerrRoutes.get('/deleting', async (req, res, next) => {
   try {
-    // Turned off, for everyone or for this person: nothing is shown.
+    // Off globally or for this person: nothing shown.
     if (!featureEnabled('deletingSoon', req.user)) {
       return res.status(200).json({ enabled: false, items: [] });
     }
     const items = await getDeletingSoon();
 
-    // Seerr's own media ids, which a card needs for its admin actions. A
-    // TMDB id in their place would point those actions at the wrong record.
-    // Looked up by TMDB id, a few hundred at a time and per kind: one
-    // (tmdbId AND mediaType) OR ... term per title passed SQLite's limit of
-    // 1000 once a rule matched that many, and failed for everyone.
+    // Cards need Seerr's own media ids for admin actions; a TMDB id would
+    // target the wrong record. Looked up by TMDB id in chunks per media type:
+    // one (tmdbId AND mediaType) OR ... term per title exceeded SQLite's
+    // parameter limit once a rule matched enough titles.
     const rows: Pick<Media, 'id' | 'tmdbId' | 'mediaType'>[] = [];
     for (const mediaType of [MediaType.MOVIE, MediaType.TV]) {
       const ids = [
@@ -86,8 +85,8 @@ maintainerrRoutes.post('/keep', async (req, res, next) => {
   if (!isMaintainerrConfigured()) {
     return next({ status: 403, message: 'Maintainerr is not set up.' });
   }
-  // Keeping is part of Deleting Soon: off, for everyone or for this person,
-  // means off here too, not just a hidden button.
+  // Keep is part of Deleting Soon: off globally or for this person means off
+  // here too, not just a hidden button.
   if (!featureEnabled('deletingSoon', req.user)) {
     return next({ status: 403, message: 'Deleting Soon is turned off.' });
   }

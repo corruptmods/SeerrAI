@@ -17,7 +17,7 @@ export interface User {
   plexUsername?: string | null;
   jellyfinUsername?: string | null;
   embyUsername?: string | null;
-  /** The media servers this person has an account linked from. */
+  /** Media servers the user has linked accounts on. */
   linkedServers?: ('plex' | 'jellyfin' | 'emby')[];
   username?: string;
   displayName: string;
@@ -41,21 +41,21 @@ export interface UserSettings {
   notificationTypes: Partial<NotificationAgentTypes>;
   watchlistSyncMovies?: boolean;
   watchlistSyncTv?: boolean;
-  /** Optional features this person turned off for themselves. */
+  /** Optional features the user turned off. */
   disabledFeatures?: string[];
-  /** Home page rows (slider ids) this person hid for themselves. */
+  /** Home page slider ids the user hid. */
   hiddenSliders?: number[];
-  /** Their own Networks row, as JSON; null for the usual list. */
+  /** Custom Networks row as JSON; null for the default. */
   discoverNetworks?: string | null;
-  /** Their own order for the sidebar and phone menu; empty for the usual. */
+  /** Custom sidebar and phone menu order; empty for the default. */
   sidebarOrder?: string[];
-  /** Sidebar and phone menu items they hid for themselves. */
+  /** Sidebar and phone menu items the user hid. */
   sidebarHidden?: string[];
-  /** Their own look; null to use the server's default. */
+  /** The user's look; null for the server default. */
   appearance?: Appearance | null;
-  /** Their answer to a seasonal theme's note, '<season>-<year>:keep|off'. */
+  /** Answer to a seasonal theme's note, '<season>-<year>:keep|off'. */
   seasonNote?: string | null;
-  /** The version of their own CSS pages load; null for none. */
+  /** Version of the user's personal CSS; null for none. */
   personalCssVersion?: string | null;
 }
 
@@ -80,10 +80,7 @@ export const useUser = ({
 }: {
   id?: number;
   initialData?: User;
-  /**
-   * The one instance that keeps the signed-in user fresh: UserContext, which
-   * is always mounted. Every other component reads the same cached copy.
-   */
+  /** The single polling instance (UserContext, always mounted); others read its cache. */
   primary?: boolean;
 } = {}): UserHookResponse => {
   const router = useRouter();
@@ -97,10 +94,9 @@ export const useUser = ({
     mutate: revalidate,
   } = useSWR<User>(id ? `/api/v1/user/${id}` : `/api/v1/auth/me`, {
     fallbackData: initialData,
-    // Dozens of components ask who is signed in, a title card among them.
-    // Each polling and re-checking on mount was a stream of /auth/me calls
-    // that grew with the page; one instance now does that for all of them.
-    // Anyone else still fetches if nothing is cached yet.
+    // Dozens of components read the user; only one instance polls and
+    // revalidates, or /auth/me calls grow with the page. Others fetch only
+    // when nothing is cached.
     ...(id || primary
       ? {
           refreshInterval: !isAuthPage ? 30000 : 0,
@@ -109,7 +105,7 @@ export const useUser = ({
           revalidateOnReconnect: !isAuthPage,
         }
       : {
-          // Not on the sign-in pages, where there is no one to fetch yet.
+          // Nobody to fetch on the sign-in pages.
           revalidateOnMount: isAuthPage ? false : undefined,
           revalidateIfStale: false,
           revalidateOnFocus: false,
@@ -119,8 +115,7 @@ export const useUser = ({
     shouldRetryOnError: false,
   });
 
-  // The same function until the permissions change, so effects that list it
-  // as a dependency do not re-run on every render.
+  // Stable until permissions change, so dependent effects don't re-run each render.
   const permissions = data?.permissions ?? 0;
   const checkPermission = useCallback(
     (

@@ -18,8 +18,8 @@ import {
 } from 'node:test';
 
 /*
- * The Radarr and Sonarr details the request window reads, which anyone
- * signed in can ask for, when the server does not answer.
+ * Radarr and Sonarr details for the request window, readable by anyone signed
+ * in, when the server doesn't answer.
  */
 
 let app: Server;
@@ -42,7 +42,7 @@ before(async () => {
 
   const routes = express();
   routes.use('/service', serviceRoutes);
-  // As the real server does: the error's message goes to the person.
+  // As the real server does: the error message goes to the client.
   routes.use(
     (
       err: { status?: number; message: string },

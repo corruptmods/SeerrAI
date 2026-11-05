@@ -28,42 +28,38 @@ import type { EntityManager } from 'typeorm';
 import { In } from 'typeorm';
 
 /*
- * Whether albums and artists are here, from what the media servers and
- * Lidarr say.
+ * Album and artist availability from media servers and Lidarr.
  *
  * An album is available when any connected server's music library lists
- * it. While no server has a music library switched on, Lidarr's files
- * decide: all of an album's tracks make it available, some of them partly.
- * Lidarr having the files before a server lists them leaves the album
- * where it was (processing, "adding to Plex").
+ * it. With no music library enabled, Lidarr's files decide: all tracks is
+ * available, some is partly. Lidarr files a server hasn't listed yet leave
+ * the status alone (processing, "adding to Plex").
  *
- * Statuses only go down on a full scan that every connected server and
- * every Lidarr answered, and that left nothing waiting on MusicBrainz: an
- * album nowhere any more becomes deleted if it was asked for, else
- * unknown. An item a server lists that could not be placed this time
- * still counts as listed for the album that has its id.
+ * Statuses only drop on a full scan where every server and Lidarr answered
+ * and nothing waits on MusicBrainz: a vanished album becomes deleted if
+ * requested, else unknown. A listed item that couldn't be placed still
+ * counts for the album holding its id.
  *
- * An artist's status follows their albums: partly available with any of
- * them here, available once every album wanted (asked for and not
- * declined, or monitored in Lidarr) is. With none here, what their
- * requests say (pending, processing) stands.
+ * An artist is partly available with any album here, available once every
+ * wanted album (requested and not declined, or monitored in Lidarr) is.
+ * With none here, the request status (pending, processing) stands.
  *
- * Rows change through update() and insert(), never by saving a loaded
- * entity, and each artist's rows in one transaction. Albums Seerr already
- * knew arriving or leaving are written into their artist's history.
+ * Rows change via update() and insert(), never by saving loaded entities,
+ * one transaction per artist. Changes to already-known albums go into the
+ * artist's history.
  */
 
-/** A server's music libraries that are switched on. */
+/** Enabled music libraries on a server. */
 export const enabledMusicLibraries = (kind: MediaServerKind): MusicLibrary[] =>
   (getSettings()[kind]?.musicLibraries ?? []).filter(
     (library) => library.enabled
   );
 
-/** No connected server has a music library switched on: Lidarr decides. */
+/** True when no connected server has a music library enabled. */
 export const lidarrOnly = (): boolean =>
   !connectedServers().some((kind) => enabledMusicLibraries(kind).length > 0);
 
-/** What Lidarr's files make an album, when Lidarr decides. */
+/** Album status from Lidarr's file counts, when Lidarr decides. */
 export const lidarrStatus = (
   trackCount: number,
   trackFileCount: number
@@ -76,7 +72,7 @@ export const lidarrStatus = (
 
 const HERE = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
 
-/** An artist's status from their albums' (see above). */
+/** An artist's status from their albums (see above). */
 export const artistStatus = (
   current: MediaStatus,
   albums: { status: MediaStatus; wanted: boolean }[]
@@ -109,9 +105,8 @@ export const artistStatus = (
 };
 
 /**
- * An artist's name, for their row: Lidarr's is MusicBrainz's own and
- * replaces what was kept; a media server's (from the files' tags) only
- * fills in a name not yet known.
+ * Artist name sources. Lidarr's (MusicBrainz's) overwrites; a media
+ * server's (from tags) only fills a missing name.
  */
 export interface ArtistNames {
   lidarr?: string;
@@ -119,9 +114,8 @@ export interface ArtistNames {
 }
 
 /**
- * The artist's row, made when Seerr does not have them yet, with their
- * name kept on it (foreignTitle) for request cards, Recently Added and
- * notifications.
+ * Finds or creates the artist's row, storing the name in foreignTitle for
+ * request cards, Recently Added and notifications.
  */
 export const artistRow = async (
   manager: EntityManager,
@@ -149,14 +143,14 @@ export const artistRow = async (
   return manager.findOneOrFail(Media, { where });
 };
 
-/** A change to one album, for its artist's history. */
+/** An album change for the artist's history. */
 export interface AlbumEvent {
   mediaId: number;
   type: MediaEventType;
   title: string;
 }
 
-/** What an album's new status is, in its artist's history. */
+/** History event type for each new album status. */
 export const STATUS_EVENTS: Partial<Record<MediaStatus, MediaEventType>> = {
   [MediaStatus.AVAILABLE]: MediaEventType.AVAILABLE,
   [MediaStatus.PARTIALLY_AVAILABLE]: MediaEventType.PARTIALLY_AVAILABLE,
@@ -164,10 +158,9 @@ export const STATUS_EVENTS: Partial<Record<MediaStatus, MediaEventType>> = {
 };
 
 /**
- * Albums Seerr already knew arriving or leaving, in their artists'
- * histories, each naming the album. Albums only now found (a library read
- * for the first time) are not: that would be thousands of entries saying
- * nothing happened.
+ * Writes album events to their artists' histories. Callers skip newly
+ * discovered albums: a first library read would add thousands of
+ * meaningless entries.
  */
 export const recordAlbumEvents = async (
   events: AlbumEvent[],
@@ -200,7 +193,7 @@ export const recordAlbumEvents = async (
   }
 };
 
-/** An album's details from Lidarr, for a row made or placed from it. */
+/** Album row fields from Lidarr. */
 export const fromLidarr = (album: IndexAlbum): Partial<MusicAlbum> => ({
   title: album.title,
   primaryType: album.albumType ?? null,
@@ -216,18 +209,17 @@ const withoutServerIds = (row: MusicAlbum, except?: string): boolean =>
     (kind) => MUSIC_ALBUM_ID[kind] === except || !row[MUSIC_ALBUM_ID[kind]]
   );
 
-/** What a scan of one server touched: rows and artists, by id. */
+/** Album and artist row ids touched by one server's scan. */
 export interface Recorded {
   albumIds: Set<number>;
   artistIds: Set<number>;
-  /** Artists the server itself lists, whose item id it gave. */
+  /** Artists the server lists with their own item id. */
   listedArtistIds: Set<number>;
 }
 
 /**
- * Albums one server lists, placed by the matcher: each artist's row made
- * if need be, each album marked available with the server's id on it.
- * Never lowers anything.
+ * Records one server's matched albums: creates artist rows as needed and
+ * marks albums available with the server's id. Never lowers a status.
  */
 export const recordServerAlbums = async (
   kind: MediaServerKind,
@@ -242,8 +234,8 @@ export const recordServerAlbums = async (
   const idColumn = MUSIC_ALBUM_ID[kind];
   const artistColumn = MEDIA_ID[kind][0];
 
-  // Albums songs were taken from: Lidarr may monitor the release it took
-  // them into, and they stay partly here until every track is.
+  // Albums songs were taken from stay partly available until every track
+  // is, even if Lidarr monitors the release they went into.
   const placed = [
     ...new Set(matches.map((m) => m.albumMbid).filter((id) => !!id)),
   ] as string[];
@@ -291,10 +283,9 @@ export const recordServerAlbums = async (
 
       for (const match of group) {
         const { album, albumMbid, lidarr } = match;
-        // An album Lidarr has only some of the files of and is not
-        // fetching the rest of, or that songs were taken from, is only
-        // partly here, unless the server lists all of it. One Lidarr has no
-        // files of is the server's own.
+        // Partly available when Lidarr has some files and isn't fetching the
+        // rest (or songs were taken from it), unless the server lists every
+        // track. With no Lidarr files, the server alone decides.
         const taken = !!albumMbid && takenFrom.has(albumMbid);
         const partly =
           !!lidarr &&
@@ -315,7 +306,7 @@ export const recordServerAlbums = async (
             ));
         const changes: Partial<MusicAlbum> = {};
 
-        // An album kept unmatched before, now placed: the same row.
+        // A previously unmatched row is now matched: reuse it.
         if (!row && albumMbid && byItem && !byItem.mbId) {
           row = byItem;
           Object.assign(
@@ -325,8 +316,8 @@ export const recordServerAlbums = async (
           );
         }
 
-        // The server's id moved to another album: off the old row, and
-        // away with it when it was only ever that server's.
+        // The server id moved to another album: clear it from the old row,
+        // deleting that row if it only existed for this server.
         if (byItem && row && byItem.id !== row.id) {
           if (!byItem.mbId && withoutServerIds(byItem, idColumn)) {
             await manager.delete(MusicAlbum, byItem.id);
@@ -358,8 +349,8 @@ export const recordServerAlbums = async (
           continue;
         }
 
-        // Marked available before, and the server too says only part of
-        // it is here: partly, without a word in the artist's history.
+        // Available before, but the server also lists only part: downgrade
+        // to partly without a history entry.
         if (
           partly &&
           row.status === MediaStatus.AVAILABLE &&
@@ -406,10 +397,9 @@ export const recordServerAlbums = async (
 };
 
 /**
- * Lidarr's side of every album it has that Seerr keeps: its id there and
- * how many of its tracks have files. With `decide` (no music library
- * switched on anywhere), the files also make the album available, or
- * partly. Never lowers a status. Returns the artists whose albums changed.
+ * Syncs Lidarr ids and track counts onto stored albums. With `decide` (no
+ * music library enabled), files also set availability. Never lowers a
+ * status. Returns artist ids whose albums changed.
  */
 export const applyLidarr = async (
   index: LidarrIndex,
@@ -433,8 +423,7 @@ export const applyLidarr = async (
       }
       if (row.trackFileCount !== lidarr.trackFileCount) {
         changes.trackFileCount = lidarr.trackFileCount;
-        // More of it came (songs taken from it, or the rest of it): it is
-        // newly added again, at the front of Recently Added.
+        // More files arrived: bump it to the front of Recently Added.
         if (
           row.trackFileCount != null &&
           lidarr.trackFileCount > row.trackFileCount
@@ -469,7 +458,7 @@ export const applyLidarr = async (
   return changed;
 };
 
-/** Albums asked for and not declined, by artist row and album id. */
+/** Non-declined requested album ids per artist row. */
 const requestedAlbums = async (
   manager: EntityManager,
   mediaIds: number[]
@@ -502,19 +491,18 @@ const requestedAlbums = async (
   return requested;
 };
 
-/** What a full scan saw, to tell what has gone. */
+/** What a full scan saw, to detect removals. */
 export interface FullScanSeen {
-  /** Album rows each server listed. */
+  /** Album row ids each server listed. */
   albums: Map<MediaServerKind, Set<number>>;
-  /** Artist rows each server listed an album of. */
+  /** Artist row ids each server listed an album of. */
   artists: Map<MediaServerKind, Set<number>>;
 }
 
 /**
- * After a full scan that every connected server and every Lidarr
- * answered: each server's ids are taken off what it no longer lists, and
- * albums found nowhere (and without files in Lidarr) go down, to deleted
- * when they were asked for, else unknown. Returns the artists touched.
+ * After a full scan every server and Lidarr answered: clears server ids no
+ * longer listed, and drops albums found nowhere (and without Lidarr files)
+ * to deleted if requested, else unknown. Returns touched artist ids.
  */
 export const markGone = async (
   seen: FullScanSeen,
@@ -537,8 +525,8 @@ export const markGone = async (
         changes[MUSIC_ALBUM_ID[kind]] = null;
       }
     }
-    // An album no server could place, which no server lists any more, was
-    // only ever that listing.
+    // An unmatched row no server lists any more existed only for that
+    // listing.
     if (!row.mbId && !anywhere) {
       await getRepository(MusicAlbum).delete(row.id);
       touched.add(row.mediaId);
@@ -562,7 +550,7 @@ export const markGone = async (
     }
   }
 
-  // An artist's id on a server that lists none of their albums any more.
+  // Clear artist ids on servers that no longer list any of their albums.
   const artists = await getRepository(Media).find({
     select: {
       id: true,
@@ -590,10 +578,7 @@ export const markGone = async (
   return touched;
 };
 
-/**
- * Works out each artist's status from their albums, and when they first
- * had one here.
- */
+/** Recomputes artist statuses and sets mediaAddedAt when first available. */
 export const refreshArtists = async (
   mediaIds: Iterable<number>,
   index?: LidarrIndex

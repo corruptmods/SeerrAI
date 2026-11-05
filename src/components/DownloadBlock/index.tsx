@@ -50,7 +50,7 @@ const messages = defineMessages('components.DownloadBlock', {
   formattedAlbum: '{album} — {title}',
 });
 
-/** How much has arrived, 0 to 100, whatever the server reported. */
+/** Progress 0–100, clamped whatever the server reports. */
 const downloadedPercent = ({ size, sizeLeft }: DownloadingItem) => {
   if (!size || !Number.isFinite(size) || !Number.isFinite(sizeLeft)) {
     return 0;
@@ -61,7 +61,7 @@ const downloadedPercent = ({ size, sizeLeft }: DownloadingItem) => {
   );
 };
 
-/** What the badge says, and a line under it after the download itself. */
+/** Badge text, and the line under the download. */
 const STAGES: Record<
   DownloadStage,
   {
@@ -94,7 +94,7 @@ const STAGES: Record<
   imported: { label: 'imported', detail: 'importedDetail', badge: 'success' },
 };
 
-/** A download's stage as a badge says it, and the badge's colour. */
+/** A stage's badge label and colour. */
 export const stageBadge = (
   intl: IntlShape,
   stage: DownloadStage
@@ -103,10 +103,7 @@ export const stageBadge = (
   badgeType: STAGES[stage].badge,
 });
 
-/**
- * What the download client says it is doing, when Seerr reads it directly:
- * more exact than the stage's own line.
- */
+/** The client's own step, when Seerr reads it directly; more precise than the stage line. */
 const stepDetail = (
   stage: DownloadStage,
   step?: DownloadStep
@@ -137,7 +134,7 @@ interface DownloadBlockProps {
   downloadItem: DownloadingItem;
   is4k?: boolean;
   title?: string;
-  /** It brings several episodes of its season, as a pack does. */
+  /** Several episodes of one season, like a pack. */
   pack?: boolean;
 }
 
@@ -150,10 +147,9 @@ const DownloadBlock = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
   const percent = downloadedPercent(downloadItem);
-  // A copy saved before stages were sent counts as downloading.
+  // A missing stage (older cached data) counts as downloading.
   const stage = STAGES[downloadItem.stage] ?? STAGES.downloading;
-  // Imported, but the media server filed it under another title: it waits
-  // for an admin to put that right (they are told; this says no more).
+  // Imported, but the media server matched another title; admins are notified.
   const detail = downloadItem.matching
     ? 'importedMatching'
     : (stepDetail(downloadItem.stage, downloadItem.step) ?? stage.detail);
@@ -163,8 +159,7 @@ const DownloadBlock = ({
       : downloadItem.mediaType === MediaType.MUSIC
         ? 'Lidarr'
         : 'Sonarr';
-  // Radarr and Sonarr hold a release for the delay its profile sets; what
-  // they call time left is how long until they send it.
+  // During a profile delay, Radarr/Sonarr's time left is until they send it.
   const held =
     downloadItem.stage === 'waiting'
       ? secondsLeft(downloadItem.timeLeft)

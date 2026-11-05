@@ -9,12 +9,11 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
 /*
- * Accounts for everyone the server owner shares Plex with, without anyone
- * pressing Import Plex Users. The same rules as that button: a Plex friend
- * with an email address and access to this server gets an account with the
- * default permissions. Unlike the button it only ever adds: an existing
- * account, including a local one with the same email, is left exactly as it
- * is, and an account an admin deleted stays deleted.
+ * Creates accounts for everyone the owner shares Plex with, without pressing
+ * Import Plex Users. Same rules as that button: a Plex friend with an email
+ * and access to this server gets an account with default permissions. Unlike
+ * the button it only adds: existing accounts (including a local one with the
+ * same email) are untouched, and an account an admin deleted stays deleted.
  */
 
 class PlexUserImport {
@@ -42,7 +41,7 @@ class PlexUserImport {
         return [];
       }
 
-      // One call for everyone: who is shared with, and on which servers.
+      // One call returns every shared user and their servers.
       const response = await new PlexTvAPI(owner.plexToken).getUsers();
       const created: User[] = [];
       const removed = new Set(

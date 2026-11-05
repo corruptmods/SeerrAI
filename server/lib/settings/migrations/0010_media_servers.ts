@@ -3,15 +3,12 @@ import type { AllSettings } from '@server/lib/settings';
 import { jellyfinDefaults } from '@server/lib/settings';
 
 /**
- * Seerr used to work with one media server, chosen at setup. Each server
- * now says whether Seerr is connected to it and whether people may sign in
- * with it; the one chosen at setup stays the primary one
- * (main.mediaServerType), and its sign-in follows the old single switch.
+ * Adds per-server `connected` and `signIn` flags. The setup server stays
+ * primary (main.mediaServerType) and its sign-in follows the old switch.
  *
- * Emby used to share Jellyfin's settings. On an Emby server they move to
- * their own block, with Jellyfin's scan schedules, and the ids Emby gave
- * titles and people are moved to Emby's own columns once the database is
- * open (pendingEmbySplit, lib/embySplit).
+ * On Emby, settings move out of the shared Jellyfin block (with Jellyfin's
+ * scan schedules), and Emby ids move to Emby columns once the database opens
+ * (pendingEmbySplit, lib/embySplit).
  */
 const migrateMediaServers = (settings: any): AllSettings => {
   if (

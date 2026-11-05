@@ -2,16 +2,14 @@ import type BackfillSonarr from '@server/lib/backfill/sonarr';
 import { commandFinished } from '@server/lib/backfill/sonarr';
 
 /*
- * A file already imported that holds several episodes (S06E01-02) but that
- * Sonarr links to only one: Plex then shows one episode, and the others
- * look missing. Relinking imports the same file again, in place, for every
- * episode it holds, and has Sonarr rename it (S06E01-E02).
+ * Relinks an imported multi-episode file (S06E01-02) that Sonarr links to
+ * one episode, so Plex shows the others as missing: the file is imported
+ * again in place for every episode it holds, then renamed (S06E01-E02).
  *
- * Sonarr treats a manual import of a file already inside the series folder
- * as the file it is: it is neither moved nor deleted, only its record is
- * replaced (ImportApprovedEpisodes, newDownload false). Nothing is
- * downloaded, and no other file is touched: every other episode given must
- * have no file of its own.
+ * Sonarr treats a manual import of a file already in the series folder as
+ * that file: it is neither moved nor deleted, only its record is replaced
+ * (ImportApprovedEpisodes, newDownload false). Nothing is downloaded and no
+ * other file is touched: every other episode given must have no file.
  */
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -25,13 +23,13 @@ export class RelinkError extends Error {
 }
 
 export interface RelinkResult {
-  /** The file's name before and after. */
+  /** File name before and after. */
   from: string;
   to: string;
-  /** What it is now linked to, like S06E01-E02. */
+  /** Linked episodes, e.g. S06E01-E02. */
   episodes: string;
   fileId: number;
-  /** False when the file was already linked to them all. */
+  /** False if already linked to all of them. */
   changed: boolean;
 }
 
@@ -120,7 +118,7 @@ export const relinkEpisodeFile = async (
   const path =
     file.path ?? `${series.path.replace(/[\\/]+$/, '')}/${file.relativePath}`;
 
-  // In place, with no download id: Sonarr only replaces the file's record.
+  // In place, no download id: Sonarr only replaces the file's record.
   await waitFor(
     sonarr,
     await sonarr.manualImport([

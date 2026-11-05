@@ -3,7 +3,7 @@ import { copyFileSync } from 'fs';
 import path from 'path';
 
 const prepareDb = async () => {
-  // Copy over test settings.json
+  // Copy the test settings.json.
   copyFileSync(
     path.join(__dirname, '../../cypress/config/settings.cypress.json'),
     path.join(__dirname, '../../config/settings.json')

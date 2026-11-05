@@ -27,7 +27,7 @@ import {
   mapWatchProviders,
 } from './common';
 
-/** How far an episode's download has got. */
+/** An episode's download progress. */
 export interface EpisodeDownload {
   stage: DownloadStage;
   size: number;
@@ -36,15 +36,15 @@ export interface EpisodeDownload {
 
 interface Episode {
   id: number;
-  /** Per-episode availability, when episode tracking has populated it. */
+  /** Set once episode tracking populates it. */
   available?: boolean;
   available4k?: boolean;
-  /** Covered by a pending or approved request, for itself or its season. */
+  /** Covered by a pending or approved request for it or its season. */
   requested?: boolean;
   requested4k?: boolean;
   /**
-   * On its way now: Sonarr's download of it, or Backfill's (the admin
-   * agent's go through Backfill), furthest along of any.
+   * The furthest-along active download: Sonarr's or Backfill's (the admin
+   * agent's go through Backfill).
    */
   download?: EpisodeDownload;
   name: string;
@@ -133,7 +133,7 @@ export interface TvDetails {
   onUserWatchlist?: boolean;
 }
 
-/** Which of a season's episodes active requests cover, standard and 4K. */
+/** A season's episodes covered by active requests, standard and 4K. */
 export interface SeasonRequestCoverage {
   wholeSeason: boolean;
   episodes: Set<number>;

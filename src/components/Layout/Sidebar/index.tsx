@@ -58,7 +58,7 @@ interface SidebarProps {
 }
 
 interface SidebarLinkProps {
-  /** Its name in each person's own order (server/constants/navigation). */
+  /** Its id in each person's saved order (server/constants/navigation). */
   id: NavItem;
   href: string;
   svgIcon: React.ReactNode;
@@ -72,13 +72,13 @@ interface SidebarLinkProps {
   dataTestId?: string;
 }
 
-/** The page you are on, in the accent's gradient; the others plain. */
+/** The current page gets the accent gradient. */
 const activeLink =
   'text-on-accent bg-gradient-to-br from-accent to-accent-alt hover:from-accent-hover hover:to-accent-alt-hover';
 const inactiveLink =
   'text-strong hover:bg-surface-raised focus:bg-surface-raised';
 
-/** In the usual order; each person can arrange their own. */
+/** Default order; each person can rearrange. */
 const SidebarLinks: SidebarLinkProps[] = [
   {
     id: 'discover',
@@ -119,7 +119,7 @@ const SidebarLinks: SidebarLinkProps[] = [
     id: 'music',
     href: '/discover/music',
     messagesKey: 'music',
-    // Only once Lidarr is set up, and for people with music on.
+    // Only once Lidarr is set up, for people with music on.
     feature: 'music',
     svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/(discover\/music|music\/)/,
@@ -200,13 +200,12 @@ const Sidebar = ({
   const { hasPermission } = useUser();
   const featureIsOn = useFeatureCheck();
   const { draft, setDraft, order, hidden } = useNavLayout();
-  // Discover loads it as customizing starts, and says so if it can't.
+  // Discover loads it when customizing starts and reports a failure.
   const NavEditor = useLazyModule(loadNavEditor, !!draft, () => undefined);
   useClickOutside(navRef, () => setClosed());
 
-  // The items this person can use, in their order. Items they cannot use
-  // (a permission, a feature switched off) keep their place in it, and are
-  // left out here whatever they chose.
+  // Usable items in the person's order. Unusable ones (permission, feature
+  // off) keep their place in the order but are left out here.
   const usable = sortByNavOrder(SidebarLinks, order)
     .filter((link) => !link.feature || featureIsOn(link.feature))
     .filter((link) =>
@@ -218,8 +217,7 @@ const Sidebar = ({
     );
   const links = withoutHiddenNav(usable, hidden);
 
-  // While they arrange their menu (from Discover), the editor takes the
-  // links' place.
+  // While arranging the menu (from Discover), the editor replaces the links.
   const editor =
     draft && NavEditor ? (
       <NavEditor
@@ -340,7 +338,7 @@ const Sidebar = ({
                   </div>
                 </div>
                 <div className="w-14 flex-shrink-0">
-                  {/* <!-- Force sidebar to shrink to fit close icon --> */}
+                  {/* Shrinks the sidebar to fit the close icon. */}
                 </div>
               </>
             </TransitionChild>

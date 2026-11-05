@@ -16,8 +16,8 @@ import { beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * The nightly database maintenance: rows nothing reads any more go, what
- * people made or decided stays, and the database is vacuumed after.
+ * Nightly database maintenance: unread rows go, what people made or decided
+ * stays, then a vacuum.
  */
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -142,14 +142,13 @@ describe('database maintenance', () => {
       new MusicMetadata({ key, data: '{}', expiresAt });
     await getRepository(MusicMetadata).save([
       kept('artist:fresh', new Date(now + DAY)),
-      // Just past its time: still shown while it is fetched again.
+      // Just expired: still shown while refetched.
       kept('artist:stale', new Date(now - DAY)),
       kept('artist:forgotten', new Date(now - 40 * DAY)),
       kept('release-rg:forever', null),
     ]);
 
-    // Download Check's findings: an old one goes, unless it still waits
-    // for an admin.
+    // Old Download Check findings go unless awaiting an admin.
     const finding = (key: string, status: CheckStatus, at: number) =>
       new DownloadCheck({
         app: 'sonarr',
@@ -209,8 +208,7 @@ describe('database maintenance', () => {
       ),
       [recentJob.id, runningJob.id]
     );
-    // Turned down by an admin, waiting on one, or what a kept download
-    // came from: all stay.
+    // Rejected, awaiting an admin, or a kept download's source: all stay.
     assert.deepEqual(
       (
         await getRepository(BackfillCandidate).find({ order: { id: 'ASC' } })

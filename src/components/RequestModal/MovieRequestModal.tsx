@@ -120,14 +120,13 @@ const MovieRequestModal = ({
       globalMutate('/api/v1/request/count');
 
       if (response.data) {
-        // The request has already succeeded; adding to lists is a follow-on
-        // and must not be able to make it look like it failed.
+        // The request already succeeded; list errors must not undo that.
         if (listIds.length && data?.id) {
           await addToLists(listIds, data.id, 'movie', globalMutate);
         }
 
         if (onComplete) {
-          // The film as the server left it, not a guess from permissions.
+          // Use the server's status, not a guess from permissions.
           onComplete(response.data.media[is4k ? 'status4k' : 'status']);
         }
         addToast(
@@ -190,7 +189,7 @@ const MovieRequestModal = ({
     }
   };
 
-  // A failed request is changed by a request manager and then retried.
+  // A failed request is edited by a manager and then retried.
   const isFailed = editRequest?.status === MediaRequestStatus.FAILED;
 
   const updateRequest = async (alsoApproveRequest = false) => {
@@ -361,8 +360,7 @@ const MovieRequestModal = ({
             onRuleSeriesType={animeChoice.setRuleSeriesType}
             requestUser={editRequest.requestedBy}
             requestId={editRequest.id}
-            // Its server was removed: it starts from the default server
-            // and that server's own settings, as a new request would.
+            // Server removed: start from the default, like a new request.
             defaultOverrides={
               editRequest.serverIssue
                 ? undefined

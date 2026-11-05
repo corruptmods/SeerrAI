@@ -11,10 +11,8 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 /**
- * On a title page, when the request that matters to the viewer should
- * arrive: their own most recent active request, or for someone who manages
- * requests, the most recent active one. Nothing when there is nothing useful
- * to say.
+ * Title page arrival estimate for the viewer's latest active request (any
+ * request, for managers). Nothing when there's nothing useful to say.
  */
 const TitleEta = ({
   requests,
@@ -22,8 +20,8 @@ const TitleEta = ({
 }: {
   requests?: MediaRequest[];
   /**
-   * The title itself: when it is being processed with no request behind it —
-   * added in Radarr or Sonarr directly — its own estimate is shown.
+   * The title; when processing with no request (added in Radarr/Sonarr
+   * directly), its own estimate shows.
    */
   media?: Media;
 }) => {
@@ -52,7 +50,7 @@ const TitleEta = ({
   const chosen = active[0];
   const etaFor = useRequestEtas(chosen ? [chosen.id] : []);
 
-  // No request to go by: the title's own estimate, while it is processing.
+  // No request: the title's own estimate while processing.
   const processing4k =
     media?.status !== MediaStatus.PROCESSING &&
     media?.status4k === MediaStatus.PROCESSING;

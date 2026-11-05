@@ -95,7 +95,7 @@ describe('watch lists', () => {
   let member: User;
   let outsider: User;
   let notified: string[];
-  // Who the requests come from; the owner unless a test says otherwise.
+  // Who requests come from; the owner unless a test says otherwise.
   let actingAs: User | undefined;
 
   const call = <T>(method: string, path: string, body?: unknown) =>
@@ -384,7 +384,7 @@ describe('watch lists', () => {
       await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
       await call('PUT', `/api/v1/list/${id}`, { memberIds: [] });
 
-      // Saving the list used to cascade its stale members array and fail.
+      // Saving the list must not cascade its stale members array and fail.
       assert.equal(
         await getRepository(MediaListItem).countBy({ listId: id }),
         1
@@ -431,8 +431,8 @@ describe('watch lists', () => {
       const id = await createList();
       await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
 
-      // Swapping one person for another removes a row and adds one. Make the
-      // adding fail: the removal must not stand on its own.
+      // Swapping one member for another removes a row and adds one. Fail the
+      // add: the removal must not persist alone.
       const failInsert: EntitySubscriberInterface<MediaListMember> = {
         listenTo: () => MediaListMember,
         beforeInsert: () => {
@@ -778,7 +778,7 @@ describe('watch lists', () => {
           body.results[1].candidates.map((c) => [c.tmdbId, c.mediaType]),
           [[86247, 'tv']]
         );
-        // No id: searched by name, as a written line is.
+        // No id: searched by name, like a typed line.
         assert.equal(body.results[2].candidates[0].tmdbId, 7001);
       });
 
@@ -832,9 +832,9 @@ describe('watch lists', () => {
       assert.equal(line.collectionHint, true);
       assert.equal(line.candidates[0].mediaType, 'collection');
       assert.equal(line.candidates[0].partCount, 3);
-      // The individual film must remain selectable.
+      // The individual film stays selectable.
       assert.ok(line.candidates.some((c) => c.mediaType === 'movie'));
-      // People are not importable.
+      // People aren't importable.
       assert.ok(!line.candidates.some((c) => c.mediaType === 'person'));
     });
 
@@ -890,7 +890,7 @@ describe('watch lists', () => {
       const poster = (tmdbId: number) =>
         stored.find((item) => item.tmdbId === tmdbId)?.posterPath;
       assert.equal(poster(710), '/aB3_x-9.jpg');
-      // Not stored as given; filled in later from TMDB itself.
+      // Not stored as given; filled in later from TMDB.
       assert.notEqual(poster(711), '/../../api/v1/user/1');
       assert.notEqual(poster(712), '/x.jpg?https://elsewhere.test/');
     });
@@ -952,8 +952,8 @@ describe('watch lists', () => {
     });
 
     it('re-requests media that was deleted from the library', async () => {
-      // A title removed in the past is missing, not handled. Its old request
-      // is history and must not block a new one.
+      // A title removed earlier is missing, not handled. Its old request is
+      // history and must not block a new one.
       const id = await createList();
       const removed = await getRepository(Media).save(
         new Media({
@@ -1079,8 +1079,8 @@ describe('watch lists', () => {
   describe('series progress', () => {
     it('is reachable through the API', async () => {
       // Mounts the router directly, so this covers the route and its access
-      // check. Its OpenAPI declaration is covered by the spec tests, which
-      // put the real validator in front.
+      // check; the spec tests cover its OpenAPI declaration with the real
+      // validator.
       const id = await createList();
 
       const { status, body } = await call<Record<string, unknown>>(
@@ -1275,7 +1275,7 @@ describe('watch lists', () => {
           })
         );
 
-        // Tautulli answers only when the test lets it.
+        // Tautulli responds only when the test allows.
         let asked = 0;
         let answer: () => void = () => undefined;
         const answered = new Promise<void>((resolve) => (answer = resolve));
@@ -1306,7 +1306,7 @@ describe('watch lists', () => {
           }
         };
 
-        // Answered while Tautulli has not: the check runs behind.
+        // Answered before Tautulli: the check runs in the background.
         const first = await call<unknown[]>('GET', '/api/v1/list/suggestions');
         assert.equal(first.status, 200);
         assert.deepEqual(first.body, [], 'nothing stored yet');

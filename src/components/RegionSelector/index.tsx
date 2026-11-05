@@ -100,7 +100,7 @@ const RegionSelector = ({
           <div className="relative">
             <span className="inline-block w-full rounded-md shadow-sm">
               <ListboxButton
-                // For the setting's label to point at.
+                // Target for the setting's label.
                 id={name}
                 className="focus:shadow-outline-blue relative flex w-full cursor-default items-center rounded-md border border-field-border bg-field py-2 pl-3 pr-10 text-left text-strong transition duration-150 ease-in-out focus:border-blue-300 focus:outline-none sm:text-sm sm:leading-5"
               >

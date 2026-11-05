@@ -46,7 +46,7 @@ import { useSWRConfig } from 'swr';
 interface TitleCardProps {
   id: number;
   image?: string;
-  /** The title's backdrop, fetched ahead as its page is opened. */
+  /** Backdrop preloaded when the title's page is opened. */
   backdrop?: string;
   summary?: string;
   year?: string;
@@ -109,8 +109,7 @@ const TitleCard = ({
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // The pictures at the top of the title's page start loading as it is
-  // opened, alongside the page itself rather than once it has arrived.
+  // Preload the page's header images alongside the navigation.
   const preloadPage = () => {
     if (backdrop) {
       preloadPicture(
@@ -124,7 +123,6 @@ const TitleCard = ({
     }
   };
 
-  // Just to get the year from the date
   if (year) {
     year = year.slice(0, 4);
   }
@@ -138,10 +136,9 @@ const TitleCard = ({
       setCurrentStatus(newStatus);
       setShowRequestModal(false);
 
-      // The card's status prop comes from the discover/search response, and
-      // an effect above syncs it. Without refreshing that data the next
-      // re-render resets the card — the request button reappears and the
-      // pending badge never shows, even though the request went through.
+      // The status prop comes from these responses and the effect above syncs
+      // it, so without a refresh the next render resets the card to
+      // unrequested.
       globalMutate(
         (key: unknown) =>
           typeof key === 'string' &&
@@ -150,7 +147,7 @@ const TitleCard = ({
             key.startsWith('/api/v1/media'))
       );
       globalMutate(MARKERS_KEY);
-      // Rows loaded page by page are not reached by the refresh above.
+      // Paged rows aren't covered by the refresh above.
       if (mediaType === 'movie' || mediaType === 'tv') {
         announceTitleChanged({ tmdbId: id, mediaType });
       }
@@ -475,7 +472,7 @@ const TitleCard = ({
         <>
           {showDetail && currentStatus !== MediaStatus.BLOCKLISTED && (
             <div className="flex flex-col gap-1">
-              {/* Someone with Plex keeps their watchlist on Plex. */}
+              {/* Plex users keep their watchlist on Plex. */}
               {!hasAccountOn(user, 'plex') &&
                 (toggleWatchlist ? (
                   <Button
@@ -553,16 +550,11 @@ const TitleCard = ({
       roomForActions={!!actionSlot || (showRequestButton && requestable)}
       actions={
         <>
-          {/*
-            Rendered in the same slot as the request button and inside the
-            card's own transition, so custom actions appear and scale with
-            the poster as one element rather than tracking it from outside.
-          */}
+          {/* In the request button's slot, so it shares the card's transition. */}
           {actionSlot}
           {/*
-            Keep takes the Request button's place. They never compete:
-            Request shows only for titles not in the library, and only
-            titles in the library are deleted.
+            Keep shares Request's slot without conflict: Request is only for
+            titles not in the library, and only library titles get deleted.
           */}
           {!actionSlot &&
             mediaType !== 'person' &&
@@ -588,11 +580,7 @@ const TitleCard = ({
               <span>{intl.formatMessage(globalMessages.request)}</span>
             </Button>
           )}
-          {/*
-            Add to a watch list without opening the title. Icon-only and
-            lazy: it fetches nothing until opened, so a grid of cards costs
-            no extra requests.
-          */}
+          {/* Fetches nothing until opened, so a grid costs no requests. */}
           {showListButton && mediaType !== 'person' && (
             <AddToList
               compact
@@ -606,6 +594,5 @@ const TitleCard = ({
   );
 };
 
-// A row of cards re-renders each time its data or loading state changes;
-// the cards whose own details did not change need not render again with it.
+// Memoised so unchanged cards skip re-rendering when their row updates.
 export default withProperties(memo(TitleCard), { Placeholder, ErrorCard });

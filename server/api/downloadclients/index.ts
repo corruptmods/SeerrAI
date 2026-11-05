@@ -33,7 +33,7 @@ export const TORRENT_CLIENT_TYPES: DownloadClientType[] = [
 export const isTorrentClient = (type: DownloadClientType): boolean =>
   TORRENT_CLIENT_TYPES.includes(type);
 
-/** Each type's product name, as people know it. */
+/** Product name per client type. */
 export const CLIENT_PRODUCTS: Record<DownloadClientType, string> = {
   sabnzbd: 'SABnzbd',
   nzbget: 'NZBGet',
@@ -43,7 +43,7 @@ export const CLIENT_PRODUCTS: Record<DownloadClientType, string> = {
   rtorrent: 'rTorrent',
 };
 
-/** A configured torrent client, by its type, for Backfill. */
+/** Backfill's API for a configured torrent client. */
 export const torrentClientFor = (
   settings: DownloadClientSettings
 ): TorrentClient => {
@@ -61,7 +61,7 @@ export const torrentClientFor = (
   }
 };
 
-/** A configured Usenet client, by its type, for Backfill. */
+/** Backfill's API for a configured Usenet client. */
 export const usenetClientFor = (
   settings: DownloadClientSettings
 ): UsenetClient => {
@@ -75,7 +75,7 @@ export const usenetClientFor = (
   }
 };
 
-/** The API for a configured download client, by its type. */
+/** The API for a configured download client. */
 export const downloadClientFor = (
   settings: DownloadClientSettings
 ): TorrentClient | UsenetClient =>

@@ -81,8 +81,8 @@ const TranscribeModal = ({
       );
       onStarted();
     } catch (e) {
-      // Whisper paused or off says so, as on the card; only Bazarr not
-      // answering is worth another try.
+      // Whisper paused or off is reported as on the card; only Bazarr not
+      // answering offers a retry.
       const code = isAxiosError(e)
         ? (e.response?.data as Partial<SubtitleError> | undefined)?.code
         : undefined;

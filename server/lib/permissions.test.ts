@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Auto-Approve Music is 2^31: past what a 32-bit `&` and an integer column
- * hold. Permission checks and the database both have to keep it.
+ * Auto-Approve Music is 2^31, beyond a 32-bit `&` and an integer column; both
+ * permission checks and the database must keep it.
  */
 
 const HIGH = 2 ** 33;
@@ -28,7 +28,7 @@ describe('permission checks', () => {
   });
 
   it('do not mistake a high bit for a low one', () => {
-    // With `&`, 2^32 + 2 wrapped to 2 and read as an admin.
+    // With `&`, 2^32 + 2 wrapped to 2 and read as admin.
     assert.equal(hasPermission(Permission.ADMIN, 2 ** 32), false);
     assert.equal(
       hasPermission(Permission.AUTO_APPROVE_MUSIC, Permission.ADMIN * 2),

@@ -8,10 +8,10 @@ import { isOwnProfileOrAdmin } from '@server/utils/profileMiddleware';
 import { Router } from 'express';
 
 /*
- * A person's own CSS (Profile → Settings → Appearance), for their own
- * screens only, while an admin lets people add their own. It is checked
- * before it is kept (server/constants/customCss.ts); the reason a style is
- * refused is sent back for the page to explain.
+ * A user's own CSS (Profile → Settings → Appearance), for their screens only,
+ * while an admin allows it. Checked before saving
+ * (server/constants/customCss.ts); a refusal's reason is sent back for the
+ * page to show.
  */
 
 const personalCssRoutes = Router({ mergeParams: true });
@@ -59,8 +59,8 @@ personalCssRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      // Someone else's screens: the owner's only by the owner, and an
-      // admin's only by an admin.
+      // For another user: the owner's only by the owner, an admin's only by
+      // an admin.
       if (
         user.id !== req.user?.id &&
         (user.id === 1 ||

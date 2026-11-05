@@ -35,10 +35,9 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
 /*
- * Subtitles in a series' season list: a count on each season, a tag on
- * each episode, and the episode's own panel under it when the tag is
- * tapped. All of them read the one copy of the series' subtitles the
- * Subtitles card loads.
+ * Subtitles in a series' season list: a count per season, a tag per episode,
+ * and an episode panel when the tag is tapped. All read the series' subtitles
+ * the Subtitles card loads.
  */
 
 const messages = defineMessages('components.Subtitles.EpisodeSubtitles', {
@@ -110,12 +109,12 @@ export const SeasonSubtitleBadge = ({
   );
 };
 
-/** One tag per language, saying what kind of subtitle it has, or MISSING. */
+/** One tag per language: its best subtitle kind, or MISSING. */
 const tagsOf = (episode: EpisodeSubtitles) => {
   const byLanguage = new Map<string, SubtitleTrack>();
   for (const track of episode.tracks) {
     const kept = byLanguage.get(track.language);
-    // A file over a track in the video; a real subtitle over a transcript.
+    // Prefer a file to an embedded track, and a real subtitle to a transcript.
     const better =
       !kept ||
       (kept.kind === 'embedded' && track.kind === 'file') ||
@@ -195,7 +194,7 @@ export const EpisodeSubtitleTag = ({
   );
 };
 
-/** At the top of an open season: how many episodes lack a subtitle. */
+/** Top of an open season: how many episodes lack a subtitle. */
 export const SeasonMissingBar = ({
   tvId,
   seasonNumber,
@@ -230,7 +229,7 @@ export const SeasonMissingBar = ({
         ),
         { appearance: 'success', autoDismiss: true }
       );
-      // The Subtitles card follows the search, and shows what it found.
+      // The Subtitles card tracks the search and shows its results.
       void transcription.mutate(started, { revalidate: false });
     } catch {
       addToast(intl.formatMessage(messages.failed), {
@@ -257,7 +256,7 @@ export const SeasonMissingBar = ({
   );
 };
 
-/** An episode's subtitles, under the episode, with what can be done. */
+/** An episode's subtitles and actions, under the episode. */
 export const EpisodeSubtitlePanel = ({
   tvId,
   seasonNumber,

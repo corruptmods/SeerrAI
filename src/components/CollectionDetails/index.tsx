@@ -240,8 +240,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
         part.mediaInfo.status4k === MediaStatus.UNKNOWN
     ).length > 0;
 
-  // How much of the collection is here, for the line under its name and the
-  // request button: films in the library, films on their way, and the rest.
+  // Library, in-progress and remaining films, for the subtitle and request button.
   const inLibrary = data.parts.filter(
     (part) =>
       part.mediaInfo?.status === MediaStatus.AVAILABLE ||
@@ -483,8 +482,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
                   <ArrowDownTrayIcon />
                   <span>
                     {hasRequestable && inLibrary + onTheirWay > 0
-                      ? // Some of it is already here: say what the button
-                        // will actually ask for.
+                      ? // Partly available: name what the button requests.
                         intl.formatMessage(messages.requestmissing, {
                           count: missing,
                         })

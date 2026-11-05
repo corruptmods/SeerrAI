@@ -19,7 +19,7 @@ interface ShowMoreCardProps {
 const ShowMoreCard = ({ url, posters }: ShowMoreCardProps) => {
   const intl = useIntl();
   const [isHovered, setHovered] = useState(false);
-  // Drawn, posters and all, as it nears the screen along the row.
+  // Render (with posters) once near the screen along the row.
   const { ref, near } = useNearScreen();
 
   if (!near) {

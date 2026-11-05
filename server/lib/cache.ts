@@ -22,20 +22,20 @@ const OBJECT_VALUE_SIZE = 80;
 const PROMISE_VALUE_SIZE = 80;
 const ARRAY_VALUE_SIZE = 40;
 
-// Limits key count, not memory, since TMDB never caps the credits rosters.
+// Caps key count, not memory: TMDB credits rosters are uncapped.
 const TMDB_MAX_KEYS = 1000;
 
-// Backstop against unbounded growth as the 15 minute TTL is what bounds this tier.
+// Backstop only; the 15 minute TTL bounds this tier.
 const TMDB_SCAN_MAX_KEYS = 2000;
 
-// Only the rolling quality profile, root folder and language profile lookups reach
-// these tiers, and keys are prefixed by server url, so this is a few keys per server.
+// Only profile, root folder and language lookups land here, keyed by server
+// url: a few keys per server.
 const RADARR_MAX_KEYS = 64;
 const SONARR_MAX_KEYS = 64;
 const LIDARR_MAX_KEYS = 64;
 
-// Artists, albums and track lists people have looked at. The database keeps
-// them for longer (MusicMetadata); this saves reading it back.
+// Viewed artists, albums and track lists. MusicMetadata keeps them longer;
+// this skips the database read.
 const MUSICBRAINZ_MAX_KEYS = 2000;
 
 // A few Discover rows, the same for everyone.
@@ -52,14 +52,14 @@ const IMDB_MAX_KEYS = 500;
 // Releases and commits, varying only by page size and branch.
 const GITHUB_MAX_KEYS = 16;
 
-// Watchlist item metadata, shared between users as the token is not part of the key.
+// Watchlist item metadata; the token isn't in the key, so users share entries.
 const PLEX_TV_MAX_KEYS = 5000;
 
 // Keyed by auth token, so one key per Plex linked user.
 const PLEX_WATCHLIST_MAX_KEYS = 500;
 
-// Several keys per show, holding the largest payloads of any tier as the extended
-// series lookup carries every episode.
+// Several keys per show; the largest payloads, as the extended series lookup
+// carries every episode.
 const TVDB_MAX_KEYS = 500;
 
 export interface CacheStats {
@@ -127,9 +127,9 @@ class LruCacheStore implements CacheStore {
     this.cache = new LRUCache<string, LruEntry>({
       max,
       ttl: stdTtl * 1000,
-      // Without this, expired entries are only dropped when their key is read.
+      // Otherwise expired entries are dropped only when read.
       ttlAutopurge: true,
-      // Fires on every removal path, so one decrement here covers all of them.
+      // Runs on every removal path.
       dispose: (entry) => {
         this.ksize -= entry.ksize;
         this.vsize -= entry.vsize;
@@ -137,8 +137,7 @@ class LruCacheStore implements CacheStore {
     });
   }
 
-  // Cloned on read because callers mutate what they get back, as getTvSeason
-  // does when it rewrites still_path in place.
+  // Cloned because callers mutate results (getTvSeason rewrites still_path).
   public get<T>(key: string): T | undefined {
     const entry = this.cache.get(key);
 

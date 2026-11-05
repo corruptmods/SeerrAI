@@ -10,7 +10,7 @@ import { In } from 'typeorm';
 export { MediaEventType };
 
 export interface MediaEventInput {
-  /** 0 for music, which is kept by `foreignId` instead. */
+  /** 0 for music, which is keyed by `foreignId` instead. */
   tmdbId: number;
   /** For music: the artist's MusicBrainz id. */
   foreignId?: string | null;
@@ -24,12 +24,11 @@ export interface MediaEventInput {
 /**
  * Records one event in a title's history.
  *
- * Pass the EntityManager of the save it belongs to: inside a transaction, a
- * write through the global connection runs apart from it — on Postgres it
- * cannot see rows not yet committed, and would survive a rollback.
+ * Pass the EntityManager of the enclosing save: a write through the global
+ * connection runs outside the transaction (on Postgres it can't see
+ * uncommitted rows, and survives a rollback).
  *
- * Never throws. History is a record of what happened; failing to write it
- * must not undo or block the thing it records.
+ * Never throws: failing to record must not undo or block what it records.
  */
 export const recordMediaEvent = async (
   input: MediaEventInput,
@@ -47,9 +46,8 @@ export const recordMediaEvent = async (
     });
 
   try {
-    // Inside a transaction, in a nested one of its own: on Postgres a write
-    // that fails aborts the transaction it is in, which would lose the save
-    // being recorded and everything after it.
+    // In a nested transaction: on Postgres a failed write aborts its enclosing
+    // transaction, losing the save being recorded and everything after it.
     await (manager?.queryRunner?.isTransactionActive
       ? withNestedTransaction(manager, insert)
       : insert(manager ?? getRepository(MediaEvent).manager));
@@ -76,8 +74,8 @@ export interface MediaHistoryEntry {
 }
 
 /**
- * A title's history, newest first, with who did each thing: by TMDB id for
- * films and series, by `foreignId` for music.
+ * A title's history, newest first, with each actor: by TMDB id for films and
+ * series, by `foreignId` for music.
  */
 export const mediaHistory = async (
   where: FindOptionsWhere<MediaEvent>

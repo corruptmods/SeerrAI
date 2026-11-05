@@ -1,10 +1,7 @@
 import { Notification } from '.';
 import type { NotificationPayload } from './agents/agent';
 
-/**
- * Why a request was declined, for the notification saying so: only on a
- * "declined" notification, and only when whoever declined it gave a reason.
- */
+/** The decline reason for a MEDIA_DECLINED notification, if one was given. */
 export const declineReasonOf = (
   type: Notification,
   payload: NotificationPayload
@@ -16,15 +13,13 @@ export const declineReasonOf = (
 };
 
 /**
- * Text to be shown as written in markdown: every ASCII punctuation mark is
- * escaped with a backslash, which CommonMark (Gotify, ntfy) and Discord both
- * show as the mark itself. Nothing in it can become formatting, a link or a
- * mention.
+ * Backslash-escapes all ASCII punctuation, so CommonMark (Gotify, ntfy) and
+ * Discord show it literally: no formatting, links or mentions.
  */
 export const escapeMarkdown = (text: string): string =>
   text.replace(/[!-/:-@[-`{-~]/g, '\\$&');
 
-/** Text to be shown as written in HTML. */
+/** Escapes text for HTML. */
 export const escapeHtml = (text: string): string =>
   text.replace(
     /[&<>"']/g,

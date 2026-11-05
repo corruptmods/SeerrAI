@@ -23,27 +23,24 @@ export enum DiscoverSliderType {
   TMDB_MOVIE_STREAMING_SERVICES,
   TMDB_TV_STREAMING_SERVICES,
   SUGGESTED,
-  /** What Maintainerr is about to delete; empty rows are not shown. */
+  /** What Maintainerr is about to delete; hidden when empty. */
   DELETING_SOON,
-  /** Anime airing this season; its own page also has other seasons. */
+  /** Anime airing this season; its own page has other seasons too. */
   ANIME,
-  /*
-   * Music, shown only once Lidarr is set up and to people with music on.
-   * New albums come from ListenBrainz; Top Albums and Top Artists (named
-   * Popular before) and Top Songs and Trending from Apple Music's charts;
-   * Recently Added from Seerr's own scans.
-   */
+  // Music, shown only once Lidarr is set up, to users with music on. New albums
+  // from ListenBrainz; Top Albums, Top Artists, Top Songs and Trending from
+  // Apple Music's charts; Recently Added from Seerr's scans.
   MUSIC_RECENTLY_ADDED,
   MUSIC_NEW_RELEASES,
   MUSIC_POPULAR_ALBUMS,
   MUSIC_POPULAR_ARTISTS,
   MUSIC_TOP_SONGS,
   MUSIC_TRENDING,
-  /** Music's own Recent Requests, a playlist import as one card. */
+  /** Music's own Recent Requests, showing a playlist import as one card. */
   MUSIC_RECENT_REQUESTS,
 }
 
-/** Music's rows, which only show once music is ready. */
+/** Music rows, shown only once music is ready. */
 export const MUSIC_SLIDERS: readonly DiscoverSliderType[] = [
   DiscoverSliderType.MUSIC_RECENTLY_ADDED,
   DiscoverSliderType.MUSIC_NEW_RELEASES,
@@ -55,7 +52,7 @@ export const MUSIC_SLIDERS: readonly DiscoverSliderType[] = [
 ];
 
 export const defaultSliders: Partial<DiscoverSlider>[] = [
-  // First: the one row that is time-sensitive.
+  // First: the one time-sensitive row.
   {
     type: DiscoverSliderType.DELETING_SOON,
     enabled: true,
@@ -146,14 +143,14 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     isBuiltIn: true,
     order: 14,
   },
-  // Music, after everything else; they show once Lidarr is set up.
+  // Music last; shown once Lidarr is set up.
   {
     type: DiscoverSliderType.MUSIC_RECENTLY_ADDED,
     enabled: true,
     isBuiltIn: true,
     order: 15,
   },
-  // Music requests apart from films' and series': a playlist import's
+  // Music requests separate from films' and series', since a playlist import's
   // songs would fill Recent Requests.
   {
     type: DiscoverSliderType.MUSIC_RECENT_REQUESTS,
@@ -167,7 +164,7 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     isBuiltIn: true,
     order: 17,
   },
-  // The charts' songs before their albums and artists.
+  // Chart songs before their albums and artists.
   {
     type: DiscoverSliderType.MUSIC_TOP_SONGS,
     enabled: true,

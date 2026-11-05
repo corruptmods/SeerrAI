@@ -2,12 +2,10 @@ import { lockBodyScroll } from '@app/utils/bodyScrollLock';
 import { useEffect } from 'react';
 
 /**
- * Stops the page scrolling behind a panel or dialog while isLocked is true
- * and the component is mounted. Several can be locked at once; the page
- * scrolls again when the last lets go, whatever order they close in.
+ * Locks page scroll while `isLocked` and mounted. Locks stack; the page
+ * scrolls again when the last releases, in any order.
  *
- * @param isLocked Toggle the scroll lock
- * @param disabled Disables the entire hook (allows conditional skipping of the lock)
+ * @param disabled Skips the hook entirely
  */
 export const useLockBodyScroll = (
   isLocked: boolean,

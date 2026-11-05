@@ -1,9 +1,8 @@
 /*
- * The files in an NZB, read from each <file>'s subject line, where posters
- * put the file name in quotes, and sized from its segments. Posts packed as
- * RAR archives name the archives, not the episodes inside them, and posts
- * with scrambled names name nothing but their PAR2 repair files, so neither
- * can be matched file by file.
+ * Lists an NZB's files: names from each <file>'s subject line (posters quote
+ * them), sizes from its segments. RAR posts name only the archives, and
+ * scrambled posts name only their PAR2 files, so neither can be matched per
+ * file.
  */
 
 export interface NzbFile {
@@ -20,7 +19,7 @@ const ENTITIES: Record<string, string> = {
   apos: "'",
 };
 
-/** A character by its number; none for a number no character has. */
+/** The character for a code point; undefined if out of range. */
 const character = (code: number): string | undefined =>
   Number.isInteger(code) && code >= 0 && code <= 0x10ffff
     ? String.fromCodePoint(code)
@@ -44,38 +43,34 @@ export const nameFromSubject = (subject: string): string | undefined => {
   return bare?.[1];
 };
 
-/** More files than any real post has: the rest of the NZB is ignored. */
+/** More than any real post has; later files are ignored. */
 const MAX_FILES = 5000;
 
 export interface NzbContents {
-  /** The files whose subjects give a name. */
+  /** Files whose subject gives a name. */
   files: NzbFile[];
-  /** The size of those whose subjects give none: scrambled names. */
+  /** Total size of files whose subject gives none (scrambled). */
   unnamedBytes: number;
 }
 
 /**
- * Walks the <file> elements with indexOf, not one regular expression over
- * the whole document, which a file with no closing tag makes quadratic.
+ * Each <file> element, up to MAX_FILES, with its name and size. Uses
+ * indexOf, not one regex over the document, which an unclosed tag makes
+ * quadratic.
  */
-export const readNzb = (data: Buffer | string): NzbContents => {
-  const xml = typeof data === 'string' ? data : data.toString('utf8');
+function* fileElements(xml: string) {
   const lower = xml.toLowerCase();
-  const files: NzbFile[] = [];
-  let unnamedBytes = 0;
-  let seen = 0;
   let at = 0;
-  while (seen < MAX_FILES) {
+  for (let seen = 0; seen < MAX_FILES; seen++) {
     const start = lower.indexOf('<file', at);
-    if (start === -1) break;
+    if (start === -1) return;
     const tagEnd = lower.indexOf('>', start);
     const end = lower.indexOf('</file>', start);
-    if (tagEnd === -1 || end === -1) break;
+    if (tagEnd === -1 || end === -1) return;
     at = end + 7;
     const subject = xml
       .slice(start, tagEnd)
       .match(/subject\s*=\s*"([^"]*)"/i)?.[1];
-    seen++;
     let size = 0;
     for (const segment of xml
       .slice(tagEnd, end)
@@ -83,6 +78,15 @@ export const readNzb = (data: Buffer | string): NzbContents => {
       size += Number(segment[1]);
     }
     const name = subject ? nameFromSubject(decode(subject)) : undefined;
+    yield { start, end: at, name, size };
+  }
+}
+
+export const readNzb = (data: Buffer | string): NzbContents => {
+  const xml = typeof data === 'string' ? data : data.toString('utf8');
+  const files: NzbFile[] = [];
+  let unnamedBytes = 0;
+  for (const { name, size } of fileElements(xml)) {
     if (name) files.push({ index: files.length, name, size });
     else unnamedBytes += size;
   }
@@ -90,44 +94,24 @@ export const readNzb = (data: Buffer | string): NzbContents => {
 };
 
 /**
- * The NZB with only some of its named files, as `readNzb` numbers them:
- * so the client downloads just those, as a torrent's other files are
- * skipped. Its head is kept. Undefined when none would be left.
+ * The NZB with only the kept named files (numbered as `readNzb` does), so
+ * the client downloads just those. Keeps the head. Undefined if none are
+ * kept.
  */
 export const nzbWith = (
   data: Buffer | string,
   keep: (file: NzbFile) => boolean
 ): string | undefined => {
   const xml = typeof data === 'string' ? data : data.toString('utf8');
-  const lower = xml.toLowerCase();
   const kept: string[] = [];
   let first = -1;
   let last = -1;
   let named = 0;
-  let seen = 0;
-  let at = 0;
-  while (seen < MAX_FILES) {
-    const start = lower.indexOf('<file', at);
-    if (start === -1) break;
-    const tagEnd = lower.indexOf('>', start);
-    const end = lower.indexOf('</file>', start);
-    if (tagEnd === -1 || end === -1) break;
-    at = end + 7;
+  for (const { start, end, name, size } of fileElements(xml)) {
     if (first === -1) first = start;
-    last = at;
-    seen++;
-    const subject = xml
-      .slice(start, tagEnd)
-      .match(/subject\s*=\s*"([^"]*)"/i)?.[1];
-    const name = subject ? nameFromSubject(decode(subject)) : undefined;
+    last = end;
     if (!name) continue;
-    let size = 0;
-    for (const segment of xml
-      .slice(tagEnd, end)
-      .matchAll(/bytes\s*=\s*"(\d+)"/gi)) {
-      size += Number(segment[1]);
-    }
-    if (keep({ index: named, name, size })) kept.push(xml.slice(start, at));
+    if (keep({ index: named, name, size })) kept.push(xml.slice(start, end));
     named++;
   }
   if (!kept.length || first === -1) return undefined;
@@ -138,18 +122,17 @@ export const parseNzb = (data: Buffer | string): NzbFile[] =>
   readNzb(data).files;
 
 const VIDEO = /\.(mkv|mp4|avi|m4v|ts|wmv)$/i;
-/** Songs, which a music post names as a film's post names its videos. */
+/** Audio files, which a music post names as a video post names its videos. */
 const AUDIO = /\.(flac|mp3|m4a|aac|ogg|oga|opus|wav|aiff?|alac|ape|wv|wma)$/i;
 const ARCHIVE = /\.(rar|r\d{2}|7z|zip|\d{3})$/i;
-/** What a post carries beside its videos: repair data, notes, subtitles. */
+/** Files a post carries beside its media: repair data, notes, subtitles. */
 const SIDECAR = /\.(par2|nfo|sfv|srr|nzb|txt|jpe?g|png|srt|sub|idx|ass|ssa)$/i;
 
 /**
- * Why an NZB's videos (or songs) can't be listed before it is downloaded, if they
- * can't: they are inside archives, or their names are scrambled (most of
- * the post is files with no name, or none a video or archive would have,
- * and only its PAR2 repair files are named; the Usenet client puts the
- * real names back from those). Undefined when it names its videos.
+ * Why an NZB's videos (or songs) can't be listed before download: they are
+ * in archives, or scrambled (most of the post is unnamed or not media or
+ * archive names, and only PAR2 files are named; the Usenet client restores
+ * real names from those). Undefined when it names its videos.
  */
 export const packingOf = ({
   files,

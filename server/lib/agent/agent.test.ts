@@ -71,12 +71,11 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * The admin agent, run end to end with a scripted model: it finds the
- * title, reads what is missing, searches, opens a collection whose files
- * are numbered their own way, is turned down when it maps a file onto an
- * episode that already has one, then maps by title and starts a Backfill
- * download of just those files. Sonarr, Prowlarr, qBittorrent and the
- * model's API are stubbed at their clients.
+ * The admin agent end to end with a scripted model: it finds the title,
+ * reads what is missing, searches, opens a collection numbered its own way,
+ * is refused when it maps a file onto an episode that has one, then maps by
+ * title and starts a Backfill download of just those files. Sonarr,
+ * Prowlarr, qBittorrent and the model's API are stubbed at their clients.
  */
 
 const ben = (value: unknown): Buffer => {
@@ -169,7 +168,7 @@ const toolUse = (name: string, input: Record<string, unknown>, id = name) => ({
   stop_reason: 'tool_use',
   usage: { input_tokens: 100, output_tokens: 20 },
 });
-/** Several tools asked for in one turn. */
+/** Several tool calls in one turn. */
 const toolUses = (...calls: [string, Record<string, unknown>][]) => ({
   content: calls.map(([name, input], i) => ({
     type: 'tool_use',
@@ -224,8 +223,8 @@ const parse = (title: string): SonarrParseResult => {
 const waitForRun = async (id: number, until = ['done', 'failed']) => {
   for (let i = 0; i < 200; i++) {
     const run = await getRepository(AgentRun).findOneOrFail({ where: { id } });
-    // SQLite shares one connection: a status can be read before its save
-    // commits. The agent is idle once the save is done.
+    // SQLite shares one connection, so a status can be read before its save
+    // commits; the agent is idle once the save is done.
     if (until.includes(run.status) && !agent.isBusy()) return run;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -234,7 +233,7 @@ const waitForRun = async (id: number, until = ['done', 'failed']) => {
 
 const WAIT_MS = searchTiming.waitMs;
 
-/** The series' notes, once they hold what `done` looks for: kept a moment after. */
+/** The series' notes once `done` accepts them; they are written async. */
 const notesOnceKept = async (done: (notes: AgentNote[]) => boolean) => {
   const title = { kind: 'series' as const, serverId: 0, arrId: SERIES_ID };
   for (let i = 0; i < 200; i++) {
@@ -472,8 +471,8 @@ describe('the admin agent', () => {
           files,
           /#1 {2}.*Film - E02 \(Wendle's Picnic Below the Pier\)\.mp4 {2}\(150 MB\)/
         );
-        // Taken by its number, E04 would be S01E04, which has no such
-        // episode; E03 by number is S01E03, which has a file.
+        // By number, E04 would be S01E04, which doesn't exist, and E03 would
+        // be S01E03, which has a file.
         return toolUse(
           'grab',
           {
@@ -572,7 +571,7 @@ describe('the admin agent', () => {
       { indexes: [0, 3], priority: 0 },
       { indexes: [1, 2], priority: 1 },
     ]);
-    // Gathered with Backfill's other news; sent when that goes out.
+    // Batched with Backfill's other news; sent when that goes out.
     assert.equal(sent.length, 0);
     backfillNotices.flush();
     assert.equal(sent.length, 1);
@@ -583,12 +582,12 @@ describe('the admin agent', () => {
     );
     assert.equal(sent[0].message, '1 download started');
 
-    // The model saw every tool, the request one included, as an admin asked.
+    // An admin asked, so the model saw every tool, request_title included.
     const names = (bodies[0].tools as { name: string }[]).map((t) => t.name);
     assert.ok(names.includes('request_title'));
 
-    // The dub is kept with the title as turned down; the file it mapped
-    // to the wrong episode isn't, as the release itself was fine.
+    // The dub is noted on the title as refused; the wrongly mapped file
+    // isn't, since the release itself was fine.
     const notes = await notesOnceKept((kept) =>
       kept.some((note) => note.kind === 'grabbed')
     );
@@ -603,8 +602,8 @@ describe('the admin agent', () => {
     );
   });
 
-  // Packed in archives, or with scrambled names (only its PAR2 repair
-  // files named): either way its files are unknown until it's downloaded.
+  // Packed in archives or with scrambled names (only PAR2 files named):
+  // either way its files are unknown until downloaded.
   const archived = (name: string) =>
     `<?xml version="1.0"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">${[
       'rar',
@@ -972,7 +971,7 @@ describe('the admin agent', () => {
       'no new download for the same torrent'
     );
 
-    // It only added to that download: ending it is not its to do.
+    // It only added to that download, so stopping it isn't its call.
     mock.method(
       QBittorrentAPI.prototype,
       'deleteTorrent',
@@ -1059,7 +1058,7 @@ describe('the admin agent', () => {
     const run = await agent.ask('Get Wendle', await admin());
     assert.equal((await waitForRun(run.id)).status, 'done');
 
-    // An admin turning it down is final.
+    // An admin's refusal is final.
     await candidates.update({ seriesId: row.id }, { status: 'skipped' });
     await getRepository(BackfillJob).update(
       { seriesId: row.id },
@@ -1288,7 +1287,7 @@ describe('the admin agent', () => {
     );
     assert.equal(sent.length, 1, 'admins are told it has a question');
     assert.match(sent[0].subject ?? '', /has a question/);
-    // It opens at the conversation, with the box to answer in.
+    // It links to the conversation's answer box.
     assert.equal(sent[0].actionUrl, `/backfill/agent/${run.id}#answer`);
 
     script = [
@@ -1299,7 +1298,7 @@ describe('the admin agent', () => {
           String(messages[messages.length - 1].content),
           /says: The English one, and check it is English first/
         );
-        // Its earlier work is still there: r1 needs no new search.
+        // Earlier work persists: r1 needs no new search.
         return toolUse('check_language', {
           title: 'series:0:1283',
           release: 'r1',
@@ -1334,7 +1333,7 @@ describe('the admin agent', () => {
     );
     const jobId = done.actions[0].jobId;
 
-    // A correction: it stops what it started.
+    // On a correction, it stops what it started.
     mock.method(
       QBittorrentAPI.prototype,
       'deleteTorrent',
@@ -1411,7 +1410,7 @@ describe('the admin agent', () => {
       () => toolUse('find_title', { query: 'wendle' }),
       () => toolUse('find_title', { query: 'wendle' }),
       (body) => {
-        // That go started nothing: no third.
+        // That go started nothing, so no third.
         assert.match(lastText(body), /limit of 3 steps/);
         return say('Nothing found.');
       },
@@ -1635,8 +1634,8 @@ describe('the admin agent', () => {
     backfillNotices.flush();
     assert.equal(sent.length, 0, 'nothing done, nobody told');
 
-    // It looks on its own once per title: never again, even once the
-    // conversation is cleared out, nor for a report of it.
+    // It runs on its own once per title: never again, even after the
+    // conversation is cleared, nor for a report of it.
     const marked = await getRepository(BackfillSeries).findOneOrFail({
       where: { id: row.id },
     });
@@ -1659,12 +1658,12 @@ describe('the admin agent', () => {
         reporter,
       });
     assert.equal(await report(member), null, 'nor for someone’s report');
-    // An admin reporting it is asking for it.
+    // An admin's report counts as asking.
     const asked = await report(await admin());
     assert.ok(asked);
     assert.equal(asked.status, 'held');
     await getRepository(AgentRun).delete({ id: asked.id });
-    // The title's history says so.
+    // The title's history records it.
     const events = await getRepository(MediaEvent).find({
       where: { tmdbId: 371849, type: MediaEventType.AGENT },
     });
@@ -1723,8 +1722,8 @@ describe('the admin agent', () => {
   });
 
   it('looks into a title reported missing once the searches found nothing, and answers on the issue', async (t) => {
-    // Issues and their comments tell people, with the title from TMDB.
-    // (A field set per client: caught on the way in, as the issue tests do.)
+    // Issue notifications name the title from TMDB. (Assigned per instance,
+    // so trapped on the prototype, as the issue tests do.)
     Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
       configurable: true,
       set() {},
@@ -1777,7 +1776,7 @@ describe('the admin agent', () => {
     assert.equal(held?.status, 'held');
     assert.equal(await agent.afterReport(report), null, 'one at a time');
 
-    // Sonarr is still searching: it waits.
+    // Sonarr is still searching, so it waits.
     await agent.checkHeld();
     const still = await getRepository(AgentRun).findOneOrFail({
       where: { id: held!.id },
@@ -1806,8 +1805,8 @@ describe('the admin agent', () => {
       ['Admin agent: No release of the two missing shorts exists yet.']
     );
 
-    // An admin's follow-up later is between the admins and the agent: the
-    // issue was answered once, for the report.
+    // A later admin follow-up stays between admins and the agent: the issue
+    // was answered once, for the report.
     script = [() => say('Checked the indexers again for the admin.')];
     await agent.reply(held!.id, 'Look once more', await admin());
     assert.equal((await waitForRun(held!.id)).status, 'done');
@@ -2063,8 +2062,8 @@ describe('the admin agent and files holding several episodes', () => {
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
-      // Given only the first, as the agent once did: Sonarr would name it
-      // S01E01 and the second would stay missing.
+      // Given only the first: Sonarr would name it S01E01 and the second
+      // would stay missing.
       () => grab({ episode: 1 }),
       (body) => {
         const refused = lastResult(body);
@@ -2234,7 +2233,7 @@ describe('relinking a file that holds several episodes', () => {
       episodeFileId: fileId,
     }) as SonarrEpisode;
 
-  /** A Sonarr whose manual import and rename change what it answers. */
+  /** A Sonarr stub whose manual import and rename update its state. */
   const fakeSonarr = (
     episodes: SonarrEpisode[],
     files: SonarrEpisodeFile[]
@@ -2293,8 +2292,8 @@ describe('relinking a file that holds several episodes', () => {
     assert.equal(result.changed, true);
     assert.equal(result.episodes, 'S06E01-E02');
     assert.match(result.to, /S06E01-E02/);
-    // The file Sonarr already has, where it is, with no download: Sonarr
-    // then only replaces its record and moves nothing.
+    // The file Sonarr already has, in place, with no download: Sonarr only
+    // replaces its record and moves nothing.
     assert.deepEqual(calls.imported, [
       [
         {
@@ -2447,9 +2446,8 @@ describe('the admin agent and movies', () => {
           reason: 'The one file is the movie',
         }),
       (body) => {
-        // It once always answered "Radarr has a file for this now": the
-        // agent's movie plan carried no movie id, so the check passed for
-        // nothing.
+        // Without the movie id in the plan, the on-disk check wrongly
+        // reports "Radarr has a file for this now".
         assert.match(lastResult(body).content, /^Started Backfill job/);
         return say('Started it.');
       },
@@ -2610,7 +2608,7 @@ describe('the admin agent and movies', () => {
 });
 
 describe('changes the admin agent proposes', () => {
-  /** What the run was paused with, for an admin to decide on. */
+  /** The proposal the run paused on, for an admin to decide. */
   const proposalOf = (run: AgentRun) =>
     (
       run.memory as {
@@ -2663,7 +2661,7 @@ describe('changes the admin agent proposes', () => {
     assert.equal(await getRepository(BackfillJob).count(), 0);
     assert.equal(waiting.actions.length, 0);
     assert.match(sent[0]?.subject ?? '', /needs your approval/);
-    // It opens at the proposal, with Approve.
+    // It links to the proposal, with Approve.
     assert.equal(sent[0]?.actionUrl, `/backfill/agent/${waiting.id}#review`);
 
     script = [
@@ -2738,8 +2736,8 @@ describe('changes the admin agent proposes', () => {
       /no longer waiting/
     );
 
-    // Answering instead of approving: the proposal is dropped, and the
-    // model is told nothing of it was done.
+    // Replying instead of approving drops the proposal, and the model is
+    // told none of it was done.
     script = [
       () =>
         toolUse('propose_change', {
@@ -2830,7 +2828,7 @@ describe('changes the admin agent proposes', () => {
     assert.equal(done.actions[0].type, 'change');
     assert.equal(done.actions[0].change, 'blockGroup');
 
-    // The agent's own searches now say so, and it cannot take one.
+    // The agent's searches now flag it, and it cannot take one.
     mock.method(ProwlarrAPI.prototype, 'search', async () => [
       {
         ...COLLECTION,
@@ -2884,7 +2882,7 @@ describe('changes the admin agent proposes', () => {
     });
     assert.equal(replaced.isError, true);
     assert.match(replaced.text, /replaced only when an admin asks/);
-    // Once an admin has replied, they are.
+    // Once an admin has replied, they are present.
     (state.run.steps as { kind: string }[]).push({ kind: 'reply' });
     const allowed = await runTool(state, 'propose_change', {
       kind: 'unblockGroup',
@@ -2895,8 +2893,8 @@ describe('changes the admin agent proposes', () => {
   });
 
   it('gives a run no more say for an admin approving what it proposed', async () => {
-    // A report run, which read release names on its own, after an admin
-    // approved the replacement it proposed.
+    // A report run that read release names on its own, after an admin
+    // approved its proposed replacement.
     const steps: { kind: string; text?: string }[] = [
       { kind: 'propose', text: 'Replace a file of Wendle the Gentle Lantern' },
       {
@@ -2929,7 +2927,7 @@ describe('changes the admin agent proposes', () => {
       title: 'series:0:77',
     });
     assert.match(other.text, /only about Wendle the Gentle Lantern/);
-    // Its replacing, which the report asked for, is still put to an admin.
+    // The replacement the report asked for still goes to an admin.
     const replaced = await runTool(state, 'grab', {
       title: 'series:0:1283',
       release: 'r9',
@@ -2938,7 +2936,7 @@ describe('changes the admin agent proposes', () => {
       replace: true,
     });
     assert.match(replaced.text, /not a release reference/);
-    // An admin saying something is replying.
+    // An admin's message counts as a reply.
     steps.push({ kind: 'reply', text: 'Admin Ana: get the specials too' });
     const allowed = await runTool(state, 'propose_change', {
       kind: 'unblockGroup',
@@ -2951,8 +2949,8 @@ describe('changes the admin agent proposes', () => {
 
 describe('the admin agent keeping its conversations whole', () => {
   /**
-   * Every call the model made is answered in the message after it, as both
-   * APIs require: one left unanswered makes them refuse every later reply.
+   * Asserts every call is answered in the next message, as both APIs
+   * require; an unanswered one makes them refuse every later reply.
    */
   const assertAnswered = (body: Record<string, unknown>) => {
     const messages = body.messages as { role: string; content: unknown }[];
@@ -2984,7 +2982,7 @@ describe('the admin agent keeping its conversations whole', () => {
     };
     script = [
       () => toolUse('find_title', { query: 'wendle' }, 'a1'),
-      // Told to stop, it asks for another tool all the same.
+      // Told to stop, it calls another tool anyway.
       () => toolUse('find_title', { query: 'wendle' }, 'a2'),
     ];
     const run = await agent.ask('Find Wendle', await admin());
@@ -3050,7 +3048,7 @@ describe('the admin agent keeping its conversations whole', () => {
       throw new axios.AxiosError('connect ECONNREFUSED', 'ECONNREFUSED');
     };
     try {
-      // Twice it can't be reached; the third try answers.
+      // Unreachable twice; the third try answers.
       script = [
         unreachable,
         unreachable,
@@ -3066,7 +3064,7 @@ describe('the admin agent keeping its conversations whole', () => {
         2
       );
 
-      // Down for longer than it waits: it fails, to be picked up later.
+      // Down longer than it waits: it fails, to resume later.
       script = [unreachable, unreachable, unreachable];
       const lost = await agent.ask('Find Wendle again', await admin());
       const failed = await waitForRun(lost.id);
@@ -3091,7 +3089,7 @@ describe('the admin agent keeping its conversations whole', () => {
       await agent.checkOutages(now + 60_000);
       assert.equal(models.length, 1, 'asked again only after a while');
 
-      // It answers again: the run carries on from where it was.
+      // It answers again: the run resumes where it was.
       up = true;
       script = [
         (body) => {
@@ -3167,7 +3165,7 @@ describe('the admin agent keeping its conversations whole', () => {
     script = [
       (body) => {
         assertAnswered(body);
-        // Whether it ran is not known, and the model is told so.
+        // Whether it ran is unknown, and the model is told so.
         assert.match(JSON.stringify(body.messages), /No answer: it stopped/);
         return say('Going on.');
       },
@@ -3267,7 +3265,7 @@ describe('the admin agent keeping its conversations whole', () => {
       });
     const runs = getRepository(AgentRun);
 
-    // Sonarr cannot be reached: it waits a while, then gives up.
+    // Sonarr is unreachable: it waits a while, then gives up.
     mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () => {
       throw new Error('connect ECONNREFUSED');
     });
@@ -3284,7 +3282,7 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.match(failed.error ?? '', /ECONNREFUSED/);
     assert.ok(failed.finishedAt);
 
-    // The Sonarr server was removed: given up at once.
+    // The Sonarr server was removed: it gives up at once.
     const second = await reportBy();
     assert.ok(second);
     getSettings().sonarr = [];
@@ -3309,8 +3307,8 @@ describe('the admin agent keeping its conversations whole', () => {
     t.after(() => {
       delete (TheMovieDb.prototype as { getTvShow?: unknown }).getTvShow;
     });
-    // Loading the issue's title asks the download clients what is under
-    // way, which an earlier test's downloads would send out to the network.
+    // Loading the issue's title polls download clients, which an earlier
+    // test's downloads would send to the network.
     mock.method(downloadTracker, 'keepFresh', () => undefined);
     mock.method(BackfillSonarr.prototype, 'getCommands', async () => []);
     const me = await admin();
@@ -3339,13 +3337,13 @@ describe('the admin agent keeping its conversations whole', () => {
     const comments = () =>
       getRepository(IssueComment).find({ where: { issue: { id: issue.id } } });
 
-    // The AI service fails on the first go: nothing goes on the issue yet.
+    // The AI service fails on the first go: nothing is posted yet.
     script = [];
     await agent.checkHeld();
     assert.equal((await waitForRun(held.id)).status, 'failed');
     assert.equal((await comments()).length, 0);
 
-    // An admin has it try again, and it finishes: the issue gets that.
+    // An admin has it retry and it finishes: the issue gets that.
     script = [() => say('Nothing usable exists yet.')];
     await agent.reply(held.id, 'Try again', me);
     assert.equal((await waitForRun(held.id)).status, 'done');
@@ -3372,8 +3370,8 @@ describe('the admin agent keeping its conversations whole', () => {
       reporter: me,
     });
     assert.ok(held);
-    // The admin replies while the report is being checked on, and the
-    // conversation that starts is over before the check is.
+    // The admin replies during the report's check, and the resulting
+    // conversation finishes before the check does.
     mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () => {
       if (!replied) {
         replied = true;
@@ -3619,7 +3617,7 @@ describe('replacing a whole season through the admin agent', () => {
 
   it('replaces a season asked to be replaced, never by deleting first: the new release is grabbed, then the old files go', async () => {
     script = [
-      // As on the owner's server: it reaches for deleting the files.
+      // As seen on a live server: it reaches for deleting the files.
       () =>
         toolUse('propose_change', {
           kind: 'deleteFiles',
@@ -3674,7 +3672,7 @@ describe('replacing a whole season through the admin agent', () => {
     await agent.approve(run.id, proposal!.id, await admin());
     const finished = await waitForRun(run.id);
     assert.equal(finished.status, 'done', finished.error ?? '');
-    // Grabbed first; only then the old release blocklisted and files gone.
+    // Grabbed first; only then is the old release blocklisted and removed.
     assert.deepEqual(done, [
       `grab:${NEW}`,
       'failed:700',
@@ -3772,11 +3770,11 @@ describe('when a download the admin agent started fails', () => {
     size: 350 * MB,
     seeders: undefined,
   });
-  // As on the owner's server: a usenet post that SABnzbd could not finish,
-  // and another group's post of the same episode that would have worked.
+  // As seen on a live server: a Usenet post SABnzbd couldn't finish, and
+  // another group's post of the same episode that works.
   const KILN = post('Wendle.the.Gentle.Lantern.S01E02.DVDRip.x264-KILN');
   const LESIGH = post('Wendle.the.Gentle.Lantern.S01E02.480p.WEB-LeSigh');
-  /** What SABnzbd says of each download it was given, by its id. */
+  /** SABnzbd's state for each download, by id. */
   let sab: Map<string, 'queue' | 'failed'>;
   let added = 0;
 
@@ -3857,7 +3855,7 @@ describe('when a download the admin agent started fails', () => {
     },
   ];
 
-  /** The last thing the model was told, whatever its shape. */
+  /** The last message the model was sent, whatever its shape. */
   const lastSaid = (body: Record<string, unknown>) => {
     const messages = body.messages as unknown[];
     return JSON.stringify(messages[messages.length - 1]);
@@ -3938,8 +3936,8 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(after.status, 'done', after.error ?? '');
     assert.equal(bodies.length, asked + 4, 'one more go of the same run');
     assert.equal(after.summary, 'Took the LeSigh post of S01E02 instead.');
-    // Its own kind of go: not a new conversation, and not one counted
-    // towards the agent's runs a day.
+    // A retry go: not a new conversation, and not counted toward the
+    // agent's daily runs.
     assert.equal(await getRepository(AgentRun).count(), 1);
     assert.equal(after.purpose, 'retry');
     assert.ok(
@@ -3961,8 +3959,8 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(replacement.title, LESIGH.title);
     assert.equal(replacement.agentRunId, run.id);
 
-    // Kept with the title: its searches (the first made before it knew
-    // the title), both downloads, and the one that failed and why.
+    // Noted on the title: its searches (the first before the title was
+    // known), both downloads, and the failure and why.
     const notes = await notesOnceKept((kept) => kept.length >= 5);
     assert.deepEqual(
       notes.map((note) => [note.kind, note.what]),
@@ -3978,7 +3976,7 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(notes[0].results, 2);
     assert.match(notes[2].why ?? '', /SABnzbd could not finish it/);
 
-    // The next conversation about the title is told, before it starts.
+    // The next conversation about the title is told before it starts.
     script = [
       (body) => {
         const first = (body.messages as { content: string }[])[0].content;
@@ -4086,8 +4084,8 @@ describe('when a download the admin agent started fails', () => {
     const waiting = await waitForRun(run.id, ['waiting']);
     const asked = bodies.length;
     const failedId = await failFirst(waiting);
-    // Not while it waits on the admin: the job says it is the agent's to
-    // pick up.
+    // Not while it waits on the admin; the job stays the agent's to pick
+    // up.
     assert.equal(bodies.length, asked);
     const jobs = getRepository(BackfillJob);
     assert.equal(
@@ -4164,7 +4162,7 @@ describe('when a download the admin agent started fails', () => {
       'still said to come from a report'
     );
 
-    // Neither counts as a run of the day, nor holds a report of the title.
+    // Neither counts as a daily run, nor blocks a report of the title.
     const report = await agent.afterReport({
       ...title,
       title: 'Wendle the Gentle Lantern',
@@ -4172,7 +4170,7 @@ describe('when a download the admin agent started fails', () => {
     });
     assert.ok(report, 'the report was looked into');
     assert.equal(report.purpose, 'work');
-    // A run of its own does count: with one done today, that is the day's.
+    // Its own run counts: with one done today, the day's quota is used.
     await getRepository(AgentRun).delete({ id: report.id });
     const second = await getRepository(AgentRun).save(
       new AgentRun({
@@ -4193,7 +4191,7 @@ describe('when a download the admin agent started fails', () => {
       null,
       "the day's runs are used up"
     );
-    // A run going again after a failed download holds up no report.
+    // A run retrying after a failed download blocks no report.
     await getRepository(AgentRun).update(
       { id: second.id },
       { purpose: 'retry', status: 'running' }
@@ -4212,7 +4210,7 @@ describe('when a download the admin agent started fails', () => {
 });
 
 describe('the admin agent and episode numbering', () => {
-  /** A Usenet post, packed in archives: only its name says what it is. */
+  /** A Usenet post in archives: only its name says what it is. */
   const post = (name: string) => ({
     ...COLLECTION,
     guid: `https://usenet/${name}`,
@@ -4258,10 +4256,10 @@ describe('the admin agent and episode numbering', () => {
     );
   };
   /**
-   * Sonarr numbering the series by the scene's seasons: every name's
-   * S01E02 is read as the library's S01E03 "Hush Hush Puppy".
+   * Sonarr numbers the series by scene seasons: a name's S01E02 reads as
+   * the library's S01E03 "Hush Hush Puppy".
    */
-  /** Asked from the title's own page, so it knows the series from the start. */
+  /** Asked from the title's page, so the series is bound from the start. */
   const ABOUT = {
     title: { kind: 'series' as const, serverId: 0, arrId: SERIES_ID },
     name: 'Wendle the Gentle Lantern',
@@ -4302,7 +4300,7 @@ describe('the admin agent and episode numbering', () => {
         }),
       (body) => {
         const listed = lastResult(body).content;
-        // Which episode each is, by its title, or by both numberings.
+        // Which episode each is, by title or by both numberings.
         assert.match(
           listed,
           /r1 \| is S01E02 "Twice Around a Riddle" \(missing\) \|/
@@ -4394,7 +4392,7 @@ describe('the admin agent and episode numbering', () => {
       'piece length': 1048576,
       pieces: Buffer.alloc(20),
       files: [
-        // A special counted as episode 1, so every number is one off.
+        // A special counted as episode 1, so every number is off by one.
         { length: 150 * MB, path: ['Wendle.S01E02.Hush.Hush.Puppy.mkv'] },
         {
           length: 40 * MB,
@@ -4543,7 +4541,7 @@ describe('stopping and correcting the admin agent while it works', () => {
       () =>
         toolUses(
           ['search_indexers', { query: 'Wendle S01E01', kind: 'series' }],
-          // Not read-only, so it runs after the search, on its own.
+          // Not read-only, so it runs alone after the search.
           [
             'grab',
             {
@@ -4564,7 +4562,7 @@ describe('stopping and correcting the admin agent while it works', () => {
       `Stopped by ${user.displayName}. Reply to have it carry on from here.`
     );
     assert.equal(bodies.length, 1, 'the model was not asked again');
-    // The call after the stop was not run, and is answered so.
+    // The call after the stop isn't run, and is answered so.
     const tools = done.steps.filter((s) => s.kind === 'tool');
     assert.deepEqual(
       tools.map((s) => s.tool),
@@ -4575,7 +4573,7 @@ describe('stopping and correcting the admin agent while it works', () => {
       new RegExp(`Not run: ${user.displayName} stopped it\\.`)
     );
 
-    // Replying carries on from there.
+    // A reply resumes from there.
     script = [() => say('Carrying on.')];
     await agent.reply(run.id, 'Go on', user);
     const again = await waitForRun(run.id);
@@ -4584,7 +4582,7 @@ describe('stopping and correcting the admin agent while it works', () => {
 
   it('stops a conversation still waiting its turn without starting it', async () => {
     const user = await admin();
-    // The first one keeps the agent busy until let go.
+    // The first keeps the agent busy until released.
     let letGo = () => undefined as void;
     const held = new Promise<void>((resolve) => {
       letGo = resolve;

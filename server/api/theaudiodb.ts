@@ -2,21 +2,18 @@ import ExternalAPI from '@server/api/externalapi';
 import logger from '@server/logger';
 
 /*
- * TheAudioDB, for artist pictures Lidarr has none of, looked up by the
- * artist's MusicBrainz id. Its free key works for that; a supporter's key,
- * entered in Settings → Music, is used instead when there is one. Answers
- * are kept a week (see artistImage), so it is asked little.
+ * Artist pictures Lidarr lacks, by MusicBrainz id. The free key suffices; a
+ * supporter key from Settings → Music is used when set. Answers are cached a
+ * week (see artistImage).
  */
 
 export const THE_AUDIO_DB_URL = 'https://www.theaudiodb.com/api/v1/json';
 
-/** TheAudioDB's public key, for anyone without one of their own. */
 export const THE_AUDIO_DB_FREE_KEY = '123';
 
 /**
- * Lookups a minute with the free key, kept well inside what TheAudioDB
- * allows it; past that the answer is "could not be asked", which is not
- * kept, so the next visit asks again.
+ * Free-key lookups per minute, well under TheAudioDB's limit. Past it the
+ * answer is "could not ask", which isn't cached, so the next visit retries.
  */
 const FREE_PER_MINUTE = 20;
 const freeAsked: number[] = [];
@@ -43,9 +40,9 @@ interface TadbArtistResponse {
 }
 
 export interface ArtistPictures {
-  /** A square picture of the artist. */
+  /** Square artist picture. */
   thumb: string | null;
-  /** A wide one, for behind the artist's page. */
+  /** Wide background for the artist page. */
   fanart: string | null;
 }
 
@@ -55,8 +52,8 @@ class TheAudioDb extends ExternalAPI {
   }
 
   /**
-   * The artist's pictures, none when it is not known; null when TheAudioDB
-   * could not be asked, which says nothing of whether it has any.
+   * The artist's pictures, empty when unknown; null when TheAudioDB could not
+   * be asked, which says nothing about whether it has any.
    */
   public async getArtistPictures(
     artistMbid: string

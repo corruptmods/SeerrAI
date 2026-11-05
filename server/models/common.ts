@@ -98,7 +98,7 @@ export const mapCast = (person: TmdbCreditCast): Cast => ({
 
 export const mapAggregateCast = (person: TmdbAggregateCreditCast): Cast => ({
   castId: person.cast_id,
-  // the first role is the one for which the actor appears the most as
+  // The first role is the one with the most episodes.
   character: person.roles[0].character,
   creditId: person.roles[0].credit_id,
   id: person.id,

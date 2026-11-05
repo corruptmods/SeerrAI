@@ -28,11 +28,11 @@ import logger from '@server/logger';
 import { IsNull, Not } from 'typeorm';
 
 /*
- * What Settings → Media Servers changes: which servers Seerr is connected
- * to, which one is primary, and which ones people may sign in with.
+ * What Settings → Media Servers changes: connected servers, the primary, and
+ * which allow sign-in.
  */
 
-/** Why a change to the media servers was refused, with the status to answer. */
+/** Why a media server change was refused, with the response status. */
 export class MediaServerChangeError extends Error {
   constructor(
     public readonly status: number,
@@ -42,18 +42,17 @@ export class MediaServerChangeError extends Error {
   }
 }
 
-/** Some connected server lets people sign in with it. */
+/** Whether any connected server allows sign-in. */
 const anyServerAllowsSignIn = (): boolean => {
   const settings = getSettings();
   return connectedServers().some((kind) => settings[kind].signIn !== false);
 };
 
 /**
- * Keeps the old single switch for media server sign-in
- * (main.mediaServerLogin), which pages and API clients still read, in step
- * with each server's own: on while any connected server allows sign-in.
- * Before any server is connected it is left as it is, as setup reads it.
- * The caller saves.
+ * Keeps the legacy sign-in switch (main.mediaServerLogin), still read by pages
+ * and API clients, in step with the per-server ones: on while any connected
+ * server allows sign-in. Left alone before any server is connected, as setup
+ * reads it. The caller saves.
  */
 export const deriveMediaServerLogin = (): void => {
   if (!connectedServers().length) return;
@@ -61,9 +60,8 @@ export const deriveMediaServerLogin = (): void => {
 };
 
 /**
- * Settings → Users has one switch standing for every connected server's.
- * Changing it turns them all on or off; saving it unchanged leaves each
- * server's own switch as it is. The caller saves.
+ * Settings → Users has one switch for all connected servers. Changing it sets
+ * them all; saving it unchanged leaves each server's own. The caller saves.
  */
 export const applyMediaServerLogin = (wanted: boolean | undefined): void => {
   if (typeof wanted === 'boolean' && connectedServers().length) {
@@ -89,7 +87,7 @@ export const setSignIn = async (
       `${serverName(kind)} is not connected.`
     );
   }
-  // Someone has to be able to sign in: with a password, or another server.
+  // Someone must still be able to sign in: by password or another server.
   if (
     !signIn &&
     settings.main.localLogin === false &&
@@ -107,7 +105,7 @@ export const setSignIn = async (
   await settings.save();
 };
 
-/** Makes a connected server the primary one, and saves. */
+/** Makes a connected server primary, and saves. */
 export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
   const settings = getSettings();
   if (!connectedServers().includes(kind)) {
@@ -124,11 +122,10 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
 };
 
 /**
- * Who removing this server would affect: people with an account on it and
- * none on another connected server that allows sign-in, nor a single
- * sign-on provider that is switched on. Their link stays, but is no longer
- * a way in; whoever has a password (and may use it) can still sign in with
- * that.
+ * Who removing this server would affect: users with an account on it and none
+ * on another sign-in-enabled connected server or enabled SSO provider. Their
+ * link stays but no longer signs them in; anyone with a usable password can
+ * still use it.
  */
 export const removalImpact = async (
   kind: MediaServerKind
@@ -157,8 +154,8 @@ export const removalImpact = async (
     if ((await usableProviderLinks(user.id)).length) {
       continue;
     }
-    // The owner may always use their password; others only while
-    // sign-in with a password is on.
+    // The owner can always use their password; others only while password
+    // sign-in is on.
     const mayUsePassword =
       !!user.password && (user.id === 1 || settings.main.localLogin !== false);
     if (mayUsePassword) {
@@ -172,12 +169,12 @@ export const removalImpact = async (
 
 /**
  * Disconnects a server. Its address and libraries are kept for an easy
- * reconnect; a Jellyfin or Emby API key is forgotten. If it was the primary
- * one, the next connected server becomes primary. Titles lose its ids (its
- * next scan after reconnecting puts them back), and an availability sync
- * runs so nothing stays available only because of it. Its scans stop, its
- * Match Check findings go, and people's accounts on it are kept but no
- * longer used to sign in. The last connected server cannot be removed.
+ * reconnect; a Jellyfin or Emby API key is discarded. If it was primary, the
+ * next connected server becomes primary. Titles lose its ids (its next scan
+ * after reconnecting restores them), and an availability sync runs so nothing
+ * stays available only because of it. Its scans stop, its Match Check findings
+ * are dropped, and users' accounts on it are kept but no longer sign them in.
+ * The last connected server can't be removed.
  */
 export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   const settings = getSettings();
@@ -206,11 +203,11 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   deriveMediaServerLogin();
   await settings.save();
 
-  // Its scans stop first, so none of them puts back an id taken off below.
+  // Stop its scans first so none restores an id cleared below.
   refreshMediaServerJobs();
 
-  // Only rows holding an id are touched, one column at a time, so the
-  // other servers' ids on the same titles are left as they are.
+  // Only rows holding an id are touched, one column at a time, so other
+  // servers' ids on the same titles are untouched.
   const media = getRepository(Media);
   for (const column of MEDIA_ID[kind]) {
     await media.update({ [column]: Not(IsNull()) }, { [column]: null });
@@ -223,7 +220,7 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   await plexMatchCheck.dropServer(serverName(kind) as MediaServerName);
   await matchWatch.dropServer(serverName(kind) as MediaServerName);
 
-  // A sync already under way checked some titles with this server still
+  // A sync already running checked some titles while this server was still
   // there; it runs once more when it finishes.
   availabilitySync.runSoon().catch((e) =>
     logger.error('Availability sync after removing a server failed', {

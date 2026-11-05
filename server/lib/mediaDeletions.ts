@@ -7,9 +7,9 @@ import { In } from 'typeorm';
 /**
  * Records that a title was removed from the library.
  *
- * Watchlist sync reads this to decide whether a watchlist entry predates the
- * deletion (leave it alone) or was added afterwards (the user wants it again).
- * Kept outside Media because deleting media can remove that row entirely.
+ * Watchlist sync uses this to tell whether an entry predates the deletion
+ * (leave it) or came after (the user wants it again). Stored outside Media
+ * because deleting media can remove that row entirely.
  */
 export const recordMediaDeletion = async (
   tmdbId: number,
@@ -22,7 +22,7 @@ export const recordMediaDeletion = async (
     });
 
     if (existing) {
-      // Latest deletion wins: re-adding and deleting again moves the line.
+      // Latest deletion wins: re-adding and deleting again moves it.
       existing.deletedAt = new Date();
       await repository.save(existing);
 
@@ -33,9 +33,9 @@ export const recordMediaDeletion = async (
       new MediaDeletion({ tmdbId, mediaType, deletedAt: new Date() })
     );
   } catch (e) {
-    // Never fail a deletion because the bookkeeping failed — but say so: this
-    // record is what stops a watchlist re-requesting a title that was
-    // deliberately deleted, and a debug line is invisible by default.
+    // Never fail a deletion over bookkeeping, but warn: this record stops a
+    // watchlist re-requesting a deliberately deleted title, and debug lines are
+    // hidden by default.
     logger.warn('Could not record a media deletion', {
       label: 'Media',
       tmdbId,
@@ -44,7 +44,7 @@ export const recordMediaDeletion = async (
   }
 };
 
-/** Deletion times for a set of titles, keyed as `mediaType:tmdbId`. */
+/** Deletion times for titles, keyed as `mediaType:tmdbId`. */
 export const getDeletionTimes = async (
   tmdbIds: number[]
 ): Promise<Map<string, Date>> => {

@@ -2,25 +2,25 @@ import type { PlaylistService } from '@server/entity/MediaList';
 import axios from 'axios';
 
 /*
- * A Spotify or Apple Music playlist, read from its public page as anyone
- * sees it in a browser: no account, no key. Not an API either side
- * promises to keep, so a page that has changed says so plainly. Spotify's
- * page holds the first 100 songs; Apple Music's, those it shows at first.
+ * Reads Spotify and Apple Music playlists from their public pages, with no
+ * account or key. The pages aren't a stable API, so a changed page fails
+ * with a clear error. Spotify's page has the first 100 songs; Apple
+ * Music's, those it initially shows.
  */
 
 export interface PlaylistLink {
   service: PlaylistService;
-  /** The playlist's own id there. */
+  /** Playlist id on the service. */
   id: string;
-  /** The link, tidied: what is kept and read again. */
+  /** Canonical link, stored and re-read. */
   url: string;
 }
 
 export interface SourceSong {
-  /** The service's id for it, unique within the playlist. */
+  /** Service track id, unique within the playlist. */
   sourceId: string;
   title: string;
-  /** The first artist credited. */
+  /** First credited artist. */
   artistName: string;
   /** Milliseconds, when known. */
   length: number | null;
@@ -31,20 +31,20 @@ export interface SourcePlaylist {
   songs: SourceSong[];
 }
 
-/** Why a playlist could not be read, in words for whoever linked it. */
+/** User-facing reason a playlist couldn't be read. */
 export class PlaylistSourceError extends Error {}
 
 const TIMEOUT_MS = 20_000;
-/** A playlist page is well under this; more is not a playlist page. */
+/** Playlist pages are well under this; larger isn't one. */
 const MAX_PAGE_BYTES = 5 * 1024 * 1024;
-/** Their pages may redirect, but only within Spotify or Apple Music. */
+/** Redirects are only followed within Spotify or Apple Music. */
 const PAGE_HOSTS = /(^|\.)(spotify\.com|apple\.com)$/i;
-/** The most songs one playlist brings in. */
+/** Max songs imported per playlist. */
 export const MAX_SOURCE_SONGS = 500;
 
 const SPOTIFY_ID = /^[A-Za-z0-9]{22}$/;
 
-/** What a pasted link is, or null for anything else. */
+/** Parses a pasted playlist link, or null. */
 export const parsePlaylistLink = (text: string): PlaylistLink | null => {
   const raw = text.trim();
   const uri = raw.match(/^spotify:playlist:([A-Za-z0-9]{22})$/);
@@ -93,7 +93,7 @@ export const parsePlaylistLink = (text: string): PlaylistLink | null => {
   return null;
 };
 
-/** The JSON a page carries in <script id="…">, or undefined. */
+/** Parses the JSON in <script id="…">, or undefined. */
 const scriptJson = (html: string, id: string): unknown => {
   const match = html.match(
     new RegExp(`<script[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</script>`)
@@ -109,7 +109,7 @@ const scriptJson = (html: string, id: string): unknown => {
 const text = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
 
-/** Spotify's embedded player page, as it holds the playlist. */
+/** Reads a playlist from Spotify's embedded player page. */
 export const readSpotifyPage = (html: string): SourcePlaylist => {
   const data = scriptJson(html, '__NEXT_DATA__') as
     | {
@@ -142,7 +142,7 @@ export const readSpotifyPage = (html: string): SourcePlaylist => {
   const songs: SourceSong[] = [];
   for (const track of entity.trackList) {
     const title = text(track.title);
-    // "Artist A, Artist B": the first is the one credited first.
+    // "Artist A, Artist B": take the first.
     const artistName = text(track.subtitle).split(/,\s*/)[0] ?? '';
     const sourceId = text(track.uri);
     if (!title || !artistName || !sourceId.startsWith('spotify:track:')) {
@@ -164,7 +164,7 @@ export const readSpotifyPage = (html: string): SourcePlaylist => {
   };
 };
 
-/** Apple Music's playlist page, from the data it is drawn from. */
+/** Reads a playlist from Apple Music's page data. */
 export const readApplePage = (html: string): SourcePlaylist => {
   interface Item {
     title?: string;
@@ -235,7 +235,7 @@ export const readPlaylist = async (
         }
       },
       headers: {
-        // Their pages are made for browsers; a bare client is turned away.
+        // The services reject non-browser user agents.
         'User-Agent':
           'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
         'Accept-Language': 'en',

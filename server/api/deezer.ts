@@ -1,11 +1,9 @@
 import ExternalAPI from '@server/api/externalapi';
 
 /*
- * Deezer's public catalog: songs as the stores list them, with each
- * recording's ISRC, the code the industry gives one recording. It needs no
- * key. A playlist's songs are looked up here to be matched on MusicBrainz
- * by that code, and, when MusicBrainz has no such song at all, for the
- * album and track number it is found by.
+ * Deezer's keyless public catalog, with each recording's ISRC. Playlist songs
+ * are looked up here to match on MusicBrainz by ISRC, or, when MusicBrainz
+ * lacks the song, by album and track number.
  */
 
 export const DEEZER_URL = 'https://api.deezer.com';
@@ -26,15 +24,15 @@ export interface DeezerAlbum {
 
 export interface DeezerTrack {
   id: number;
-  /** The title with its version ("Song (Live)"). */
+  /** Title with version ("Song (Live)"). */
   title: string;
-  /** The title without it. */
+  /** Title without version. */
   title_short?: string;
-  /** Its version, in brackets, or empty. */
+  /** Bracketed version, or empty. */
   title_version?: string;
   /** Seconds. */
   duration: number;
-  /** Only on a track looked up by its id. */
+  /** Only on a track fetched by id. */
   isrc?: string;
   track_position?: number;
   disk_number?: number;
@@ -52,11 +50,11 @@ interface DeezerSearch extends DeezerError {
   data?: DeezerTrack[];
 }
 
-/** Deezer answered with an error of its own (it does so with a 200). */
+/** A Deezer error, which it sends with a 200. */
 export class DeezerProblem extends Error {
   constructor(
     message: string,
-    /** 800: nothing by that id. 4: asked too often. */
+    /** 800: no such id. 4: rate limited. */
     public code?: number
   ) {
     super(message);
@@ -73,12 +71,12 @@ const checked = <T extends DeezerError>(data: T): T => {
   return data;
 };
 
-/** A phrase for Deezer's search, its quotes taken out. */
+/** A search phrase with quotes and backslashes removed. */
 const phrase = (text: string): string => text.replace(/["\\]/g, ' ').trim();
 
 class DeezerAPI extends ExternalAPI {
   constructor() {
-    // Deezer allows 50 requests in 5 seconds; this stays well inside it.
+    // Deezer allows 50 requests per 5 seconds; stay well under.
     super(
       DEEZER_URL,
       {},
@@ -86,7 +84,7 @@ class DeezerAPI extends ExternalAPI {
     );
   }
 
-  /** Tracks by this artist with this title, best known first. */
+  /** Tracks by this artist with this title, most popular first. */
   public async searchTracks(
     title: string,
     artistName: string,
@@ -107,7 +105,7 @@ class DeezerAPI extends ExternalAPI {
     return Array.isArray(data.data) ? data.data : [];
   }
 
-  /** One track, with its ISRC and where it is on its album. */
+  /** One track with its ISRC and album position. */
   public async getTrack(id: number): Promise<DeezerTrack | null> {
     try {
       return checked(

@@ -129,8 +129,8 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
   configurable: true,
 });
 
-// both are assigned in the constructor, so the prototype stubs miss the instance
-// sonarrScanner built when it was first imported
+// These methods are assigned in the constructor, so prototype stubs miss the
+// sonarrScanner instance built at import; stub the instance too.
 for (const method of ['getTvShow', 'getTvShowForScan'] as const) {
   Object.defineProperty(sonarrScanner.tmdb, method, {
     value: async (args: { tvId: number; language?: string }) =>
@@ -863,7 +863,7 @@ describe('Sonarr Scanner', () => {
       const requestedBy = await getRepository(User).findOneOrFail({
         where: { id: 1 },
       });
-      // TheTVDB merged the series: Seerr kept 610, Sonarr has it as 611.
+      // TheTVDB merged the series: Seerr stored 610, Sonarr has 611.
       const media = await mediaRepository.save(
         new Media({
           tmdbId: 2011,
@@ -962,8 +962,8 @@ describe('Sonarr Scanner', () => {
         })
       );
 
-      // Just added: Sonarr has the series, monitored, but its seasons
-      // have not come through from TheTVDB yet.
+      // Just added: Sonarr has the series monitored, but TheTVDB hasn't
+      // supplied its seasons yet.
       configureSonarr([{ syncEnabled: true }]);
       getSeriesImpl = async () => [
         fakeSonarrSeries({ tvdbId: 610, monitored: true, seasons: [] }),
@@ -1163,7 +1163,7 @@ describe('Sonarr Scanner', () => {
       getSeriesImpl = async () => {
         callCount++;
         if (callCount === 1) {
-          // standard server still has the show (processing, no files)
+          // The standard server still has the show (processing, no files).
           return [
             fakeSonarrSeries({
               tvdbId: 666,
@@ -1184,7 +1184,7 @@ describe('Sonarr Scanner', () => {
             }),
           ];
         }
-        // 4k server: populated but the show is absent, so 4k dimension orphaned
+        // The 4K server is populated but lacks the show, so 4K is orphaned.
         return [fakeSonarrSeries({ tvdbId: 997 })];
       };
 

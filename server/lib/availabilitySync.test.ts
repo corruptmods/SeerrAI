@@ -40,7 +40,6 @@ import { setupTestDb } from '@server/test/db';
 import { ApiError } from '@server/types/error';
 import schedule from 'node-schedule';
 
-// --- Mock JellyfinAPI ---
 let getSystemInfoImpl: (
   kind: JellyfinAPI['kind']
 ) => Promise<Record<string, unknown>> = async () => ({
@@ -99,7 +98,6 @@ Object.defineProperty(JellyfinAPI.prototype, 'setUserId', {
   configurable: true,
 });
 
-// --- Mock PlexAPI ---
 let getMetadataImpl: (
   key: string,
   options?: { includeChildren?: boolean }
@@ -137,7 +135,6 @@ Object.defineProperty(PlexAPI.prototype, 'getChildrenMetadata', {
   configurable: true,
 });
 
-// --- Mock SonarrAPI ---
 let getSeriesByIdImpl: (id: number) => Promise<SonarrSeries> = async () => {
   throw new Error('404');
 };
@@ -150,7 +147,6 @@ Object.defineProperty(SonarrAPI.prototype, 'getSeriesById', {
   configurable: true,
 });
 
-// --- Mock RadarrAPI ---
 let getMovieImpl: (id: number) => Promise<RadarrMovie> = async () => {
   throw new Error('404');
 };
@@ -163,7 +159,6 @@ Object.defineProperty(RadarrAPI.prototype, 'getMovie', {
   configurable: true,
 });
 
-// --- Mock TheMovieDb ---
 let getTvShowImpl: (args: {
   tvId: number;
   language?: string;
@@ -191,15 +186,13 @@ Object.defineProperty(TheMovieDb.prototype, 'getShowByTvdbIdForScan', {
   configurable: true,
 });
 
-// getTvShowForScan is assigned in the constructor, so the prototype stub misses
-// the instance availabilitySync built when it was first imported
+// getTvShowForScan is assigned in the constructor, so stub the instance built
+// at import; a prototype stub misses it.
 Object.defineProperty(availabilitySync.tmdb, 'getTvShowForScan', {
   value: async (args: { tvId: number; language?: string }) =>
     getTvShowImpl(args),
   configurable: true,
 });
-
-// --- Helpers ---
 
 function fakeTmdbShow(
   tmdbId: number,
@@ -308,9 +301,7 @@ function configureRadarr(overrides: Partial<RadarrSettings>[] = [{}]): void {
   settings.sonarr = [];
 }
 
-/**
- * Connects the servers given, the first as the primary one, and no others.
- */
+/** Connects only these servers, the first as primary. */
 function connectServers(...kinds: MediaServerKind[]): void {
   const settings = getSettings();
   settings.main.mediaServerType = typeOfKind(kinds[0]);
@@ -329,7 +320,6 @@ function configurePlex(): void {
   connectServers('plex');
 }
 
-// --- Jellyfin helpers ---
 function fakeJellyfinSeason(
   seasonNumber: number,
   id?: string
@@ -372,7 +362,6 @@ function fakeJellyfinShow(
   };
 }
 
-// --- Plex helpers ---
 function fakePlexSeason(seasonNumber: number, ratingKey: string): PlexMetadata {
   return {
     ratingKey,
@@ -437,7 +426,6 @@ function fakePlexShow(ratingKey: string): PlexMetadata {
   };
 }
 
-// --- Sonarr helpers ---
 function fakeSonarrSeasons(
   totalSeasons: number,
   seasonsWithFiles: Record<number, number>
@@ -729,8 +717,8 @@ describe('AvailabilitySync', () => {
         return undefined;
       };
 
-      // MOCK REAL BEHAVIOR: Jellyfin returns ALL 8 season metadata entries
-      // even though only season 6 has actual episode files.
+      // Jellyfin returns all 8 season entries though only season 6 has
+      // episode files.
       getSeasonsImpl = async (seriesID: string) => {
         if (seriesID === 'jellyfin-house3-id') {
           return Array.from({ length: 8 }, (_, i) =>
@@ -740,7 +728,7 @@ describe('AvailabilitySync', () => {
         return [];
       };
 
-      // Only season 6 has actual episodes
+      // Only season 6 has episodes.
       getEpisodesImpl = async (_seriesID: string, seasonID: string) => {
         if (seasonID === 'jellyfin-house3-s6-id') {
           return fakeJellyfinEpisodes(21);
@@ -1017,8 +1005,7 @@ describe('AvailabilitySync', () => {
         throw new Error('404');
       };
 
-      // Plex returns ALL 8 season metadata entries,
-      // but only season 6 has episode files
+      // Plex returns all 8 season entries; only season 6 has episode files.
       getChildrenMetadataImpl = async (key: string) => {
         if (key === 'plex-house-rk') {
           return Array.from({ length: 8 }, (_, i) =>
@@ -1423,9 +1410,9 @@ describe('AvailabilitySync', () => {
 
       const mediaRepository = getRepository(Media);
 
-      // The Plex scanner writes the same rating key to both versions of a
-      // merged item, and a prior deletion left no externalServiceId4k to
-      // query, so retention rides on the Plex check alone.
+      // Plex writes the same rating key to both versions of a merged item,
+      // and a prior deletion left no externalServiceId4k, so retention relies
+      // on the Plex check alone.
       const media = new Media();
       media.tmdbId = 687163;
       media.mediaType = MediaType.MOVIE;
@@ -2539,8 +2526,8 @@ describe('AvailabilitySync', () => {
   });
 
   describe('media server unreachable', () => {
-    // A show whose four seasons are all here, only season 1 of which Sonarr
-    // has files for: the rest came from somewhere else.
+    // All four seasons are here, but Sonarr has files only for season 1: the
+    // rest came from elsewhere.
     const saveShow = async (fields: Partial<Media>) => {
       const media = new Media();
       media.tmdbId = 4700;

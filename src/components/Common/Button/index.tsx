@@ -10,7 +10,7 @@ export type ButtonType =
   | 'success'
   | 'ghost';
 
-// Helper type to override types (overrides onClick)
+// P's props replace the element's own (such as onClick).
 type MergeElementProps<
   T extends React.ElementType,
   P extends Record<string, unknown>,
@@ -25,7 +25,7 @@ type Element<P extends ElementTypes = 'button'> = P extends 'a'
 type BaseProps<P> = {
   buttonType?: ButtonType;
   buttonSize?: 'default' | 'lg' | 'md' | 'sm';
-  // Had to do declare this manually as typescript would assume e was of type any otherwise
+  // Declared explicitly, or TypeScript infers e as any.
   onClick?: (
     e: React.MouseEvent<P extends 'a' ? HTMLAnchorElement : HTMLButtonElement>
   ) => void;
@@ -49,9 +49,9 @@ function Button<P extends ElementTypes = 'button'>(
   const buttonStyle = [
     'inline-flex items-center justify-center border leading-5 font-medium rounded-md focus:outline-none transition ease-in-out duration-150 cursor-pointer disabled:opacity-50 whitespace-nowrap',
   ];
-  // Theme colours (tailwind.config.js): a fill is see-through in dark
-  // (bg-accent/accent-fill, solid for an accent with dark text) and solid
-  // in light, under text that reads on it.
+  // Theme colours (tailwind.config.js): fills are see-through in dark
+  // (bg-accent/accent-fill; solid for an accent with dark text), solid in
+  // light.
   switch (buttonType) {
     case 'primary':
       buttonStyle.push(

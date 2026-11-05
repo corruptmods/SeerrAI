@@ -28,12 +28,12 @@ interface RouletteProps {
   onClose: () => void;
 }
 
-/** Tile width plus its gap; the reel maths depends on these matching the CSS. */
+/** Tile width and gap; the reel maths requires these to match the CSS. */
 const TILE_WIDTH = 120;
 const TILE_GAP = 12;
 const TILE_STRIDE = TILE_WIDTH + TILE_GAP;
 
-/** How many tiles stream past before the winner. More reads as a longer spin. */
+/** Tiles that pass before the winner. */
 const RUNWAY = 34;
 const SPIN_MS = 4200;
 
@@ -43,23 +43,18 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
   const [isSpinning, setSpinning] = useState(true);
   const [offset, setOffset] = useState(0);
   /*
-   * The reel has to jump back to the start without animating before it can
-   * travel again. With the transition always on, a second spin slid from
-   * wherever it stopped to almost the same place — pressing "Spin again"
-   * looked like it did nothing at all.
+   * The reel must jump back to the start without a transition before each
+   * spin, or "Spin again" slides to almost the same place.
    */
   const [animating, setAnimating] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   /** The previous pick, so spinning again offers something else. */
   const lastWinnerRef = useRef<number | null>(null);
 
-  // The winner is chosen up front; the reel is then built to end on it, so
-  // the animation can never disagree with the result.
+  // The winner is picked first and the reel built to end on it, so the
+  // animation always matches the result.
   const { reel, winner } = useMemo(() => {
-    /*
-     * Avoid handing back the title they just rejected. With a short unwatched
-     * list that happened often enough that spinning again felt broken.
-     */
+    // Never repeat the title just rejected.
     const choices =
       items.length > 1 && lastWinnerRef.current
         ? items.filter((item) => item.tmdbId !== lastWinnerRef.current)
@@ -75,7 +70,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
 
     strip.push(pick);
 
-    // A few tiles after the winner so the reel does not end at a visible edge.
+    // Tiles after the winner, so the reel doesn't end at a visible edge.
     for (let i = 0; i < 4; i++) {
       strip.push(items[Math.floor(Math.random() * items.length)]);
     }
@@ -88,10 +83,8 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
 
   /*
    * The overlay renders nothing on its first pass (see the portal below), so
-   * the reel does not exist yet. The spin waits for it: measuring an absent
-   * reel gave a width of 0, which put the winner's centre at the reel's left
-   * edge, half a reel short of the pointer — the first spin only, since every
-   * later spin starts with the reel on screen.
+   * the spin waits for the reel: measuring it absent gives width 0 and lands
+   * the first spin half a reel short.
    */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -108,9 +101,8 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-    // Centre the winning tile under the marker: its centre sits TILE_WIDTH / 2
-    // past its left edge, and the marker is half the reel's width in.
-    // Measured when used, so it is always the laid-out width.
+    // Centre the winner under the marker, half the reel's width in. Measured
+    // when used, so it is the laid-out width.
     const targetFor = () =>
       RUNWAY * TILE_STRIDE +
       TILE_WIDTH / 2 -
@@ -124,12 +116,9 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
       return;
     }
 
-    // Two frames: the first paints at zero so the transition has somewhere to
-    // travel from, rather than jumping straight to the end.
-    // First frame paints at zero with no transition; the second turns the
-    // transition back on and sends it to the target.
-    // Two frames: the reel resets, then animates. Both are tracked, so closing
-    // between them cannot leave the second to fire on a component that is gone.
+    // Two frames: the first paints at zero without a transition, the second
+    // animates to the target. Both are tracked, so unmounting between them
+    // cancels the second.
     let innerRaf = 0;
     const raf = requestAnimationFrame(() => {
       innerRaf = requestAnimationFrame(() => {
@@ -148,11 +137,8 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
   }, [spinKey, mounted]);
 
   /*
-   * Rendered into the top of the page, like the app's Modal, rather than
-   * where the list happens to sit. The page content lives in a z-0 layer, so
-   * inline the overlay was trapped beneath the bottom navigation bar on a
-   * phone and the sidebar on desktop. The page behind is locked from
-   * scrolling, as it is under every other dialog.
+   * Portalled to the top of the page, like Modal: page content is in a z-0
+   * layer, so inline it would sit beneath the tab bar and sidebar.
    */
   useLockBodyScroll(true);
 
@@ -163,8 +149,8 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
   return ReactDOM.createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-strong/90 px-4"
-      // Keeps the card clear of the notch and home bar in the installed app,
-      // which draws edge to edge; both are zero in a normal browser.
+      // Clears the notch and home bar in the edge-to-edge installed app; both
+      // are zero in a browser.
       style={{
         paddingTop: 'max(1rem, env(safe-area-inset-top))',
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
@@ -201,7 +187,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
             style={{
               gap: `${TILE_GAP}px`,
               transform: `translate3d(-${offset}px, 0, 0)`,
-              // Fast to begin with, then a long glide into the result.
+              // Fast start, then a long glide.
               transition: animating
                 ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.12, 1)`
                 : 'none',

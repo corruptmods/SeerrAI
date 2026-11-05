@@ -110,8 +110,8 @@ const QueryFilterOptions = z.object({
 export type FilterOptions = z.infer<typeof QueryFilterOptions>;
 
 /**
- * The streaming services to leave out, as TMDB takes them ("8|9"), or
- * nothing. One also chosen to be shown stays shown.
+ * Streaming services to exclude, in TMDB's format ("8|9"), or undefined. A
+ * service also chosen for inclusion stays included.
  */
 const excludedServices = (query: FilterOptions): string | undefined => {
   const ids = leftOutServices(
@@ -759,25 +759,19 @@ discoverRoutes.get('/tv/upcoming', async (req, res, next) => {
 });
 
 /*
- * Anime: series airing in a season, series premiering in one, the most
- * popular series, or films, optionally only those made in one country.
- * Anime here is what Seerr counts as anime everywhere else (utils/isAnime),
- * so every title listed is one Seerr would also send to Sonarr or Radarr as
- * anime: what TMDB tags as anime, from any country but those an admin
- * leaves out (unless it is in Japanese), and Japanese animation TMDB has
- * not tagged, as the tag is missing from many series, new ones especially.
- *
- * TMDB cannot ask for "tagged, or Japanese animation" at once, so each page
- * is two of TMDB's pages, the same page of each: the tagged titles, and the
- * Japanese animation without the tag. The two never share a title, so
- * nothing is listed twice or missed, and there are as many pages as the
- * longer of the two has. Each page is sorted by popularity. Titles from a
- * country left out are taken out of the page they arrive in, so a page can
- * hold fewer titles than TMDB's twenty without being the last.
- *
- * The person's region is followed, as on every Discover page, but not their
- * Discover Language: a filter to one language could only leave out most of
- * what counts as anime. Someone who does not want them hides the row.
+ * Anime: series airing in a season, premiering in one, most popular, or films,
+ * optionally from one country. Matches Seerr's anime definition elsewhere
+ * (utils/isAnime), so every title listed is one Seerr would send to Sonarr or
+ * Radarr as anime: TMDB's anime tag from any country not excluded by an admin
+ * (unless in Japanese), plus untagged Japanese animation, since many series
+ * (especially new ones) lack the tag. TMDB can't query "tagged OR Japanese
+ * animation", so each page merges the same page of both queries. They never
+ * overlap, so nothing repeats or is missed, and the page count is the longer
+ * one's. Each page is sorted by popularity. Excluded-country titles are dropped
+ * from their page, so a page can have fewer than TMDB's 20 without being last.
+ * The person's region applies, as on every Discover page, but not their
+ * Discover Language: filtering to one language would drop most anime. People
+ * who don't want anime hide the row.
  */
 discoverRoutes.get('/anime', async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage(req.user);
@@ -825,9 +819,9 @@ discoverRoutes.get('/anime', async (req, res, next) => {
         tmdb.getDiscoverMovies(tagged),
         tmdb.getDiscoverMovies(untagged),
       ]);
-      // TMDB's lists do not say where a film was made, so a tagged film
-      // not in Japanese is looked up when a country is left out. One that
-      // cannot be looked up is kept: TMDB tags it as anime.
+      // TMDB lists don't include production country, so with a country
+      // excluded, tagged non-Japanese films are looked up. If lookup fails the
+      // film is kept, since TMDB tags it anime.
       const kept = await Promise.all(
         pages[0].results.map(async (result) => {
           if (!leaveOut.length || result.original_language === 'ja') {
@@ -863,7 +857,7 @@ discoverRoutes.get('/anime', async (req, res, next) => {
             (med) =>
               med.tmdbId === result.id && med.mediaType === MediaType.MOVIE
           );
-          // An admin said on its page that this one is not anime.
+          // An admin marked this title not anime.
           return info?.animeSetting === false
             ? []
             : [mapMovieResult(result, info)];
@@ -971,11 +965,8 @@ discoverRoutes.get('/trending', async (req, res, next) => {
       totalPages: data.total_pages,
       totalResults: data.total_results,
       results: data.results.map((result) => {
-        // - If "type" is set (case: "movie" or "tv"), the mediaType must also match.
-        // - If "type" is not set (case: "all"), only filter by tmdbId.
         const selectedMedia = media.find(
-          (med) =>
-            med.tmdbId === result.id && (type ? med.mediaType === type : true)
+          (med) => med.tmdbId === result.id && (!type || med.mediaType === type)
         );
 
         return mapper(result, selectedMedia);
@@ -1144,7 +1135,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     });
 
     if (activeUser && !activeUser?.plexToken) {
-      // Non-Plex users can only see their own watchlist
+      // Non-Plex users see their saved watchlist.
       const [result, total] = await savedWatchlistPage(
         activeUser.id,
         offset,
@@ -1160,7 +1151,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
       }
     }
     if (!activeUser?.plexToken) {
-      // We will just return an empty array if the user has no Plex token
+      // No Plex token: empty list.
       return res.json({
         page: 1,
         totalPages: 1,
@@ -1169,7 +1160,6 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
       });
     }
 
-    // List watchlist from Plex
     const plexTV = new PlexTvAPI(activeUser.plexToken);
 
     const watchlist = await plexTV.getWatchlist({ offset });
@@ -1190,9 +1180,8 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
 );
 
 /**
- * Titles like the ones this person has been watching, from their watch
- * history. Empty, rather than an error, when there is nothing to go on, so
- * the row simply does not show.
+ * Titles like this person's recent watch history. Empty instead of an error
+ * when there's nothing to go on, so the row just doesn't show.
  */
 discoverRoutes.get('/suggested', async (req, res, next) => {
   const itemsPerPage = 20;
@@ -1256,12 +1245,11 @@ discoverRoutes.get('/suggested', async (req, res, next) => {
 });
 
 /**
- * What each title on a page of posters can be filtered by: names, cast and
- * characters, who made it, genres and keywords. Up to 60 titles a call, as
- * "movie:603,tv:1399".
+ * Filterable text for each title on a poster page: names, cast and characters,
+ * crew, genres and keywords. Up to 60 titles per call, as "movie:603,tv:1399".
  */
 discoverRoutes.get('/search-text', async (req, res, next) => {
-  // The validator may already have split the list; a plain string works too.
+  // The validator may have split the list already; a plain string works too.
   const raw = req.query.ids as unknown;
   const keys = (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
     .map((key) => String(key).trim())

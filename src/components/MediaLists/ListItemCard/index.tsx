@@ -18,16 +18,13 @@ const messages = defineMessages('components.MediaLists.ListItemCard', {
 
 interface ListItemCardProps {
   item: ListItem;
-  /** The viewer's own position, when their watch history can answer it. */
+  /** The viewer's progress, when watch history has it. */
   progress?: SeriesProgress;
   onToggleWatched: (item: ListItem) => void;
   onRemove: (item: ListItem) => void;
 }
 
-/**
- * One title on a list: the poster, its watched/remove controls in the card's
- * own action slot, and the episode progress line for a partial series.
- */
+/** A list title: poster, watched/remove controls, and episode progress. */
 const ListItemCard = ({
   item,
   progress,
@@ -40,14 +37,12 @@ const ListItemCard = ({
     <li key={`item-${item.id}`}>
       <div className={item.watchedAt ? 'opacity-60' : undefined}>
         <TitleCard
-          // Fill the grid cell rather than keeping a fixed width: a card
-          // narrower than its column leaves ragged gaps down the page. This
-          // is how the cast and discover grids do it.
+          // Fill the grid cell, as the cast and discover grids do: a fixed
+          // width leaves ragged gaps.
           canExpand
           showListButton={false}
-          // The controls go in the card's own action slot, alongside where
-          // its request button would sit — so they reveal and scale with the
-          // poster as a single element instead of being tracked from outside.
+          // In the card's action slot, so they reveal and scale with the
+          // poster.
           actionSlot={
             <div className="flex w-full space-x-1">
               <Button
@@ -86,9 +81,8 @@ const ListItemCard = ({
         />
       </div>
       {/*
-        A partially available series shows one status badge, which does not
-        say how much of it is actually here. The episode counts come from the
-        rows the episode sync already maintains.
+        A partial series' badge doesn't say how much is here. Counts come
+        from the episode sync's rows.
       */}
       {item.mediaType === 'tv' &&
         !!item.totalEpisodes &&
@@ -102,10 +96,7 @@ const ListItemCard = ({
         )}
       {progress && (
         <>
-          {/*
-            Up next and the count to catch up on two short lines: as one
-            sentence it did not fit a poster's width and was cut off.
-          */}
+          {/* Two short lines: one sentence doesn't fit a poster's width. */}
           <p
             className={
               progress.state === 'up_next'

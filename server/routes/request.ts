@@ -84,9 +84,8 @@ import { z } from 'zod';
 const requestRoutes = Router();
 
 /*
- * Which server, quality profile, root folder, language profile and tags a
- * request uses are the advanced options. Only people allowed them may choose;
- * for everyone else the request gets the defaults, as their dialog shows.
+ * Advanced options (server, quality profile, root folder, language profile,
+ * tags) are only for those allowed them; everyone else gets the defaults.
  */
 const mayChooseAdvancedOptions = (user?: User) =>
   !!user?.hasPermission(
@@ -95,9 +94,9 @@ const mayChooseAdvancedOptions = (user?: User) =>
   );
 
 /*
- * A blocklisted title must stay out of Radarr and Sonarr. Approving or
- * retrying a request made before it was blocklisted would send it there
- * anyway, so both are refused; declining or deleting it is still allowed.
+ * A blocklisted title must stay out of Radarr and Sonarr, so approving or
+ * retrying an older request for it is refused; declining or deleting is still
+ * allowed.
  */
 const titleBlocklisted = (request: MediaRequest) =>
   request.media?.status === MediaStatus.BLOCKLISTED ||
@@ -125,23 +124,22 @@ const musicWithoutAdvancedOptions = (
   return allowed;
 };
 
-/** Music is listed and handled for this person: set up, and on for them. */
+/** Whether music is set up and on for this person. */
 const musicFor = (user?: User) => musicReady() && featureEnabled('music', user);
 
-/** The kinds of request listed and counted for this person. */
+/** Request types listed and counted for this person. */
 const requestTypesFor = (user?: User): MediaType[] =>
   musicFor(user)
     ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
     : [...VIDEO_MEDIA_TYPES];
 
-/** Pages of TMDB's search read for a request search. */
+/** TMDB search pages read per request search. */
 const SEARCH_PAGES = 2;
 
 /**
- * The titles a request search finds: films and series by TMDB's search of
- * the words (their titles aren't kept with the requests), and music
- * requests by their artist, album or song, as kept. TMDB not answering
- * leaves films and series out, not the music.
+ * Request ids matching a search: films and series via TMDB search (titles
+ * aren't stored on requests), music by stored artist, album or song. If TMDB
+ * fails, only music is matched.
  */
 const searchedRequests = async (
   text: string,
@@ -171,7 +169,7 @@ const searchedRequests = async (
       if (!answer || page >= (answer.total_pages ?? 1)) break;
     }
   }
-  // Words, as LIKE reads them: its own wildcards taken out.
+  // Strip LIKE wildcards.
   const words = text
     .toLowerCase()
     .replace(/[%_\\]/g, ' ')
@@ -207,8 +205,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
   async (req, res, next) => {
     try {
       const { pageSize, skip } = pageOf(req.query, 10);
-      // All three filters accept a comma-separated list so several values can
-      // be ticked at once. A single value still works exactly as before.
+      // Each filter accepts a comma-separated list.
       const splitParam = (value: unknown): string[] =>
         String(value ?? '')
           .split(',')
@@ -219,18 +216,17 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .map(Number)
         .filter((id) => Number.isFinite(id));
 
-      // Music only for someone who has it: set up, and not turned off.
       const listedTypes = requestTypesFor(req.user);
       const mediaTypes = splitParam(req.query.mediaType).filter(
         (type): type is MediaType => listedTypes.includes(type as MediaType)
       );
 
       /**
-       * Each filter is a pair of conditions — the request's own status and the
-       * media's status — so they cannot be merged into two flat lists. Ticking
-       * "available" and "failed" has to mean (completed AND available) OR
-       * (failed AND anything), not (completed OR failed) AND (available OR
-       * anything), which would let a failed-but-available request through.
+       * Each filter pairs a request status with media statuses, so they can't
+       * be merged into two flat lists: "available" + "failed" must mean
+       * (completed AND available) OR (failed AND any), not (completed OR
+       * failed) AND (available OR any), which lets failed-but-available
+       * through.
        */
       const filterSpec = (
         filter: string
@@ -392,12 +388,11 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         });
       }
 
-      // Ticking none is everything this person can see.
+      // No filter ticked: everything this person can see.
       query = query.andWhere('request.type IN (:...mediaTypes)', {
         mediaTypes: mediaTypes.length ? mediaTypes : listedTypes,
       });
 
-      // Only the titles the words find.
       const search = String(req.query.search ?? '')
         .trim()
         .slice(0, 100);
@@ -430,7 +425,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         );
       }
 
-      // A playlist import's many requests, as one each.
+      // Group each playlist import's requests into one entry.
       const playlists =
         req.query.playlists === 'group' && req.user
           ? await playlistRequestGroups(query, req.user, pageSize)
@@ -450,7 +445,6 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
 
       const settings = getSettings();
 
-      // get all quality profiles for every configured sonarr server
       const sonarrServers = await Promise.all(
         settings.sonarr.map(async (sonarrSetting) => {
           const sonarr = new SonarrAPI({
@@ -465,7 +459,6 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         })
       );
 
-      // get all quality profiles for every configured radarr server
       const radarrServers = await Promise.all(
         settings.radarr.map(async (radarrSetting) => {
           const radarr = new RadarrAPI({
@@ -480,40 +473,33 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         })
       );
 
-      // add profile names to the media requests, with undefined if not found
       let mappedRequests = requests.map((r) => {
         switch (r.type) {
-          case MediaType.MOVIE: {
-            const profileName = radarrServers
-              .find((serverr) => serverr.id === r.serverId)
-              ?.profiles?.find((profile) => profile.id === r.profileId)?.name;
-
+          case MediaType.MOVIE:
             return {
               ...r,
-              profileName,
+              profileName: radarrServers
+                .find((server) => server.id === r.serverId)
+                ?.profiles?.find((profile) => profile.id === r.profileId)?.name,
             };
-          }
-          case MediaType.TV: {
+          case MediaType.TV:
             return {
               ...r,
               profileName: sonarrServers
-                .find((serverr) => serverr.id === r.serverId)
+                .find((server) => server.id === r.serverId)
                 ?.profiles?.find((profile) => profile.id === r.profileId)?.name,
             };
-          }
           default:
             return { ...r, profileName: undefined };
         }
       });
 
-      // add canRemove prop if user has permission
       if (req.user?.hasPermission(Permission.MANAGE_REQUESTS)) {
         mappedRequests = mappedRequests.map((r) => {
           switch (r.type) {
             case MediaType.MOVIE: {
               return {
                 ...r,
-                // check if the radarr server for this request is configured
                 canRemove: radarrServers.some(
                   (server) =>
                     server.id ===
@@ -524,7 +510,6 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
             case MediaType.TV: {
               return {
                 ...r,
-                // check if the sonarr server for this request is configured
                 canRemove: sonarrServers.some(
                   (server) =>
                     server.id ===
@@ -573,9 +558,9 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
 );
 
 /*
- * Several titles at once, each requested only if nothing has it yet: what
- * AI Search offers to request. One at a time, as each request dispatches to
- * Radarr or Sonarr, and each through the usual request rules.
+ * Request several titles, each only if nothing has it yet (AI Search).
+ * Sequential, since each dispatches to Radarr or Sonarr, and each goes through
+ * the usual request rules.
  */
 const missingBody = z.object({
   items: z
@@ -626,8 +611,7 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
           message: 'You must be logged in to request media.',
         });
       }
-      // With partial requests off, every request is for whole seasons, so
-      // any single episodes asked for are left out.
+      // With partial requests off, single episodes are dropped.
       if (!getSettings().main.partialRequestsEnabled) {
         delete req.body.episodes;
       }
@@ -674,9 +658,8 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
 );
 
 /*
- * Albums of one artist, sent to Lidarr once approved. Its own route: a
- * music request names an artist and albums by MusicBrainz id, not a TMDB
- * title.
+ * Request an artist's albums (sent to Lidarr once approved). Separate route
+ * because music is keyed by MusicBrainz id, not TMDB.
  */
 requestRoutes.post<never, MediaRequest, MusicRequestBody>(
   '/music',
@@ -714,7 +697,7 @@ requestRoutes.post<never, MediaRequest, MusicRequestBody>(
   }
 );
 
-/** What a music request's failure means for the person making it. */
+/** User-facing meaning of a music request failure. */
 const musicRequestError = (
   error: unknown
 ): { status: number; message: string } => {
@@ -746,9 +729,9 @@ const musicRequestError = (
 };
 
 /**
- * Roughly when each request should arrive, for a page of request cards in
- * one call. Registered before /:requestId, which would otherwise take "eta"
- * as an id. Each request is only estimated for someone allowed to see it.
+ * Arrival estimates for a page of request cards. Registered before /:requestId,
+ * which would take "eta" as an id. Only requests the viewer may see are
+ * estimated.
  */
 requestRoutes.get('/eta', async (req, res, next) => {
   // The validator parses "1,2,3" into a list; a plain string is handled too.
@@ -758,7 +741,7 @@ requestRoutes.get('/eta', async (req, res, next) => {
     .filter((id) => Number.isInteger(id) && id > 0)
     .slice(0, 50);
 
-  // Switched off for everyone or by this person: no estimates at all.
+  // Off globally or for this person: no estimates.
   if (!ids.length || !featureEnabled('arrivalEstimates', req.user)) {
     return res.status(200).json({});
   }
@@ -783,7 +766,7 @@ requestRoutes.get('/eta', async (req, res, next) => {
     const estimates = await Promise.all(
       visible.map(async (request) => [
         request.id,
-        // The viewer's region, as their title pages show release dates.
+        // Viewer's region, as their title pages use for release dates.
         await estimateRequest(
           request,
           req.user?.settings?.discoverRegion || defaultRegion()
@@ -801,9 +784,8 @@ requestRoutes.get('/count', async (req, res, next) => {
   const requestRepository = getRepository(MediaRequest);
 
   try {
-    // Only the kinds of request this person is shown in the list: music
-    // only where it is set up and on for them, so the pending badge never
-    // counts requests they cannot open.
+    // Count only types this person sees in the list, so the pending badge never
+    // counts requests they can't open.
     const countedTypes = requestTypesFor(req.user);
     const query = () =>
       requestRepository
@@ -919,8 +901,8 @@ requestRoutes.get<{ requestId: string }>(
 
       const { reachable, channels } = await getNotificationChannels(req.user);
 
-      // The requester is notified by virtue of having made the request, so
-      // their state is the mute flag rather than a watcher row.
+      // The requester is notified via the request itself, so their state is the
+      // mute flag, not a watcher row.
       const isRequester = request.requestedBy?.id === req.user.id;
 
       if (isRequester) {
@@ -974,13 +956,11 @@ requestRoutes.post<{ requestId: string }>(
         return next({ status: 401, message: 'You must be logged in.' });
       }
 
-      // The requester is notified through the request itself, so turning
-      // notifications back on means clearing the mute rather than adding a
-      // watcher row.
+      // The requester's notifications are the mute flag, not a watcher row.
       if (request.requestedBy.id === req.user.id) {
-        // Only the flag is written. Saving the whole request ran its save
-        // hooks, which announced an approved or declined request all over
-        // again and sent an approved one to Radarr or Sonarr a second time.
+        // Write only the flag: saving the whole request runs save hooks that
+        // re-announce approval/decline and resend an approved request to Radarr
+        // or Sonarr.
         if (request.requesterMuted) {
           await requestRepository.update(request.id, {
             requesterMuted: false,
@@ -1039,10 +1019,10 @@ requestRoutes.delete<{ requestId: string }>(
         where: { id: Number(req.params.requestId) },
       });
 
-      // Muting a request you made leaves the request itself alone — only a
-      // deliberate delete removes it.
+      // Muting your own request leaves the request alone; only an explicit
+      // delete removes it.
       if (request && request.requestedBy?.id === req.user?.id) {
-        // Only the flag is written, as when turning notifications back on.
+        // Write only the flag (see unmute).
         if (!request.requesterMuted) {
           await getRepository(MediaRequest).update(request.id, {
             requesterMuted: true,
@@ -1103,11 +1083,10 @@ requestRoutes.get('/:requestId', async (req, res, next) => {
 });
 
 /**
- * Changes a pending music request: its albums, and the server, profiles,
- * folder and tags it goes to Lidarr with (what the body carries, already
- * limited to what the person may change). Albums are added or taken off
- * as rows of their own, and the request itself is only updated, so saving
- * it cannot send it anywhere.
+ * Edit a pending music request: its albums, and the Lidarr server, profiles,
+ * folder and tags (the body is already limited to what the person may change).
+ * Albums are added or removed as their own rows and the request is only
+ * updated, so saving can't send it anywhere.
  */
 const editMusicRequest = async (
   request: MediaRequest,
@@ -1123,7 +1102,7 @@ const editMusicRequest = async (
   const current = request.albums ?? [];
   const asked = [...new Set(body.albums ?? current.map((a) => a.albumMbid))];
 
-  // A request for songs may hold no albums; their songs are kept as they are.
+  // A songs request may have no albums; its songs are kept.
   const songs = request.songs ?? [];
   if (!asked.length && !songs.length) {
     return {
@@ -1144,7 +1123,7 @@ const editMusicRequest = async (
     };
   }
 
-  // Albums another open request holds, or already here, cannot be added.
+  // Albums already here or held by another open request can't be added.
   const others = await getRepository(MediaRequest).find({
     where: {
       media: { id: media.id },
@@ -1188,8 +1167,8 @@ const editMusicRequest = async (
 
   if (!request.ignoreQuota) {
     const quotas = await requestUser.getQuota();
-    // Albums the owner's quota already counted for this request are paid
-    // for; a new owner is charged for all of them.
+    // Albums the owner's quota already counted are paid for; a new owner is
+    // charged for all.
     const countedAlready =
       !ownerChanging &&
       countsTowardsQuota(request.createdAt, quotas.music.days);
@@ -1215,7 +1194,7 @@ const editMusicRequest = async (
 
   if (dropped.length) {
     await albumRequestRepository.delete(dropped.map((album) => album.id));
-    // An album nobody else is waiting for is no longer pending.
+    // An album nobody else wants is no longer pending.
     const stillWanted = new Set(
       others.flatMap((other) => other.albums.map((a) => a.albumMbid))
     );
@@ -1285,7 +1264,8 @@ requestRoutes.put<{ requestId: string }>(
     const userRepository = getRepository(User);
     const requestId = Number(req.params.requestId);
     try {
-      // Ordering is request then owner here, user then media on create, so no cycle
+      // Lock order is request then owner here, user then media on create, so no
+      // cycle.
       return await requestLock.dispatch(requestKey(requestId), async () => {
         const request = await requestRepository.findOne({
           where: {
@@ -1297,10 +1277,9 @@ requestRoutes.put<{ requestId: string }>(
           return next({ status: 404, message: 'Request not found.' });
         }
 
-        // What kind of request this is comes from the request, never from
-        // the body: claiming "tv" must not unlock editing a film request.
-        // Whoever made a series or music request may change its seasons or
-        // albums; a film request has only the advanced options to change.
+        // Request type comes from the stored request, never the body: claiming
+        // "tv" must not unlock editing a film request. Requesters may change a
+        // series' seasons or music albums; a film has only advanced options.
         if (
           (request.requestedBy.id !== req.user?.id ||
             (request.type === MediaType.MOVIE &&
@@ -1314,8 +1293,8 @@ requestRoutes.put<{ requestId: string }>(
         }
         req.body.mediaType = request.type;
 
-        // Someone changing only their seasons keeps the server, profile,
-        // folder and tags the request already has.
+        // Without advanced permission, keep the request's existing server,
+        // profile, folder and tags.
         if (!mayChooseAdvancedOptions(req.user)) {
           req.body.serverId = request.serverId;
           req.body.profileId = request.profileId;
@@ -1325,8 +1304,8 @@ requestRoutes.put<{ requestId: string }>(
           req.body.tags = request.tags;
         }
 
-        // A failed request can be put right by a request manager (another
-        // server, say, when its own was removed) before it is retried.
+        // Request managers may fix a failed request (e.g. pick another server)
+        // before retrying.
         if (
           request.status !== MediaRequestStatus.PENDING &&
           !(
@@ -1341,11 +1320,10 @@ requestRoutes.put<{ requestId: string }>(
           });
         }
 
-        // A server it does not already have must exist, and take its kind
-        // of request (4K or not). The one it has is kept even if it was
-        // removed, so changing seasons still works; Retry then sends it to
-        // the default server. With no server of its kind at all (requests
-        // fulfilled by hand), the id means nothing and is kept as given.
+        // A new server must exist and match the request's 4K-ness. The current
+        // one is kept even if removed, so season edits still work; Retry then
+        // uses the default server. With no server of that kind at all (manual
+        // fulfilment), the id is kept as given.
         const serverProblem =
           req.body.serverId !== request.serverId
             ? chosenServerProblem({
@@ -1382,13 +1360,12 @@ requestRoutes.put<{ requestId: string }>(
           });
         }
 
-        // Reassignment moves every season on the request onto the new owner's
-        // quota, so it is charged in full rather than as a delta
+        // Reassignment moves every season onto the new owner's quota, so it's
+        // charged in full, not as a delta.
         const ownerChanging = requestUser.id !== previousOwnerId;
 
-        // Anime or not as ticked in the request dialog; left out, the
-        // request keeps what it had, and null hands it back to the title's
-        // setting and detection.
+        // Anime flag from the request dialog: omitted keeps the current value,
+        // null reverts to the title's setting and detection.
         const setChosenSeriesType = () => {
           if (req.body.seriesType !== undefined) {
             request.seriesType = toSeriesTypeFor(
@@ -1465,12 +1442,11 @@ requestRoutes.put<{ requestId: string }>(
               });
             }
 
-            // Same key as create, so an edit cannot claim a season that a new
-            // request is taking at the same moment
+            // Same key as create, so an edit can't claim a season a new request
+            // is taking concurrently.
             return mediaLock.dispatch(
               mediaKey(MediaType.TV, request.media.tmdbId),
               async () => {
-                // Get existing media so we can work with all the requests
                 const media = await mediaRepository.findOneOrFail({
                   where: {
                     tmdbId: request.media.tmdbId,
@@ -1479,7 +1455,7 @@ requestRoutes.put<{ requestId: string }>(
                   relations: { requests: true },
                 });
 
-                // Get all requested seasons that are not part of this request we are editing
+                // Seasons requested by other requests.
                 const existingSeasons = media.requests
                   .filter(
                     (r) =>
@@ -1500,8 +1476,8 @@ requestRoutes.put<{ requestId: string }>(
                   (s) => s.seasonNumber
                 );
 
-                // Seasons the media already covers cannot be requested again, while
-                // the ones this request holds stay on it
+                // Seasons the media already covers can't be requested again;
+                // this request's own stay.
                 const coveredSeasons = (media.seasons ?? [])
                   .filter(
                     (season) =>
@@ -1539,8 +1515,8 @@ requestRoutes.put<{ requestId: string }>(
                 if (!request.ignoreQuota) {
                   const quotas = await requestUser.getQuota();
 
-                  // Only the seasons getQuota already counted for this owner are
-                  // paid for, so the edit is charged for everything it left out
+                  // Only seasons getQuota already counted for this owner are
+                  // paid for, so charge for the rest.
                   const countedAlready =
                     !ownerChanging &&
                     countsTowardsQuota(request.createdAt, quotas.tv.days);
@@ -1664,10 +1640,9 @@ requestRoutes.post<{
           });
         }
 
-        // Its server was removed, or none is the default: the default server
-        // of its kind takes it, starting from that server's own profile, folder and
-        // tags (the old server's mean nothing there). With no default, a
-        // manager has to choose one, and retrying would only fail again.
+        // Server removed or none set as default: the default server of its kind
+        // takes it, with that server's own profile, folder and tags. With no
+        // default, a manager must choose; retrying would just fail.
         const serverIssue = requestServerIssue(request);
         if (serverIssue) {
           const name = serviceName(serverIssue.service, request.is4k);
@@ -1702,11 +1677,11 @@ requestRoutes.post<{
           request.historyNote = note;
         }
 
-        // The failure was reported once; without letting go of that, a
-        // second failure after this retry would never be reported at all.
+        // Release the earlier failure report, or a failure after this retry is
+        // never reported.
         await releaseDelivery(request.id, Notification.MEDIA_FAILED);
 
-        // this also triggers updating the parent media's status & sending to *arr
+        // Also updates the parent media's status and sends to *arr.
         request.status = MediaRequestStatus.APPROVED;
         request.modifiedBy = req.user;
         await requestRepository.save(request);
@@ -1726,9 +1701,8 @@ requestRoutes.post<{
 );
 
 /*
- * Whoever declines a request may say why. Blank after trimming is no reason
- * at all. The Decline button on a push notification sends no body, so it
- * declines without one.
+ * Optional decline reason; blank after trimming is none. A push notification's
+ * Decline button sends no body.
  */
 const statusChangeBody = z
   .object({
@@ -1801,8 +1775,8 @@ requestRoutes.post<{
 
         request.status = newStatus;
         request.modifiedBy = req.user;
-        // Saved with the status, so the declined notification and the
-        // title's history both have it.
+        // Saved with the status so the declined notification and title history
+        // both have it.
         if (newStatus === MediaRequestStatus.DECLINED) {
           request.declineReason = body.data?.declineReason || null;
         }

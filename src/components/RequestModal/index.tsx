@@ -15,11 +15,8 @@ const messages = defineMessages('components.RequestModal', {
 });
 
 /*
- * The request dialogs, with the select menus and quota logic they carry, are
- * a large share of every page with a poster on it — yet they only matter once
- * someone taps Request. They load separately, and are fetched while the
- * browser is otherwise idle, so the first tap still opens at once. If loading
- * fails, the dialog closes with a message and the next tap tries again.
+ * The dialogs are heavy and only needed on tap, so they load separately and
+ * preload when idle. A failed load closes with a toast; the next tap retries.
  */
 const loaders = {
   movie: () => import('@app/components/RequestModal/MovieRequestModal'),
@@ -41,7 +38,7 @@ interface CommonProps {
 interface VideoRequestModalProps extends CommonProps {
   type: 'movie' | 'tv' | 'collection';
   tmdbId: number;
-  /** Series only: open with this season, or one episode of it, ticked. */
+  /** Series only: season, or one episode of it, to open ticked. */
   preselect?: RequestPreselect;
 }
 
@@ -49,7 +46,7 @@ interface VideoRequestModalProps extends CommonProps {
 interface MusicModalProps extends CommonProps {
   type: 'music';
   artistMbid: string;
-  /** Opens with only this album ticked. */
+  /** Open with only this album ticked. */
   albumMbid?: string;
 }
 
@@ -61,7 +58,6 @@ const RequestModal = (props: RequestModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
 
-  // Each dialog's own wrapper below knows what its module holds.
   const loader: () => Promise<unknown> = loaders[type];
 
   useEffect(() => preloadModule(loader), [loader]);

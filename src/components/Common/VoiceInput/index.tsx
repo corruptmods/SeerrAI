@@ -21,8 +21,8 @@ const messages = defineMessages('components.Common.VoiceInput', {
 });
 
 /**
- * Speech for a text field: what is heard is passed to `onText` as it comes,
- * and any trouble is shown as a toast.
+ * Speech input for a text field: passes text to `onText` as heard; errors
+ * show as toasts.
  */
 export const useVoiceInput = (
   onText: (text: string, final: boolean) => void
@@ -72,7 +72,7 @@ const VoiceInputButton = ({
     <button
       type="button"
       onClick={onToggle}
-      // Keeps focus, and the caret, in the field being spoken into.
+      // Keeps focus and the caret in the field.
       onMouseDown={(e) => e.preventDefault()}
       aria-label={label}
       aria-pressed={listening}

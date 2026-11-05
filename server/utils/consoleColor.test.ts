@@ -12,7 +12,7 @@ describe('console log colour', () => {
   it('honours NO_COLOR and TERM=dumb even at a terminal', () => {
     assert.equal(consoleColor({ NO_COLOR: '1' }, true), false);
     assert.equal(consoleColor({ TERM: 'dumb' }, true), false);
-    // An empty NO_COLOR does not count (no-color.org).
+    // An empty NO_COLOR doesn't count (no-color.org).
     assert.equal(consoleColor({ NO_COLOR: '' }, true), true);
   });
 

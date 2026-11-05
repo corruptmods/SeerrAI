@@ -7,18 +7,17 @@ import type {
 import logger from '@server/logger';
 
 /*
- * Transcriptions run one at a time, in the order they were asked for:
- * Whisper uses the whole of whatever machine runs it, so each is followed
- * in Bazarr until it is finished before the next is asked for. Asking for
- * an episode already queued or under way does nothing.
+ * Transcriptions run one at a time in request order: Whisper uses the whole
+ * machine it runs on, so each is followed in Bazarr until done before the next
+ * is requested. Requesting an episode already queued or running is a no-op.
  *
- * The queue is in memory. A restart forgets what had not started yet; what
- * was under way finishes in Bazarr regardless.
+ * The queue is in memory. A restart drops what hadn't started; what was
+ * running finishes in Bazarr regardless.
  */
 
 /**
- * A failure the title page can explain: the reason travels with it as a
- * code, and its message is the same reason in English, for the log.
+ * A failure the title page can explain: the reason as a code, and the message
+ * as the same reason in English for the log.
  */
 export class SubtitleProblem extends Error {
   constructor(
@@ -30,15 +29,15 @@ export class SubtitleProblem extends Error {
 }
 
 export interface TranscriptionTask {
-  /** One per movie or episode: asking twice is asking once. */
+  /** One per movie or episode: requesting twice is requesting once. */
   key: string;
-  /** The title it belongs to ("movie:603", "tv:1399"), for its status. */
+  /** The owning title ("movie:603", "tv:1399"), for its status. */
   owner: string;
   seasonNumber?: number;
   episodeNumber?: number;
-  /** Queued because a search found nothing, rather than asked for. */
+  /** Queued because a search found nothing, not requested. */
   auto?: boolean;
-  /** Told when Bazarr has it queued, and when it starts on it. */
+  /** Notified when Bazarr queues it and when it starts. */
   run: (watch: JobWatch) => Promise<void>;
 }
 
@@ -46,9 +45,8 @@ interface Tally {
   done: number;
   failed: number;
   /**
-   * Why the last one that failed did. Anyone who can see the title reads
-   * it, so anything other than a known reason is only "Bazarr failed"; the
-   * detail is in the log.
+   * Why the last failure failed. Anyone who can see the title reads it, so
+   * anything but a known reason is just "Bazarr failed"; details are logged.
    */
   error?: SubtitleError;
 }
@@ -56,17 +54,17 @@ interface Tally {
 export class Transcriber {
   private queue: TranscriptionTask[] = [];
   private current?: TranscriptionTask;
-  /** The one under way is waiting in Bazarr's own queue. */
+  /** The running job is waiting in Bazarr's own queue. */
   private waiting = false;
-  /** Where the one under way is in Bazarr's queue. */
+  /** The running job's place in Bazarr's queue. */
   private live?: BazarrJobLive;
-  /** Where each title's search is in Bazarr's queue. */
+  /** Each title's search's place in Bazarr's queue. */
   private searchLive = new Map<string, BazarrJobLive>();
   private tallies = new Map<string, Tally>();
-  /** Titles Bazarr is searching for, and how many searches each. */
+  /** Titles Bazarr is searching, with search counts. */
   private searches = new Map<string, number>();
 
-  /** Adds what is not already queued or under way; returns how many. */
+  /** Adds tasks not already queued or running; returns how many. */
   public enqueue(tasks: TranscriptionTask[]): number {
     const known = new Set([
       ...this.queue.map((task) => task.key),
@@ -80,7 +78,8 @@ export class Transcriber {
       return true;
     });
     for (const task of added) {
-      // A title asked again once its last batch is over starts a new count.
+      // A title requested again after its last batch finished starts a new
+      // count.
       if (!this.isBusy(task.owner)) {
         this.tallies.set(task.owner, { done: 0, failed: 0 });
       }
@@ -91,8 +90,8 @@ export class Transcriber {
   }
 
   /**
-   * Bazarr's own search for what a title is missing, which can run for many
-   * minutes: the title's status says it is searching meanwhile.
+   * Bazarr's own search for a title's missing subtitles, which can run for many
+   * minutes; the title's status shows it searching meanwhile.
    */
   public async searching<T>(
     owner: string,

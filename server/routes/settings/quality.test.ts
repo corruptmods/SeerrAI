@@ -17,8 +17,8 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import request from 'supertest';
 
 /*
- * Settings → Quality's choices as saved: only what is valid, one entry a
- * server, and what an apply recorded kept. Nothing reaches a server here.
+ * Settings → Quality as saved: only valid choices, one entry per server, and
+ * what an apply recorded kept. No server is reached.
  */
 
 setupTestDb();
@@ -69,7 +69,7 @@ beforeEach(() => {
     ],
   };
   mock.method(settings, 'save', async () => undefined);
-  // No server is reached: each answers as one that can't be.
+  // Every server answers as unreachable.
   mock.method(QualityArr, 'forServer', () => undefined);
   mock.method(trashModule, 'readTrashState', async () => ({ blobs: {} }));
 });

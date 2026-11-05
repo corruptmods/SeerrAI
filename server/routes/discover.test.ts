@@ -17,16 +17,15 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * The studio and network pages list titles for the person looking, so they
- * follow that person's Discover region and original language like every
- * other Discover page. The Anime pages follow their region, and list what
- * Seerr counts as anime (utils/isAnime): what TMDB tags as anime, apart
- * from the countries an admin leaves out, and Japanese animation.
+ * Studio and network pages follow the viewer's Discover region and original
+ * language like every other Discover page. Anime pages follow the region and
+ * list what Seerr counts as anime (utils/isAnime): TMDB's anime tag except
+ * admin-excluded countries, plus Japanese animation.
  */
 
 setupTestDb();
 
-// What the TMDB client each route made was set up with, per call.
+// Region and language each route's TMDB client was created with, per call.
 let asked: { region?: string; language?: string }[] = [];
 // What each discover call asked TMDB for.
 let searched: ({ kind: 'movie' | 'tv' } & Record<string, unknown>)[] = [];
@@ -36,12 +35,12 @@ interface TmdbPage {
   total_results: number;
   results: unknown[];
 }
-// The page TMDB answers with: the same for every call, or by what was asked.
+// TMDB's response: the same for every call, or by request.
 let tmdbPage: TmdbPage;
 let tmdbAnswer:
   | ((kind: 'movie' | 'tv', options: Record<string, unknown>) => TmdbPage)
   | undefined;
-// The films looked up one by one, to see where they were made.
+// Films looked up individually to find their production country.
 let lookedUp: number[] = [];
 let filmCountries: Record<number, string[]> = {};
 const settingsOf = (tmdb: TheMovieDb) => {
@@ -214,8 +213,7 @@ describe('the Anime pages', () => {
     total_results: results.length * totalPages,
     results,
   });
-  // TMDB's two answers: what it tags as anime, and Japanese animation it
-  // has not tagged.
+  // TMDB's two responses: tagged anime, and untagged Japanese animation.
   const answer = (tagged: TmdbPage, untagged: TmdbPage) => {
     tmdbAnswer = (_kind, options) => (options.keywords ? tagged : untagged);
   };
@@ -466,7 +464,7 @@ describe('leaving out streaming services', () => {
   });
 
   it('can leave out services without choosing any to show', async () => {
-    // A comma has to be written %2C in an address.
+    // A comma must be encoded as %2C in a URL.
     const res = await get('/movies?watchRegion=GB&excludeWatchProviders=8%2C9');
     assert.equal(res.status, 200);
     assert.deepEqual(services(), [

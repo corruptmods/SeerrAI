@@ -13,7 +13,7 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 interface JellyfinImportProps {
-  /** The server whose people are imported. */
+  /** Server to import users from. */
   kind: JellyfinFamilyKind;
   onCancel?: () => void;
   onComplete?: () => void;
@@ -22,7 +22,7 @@ interface JellyfinImportProps {
 interface JellyfinImportResponse {
   createdUsers: unknown[];
   refreshedUsers: number;
-  /** People left out, because another account has their name as its email. */
+  /** Users skipped because another account has their username as its email. */
   skippedUsers?: { id: string; name: string; reason: string }[];
 }
 
@@ -76,8 +76,8 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
     setImporting(true);
 
     try {
-      // People already imported are refreshed on every import, so with
-      // nobody left to import this is still worth doing, as a sync.
+      // Import also refreshes already imported users, so it works as a sync
+      // with none selected.
       const { data: importResponse } = await axios.post<JellyfinImportResponse>(
         `/api/v1/user/import-from-${kind}`,
         kind === 'emby'
@@ -310,13 +310,6 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
                                 <div className="text-base font-bold leading-5">
                                   {user.username}
                                 </div>
-                                {/* {user.username &&
-                                  user.username.toLowerCase() !==
-                                  user.email && (
-                                    <div className="text-sm leading-5 text-gray-300">
-                                      {user.email}
-                                    </div>
-                                  )} */}
                               </div>
                             </div>
                           </td>

@@ -10,10 +10,10 @@ import { getSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 
 /*
- * The Radarr and Sonarr calls Settings → Quality needs: quality profiles
- * and custom formats (read all, write only Seerr AI's own), the delay
- * profile, what a release name matches, what was grabbed, and moving titles
- * between profiles. Both apps answer these the same way, at /api/v3.
+ * Radarr and Sonarr calls for Settings → Quality: quality profiles and
+ * custom formats (reads all, writes only Seerr AI's own), the delay
+ * profile, release parsing, grab history, and moving titles between
+ * profiles. Both apps serve these identically at /api/v3.
  */
 
 export interface QualityServerRef {
@@ -21,14 +21,14 @@ export interface QualityServerRef {
   serverId: number;
 }
 
-/** A quality, or a group of them, in a profile. */
+/** A quality or quality group in a profile. */
 export interface ArrProfileItem {
   id?: number;
   name?: string;
   quality?: { id: number; name: string; resolution?: number };
   items: ArrProfileItem[];
   allowed: boolean;
-  /** Sonarr v5: sizes in MB a minute, per quality. */
+  /** Sonarr v5: per-quality sizes in MB per minute. */
   minSize?: number | null;
   maxSize?: number | null;
   preferredSize?: number | null;
@@ -48,7 +48,7 @@ export interface ArrDelayProfile {
 
 export interface ArrParsed {
   quality?: string;
-  /** Language names Radarr or Sonarr read in the name. */
+  /** Languages Radarr or Sonarr parsed from the name. */
   languages: string[];
   formats: { id: number; name: string }[];
 }
@@ -60,7 +60,7 @@ export interface ArrTitle {
   hasFile: boolean;
   monitored: boolean;
   added?: string;
-  /** Out (a film), or with episodes aired (a series). */
+  /** Released (movie) or has aired episodes (series). */
   wanted: boolean;
 }
 
@@ -122,7 +122,7 @@ export class QualityArr {
     return new QualityArr(ref.kind, api.http);
   }
 
-  /** The app's version, as "5.0.0.2870". */
+  /** App version, e.g. "5.0.0.2870". */
   async version(): Promise<string> {
     const { data } = await this.http.get<{ version?: string }>(
       '/system/status'
@@ -130,7 +130,7 @@ export class QualityArr {
     return data?.version ?? '';
   }
 
-  /** A new profile as this app lays one out: every quality, in order. */
+  /** The app's default new profile: every quality, in order. */
   async template(): Promise<ArrQualityProfile> {
     const { data } = await this.http.get<ArrQualityProfile>(
       '/qualityprofile/schema'
@@ -195,7 +195,7 @@ export class QualityArr {
     await this.http.put(`/delayprofile/${profile.id}`, profile);
   }
 
-  /** What a release name is read as, and the formats it matches. */
+  /** How the app parses a release name, and the formats it matches. */
   async parse(title: string): Promise<ArrParsed> {
     const { data } = await this.http.get<{
       parsedMovieInfo?: { quality?: { quality?: { name?: string } } };
@@ -213,7 +213,7 @@ export class QualityArr {
     };
   }
 
-  /** Recent grabs, newest first, with the profile each title is on. */
+  /** Recent grabs, newest first, with each title's profile. */
   async grabs(count = 100): Promise<ArrGrab[]> {
     const { data } = await this.http.get<{
       records?: {
@@ -247,7 +247,7 @@ export class QualityArr {
     }));
   }
 
-  /** Every movie's or series' id and title, by the profile it is on. */
+  /** Every movie or series with its id, title and profile. */
   async titles(): Promise<ArrTitle[]> {
     const { data } = await this.http.get<
       {
@@ -272,7 +272,7 @@ export class QualityArr {
           : (t.statistics?.episodeFileCount ?? 0) > 0,
       monitored: t.monitored !== false,
       added: t.added,
-      // A film not out yet, or a series with nothing aired, isn't missing.
+      // An unreleased movie or a series with nothing aired isn't missing.
       wanted:
         this.kind === 'radarr'
           ? t.isAvailable !== false
@@ -280,7 +280,7 @@ export class QualityArr {
     }));
   }
 
-  /** Puts these movies or series on a profile. */
+  /** Moves movies or series to a profile. */
   async moveTitles(ids: number[], profileId: number): Promise<void> {
     if (!ids.length) return;
     await this.http.put(
@@ -291,14 +291,14 @@ export class QualityArr {
     );
   }
 
-  /** Asks for a search of these movies or series. */
+  /** Starts a search for movies or series. */
   async search(ids: number[]): Promise<void> {
     if (!ids.length) return;
     if (this.kind === 'radarr') {
       await this.http.post('/command', { name: 'MoviesSearch', movieIds: ids });
       return;
     }
-    // Sonarr searches one series a command.
+    // Sonarr's SeriesSearch takes one series per command.
     for (const id of ids) {
       await this.http.post('/command', { name: 'SeriesSearch', seriesId: id });
     }

@@ -18,7 +18,7 @@ const settings = {
   animeSeriesType: 'anime',
 } as SonarrSettings;
 
-const oshiNoKo = {
+const japaneseSeries = {
   keywords: { results: [] },
   genres: [{ id: 16 }, { id: 18 }],
   original_language: 'ja',
@@ -31,7 +31,7 @@ const koreanAnimation = {
 
 describe('sonarrRouting', () => {
   it('sends detected anime to the anime folder, profiles, tags and type', () => {
-    assert.deepEqual(sonarrRouting(oshiNoKo, settings), {
+    assert.deepEqual(sonarrRouting(japaneseSeries, settings), {
       anime: true,
       decidedBy: 'detection',
       seriesType: 'anime',
@@ -60,7 +60,7 @@ describe('sonarrRouting', () => {
       [forced.anime, forced.decidedBy, forced.seriesType, forced.rootFolder],
       [true, 'request', 'anime', '/anime']
     );
-    const standard = sonarrRouting(oshiNoKo, settings, 'standard');
+    const standard = sonarrRouting(japaneseSeries, settings, 'standard');
     assert.deepEqual(
       [standard.anime, standard.seriesType, standard.rootFolder],
       [false, 'standard', '/tv']
@@ -73,13 +73,13 @@ describe('sonarrRouting', () => {
       [set.anime, set.decidedBy, set.seriesType, set.rootFolder],
       [true, 'title', 'anime', '/anime']
     );
-    const unset = sonarrRouting(oshiNoKo, settings, null, false);
+    const unset = sonarrRouting(japaneseSeries, settings, null, false);
     assert.deepEqual(
       [unset.anime, unset.decidedBy, unset.seriesType, unset.qualityProfile],
       [false, 'title', 'standard', 1]
     );
     assert.equal(
-      sonarrRouting(oshiNoKo, settings, null, null).decidedBy,
+      sonarrRouting(japaneseSeries, settings, null, null).decidedBy,
       'detection'
     );
   });
@@ -91,7 +91,7 @@ describe('sonarrRouting', () => {
       [false, 'request', 'standard', '/tv']
     );
     assert.equal(
-      sonarrRouting(oshiNoKo, settings, 'daily', false).seriesType,
+      sonarrRouting(japaneseSeries, settings, 'daily', false).seriesType,
       'daily'
     );
   });
@@ -104,7 +104,7 @@ describe('sonarrRouting', () => {
       activeAnimeLanguageProfileId: undefined,
       animeTags: undefined,
     } as unknown as SonarrSettings;
-    assert.deepEqual(sonarrRouting(oshiNoKo, bare), {
+    assert.deepEqual(sonarrRouting(japaneseSeries, bare), {
       anime: true,
       decidedBy: 'detection',
       seriesType: 'anime',

@@ -10,12 +10,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Backfill's settings. Prowlarr's connection is kept with them, and set
- * apart from them in Settings → Services (/prowlarr); the Backfill form
- * leaves it out, and the saved one stays. Prowlarr's API key is never sent
- * back; a blank one keeps the saved key, but only for the same address, so
- * the key can't be sent somewhere new. With Backfill on, Prowlarr is tested
- * before saving.
+ * Backfill settings. Prowlarr's connection is stored with them but set in
+ * Settings → Services (/prowlarr); the Backfill form omits it and keeps the
+ * saved one. Prowlarr's API key is never sent back; a blank key keeps the
+ * saved one only for the same address, so it can't be sent somewhere new.
+ * With Backfill on, Prowlarr is tested before saving.
  */
 const backfillSettingsRoutes = Router();
 
@@ -211,14 +210,14 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
   return res.status(200).json(shown(next_));
 });
 
-/** Prowlarr's connection, for Settings → Services, without its API key. */
+/** Prowlarr's connection for Settings → Services, without its API key. */
 backfillSettingsRoutes.get('/prowlarr', (_req, res) => {
   res.status(200).json(prowlarrShown(getSettings().backfill.prowlarr));
 });
 
 /**
- * Saves Prowlarr's connection, once Prowlarr answers. A blank address
- * removes it, unless Backfill is on, which can't run without it.
+ * Saves Prowlarr's connection once Prowlarr answers. A blank address removes
+ * it, unless Backfill is on, which needs it.
  */
 backfillSettingsRoutes.put('/prowlarr', async (req, res, next) => {
   const parsed = prowlarrBody.safeParse(req.body);
@@ -255,8 +254,8 @@ backfillSettingsRoutes.put('/prowlarr', async (req, res, next) => {
 });
 
 /**
- * Turns Download Check off, to Report only, or on. Apart from the form: it
- * needs nothing else of Backfill's to be set up.
+ * Sets Download Check to off, Report only, or on. Separate from the form: it
+ * needs no other Backfill setup.
  */
 backfillSettingsRoutes.put('/download-check', async (req, res, next) => {
   const parsed = z
@@ -278,8 +277,8 @@ backfillSettingsRoutes.put('/download-check', async (req, res, next) => {
 });
 
 /**
- * Blocks a release group, or unblocks one: saved, and Radarr and Sonarr
- * brought in line. Answers the list, and what could not be updated.
+ * Blocks or unblocks a release group and syncs Radarr and Sonarr. Returns
+ * the list and what could not be updated.
  */
 backfillSettingsRoutes.post('/blocked-groups', async (req, res, next) => {
   const parsed = z

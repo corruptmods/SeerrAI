@@ -47,17 +47,17 @@ interface ListCardProps {
   kind?: 'watch' | 'music';
   /** A playlist's album covers, by release-group id. */
   covers?: string[];
-  /** Offsets this card's animation so a grid of cards is not in lockstep. */
+  /** Offsets this card's animation so a grid isn't in lockstep. */
   index: number;
 }
 
-/** A fraction from 0 to 1, the same for the same seed on every render. */
+/** A deterministic fraction in [0, 1) for the seed. */
 const fraction = (seed: number) => {
   const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
 };
 
-/** The posters in an order the seed sets, the same on every render. */
+/** A deterministic shuffle for the seed. */
 const mixed = <T,>(items: T[], seed: number): T[] => {
   const out = [...items];
   for (let i = out.length - 1; i > 0; i--) {
@@ -68,12 +68,9 @@ const mixed = <T,>(items: T[], seed: number): T[] => {
 };
 
 /**
- * One tile of a card's mosaic. It opens on a picture already in place, part
- * way through its time, so a page of cards looks as if it had been running
- * a while: no fade in on arrival, and tiles turning over at their own
- * moments rather than together. Each new picture fades in over the one
- * before, which stays put underneath until it is covered. A watch list's
- * tiles show posters, a playlist's album covers.
+ * One mosaic tile. It starts part way through a picture, with no fade in, so
+ * tiles turn over at their own moments. Each new picture fades in over the
+ * previous one, which stays underneath until covered.
  */
 const RotatingTile = <T,>({
   items,
@@ -82,7 +79,7 @@ const RotatingTile = <T,>({
 }: {
   items: T[];
   seed: number;
-  /** One picture of the tile, drawn with the class and style given. */
+  /** Renders one picture with the given class and style. */
   slide: (
     item: T,
     className: string,
@@ -91,11 +88,10 @@ const RotatingTile = <T,>({
   ) => React.ReactNode;
 }) => {
   const count = items.length;
-  // Where this tile starts in its pictures, and how far into the first
-  // one's time it already is.
+  // Start picture, and how far into its time the tile starts.
   const first = Math.floor(fraction(seed) * count);
   const phase = fraction(seed + 0.5);
-  // The picture shown and the one under it, by how many turns in each is.
+  // Steps of the picture shown and the one under it.
   const [shown, setShown] = useState([0]);
 
   useEffect(() => {
@@ -134,14 +130,14 @@ const RotatingTile = <T,>({
       {shown.map((step) =>
         slide(
           items[(first + step) % count],
-          // Every picture after the first fades in; the class never changes
-          // on one once shown, so its drift is never restarted.
+          // Pictures after the first fade in; a shown picture's class never
+          // changes, so its drift never restarts.
           step > 0 ? 'list-poster-slide entering' : 'list-poster-slide',
           {
             animationDuration: `${CROSSFADE_SECONDS}s, ${
               SECONDS_PER_POSTER + CROSSFADE_SECONDS
             }s`,
-            // The first picture is part way through its slow drift already.
+            // The first picture starts part way through its drift.
             animationDelay:
               step === 0
                 ? `0s, -${(phase * SECONDS_PER_POSTER).toFixed(2)}s`
@@ -154,7 +150,7 @@ const RotatingTile = <T,>({
   );
 };
 
-/** Each tile's own share of the pictures, so no two tiles show the same one. */
+/** Splits the pictures between tiles, so no two show the same one. */
 const shares = <T,>(items: T[]): T[][] => {
   const tileCount = Math.min(items.length, TILE_COUNT);
   return Array.from({ length: tileCount }, (_, tile) =>
@@ -178,10 +174,8 @@ const ListCard = ({
   const intl = useIntl();
   const { currentSettings } = useSettings();
   const playlist = kind === 'music';
-  // A new start each visit: which pictures each tile shows, and where in
-  // them it begins. The same while the page stays open.
+  // A new seed per mount: which pictures each tile shows and where it starts.
   const [visit] = useState(() => Math.floor(Math.random() * 1_000_000));
-  // Each tile walks its own share, starting at a different place in it.
   const posterTiles = shares(
     mixed(
       previews.filter((p) => p.posterPath),

@@ -14,12 +14,9 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * Theme files: a look someone can share, holding colours and a few
- * settings only. They are checked strictly wherever they come from (a file
- * being imported, a saved look, settings.json), so nothing but colours and
- * known values can reach the page.
- */
+// Theme files: shareable looks with colours and a few settings only, validated
+// strictly from every source (an imported file, a saved look, settings.json),
+// so only colours and known values reach the page.
 
 const ember = {
   seerrTheme: 1,

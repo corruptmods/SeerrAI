@@ -30,7 +30,7 @@ export type BackfillFileState = 'waiting' | 'importing' | 'imported' | 'failed';
 export interface BackfillJobFile extends PlanEntry {
   state: BackfillFileState;
   note?: string;
-  /** Episode file ids before the import, to tell what it replaced. */
+  /** Episode file ids before import, to tell what it replaced. */
   before?: number[];
 }
 
@@ -39,32 +39,31 @@ export interface BackfillLogLine {
   kind: 'info' | 'ok' | 'warn' | 'error';
   message: string;
   /**
-   * The same line again and again (a try that keeps failing alike) is
-   * written once: how many times it came, and when it came last.
+   * A repeated identical line (a retry failing the same way) is logged once,
+   * with its count and last time.
    */
   count?: number;
   lastAt?: string;
 }
 
 /**
- * The indexer a job's release comes from has reached its download limit:
- * since when the job has waited on it, and when it is asked again.
+ * The job's indexer hit its download limit: when the wait started and when to
+ * retry.
  */
 export interface BackfillIndexerWait {
   indexer: string;
   indexerId: number | null;
   since: string;
   until: string;
-  /** Limits in a row, each wait longer than the last. */
+  /** Consecutive limits; each wait is longer than the last. */
   strikes: number;
 }
 
 /**
- * What became of a failed download: another took its place (replacedById),
- * Backfill is searching for one, the admin agent is looking (agentRunId),
- * Backfill offered the next pack (or the same one again) to an admin,
- * nothing else was found, or the agent stopped looking: after three failed
- * replacements in a day, or with its downloads for the day used up.
+ * What happened after a download failed: replaced (replacedById), Backfill
+ * searching, the admin agent looking (agentRunId), Backfill offered the next
+ * pack (or the same again) to an admin, nothing found, or the agent stopped
+ * after three failed replacements in a day or its daily downloads ran out.
  */
 export type BackfillFollowUp =
   | 'replaced'
@@ -111,14 +110,13 @@ export class BackfillJob {
   public clientId: number;
 
   /**
-   * Where a running job is within its status, in words: "Waiting for the
-   * torrent's file list", "NZBGet is repairing the download", Sonarr
-   * importing.
+   * A running job's progress within its status, in words: "Waiting for the
+   * torrent's file list", "NZBGet is repairing the download", Sonarr importing.
    */
   @Column({ type: 'varchar', nullable: true })
   public stage: string | null;
 
-  /** The torrent's hash or the Usenet client's job id, once added. */
+  /** The torrent hash or Usenet job id, once added. */
   @Column({ type: 'varchar', nullable: true })
   public downloadId: string | null;
 
@@ -160,7 +158,7 @@ export class BackfillJob {
   @Column({ type: 'text', nullable: true })
   public error: string | null;
 
-  /** While waiting out its indexer's download limit; kept over restarts. */
+  /** Set while waiting out its indexer's download limit; survives restarts. */
   @Column({ type: 'simple-json', nullable: true })
   public indexerWait: BackfillIndexerWait | null;
 
@@ -170,15 +168,15 @@ export class BackfillJob {
   @Column({ type: 'varchar', nullable: true })
   public approvedByName: string | null;
 
-  /** The admin agent's conversation that started it, if it did. */
+  /** The admin agent run that started it, if any. */
   @Column({ type: 'integer', nullable: true })
   public agentRunId: number | null;
 
-  /** Once failed: what became of it. */
+  /** Once failed: what happened next. */
   @Column({ type: 'varchar', nullable: true })
   public followUp: BackfillFollowUp | null;
 
-  /** Once failed: the download that took its place. */
+  /** Once failed: the replacement download. */
   @Column({ type: 'integer', nullable: true })
   public replacedById: number | null;
 

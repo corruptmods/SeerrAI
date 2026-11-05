@@ -8,12 +8,10 @@ import {
 } from 'react';
 
 /*
- * One notice at a time. Banners and pop-ups that ask something of you (the
- * app was updated, your Plex sign-in expired, finished-watching suggestions,
- * turning on notifications, adding a passkey, a seasonal theme starting)
- * each report whether they have something to say; only the most important
- * one is shown, and the next takes its place once it is dealt with.
- * Nothing stacks, and two dialogs never open over each other.
+ * One notice at a time. Prompting banners and pop-ups (app updated, Plex
+ * sign-in expired, watch suggestions, notifications, passkeys, a season
+ * starting) report whether they want to show; only the highest priority
+ * shows, and the next follows once it's dismissed. Dialogs never stack.
  */
 
 /** Lower comes first. */
@@ -29,9 +27,8 @@ export const NOTICE_PRIORITY = {
 export type NoticeId = keyof typeof NOTICE_PRIORITY;
 
 /**
- * `pending`: still finding out (loading). A notice that is pending holds back
- * the ones after it, so a less important one never flashes up only to be
- * replaced; after a few seconds it stops holding them back.
+ * `pending`: still loading. It holds back lower notices for a few seconds so
+ * one doesn't flash up only to be replaced.
  */
 export type NoticeState = 'pending' | 'show' | 'hide';
 
@@ -49,19 +46,18 @@ interface NoticeQueueValue {
 
 const NoticeQueueContext = createContext<NoticeQueueValue | null>(null);
 
-/** Which notice should be showing, given what each has reported. */
+/** The notice to show, given each one's state. */
 export const pickNotice = (
   entries: Partial<Record<NoticeId, Entry>>,
   current: NoticeId | undefined,
   now: number
 ): { next?: NoticeId; recheckIn?: number } => {
-  // An update blocks the app until it reloads, so it goes first regardless.
+  // An update blocks the app until reload, so it always wins.
   if (entries.appUpdated?.state === 'show') {
     return { next: 'appUpdated' };
   }
-  // Otherwise whatever is showing stays until it is dealt with, even if
-  // something more important turns up: no notice is pulled out from under a
-  // tap.
+  // Otherwise the current notice stays until dismissed, so none is pulled
+  // out from under a tap.
   if (current && entries[current]?.state === 'show') {
     return { next: current };
   }
@@ -120,10 +116,7 @@ export const NoticeQueueProvider = ({
   );
 };
 
-/**
- * Report what this notice has to say; true when it is its turn to show.
- * Outside a queue (a page rendered on its own) it simply shows.
- */
+/** Reports a notice's state; true when it should show. Always true outside a queue. */
 export const useNotice = (id: NoticeId, state: NoticeState): boolean => {
   const queue = useContext(NoticeQueueContext);
   const report = queue?.report;
@@ -132,7 +125,7 @@ export const useNotice = (id: NoticeId, state: NoticeState): boolean => {
     report?.(id, state);
   }, [report, id, state]);
 
-  // Leaving the page counts as having nothing to say.
+  // Unmounting hides it.
   useEffect(() => () => report?.(id, 'hide'), [report, id]);
 
   if (!queue) {

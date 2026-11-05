@@ -27,8 +27,8 @@ interface Flagged {
 }
 
 /**
- * A second look at what Maintainerr is about to delete, for those who
- * manage requests: the titles that may be a mistake, each with its Keep.
+ * For request managers: flags Maintainerr deletions that may be mistakes, each
+ * with a Keep action.
  */
 const DeletionReview = () => {
   const intl = useIntl();

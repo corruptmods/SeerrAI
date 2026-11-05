@@ -17,10 +17,9 @@ const messages = defineMessages('components.Themes.CustomCss', {
 });
 
 /**
- * Keeps the custom stylesheets on the page in step with the server's
- * settings and the person signed in (the server puts the first ones in
- * the page; see utils/theme/safeMode). In safe mode there are none, and a
- * small note says so, with a way to turn it off.
+ * Keeps custom stylesheet links in sync with settings and the signed-in user
+ * (the server renders the initial ones; see utils/theme/safeMode). Safe mode
+ * drops them and shows a note with a way out.
  */
 const CustomCss = () => {
   const intl = useIntl();

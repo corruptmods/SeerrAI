@@ -42,7 +42,7 @@ const episode = (
     : [],
 });
 
-/** The shape of the real BRIXO Shurikan: Wyverns Waking. */
+/** Shaped like a real series' Bazarr data. */
 const series = [
   ...[1, 2, 3].flatMap((s) =>
     Array.from({ length: 20 }, (_, i) => episode(s, i + 1, [track({})]))

@@ -2,7 +2,7 @@ import type { ToolWords } from '@app/components/Backfill/Agent/work';
 import defineMessages from '@app/utils/defineMessages';
 import type { MessageDescriptor } from 'react-intl';
 
-/** What each tool did, as an admin is told it (see work.ts). */
+/** Admin-facing words per agent tool (see work.ts). */
 export const toolMessages: Record<ToolWords, MessageDescriptor> =
   defineMessages('components.Backfill.Agent.tools', {
     find_title: 'found the title',

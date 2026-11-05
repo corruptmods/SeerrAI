@@ -16,15 +16,13 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /**
- * The live loop behind "HOLLOWAY - Phantom" being auto-approved every three
- * minutes.
+ * Regression for a live loop that auto-approved a series every three minutes.
  *
- * TVDB folded HOLLOWAY into its Phantom anthology entry, which TMDB assigns to
- * the anthology (336745), so the HOLLOWAY entry (226491) has no TVDB id of its
- * own. When a series request cannot resolve a TVDB id, the Sonarr dispatch
- * deleted both the media row and the request. Nothing survived, so watchlist
- * sync had no record of trying and tried again on every run — notifying each
- * time.
+ * TVDB folded the series (TMDB 226491) into an anthology entry, which TMDB
+ * assigns to the anthology (336745), so the series has no TVDB id of its own.
+ * When a series request couldn't resolve a TVDB id, the Sonarr dispatch deleted
+ * both the media row and the request, so watchlist sync had no record of trying
+ * and retried every run, notifying each time.
  */
 describe('a series request whose TVDB id cannot be resolved', () => {
   setupTestDb();
@@ -53,13 +51,13 @@ describe('a series request whose TVDB id cannot be resolved', () => {
       { isAutoRequest: true }
     );
 
-  // The dispatch is fire-and-forget from the subscriber; give it a moment.
+  // Dispatch is fire-and-forget from the subscriber; give it a moment.
   const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 
   beforeEach(async () => {
     stub(TheMovieDb.prototype, 'getTvShow', {
       id: 226491,
-      name: 'HOLLOWAY - Phantom: The Edgar Holloway Story',
+      name: 'Harbour Lights - Lantern Song: The Long Night',
       first_air_date: '2022-09-21',
       // What TMDB returns for this entry: no TVDB id of its own.
       external_ids: { tvdb_id: null },
@@ -105,7 +103,7 @@ describe('a series request whose TVDB id cannot be resolved', () => {
       where: { plexUsername: 'unresolvable' },
     });
 
-    // The anthology, which legitimately holds TVDB 497315.
+    // The anthology, which rightly holds TVDB 497315.
     await getRepository(Media).save(
       new Media({
         tmdbId: 336745,

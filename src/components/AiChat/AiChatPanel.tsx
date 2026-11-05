@@ -89,7 +89,7 @@ interface TurnMusic {
   artists: MusicArtistResult[];
 }
 
-/** Music as it is named back, so it is not offered again. */
+/** Music labels sent back as context so it isn't offered again. */
 const musicLabels = (music?: TurnMusic): string[] => [
   ...(music?.albums ?? []).map((album) =>
     album.artistName ? `${album.title} by ${album.artistName}` : album.title
@@ -99,31 +99,30 @@ const musicLabels = (music?: TurnMusic): string[] => [
 
 interface Turn {
   ask: string;
-  /** A small copy of the photo sent with it, if any. */
+  /** Thumbnail of the attached photo. */
   photo?: string;
   reply?: string;
   results?: Title[];
-  /** Albums and artists, for someone with music. */
   music?: TurnMusic;
-  /** A whole set read from TMDB: its name, and whether it was cut short. */
+  /** A full TMDB set: its name and whether it was truncated. */
   source?: { name: string; more: boolean };
-  /** A fix that was done or started, and the page that follows it. */
+  /** A fix that ran or started, with a link to follow it. */
   fix?: { kind: string; ok: boolean; link?: string };
-  /** A fix that replaces files, offered, waiting for them to confirm it. */
+  /** A file-replacing fix awaiting the user's confirmation. */
   confirm?: Record<string, unknown>;
   error?: string;
 }
 
-/** As long as the server reads a message, or an earlier one sent back. */
+/** Server-side limit for a message, including earlier ones sent back. */
 const MAX_ASK = 500;
 
-/** Cards shown for a whole set before "Show all". */
+/** Cards shown for a full set before "Show all". */
 const SET_PREVIEW = 12;
 
 interface ChatAction {
   do: 'list' | 'request';
   name?: string;
-  /** About titles offered in an earlier answer, not this one's. */
+  /** Refers to titles from an earlier answer. */
   earlier: boolean;
 }
 
@@ -134,10 +133,9 @@ interface Sheet {
 }
 
 /**
- * The panel the AI button opens: a short conversation that ends in titles to
- * open or request, and picking for a room. Loaded the first time it is
- * opened, then kept as it is while someone moves around the app; gone when
- * they sign out.
+ * AI chat panel: conversation ending in titles to open or request, plus pick
+ * for a room. Loaded on first open, kept across navigation, cleared on sign
+ * out.
  */
 const AiChatPanel = ({
   open,
@@ -167,7 +165,7 @@ const AiChatPanel = ({
     keys: Set<string>;
   }>();
   const [sheet, setSheet] = useState<Sheet>();
-  // Answers whose whole set is shown, not just the first few.
+  // Turns showing their full set.
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const { hasPermission } = useUser();
   const canRequest = hasPermission(
@@ -176,8 +174,7 @@ const AiChatPanel = ({
   );
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  // Spoken words fill the box; sending stays with the person, so a misheard
-  // word can be put right first.
+  // Voice fills the box but never sends, so misheard words can be fixed.
   const voice = useVoiceInput(
     useCallback((heard: string) => {
       if (heard) {
@@ -186,8 +183,8 @@ const AiChatPanel = ({
     }, [])
   );
 
-  // Opening a title from the panel goes to its page; the panel steps aside,
-  // and so does a sheet open in it, rather than coming back with the panel.
+  // Close the panel and any sheet on navigation so the sheet doesn't reappear
+  // with it.
   useEffect(() => {
     const leave = () => {
       setSheet(undefined);
@@ -227,8 +224,7 @@ const AiChatPanel = ({
     setPhoto(undefined);
     setPhotoProblem(false);
     setBusy(true);
-    // Only what was asked and offered goes back as context, not the cards
-    // or the photos.
+    // Context is text only: no cards or photos.
     const earlier = turns
       .filter((t) => !t.error)
       .slice(-3)
@@ -267,7 +263,7 @@ const AiChatPanel = ({
         ...all.slice(0, -1),
         { ask, photo: shown, reply, results, music, source, fix, confirm },
       ]);
-      // Asked to list or request titles: set it up to confirm, never more.
+      // List or request actions only open a confirm sheet, never act directly.
       if (action) {
         const titles = action.earlier
           ? ([...turns].reverse().find((t) => t.results?.length)?.results ?? [])
@@ -291,8 +287,7 @@ const AiChatPanel = ({
     }
   };
 
-  // A fix that replaces files, confirmed: filed and started, and the
-  // answer it was offered in says so.
+  // Start a confirmed file-replacing fix and update the turn that offered it.
   const confirmFix = async (index: number) => {
     const turn = turns[index];
     if (!turn?.confirm || busy) {
@@ -331,8 +326,8 @@ const AiChatPanel = ({
         : messages.placeholder
   );
 
-  // The microphone until there is something to send, then Send; a photo on
-  // its own can be sent too. While listening it stays, so it can be stopped.
+  // Mic until there is text or a photo to send; stays while listening so it can
+  // be stopped.
   const showMic =
     voice.available && (voice.listening || (!text.trim() && !photo));
 
@@ -384,7 +379,7 @@ const AiChatPanel = ({
             maxLength={500}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            // A picture copied on a computer can be pasted straight in.
+            // Accept pasted images.
             onPaste={(e) => {
               const file = [...e.clipboardData.files].find((f) =>
                 f.type.startsWith('image/')
@@ -397,7 +392,7 @@ const AiChatPanel = ({
             placeholder={placeholder}
             className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2 text-strong placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-0"
           />
-          {/* On a phone this offers the camera or the photo library. */}
+          {/* On phones this offers the camera or photo library. */}
           <input
             ref={picker}
             type="file"
@@ -419,7 +414,6 @@ const AiChatPanel = ({
         >
           <CameraIcon className="h-5 w-5" />
         </button>
-        {/* One button: the microphone until there is something to send. */}
         {showMic ? (
           <VoiceInputButton
             className={`h-10 w-10 ${
@@ -486,8 +480,7 @@ const AiChatPanel = ({
       {showing === 'pick' ? (
         <PickForRoom />
       ) : (
-        // The conversation scrolls; the message box is the panel's footer,
-        // so it stays put however long the conversation gets.
+        // Only the conversation scrolls; the message box is the footer.
         <div className="flex flex-col" data-testid="ai-chat">
           {turns.length > 0 && (
             <button
@@ -628,8 +621,8 @@ const AiChatPanel = ({
                           >
                             <AiTitleCard result={result} />
                             {picking && (
-                              // While choosing, a tap chooses the title
-                              // rather than opening it.
+                              // While choosing, a tap selects instead of
+                              // opening.
                               <button
                                 type="button"
                                 aria-pressed={picked}
@@ -704,8 +697,8 @@ const AiChatPanel = ({
                   </>
                 )}
                 {turn.music && (
-                  // Each requested from its own tile: lists and requests
-                  // together are for films and series.
+                  // Music is requested per tile; bulk actions are for films and
+                  // series.
                   <ul className="cards-vertical">
                     {turn.music.artists.map((artist) => (
                       <li key={`artist-${artist.id}`}>
@@ -726,7 +719,7 @@ const AiChatPanel = ({
                 {intl.formatMessage(messages.thinking)}
               </div>
             )}
-            {/* Scrolled to after each answer. */}
+            {/* Scroll target after each answer. */}
             <div ref={end} />
           </div>
         </div>
@@ -767,10 +760,7 @@ const AiChatPanel = ({
   );
 };
 
-/**
- * Under an answer's titles: put them on a list or request them, all of
- * them, or only the ones chosen.
- */
+/** List or request all of an answer's titles, or only the chosen ones. */
 const ResultActions = ({
   titles,
   choosing,

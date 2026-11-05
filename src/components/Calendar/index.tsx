@@ -36,15 +36,14 @@ type Filter = 'all' | 'movie' | 'tv';
 const PAGE_WEEKS = 4;
 const MAX_WEEKS = 12;
 
-/** Midnight at the start of a local day, as a key. */
+/** Local midnight of a day, as a key. */
 const localKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 /**
- * The day an item falls on for the viewer. A film's release is a calendar
- * date stored at midnight UTC — read in local time west of UTC it would fall
- * a day early — so it keeps its own date. An episode airs at a real moment,
- * so it falls on the viewer's local day.
+ * The viewer's day for an item. Film releases are midnight-UTC calendar
+ * dates, kept as-is (local time would shift them a day early west of UTC).
+ * Episodes air at an instant, so they use the local day.
  */
 const dayOf = (item: CalendarItem) =>
   item.allDay ? item.at.slice(0, 10) : localKey(new Date(item.at));
@@ -142,10 +141,7 @@ const Row = ({ item }: { item: CalendarItem }) => {
   return href ? <Link href={href}>{content}</Link> : content;
 };
 
-/**
- * What is coming, day by day: film releases and episode air dates for
- * everything Radarr and Sonarr are watching for.
- */
+/** Upcoming film releases and episode airings from Radarr and Sonarr, by day. */
 const Calendar = () => {
   const intl = useIntl();
   const [weeks, setWeeks] = useState(PAGE_WEEKS);
@@ -161,8 +157,7 @@ const Calendar = () => {
     for (const item of data?.items ?? []) {
       if (filter !== 'all' && item.mediaType !== filter) continue;
       const key = dayOf(item);
-      // The server starts a day early to catch releases at midnight UTC;
-      // anything before the viewer's own today is past.
+      // The server starts a day early for midnight-UTC releases; skip past days.
       if (key < todayKey) continue;
       grouped.set(key, [...(grouped.get(key) ?? []), item]);
     }
@@ -215,8 +210,7 @@ const Calendar = () => {
               {intl.formatMessage(messages.nothing, { weeks })}
             </p>
           ) : (
-            // One column on a phone; on a wide screen, each day is a card, two
-            // or three across, instead of a narrow list down one side.
+            // One column on phones; day cards two or three across on wide screens.
             <div className="xl:grid xl:grid-cols-2 xl:items-start xl:gap-6 2xl:grid-cols-3">
               {days.map(([key, items]) => (
                 <section

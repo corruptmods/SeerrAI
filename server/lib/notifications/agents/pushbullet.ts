@@ -23,7 +23,7 @@ interface PushbulletPayload {
   type: string;
   title: string;
   body: string;
-  /** For a "link" push: where tapping it goes. */
+  /** Tap target for a "link" push. */
   url?: string;
   channel_tag?: string;
 }
@@ -172,8 +172,7 @@ class PushbulletAgent
       }
     }
 
-    // Held while a burst to this person is gathered into one (see the
-    // notification manager): only the admin and channel copies go now.
+    // holdUser: the user's copy goes out later in a digest.
     if (payload.notifyUser && !payload.holdUser) {
       if (
         payload.notifyUser.settings?.hasNotificationType(

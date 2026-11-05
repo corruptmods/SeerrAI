@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /**
- * The parser takes whatever someone pasted out of a notes app. The cases here
- * are the shapes real lists actually contain — bullets, checkboxes, numbering,
- * years written either way, and personal asides after a dash.
+ * Input is whatever was pasted from a notes app; the cases cover shapes real
+ * lists contain: bullets, checkboxes, numbering, years either way, and asides
+ * after a dash.
  */
 describe('parseTitleList', () => {
   it('strips bullets, numbering and checkboxes', () => {

@@ -19,8 +19,7 @@ const GenreCard = ({ image, url, name, canExpand = false }: GenreCardProps) => {
       className={`relative flex h-32 items-center justify-center sm:h-36 ${
         canExpand ? 'w-full' : 'w-56 sm:w-72'
       } transform-gpu cursor-pointer p-8 shadow ring-1 transition duration-300 ease-in-out ${
-        // Dark behind the white name in every look, before the picture
-        // arrives and around it.
+        // Dark behind the white name in every look, before and around the image.
         isHovered
           ? 'scale-105 bg-gray-700/100 ring-gray-500 light:bg-[rgb(var(--media-scrim-raised))]'
           : 'scale-100 bg-[rgb(var(--media-scrim-raised)/0.8)] ring-subtle'

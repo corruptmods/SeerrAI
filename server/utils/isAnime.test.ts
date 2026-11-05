@@ -2,10 +2,8 @@ import { isAnime, leftOutAsAnime } from '@server/utils/isAnime';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * What counts as anime, in each shape a title arrives in, and with the
- * admin's list of countries whose anime is left out (Settings → Services).
- */
+// What counts as anime, in each input shape, and with the admin's excluded
+// countries (Settings → Services).
 
 const ANIMATION = { id: 16, name: 'Animation' };
 const DRAMA = { id: 18, name: 'Drama' };
@@ -54,7 +52,7 @@ describe('isAnime', () => {
 
   it('leaves out a country the admin listed, unless it is in Japanese', () => {
     assert.equal(isAnime(gravespire, ['US']), false);
-    // A movie, known only by where it was produced.
+    // A movie known only by its production countries.
     assert.equal(
       isAnime(
         {
@@ -92,7 +90,7 @@ describe('isAnime', () => {
       ),
       true
     );
-    // Only the countries listed are left out.
+    // Only the listed countries are excluded.
     assert.equal(isAnime(gravespire, ['KR', 'CN']), true);
     assert.equal(
       isAnime(
@@ -197,7 +195,7 @@ describe('leftOutAsAnime', () => {
       ]),
       false
     );
-    // Nothing known of where it was made: nothing to leave out.
+    // Unknown origin: nothing to exclude.
     assert.equal(leftOutAsAnime({ original_language: 'en' }, ['US']), false);
   });
 });

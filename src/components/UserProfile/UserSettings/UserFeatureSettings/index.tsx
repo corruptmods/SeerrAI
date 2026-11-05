@@ -34,13 +34,13 @@ const UserFeatureSettings = () => {
   const { currentSettings } = useSettings();
   const { user: currentUser, revalidate: revalidateCurrentUser } = useUser();
   const { user, revalidate } = useUser({ id: Number(router.query.userId) });
-  // Admin tools are only listed for someone who can use them.
+  // Hide admin tools the user can't use.
   const can = (permission: Permission) =>
     hasPermission(permission, user?.permissions ?? 0);
   const adminTools: Feature[] = [
     ...(can(Permission.MANAGE_REQUESTS) ? [] : ['aiDeletionReview' as const]),
     ...(can(Permission.MANAGE_ISSUES) ? [] : ['aiIssueTriage' as const]),
-    // Siri only reports problems, which they may not.
+    // Siri only reports issues.
     ...(can(Permission.CREATE_ISSUES) || can(Permission.MANAGE_ISSUES)
       ? []
       : ['siri' as const]),
@@ -60,13 +60,13 @@ const UserFeatureSettings = () => {
     setSaving(true);
     try {
       const disabled = withFeature(data.disabled, feature, on);
-      // Shown straight away; put back if the save fails.
+      // Optimistic; reverted if the save fails.
       await mutate({ disabled }, { revalidate: false });
       const response = await axios.post<{ disabled: string[] }>(key, {
         disabled,
       });
       await mutate(response.data, { revalidate: false });
-      // Pages read the switches from the signed-in user.
+      // Pages read the switches from the user object.
       await revalidate();
       if (currentUser?.id === user?.id) {
         await revalidateCurrentUser();

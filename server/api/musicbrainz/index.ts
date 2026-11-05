@@ -32,54 +32,52 @@ export { MusicBrainzBusyError, MusicBrainzUnwantedError };
 export type { MbPriority };
 
 /*
- * MusicBrainz: artists, albums (release groups) and track lists.
+ * MusicBrainz client: artists, albums (release groups) and track lists.
  *
- * Every request goes through one queue shared by the whole server (see
- * ./queue), and what comes back is kept twice: in memory, and in the
- * database (MusicMetadata) so a restart does not have to ask again. Kept
- * answers past their time are still served while a fresh copy is fetched
- * in the background.
+ * All requests share one server-wide queue (./queue). Answers are cached in
+ * memory and in the database (MusicMetadata) to survive restarts; stale
+ * entries are served while a fresh copy is fetched in the background.
  *
- * Use musicBrainz() rather than making a client: the limit is per server,
- * not per client.
+ * Use musicBrainz() rather than constructing a client: the rate limit is
+ * per server, not per client.
  */
 
 const LABEL = 'MusicBrainz';
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/** How long each kind of answer is kept before it is asked for again. */
+/** Cache lifetime per answer kind; null never expires. */
 export const MB_LIFETIMES = {
   artist: 7 * DAY,
   releaseGroup: 30 * DAY,
   releaseGroupList: 7 * DAY,
-  /** Which album a release belongs to never changes. */
+  /** A release's album never changes. */
   releaseGroupOfRelease: null,
   tracks: 30 * DAY,
   recording: 30 * DAY,
   wikipedia: 30 * DAY,
 } as const;
 
-/** Searches are kept in memory only, for an hour. */
+/** Searches are cached in memory only. */
 const SEARCH_TTL_SECONDS = 3600;
 
-/** Kept answers stay in memory this long; the database keeps them longer. */
+/** Memory cache time; the database keeps answers longer. */
 const MEMORY_TTL_SECONDS = 6 * 3600;
 
-/** Requests to the public MusicBrainz start at least this far apart. */
+/** Minimum spacing between requests to the public MusicBrainz. */
 export const MB_SPACING_MS = 1100;
 
-/** A person is told MusicBrainz is busy rather than wait longer than this. */
+/** Max interactive wait before a busy error. */
 export const MB_MAX_WAIT_MS = 8000;
 
 const TIMEOUT_MS = 15_000;
 
-/** The most release groups MusicBrainz gives in one page. */
+/** MusicBrainz's max release groups per page. */
 export const MB_PAGE_SIZE = 100;
 
 const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** A MusicBrainz id: a lower-case UUID. */
+/** True for a MusicBrainz id (lowercase UUID). */
 export const isMbid = (value: unknown): value is string =>
   typeof value === 'string' && MBID.test(value);
 
@@ -91,10 +89,9 @@ const requireMbid = (value: string): string => {
 };
 
 /**
- * What someone typed, as words to look for: MusicBrainz reads its search
- * as Lucene, where `AC/DC`, `!!!` or `Sunn O)))` are syntax (and an
- * unbalanced bracket fails the search), and AND, OR and NOT are operators
- * ("Simon AND Garfunkel"). Each of those is matched as text instead.
+ * Escapes user input for MusicBrainz's Lucene search, where `/`, `!` and
+ * brackets are syntax (an unbalanced bracket fails the search) and AND, OR
+ * and NOT are operators. All are matched as text instead.
  */
 export const searchText = (typed: string): string =>
   typed
@@ -103,7 +100,7 @@ export const searchText = (typed: string): string =>
 
 const trimSlashes = (url: string): string => url.trim().replace(/\/+$/, '');
 
-/** The public MusicBrainz, which allows a request a second. */
+/** True for the public MusicBrainz (one request per second). */
 export const isPublicMusicBrainz = (baseUrl: string): boolean => {
   try {
     const host = new URL(baseUrl).hostname.toLowerCase();
@@ -114,10 +111,9 @@ export const isPublicMusicBrainz = (baseUrl: string): boolean => {
 };
 
 /**
- * How Seerr names itself to MusicBrainz, as it asks: an application name,
- * version and a way to reach whoever runs it. Every install sends the same
- * name, so an admin's own address keeps one busy server from slowing the
- * others down.
+ * User-Agent for MusicBrainz: app name, version and contact. Every install
+ * shares the name, so an admin's contact address keeps one busy install
+ * from slowing the others.
  */
 export const musicBrainzUserAgent = (contactEmail?: string): string => {
   const contact = [PROJECT_URL, contactEmail?.trim()]
@@ -126,7 +122,7 @@ export const musicBrainzUserAgent = (contactEmail?: string): string => {
   return `${PROJECT_NAME.replace(/\s+/g, '')}/${getAppVersion()} ( ${contact} )`;
 };
 
-/** The shared line: spaced for the public server, not for a mirror. */
+/** The shared queue: spaced for the public server, not for a mirror. */
 const queue = new RequestQueue({
   spacingMs: () =>
     isPublicMusicBrainz(getSettings().music.musicbrainzUrl || MUSICBRAINZ_URL)
@@ -135,22 +131,22 @@ const queue = new RequestQueue({
   maxWaitMs: MB_MAX_WAIT_MS,
 });
 
-/** The queue itself, for Health and for tests. */
+/** The queue, for Health and tests. */
 export const musicBrainzQueue = queue;
 
-/** Answers being worked out, by cache key, shared by everyone asking. */
+/** In-flight work by cache key, shared by concurrent callers. */
 const inFlight = new Map<string, Promise<unknown>>();
 
 interface Kept<T> {
   data: T;
-  /** Epoch ms; null is kept for good. */
+  /** Epoch ms; null never expires. */
   expiresAt: number | null;
 }
 
 const isStale = (kept: Kept<unknown>, now = Date.now()): boolean =>
   kept.expiresAt !== null && kept.expiresAt <= now;
 
-/** The release a track list is read from: official first, then earliest. */
+/** Release to read a track list from: official first, then earliest. */
 const representative = (
   releases: MbReleaseSummary[]
 ): MbReleaseSummary | undefined =>
@@ -160,11 +156,11 @@ const representative = (
     if (official) {
       return official;
     }
-    // A release without a date goes after every dated one.
+    // Undated releases sort last.
     return (a.date || '9999').localeCompare(b.date || '9999');
   })[0];
 
-/** Text from the Wikipedia extract's HTML: tags out, entities decoded. */
+/** Plain text from the Wikipedia extract's HTML, entities decoded. */
 export const plainText = (html: string): string =>
   html
     .replace(/<\s*(br|\/p|\/div|\/li|\/h\d)\s*\/?>/gi, '\n')
@@ -174,8 +170,8 @@ export const plainText = (html: string): string =>
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
-    // One past Unicode's last character is left as it is: decoding it
-    // throws, and the biography would never show.
+    // Leave code points beyond Unicode as is: decoding throws and the
+    // biography would never show.
     .replace(/&#(\d+);/g, (entity, code) =>
       Number(code) <= 0x10ffff ? String.fromCodePoint(Number(code)) : entity
     )
@@ -206,9 +202,9 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * One GET through the shared queue. Each queued job is a single request:
-   * work made of several (a track list) queues each in turn, so nothing
-   * queued ever waits on the queue itself.
+   * One GET through the shared queue. Each job is a single request;
+   * multi-request work (a track list) queues each in turn, so no queued job
+   * waits on the queue itself.
    */
   private request<T>(
     priority: MbPriority,
@@ -232,7 +228,7 @@ export class MusicBrainz extends ExternalAPI {
     );
   }
 
-  /** The same work asked for again while under way is shared. */
+  /** Shares in-flight work for the same key. */
   private once<T>(key: string, work: () => Promise<T>): Promise<T> {
     const existing = inFlight.get(key);
     if (existing) {
@@ -286,7 +282,7 @@ export class MusicBrainz extends ExternalAPI {
         ['key']
       );
     } catch (e) {
-      // Still kept in memory; the database copy comes next time.
+      // Still cached in memory; the database write is retried next time.
       logger.warn('Could not keep a MusicBrainz answer', {
         label: LABEL,
         key,
@@ -296,8 +292,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * An answer from memory, else the database, else MusicBrainz. One past its
-   * time is still answered with, and fetched again behind the scenes.
+   * Answers from memory, else the database, else MusicBrainz. Stale answers
+   * are returned and refreshed in the background.
    */
   private async cached<T>(
     key: string,
@@ -347,8 +343,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * Searches take `wanted`: asked before each request starts, and a search
-   * no one wants any more (typed past) is dropped while it waits.
+   * `wanted` is checked before the request starts; a superseded search is
+   * dropped while queued.
    */
   public searchArtists(
     query: string,
@@ -391,8 +387,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * Albums (release groups) by one of these artists whose title holds this
-   * one, as a phrase: a chart's album found among its artist's.
+   * Release groups by any of these artists whose title contains this phrase,
+   * e.g. a chart album among its artist's.
    */
   public searchReleaseGroupsBy(
     title: string,
@@ -418,10 +414,9 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * Recordings whose title holds what was typed, as a phrase, by any of
-   * these artists. MusicBrainz scores every exact title the same, and a
-   * well-known song has hundreds of covers, so a search by title alone
-   * rarely reaches the original: the artists narrow it to the ones meant.
+   * Recordings by any of these artists whose title contains this phrase.
+   * Title-only searches rarely reach the original (exact titles all score
+   * the same and hits have hundreds of covers), so artists narrow it.
    */
   public searchRecordings(
     query: string,
@@ -448,9 +443,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * Recordings with this ISRC, the code the industry gives one recording:
-   * the very take a store lists, live and remixed ones apart. Not every
-   * recording on MusicBrainz has its code yet.
+   * Recordings with this ISRC, which identifies the exact take a store
+   * lists. Not every MusicBrainz recording has one.
    */
   public searchRecordingsByIsrc(
     isrc: string,
@@ -469,10 +463,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * Keeps recordings a search found as if each was looked up: a recording's
-   * lookup is the same search by its id, so the answer is the same. Asking
-   * for a song found this way (a playlist's, a chart's) then needs no second
-   * request.
+   * Caches search results as recording lookups, which use the same search
+   * by id, so requesting the song later needs no second request.
    */
   public async keepRecordings(recordings: MbRecording[]): Promise<void> {
     for (const recording of recordings) {
@@ -486,10 +478,7 @@ export class MusicBrainz extends ExternalAPI {
     }
   }
 
-  /**
-   * A recording as kept from an earlier lookup, without asking MusicBrainz:
-   * undefined when none is kept (or it is past its time).
-   */
+  /** A cached recording, without querying; undefined if absent or stale. */
   public async keptRecording(
     id: string
   ): Promise<MbRecording | null | undefined> {
@@ -502,9 +491,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * One recording, with every release it is on and their albums. Asked as
-   * a search by id: a lookup lists only the first 25 releases, and a hit
-   * song is on far more.
+   * A recording with all its releases and albums. Uses a search by id
+   * because a lookup lists only 25 releases, and hits are on far more.
    */
   public async getRecording(
     id: string,
@@ -542,8 +530,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * One page (of MB_PAGE_SIZE) of an artist's albums of the given kinds,
-   * e.g. ['album', 'ep']; every kind when none are given.
+   * One MB_PAGE_SIZE page of an artist's release groups of these types
+   * (e.g. ['album', 'ep']), or all types when none given.
    */
   public async getArtistReleaseGroups(
     artistId: string,
@@ -564,9 +552,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * The artist's albums MusicBrainz has already been asked for (any page,
-   * any kinds), without asking again: for an artist picture to fall back
-   * on, where a request in the queue would be one too many.
+   * An artist's already-cached release groups (any page or type), without
+   * querying MusicBrainz, for callers that can't afford a queued request.
    */
   public async keptArtistReleaseGroups(
     artistId: string
@@ -602,9 +589,9 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * The album a release belongs to. Media servers often know a release
-   * (one pressing) rather than the album; this never changes, so it is
-   * kept for good. Background by default: scans are what ask.
+   * The release group a release belongs to. Media servers often know only
+   * the release; the answer never changes, so it's cached forever.
+   * Background by default, since scans call it.
    */
   public async getReleaseGroupOfRelease(
     releaseId: string,
@@ -625,10 +612,7 @@ export class MusicBrainz extends ExternalAPI {
     return found.releaseGroupId;
   }
 
-  /**
-   * An album's track list, from one of its releases: an official one,
-   * the earliest.
-   */
+  /** An album's track list from its earliest official release. */
   public async getTracks(
     releaseGroupId: string,
     priority: MbPriority = 'interactive'
@@ -655,9 +639,8 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
-   * The start of an artist's Wikipedia article, as plain text, or null when
-   * there is none. From the MusicBrainz website, which a mirror may not
-   * serve.
+   * The start of an artist's Wikipedia article as plain text, or null. From
+   * the MusicBrainz website, which a mirror may not serve.
    */
   public async getWikipediaExtract(
     artistId: string,
@@ -680,7 +663,7 @@ export class MusicBrainz extends ExternalAPI {
 
 let shared: { client: MusicBrainz; settings: string } | undefined;
 
-/** The server's MusicBrainz client, following Settings → Music. */
+/** The shared MusicBrainz client, rebuilt when Settings → Music change. */
 export const musicBrainz = (): MusicBrainz => {
   const { musicbrainzUrl, contactEmail } = getSettings().music;
   const settings = JSON.stringify([musicbrainzUrl, contactEmail]);

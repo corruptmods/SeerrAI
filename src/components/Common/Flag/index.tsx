@@ -11,9 +11,8 @@ export const hasFlag = (code?: string | null): code is string =>
   !!code && countries.includes(code);
 
 /**
- * A country's flag at the size of the text around it, fetched on its own
- * and only once it is near the screen. Decorative: the country is always
- * named beside it.
+ * A country's flag at text size, loaded lazily. Decorative: the country is
+ * always named beside it.
  */
 const Flag = ({ code, className = '' }: FlagProps) => {
   if (!hasFlag(code)) {

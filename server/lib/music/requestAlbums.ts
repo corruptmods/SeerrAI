@@ -3,14 +3,12 @@ import type { MbReleaseGroup } from '@server/api/musicbrainz/interfaces';
 import type MusicAlbum from '@server/entity/MusicAlbum';
 
 /*
- * What a music request needs to know about the albums asked for: their
- * titles, kinds and dates, kept on the request and the artist's albums so
- * cards and notifications never have to ask MusicBrainz. Each album has to
- * be the artist's own, so nobody can attach someone else's album to an
- * artist.
+ * Album details are stored on the request so cards and notifications don't
+ * query MusicBrainz. Each album must credit the artist, so nobody can attach
+ * another artist's album.
  */
 
-/** An album as a request keeps it. */
+/** Album details stored on a request. */
 export interface RequestedAlbum {
   mbId: string;
   title: string;
@@ -19,7 +17,7 @@ export interface RequestedAlbum {
   releaseDate?: string | null;
 }
 
-/** An album asked for that MusicBrainz does not list under the artist. */
+/** Requested album that MusicBrainz doesn't credit to the artist. */
 export class NotTheArtistsAlbumError extends Error {}
 
 const fromReleaseGroup = (group: MbReleaseGroup): RequestedAlbum => ({
@@ -36,10 +34,9 @@ const credits = (group: MbReleaseGroup, artistMbid: string): boolean =>
   );
 
 /**
- * The artist's name and the albums asked for, in the order asked. Albums
- * already known (on the artist, or in what MusicBrainz said about the
- * artist's albums when their page was opened) cost nothing; any other is
- * looked up, and must credit the artist.
+ * Returns the artist's name and the requested albums in order. Known albums
+ * (stored, or cached from the artist page) are free; others are looked up
+ * and must credit the artist.
  */
 export const resolveRequestAlbums = async (
   artistMbid: string,

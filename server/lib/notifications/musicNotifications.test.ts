@@ -27,10 +27,8 @@ import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
-/*
- * Music in notifications: their own event lines, what they say about the
- * albums, and links to the album or artist rather than a TMDB address.
- */
+// Music notifications: own event lines, album details, album/artist links
+// instead of TMDB.
 
 setupTestDb();
 
@@ -40,7 +38,7 @@ const FOG_B = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
 const sent: { type: Notification; payload: NotificationPayload }[] = [];
 
-/** The artist, its albums, and a request for some of them. */
+/** An artist, its albums, and a request for some of them. */
 const musicRequest = async (
   albums: { mbId: string; title: string; date: string }[]
 ): Promise<{ media: Media; request: MediaRequest }> => {
@@ -197,7 +195,7 @@ describe('music event lines', () => {
       requestAvailableEvent(MediaType.MUSIC, false).event,
       'Music Request Now Available'
     );
-    // Films and series keep theirs.
+    // Films and series are unchanged.
     assert.equal(
       mediaEvent(Notification.MEDIA_PENDING, MediaType.TV, false)?.event,
       'New Series Request'

@@ -27,7 +27,7 @@ import { after, beforeEach, describe, it } from 'node:test';
 
 /*
  * A title's history, recorded by the real save hooks and routes on a real
- * database, and read back through the route the manage panel uses.
+ * database, read back through the manage panel's route.
  */
 
 setupTestDb();
@@ -218,8 +218,8 @@ describe('what a request records', () => {
   });
 
   it('approval, then the reason it could not be sent, once each', async () => {
-    // A Sonarr exists but none is the default: Seerr cannot send it, and
-    // marks it failed with the reason. (With no Sonarr at all it waits.)
+    // A Sonarr exists but none is default: Seerr can't send it and marks it
+    // failed with the reason. (With no Sonarr at all it waits.)
     const previousSonarr = getSettings().sonarr;
     getSettings().sonarr = [
       {
@@ -370,8 +370,8 @@ describe('reading it', () => {
     assert.equal(await getRepository(MediaEvent).countBy({ tmdbId: 1 }), 0);
   });
 
-  // On Postgres a refused write aborts the transaction it is in, so the save
-  // it was recorded for, and everything after it, would be lost with it.
+  // On Postgres a refused write aborts its transaction, losing the save it was
+  // recorded for and everything after.
   it('never undoes the save it is written in when a write fails', async () => {
     await dataSource.transaction(async (em) => {
       await recordMediaEvent(

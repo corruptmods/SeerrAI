@@ -1,19 +1,16 @@
-/*
- * The Networks row on Discover: by default a fixed list, which an admin can
- * replace with their own (Customize Discover). The list is kept as JSON in
- * the row's data. The same rules are used by the server when saving and by
- * the page when reading, so a list one accepts the other does too.
- *
- * Shared with the page, so it imports nothing: a validation library here
- * would be downloaded by everyone who opens Discover.
- */
+// Discover's Networks row: a fixed default list an admin can replace (Customize
+// Discover), stored as JSON in the row's data. The server (saving) and page
+// (reading) share these rules, so both accept the same lists.
+//
+// Shared with the page, so it imports nothing: a validation library here would
+// be downloaded by everyone who opens Discover.
 
 export const MAX_DISCOVER_NETWORKS = 50;
 export const MAX_DISCOVER_NETWORK_NAME_LENGTH = 100;
 
 /**
- * A TMDB logo file, as TMDB names them ("/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"),
- * and as the image proxy will fetch them: one file name, no folders.
+ * A TMDB logo file name ("/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"), as the image
+ * proxy fetches it: one file, no folders.
  */
 export const DISCOVER_NETWORK_LOGO_PATH =
   /^\/[\w-]{1,100}\.(?:png|svg|jpe?g|webp)$/i;
@@ -25,7 +22,7 @@ export interface DiscoverNetwork {
   logoPath: string;
 }
 
-/** One network as it is kept, or undefined if anything about it is wrong. */
+/** One network as stored, or undefined if anything is invalid. */
 export const readDiscoverNetwork = (
   value: unknown
 ): DiscoverNetwork | undefined => {
@@ -49,9 +46,8 @@ export const readDiscoverNetwork = (
 };
 
 /**
- * A whole list, in order, with a network listed twice kept once. A list is
- * taken whole or not at all: it is refused if it is not a list, if any
- * entry is wrong, or if it has more networks than the limit.
+ * A whole list in order, duplicates kept once. All or nothing: rejected if not
+ * an array, any entry is invalid, or it exceeds the limit.
  */
 export const checkDiscoverNetworks = (
   value: unknown
@@ -73,7 +69,7 @@ export const checkDiscoverNetworks = (
     : { networks };
 };
 
-/** The list, or undefined if it would be refused. */
+/** The list, or undefined if it would be rejected. */
 export const readDiscoverNetworks = (
   value: unknown
 ): DiscoverNetwork[] | undefined => checkDiscoverNetworks(value).networks;

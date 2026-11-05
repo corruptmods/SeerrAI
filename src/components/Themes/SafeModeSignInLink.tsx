@@ -10,9 +10,8 @@ const messages = defineMessages('components.Themes.SafeModeSignInLink', {
 });
 
 /**
- * On the sign-in page, while the server has Server CSS or a theme file as
- * its default: a way to open Seerr AI without them, in case they break
- * the page. A plain link, so the page loads again from scratch.
+ * Sign-in page link into safe mode while Server CSS or a default theme file
+ * is set, in case they break the page. A plain link so the page fully reloads.
  */
 const SafeModeSignInLink = () => {
   const intl = useIntl();

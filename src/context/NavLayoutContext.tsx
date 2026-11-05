@@ -3,14 +3,13 @@ import type { NavItem } from '@server/constants/navigation';
 import { createContext, useContext, useMemo, useState } from 'react';
 
 /*
- * The menu editor. Only someone arranging their menu needs it, and it brings
- * the drag-and-drop library with it, so it loads when they start customizing
- * their home page (with Discover's own editor), not with every page.
+ * The menu editor, lazy-loaded with Discover's editor since it pulls in the
+ * drag-and-drop library.
  */
 export const loadNavEditor = () =>
   import('@app/components/Layout/NavEditor').then((module) => module.default);
 
-/** A menu arrangement being edited: every item in order, and those hidden. */
+/** A menu arrangement being edited: all items in order, and the hidden ones. */
 export interface NavDraft {
   order: NavItem[];
   hidden: NavItem[];
@@ -18,9 +17,8 @@ export interface NavDraft {
 
 interface NavLayoutContextValue {
   /**
-   * The arrangement being edited while someone customizes their home page
-   * (Discover's pencil button); undefined the rest of the time. The sidebar
-   * and the phone menu show their editors while it is set.
+   * The arrangement being edited (Discover's pencil button), else undefined.
+   * While set, the sidebar and phone menu show their editors.
    */
   draft?: NavDraft;
   setDraft: (draft: NavDraft | undefined) => void;
@@ -44,10 +42,7 @@ export const NavLayoutProvider = ({
   );
 };
 
-/**
- * The menu arrangement in effect: the one being edited, or the signed-in
- * person's own (empty lists for the usual order with everything shown).
- */
+/** The active menu arrangement: the draft, else the user's (empty lists mean default). */
 export const useNavLayout = () => {
   const { draft, setDraft } = useContext(NavLayoutContext);
   const { user } = useUser();

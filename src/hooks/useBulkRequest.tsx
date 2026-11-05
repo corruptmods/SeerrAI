@@ -23,21 +23,19 @@ const messages = defineMessages('components.Common.BulkRequest', {
 
 type Requestable = 'movie' | 'tv';
 
-/** Requests sent at once. */
+/** Concurrent requests. */
 const REQUEST_CONCURRENCY = 2;
 
-/** How titles are keyed for selection: "movie:603", "tv:1399". */
+/** Selection key for a title, e.g. "movie:603". */
 export const bulkKey = (mediaType: string | undefined, id: number) =>
   `${mediaType ?? ''}:${id}`;
 
 /**
- * Choosing several titles on a page of posters and requesting them together.
- * Shared by every such page — Discover, search, watchlists, a person's
- * credits — so choosing, confirming and the report that follows are the same
- * everywhere.
+ * Multi-select and bulk request on poster grids (Discover, search,
+ * watchlists, credits).
  *
- * The page places `selectButton` where it wants it, passes each poster
- * through `pick`, and renders `bar` with the titles it is showing.
+ * The page places `selectButton`, wraps each poster in `pick`, and renders
+ * `bar` with the titles it shows.
  */
 const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
   const intl = useIntl();
@@ -57,17 +55,17 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
 
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Map<string, Requestable>>(new Map());
-  // What this page has just requested, until the list itself catches up.
+  // Just-requested statuses, until the list catches up.
   const [requestedNow, setRequestedNow] = useState<Map<string, MediaStatus>>(
     new Map()
   );
   const [progress, setProgress] = useState<{ done: number; count: number }>();
 
-  /** A title's status, counting a request just made here. */
+  /** A title's status, including a request just made here. */
   const statusOf = (key: string, status?: MediaStatus) =>
     requestedNow.get(key) ?? status;
 
-  /** Whether a request could still add anything: the server has the last word. */
+  /** Whether a request could add anything; the server decides finally. */
   const requestable = (
     mediaType: string | undefined,
     status: MediaStatus | undefined
@@ -175,7 +173,7 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
     setProgress(undefined);
     stop();
 
-    // Title cards that look their own status up (a watchlist) see it next.
+    // Cards that fetch their own status (watchlist) see it next.
     statuses.forEach((_status, key) => {
       const [mediaType, id] = key.split(':');
       mutate(`/api/v1/${mediaType}/${id}`);
@@ -211,16 +209,14 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
   };
 
   /**
-   * A poster, and while choosing, what picks it. A chosen poster is outlined
-   * all the way round; one that cannot be requested is dimmed.
+   * Wraps a poster for selection: outlined when chosen, dimmed when not
+   * requestable.
    *
-   * The outline belongs to the poster's own wrapper, so it is always exactly
-   * the poster's size, and the poster underneath is inert while choosing: a
-   * tap picks it rather than opening it. Positioned, so a page's backdrop
-   * (a person's, a collection's) can never sit over it and take the tap.
+   * The outline is on the wrapper so it matches the poster, which is inert
+   * while choosing (a tap selects). Positioned so a page backdrop can't sit
+   * over it and take the tap.
    *
-   * `name` is the title, what a screen reader says for the poster while
-   * choosing: the poster's own title only appears on hover.
+   * `name` is the screen reader label, since the poster's title only shows on hover.
    */
   const pick = (
     key: string,
@@ -282,10 +278,7 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
     </Button>
   ) : null;
 
-  /**
-   * The bar along the bottom while choosing. `shown` = the titles on screen,
-   * as [key, media type, status], for "Select all shown".
-   */
+  /** Bottom bar while choosing. `shown` is [key, media type, status] per visible title, for "Select all shown". */
   const bar = (
     shown: [string, string | undefined, MediaStatus | undefined][]
   ) => {

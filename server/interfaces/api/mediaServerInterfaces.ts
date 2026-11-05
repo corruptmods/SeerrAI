@@ -3,16 +3,16 @@ import type { MediaServerKind } from '@server/constants/server';
 /** A media server as Settings → Media Servers shows it. */
 export interface MediaServerSummary {
   kind: MediaServerKind;
-  /** The server's own name, once Seerr has been connected to it. */
+  /** The server's own name, once connected. */
   name: string;
   connected: boolean;
   primary: boolean;
   signIn: boolean;
   libraries: number;
   enabledLibraries: number;
-  /** When an enabled library was last scanned, in milliseconds. */
+  /** Last scan of an enabled library, epoch ms. */
   lastScan?: number;
-  /** Where Seerr last reached it, to connect again. */
+  /** Last reachable address, for reconnecting. */
   address: {
     ip: string;
     port: number;
@@ -21,15 +21,15 @@ export interface MediaServerSummary {
     externalHostname?: string;
     webAppUrl?: string;
   };
-  /** The owner's (user 1's) account on it, when one is linked. */
+  /** The owner's (user 1) linked account, if any. */
   ownerAccount?: string;
 }
 
-/** How many people removing a server would leave with fewer ways in. */
+/** Users who would lose sign-in methods if the server were removed. */
 export interface MediaServerRemovalImpact {
-  /** People who could then sign in only with their password. */
+  /** Left with password sign-in only. */
   passwordOnly: number;
-  /** People who could then not sign in at all. */
+  /** Left unable to sign in. */
   noSignIn: number;
 }
 

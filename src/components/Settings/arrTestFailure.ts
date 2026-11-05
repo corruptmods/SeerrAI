@@ -8,9 +8,8 @@ const messages = defineMessages('components.Settings.arrTestFailure', {
 });
 
 /**
- * Why a Radarr, Sonarr or Lidarr connection test failed, for its toast:
- * turned away for the name it was reached by (Allowed Hosts, in Radarr 7),
- * or the usual failure.
+ * Toast text for a failed *arr connection test: the Allowed Hosts refusal
+ * (Radarr 7+) if the server reported one, else `otherwise`.
  */
 export const arrTestFailure = (
   intl: IntlShape,

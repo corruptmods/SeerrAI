@@ -113,8 +113,8 @@ class GithubAPI extends ExternalAPI {
       const data = await this.get<GithubCommit[]>(
         `/repos/${PROJECT_REPO}/commits`,
         {
-          // GitHub picks the branch by "sha"; a "branch" parameter is
-          // ignored and lists the default branch instead.
+          // GitHub selects the branch by "sha"; "branch" is ignored and lists
+          // the default branch.
           params: {
             per_page: take,
             sha: branch,

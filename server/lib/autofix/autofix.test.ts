@@ -52,9 +52,8 @@ import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * Fixing what people report, with Sonarr, Radarr, Bazarr and the model
- * stubbed at their API clients. The rejection texts are ones Sonarr gave on
- * the live server.
+ * Auto-fix with Sonarr, Radarr, Bazarr and the model stubbed at their API
+ * clients. Rejection texts are real Sonarr output.
  */
 
 const EXISTING =
@@ -264,18 +263,18 @@ let grabbed: string[] = [];
 let searched: number[][] = [];
 let downloads: string[] = [];
 let episodes: ArrEpisode[] = [];
-/** Where each file came from, by episode id. */
+/** Source release per episode id. */
 let origins: Record<number, string> = {};
 let releases: ArrRelease[] = [];
 let modelAnswer = '{}';
-/** Sonarr's answer to a search for a whole season. */
+/** Sonarr's season search results. */
 let seasonReleases: ArrRelease[] = [];
-/** The season's history: what was grabbed, and which files it became. */
+/** Season history: grabs and the files they became. */
 let seasonHistory: ArrHistoryRecord[] = [];
-/** Grabs marked failed (and so blocklisted), by history id. */
+/** History ids of grabs marked failed (blocklisted). */
 let markedFailed: number[] = [];
 let monitored: number[][] = [];
-/** Everything done to Sonarr, in order. */
+/** Sonarr actions, in order. */
 let done: string[] = [];
 let quietRavens: Media;
 
@@ -288,7 +287,7 @@ const call = async (method: string, url: string, body?: unknown) => {
   return { status: res.status, body: await res.json() };
 };
 
-/** The automatic comment on an issue, once the background fix is done. */
+/** The auto-fix comment, once the background fix finishes. */
 const commentOn = async (issueId: number): Promise<string> => {
   for (let i = 0; i < 100; i++) {
     const comments = await getRepository(IssueComment).find({
@@ -341,7 +340,7 @@ beforeEach(async () => {
     dailyLimit: 0,
   };
 
-  // Issues and comments tell people; not in these tests.
+  // Silence issue notifications.
   mock.method(
     IssueSubscriber.prototype as unknown as {
       sendIssueNotification: () => Promise<void>;
@@ -519,14 +518,14 @@ beforeEach(async () => {
     }
   );
 
-  // The model, at its HTTP call; TMDB, for the title it names.
+  // Stub the model's HTTP call, and TMDB for the title it names.
   mock.method(axios, 'post', async () => ({
     data: {
       content: [{ type: 'text', text: modelAnswer }],
       usage: { input_tokens: 1, output_tokens: 1 },
     },
   }));
-  // TMDB sets its methods on each instance: answered from the prototype.
+  // TMDB assigns methods per instance; pin them to the prototype.
   Object.defineProperty(TheMovieDb.prototype, 'searchMovies', {
     configurable: true,
     set() {},
@@ -662,7 +661,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // A fix from an issue runs on after the route answers.
+  // Issue fixes outlive the route response.
   await autofix.idle();
   mock.restoreAll();
 });
@@ -719,8 +718,7 @@ describe('Auto-fix: reported issues', () => {
   });
 
   it('checks the whole season for a wrong episode, and replaces the ones that are off', async () => {
-    // Episode 3's file came from episode 4's release; episode 1 runs twice
-    // as long as it should.
+    // Episode 3's file is episode 4's release; episode 1 runs double length.
     origins = { 103: 'Show S01E04 1080p WEB-DL' };
     episodes[0] = { ...episodes[0], runtime: 45 };
     releases = [
@@ -788,7 +786,7 @@ describe('Auto-fix: reported issues', () => {
   });
 
   it('leaves the subtitles of a title on a Radarr Bazarr does not follow', async () => {
-    // A second Radarr numbers its films on its own: its 9 is not Bazarr's 9.
+    // A second Radarr has its own ids: its 9 is not Bazarr's 9.
     getSettings().radarr = [
       { ...RADARR, isDefault: true },
       { ...RADARR, id: 1, name: 'Radarr Anime', isDefault: false },
@@ -1022,8 +1020,7 @@ describe('Auto-fix: from AI Search', () => {
       message: 'hedgehog morning has no sound',
     });
     assert.equal(asked.status, 200, JSON.stringify(asked.body));
-    // Nothing is touched until they confirm, with the title it would act
-    // on shown to them.
+    // Nothing happens until confirmed, with the title shown.
     assert.equal(await getRepository(Issue).count(), 0);
     assert.equal(asked.body.fix, undefined);
     assert.deepEqual(
@@ -1069,7 +1066,7 @@ describe('Auto-fix: from AI Search', () => {
     });
     assert.match(res.body.reply, /needs permission to report problems/);
     assert.equal(res.body.confirm, undefined);
-    // Nor can it be confirmed by asking the server directly.
+    // Nor via a direct API call.
     const direct = await call('POST', '/api/v1/ai/fix', {
       kind: 'broken',
       mediaId: movie.id,
@@ -1096,7 +1093,7 @@ describe('Auto-fix: from AI Search', () => {
       original_title: 'Hedgehog Morning',
       video: false,
     });
-    // A newer film by the same name comes first, and is not on the server.
+    // A newer same-named film ranks first but isn't on the server.
     Object.defineProperty(TheMovieDb.prototype, 'searchMovies', {
       configurable: true,
       set() {},
@@ -1146,7 +1143,7 @@ describe('Auto-fix: from AI Search', () => {
   });
 
   describe('a title newer than the model', () => {
-    // A sequel on the server, which TMDB finds by its own name only.
+    // An on-server sequel TMDB finds only by its own name.
     const film = (id: number, title: string, date: string) => ({
       id,
       title,
@@ -1270,12 +1267,11 @@ describe('Auto-fix: from AI Search', () => {
 
 // ---- a whole season --------------------------------------------------------------
 
-/** The release Quiet Ravens' season 6 came from, on the fake Sonarr. */
+/** Source release of Quiet Ravens season 6 on the fake Sonarr. */
 const OLD_PACK = 'Quiet.Ravens.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-OLDGRP';
 
 /**
- * Season 6 of Quiet Ravens: five episodes, every file from one season pack,
- * as Sonarr's history has it.
+ * Quiet Ravens season 6: five episodes, all from one pack per Sonarr history.
  */
 const season6 = () => {
   episodes = [1, 2, 3, 4, 5].map((n) =>
@@ -1338,7 +1334,7 @@ const single = (n: number, over: Partial<ArrRelease> = {}) =>
 
 const NEW_PACK = 'Quiet.Ravens.S06.1080p.WEB-DL-NEWGRP';
 
-/** The admin agent, able to ask admins: what it sends them. */
+/** Messages the admin agent sends admins. */
 const agentReady = () => {
   const sent: { subject?: string; message?: string }[] = [];
   mock.method(agent, 'problem', () => null);
@@ -1352,7 +1348,7 @@ const agentReady = () => {
   return sent;
 };
 
-/** A run, once the agent is done with it. */
+/** A run, once the agent finishes it. */
 const settled = async (id: number) => {
   for (let i = 0; i < 200; i++) {
     const run = await getRepository(AgentRun).findOneOrFail({ where: { id } });
@@ -1362,7 +1358,7 @@ const settled = async (id: number) => {
   throw new Error('The run did not finish');
 };
 
-/** Every comment on an issue, oldest first, once there are `count`. */
+/** An issue's comments, oldest first, once there are `count`. */
 const commentsOn = async (issueId: number, count: number) => {
   for (let i = 0; i < 100; i++) {
     const comments = await getRepository(IssueComment).find({
@@ -1375,7 +1371,7 @@ const commentsOn = async (issueId: number, count: number) => {
   throw new Error(`Fewer than ${count} comments were written`);
 };
 
-/** Sonarr, as the agent reads it, once the new files have imported. */
+/** Sonarr state after the new files import. */
 const filesBack = () =>
   mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
     episodes.map((ep) => ({ ...ep, hasFile: true }))
@@ -1467,8 +1463,8 @@ describe('Auto-fix: reading which season and episode', () => {
   });
 
   it('reads a long report in good time, whatever is in it', () => {
-    // A report is up to the size of a request body: spaces after "season"
-    // once took seconds, holding up every other request meanwhile.
+    // Reports can be request-body sized; long space runs after "season"
+    // must not cause quadratic regex time.
     const started = Date.now();
     for (const text of [
       `season${' '.repeat(90_000)}x`,
@@ -1485,21 +1481,21 @@ describe('Auto-fix: reading which season and episode', () => {
 describe('Auto-fix: replacing a whole season', () => {
   it('takes a season pack that is not the old release, and removes the old files only once it is grabbed', async () => {
     season6();
-    // Episode 2 was unmonitored by someone: it is wanted again.
+    // Episode 2 is unmonitored and must be re-monitored.
     episodes[1] = { ...episodes[1], monitored: false };
     seasonReleases = [
-      // The release the files came from, of the best quality: never again.
+      // The files' source, best quality: never retaken.
       pack('old-again', OLD_PACK, { qualityWeight: 900 }),
-      // Dubbed into a language the series is not in.
+      // Dubbed into a language the series isn't in.
       pack('german', 'Quiet.Ravens.S06.GERMAN.1080p.WEB.x264-GERGRP', {
         qualityWeight: 800,
         languages: [{ id: 4, name: 'German' }],
       }),
-      // A quality the profile does not want.
+      // A quality the profile rejects.
       pack('unwanted', 'Quiet.Ravens.S06.480p.WEB.x264-LOW', {
         rejections: ['WEBDL-480p is not wanted in profile'],
       }),
-      // One episode, better than any pack: a pack is still preferred.
+      // A single episode better than any pack; the pack still wins.
       single(1, { qualityWeight: 950 }),
       pack('good', 'Quiet.Ravens.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-NEWGRP', {
         qualityWeight: 700,
@@ -1513,7 +1509,7 @@ describe('Auto-fix: replacing a whole season', () => {
     });
     assert.equal(result.ok, true, result.message);
     assert.deepEqual(grabbed, ['good']);
-    // Grabbed first; then the old release blocklisted; then the files gone.
+    // Order: grab, blocklist old release, delete files.
     assert.deepEqual(done, [
       'grab:good',
       'failed:9001',
@@ -1536,7 +1532,7 @@ describe('Auto-fix: replacing a whole season', () => {
   it('takes a release per episode when there is no season pack, and keeps the files of episodes it found nothing for', async () => {
     season6();
     seasonReleases = [single(1), single(2), single(3)];
-    // Episode 4 is found by its own search; episode 5 by none.
+    // Episode 4 found by its own search; episode 5 not at all.
     mock.method(FixSonarr.prototype, 'releases', async (episodeId: number) =>
       episodeId === 604 ? [single(4)] : []
     );
@@ -1712,7 +1708,7 @@ describe('Auto-fix: replacing a whole season', () => {
     assert.match(said[2], /^Admin agent: Approved by fix-admin\./);
     assert.match(said[2], /grabbed the season pack/);
 
-    // Followed until the new files are in, then the reporter is told.
+    // Followed until files import, then the reporter is told.
     const follow = await getRepository(AgentRun).findOneOrFail({
       where: { status: 'held' },
     });
@@ -1814,7 +1810,7 @@ describe('Auto-fix: a season from AI Search and issues', () => {
   it('“Fix season 6 of quiet ravens” with nothing missing asks what is wrong, and replacing it then works', async () => {
     season6();
     actingAs = admin;
-    // As the model answered on the owner's server: missing episodes.
+    // A real model answer: missing episodes.
     modelAnswer = JSON.stringify({
       r: 'Looking for what is missing in season 6.',
       titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
@@ -1836,8 +1832,8 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     assert.doesNotMatch(res.body.reply, /report it as/);
     assert.equal(res.body.confirm, undefined);
 
-    // The answer: the model names the title from before, but not the
-    // season; it comes from the conversation.
+    // The model names the earlier title but no season; it comes from the
+    // conversation.
     modelAnswer = JSON.stringify({
       r: 'Replacing season 6.',
       titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
@@ -1877,8 +1873,7 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     season6();
     seasonReleases = [pack('good', NEW_PACK)];
     actingAs = admin;
-    // As the model answered on the owner's server: the wrong episode, and
-    // no season.
+    // A real model answer: wrong episode, no season.
     modelAnswer = JSON.stringify({
       r: 'Checking season 6.',
       titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],

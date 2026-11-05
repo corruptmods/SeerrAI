@@ -75,8 +75,7 @@ const NotificationsGotify = () => {
           .required(intl.formatMessage(messages.validationTokenRequired)),
       otherwise: (schema) => schema.nullable(),
     }),
-    // Gotify's apps read 0 to 10 (see the guide); anything else would be
-    // saved as nothing.
+    // Gotify apps read 0 to 10 (see the guide); other values save as nothing.
     priority: Yup.string()
       .when('enabled', {
         is: true,

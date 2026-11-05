@@ -9,13 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
-/*
- * Settings migration 0013: Diwali and Pride Month were seasonal themes an
- * admin could turn on. They are gone; a settings file that has them still
- * loads, and loses them.
- */
+// Migration 0013: settings with the retired Diwali and Pride Month seasons load
+// and drop them.
 
-/** The seasons as the version with Diwali and Pride Month saved them. */
+/** Seasons as saved with Diwali and Pride Month. */
 const before = () => ({
   halloween: { enabled: true, start: '10-20', end: '11-01' },
   holidays: { enabled: false, start: '12-01', end: '12-28' },
@@ -25,7 +22,7 @@ const before = () => ({
   pride: { enabled: true, start: '06-01', end: '06-30' },
 });
 
-/** The same seasons once the migration has run. */
+/** The same seasons after migration. */
 const after = () => ({
   halloween: { enabled: true, start: '10-20', end: '11-01' },
   holidays: { enabled: false, start: '12-01', end: '12-28' },
@@ -33,7 +30,7 @@ const after = () => ({
   lunarnewyear: { enabled: true },
 });
 
-/** A settings file from an up-to-date install but for its seasons. */
+/** An up-to-date settings file except for its seasons. */
 const install = (appearance: unknown) => ({
   main: {
     mediaServerType: MediaServerType.PLEX,
@@ -59,7 +56,7 @@ afterEach(async () => {
   );
 });
 
-/** Runs every migration on a settings file, as starting Seerr AI does. */
+/** Runs all migrations on a settings file, as startup does. */
 const start = async (settings: unknown) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'seerr-settings-'));
   dirs.push(dir);
@@ -117,7 +114,7 @@ describe('settings migration 0013 (Diwali and Pride Month)', () => {
     assert.deepEqual(migrated.appearance.seasons, after());
     assert.deepEqual(saved, migrated, 'the trimmed settings are saved');
 
-    // Running with them, pages are told only of the seasons there are.
+    // At run time, pages see only the remaining seasons.
     const settings = getSettings();
     const { seasons } = settings.appearance;
     settings.appearance.seasons = migrated.appearance.seasons;

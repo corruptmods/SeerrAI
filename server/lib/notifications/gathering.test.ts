@@ -13,10 +13,7 @@ import type {
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-/*
- * A burst of notifications to one person goes out as one: what was sent,
- * to whom, and when.
- */
+// A burst to one user goes out as one digest.
 
 let sent: { type: Notification; payload: NotificationPayload }[] = [];
 const agent: NotificationAgent = {
@@ -26,7 +23,7 @@ const agent: NotificationAgent = {
     return true;
   },
 };
-// Fails when told to, as an agent does when its service is down.
+// Fails on demand, like an agent whose service is down.
 let failing = false;
 const flaky: NotificationAgent = {
   shouldSend: () => true,

@@ -21,20 +21,20 @@ import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
-/** The server is local, but a shared list still means one query per person. */
+/** The server is local, but a shared list still costs one query per viewer. */
 const ITEM_CONCURRENCY = 3;
 
 const episodeKey = (season: number, episode: number) => `${season}:${episode}`;
 
-/** Checks in progress, by owner, so a second load joins the first. */
+/** In-progress checks by owner, so a second load joins the first. */
 const inFlight = new Map<number, Promise<void>>();
 
 /**
  * Checks the owner's watch-sync lists and records a suggestion for any title
- * everyone on the list has finished since it was added. One check at a time
- * for each owner: asking while one runs waits for that one.
+ * everyone on the list has finished since it was added. One check per owner
+ * at a time; a second call waits for the running one.
  *
- * Nothing is removed here — the owner is prompted and decides.
+ * Nothing is removed here: the owner is prompted and decides.
  */
 export const refreshWatchSuggestions = (owner: User): Promise<void> => {
   const running = inFlight.get(owner.id);
@@ -85,9 +85,9 @@ const checkOwnerLists = async (owner: User): Promise<void> => {
       });
     }
 
-    // Only the check time is written. Saving the loaded list would write back
-    // a name or setting the owner changed meanwhile, and a check is not
-    // activity: updatedAt is kept so the list does not move up the page.
+    // Write only the check time. Saving the loaded list would overwrite a name
+    // or setting changed meanwhile, and a check isn't activity: updatedAt stays
+    // so the list doesn't move up the page.
     await listRepository
       .createQueryBuilder()
       .update()
@@ -107,17 +107,17 @@ const checkList = async (
     relations: { user: true },
   });
 
-  // Everyone on the list has to have finished it — one person watching does
-  // not mean the household is done with it. Someone it was shared with only
-  // counts once they have accepted it: until then their history is theirs.
+  // Everyone on the list must have finished it: one viewer doesn't mean the
+  // household is done. A share recipient counts only once they accept; until
+  // then their history is private.
   const viewers = [
     owner,
     ...members.filter((m) => m.acceptedAt).map((m) => m.user),
   ].filter((user): user is User => !!user);
 
-  // Someone with no account on the media server has no history to ask, so
-  // "everyone has watched it" cannot be known; suggest nothing rather than
-  // go by the others alone. The list page tells the owner who it is.
+  // A viewer with no media server account has no history, so "everyone watched
+  // it" is unknowable; suggest nothing instead of going by the others. The list
+  // page tells the owner who it is.
   if (viewers.some((user) => !source.viewerOf(user))) {
     return;
   }
@@ -130,8 +130,8 @@ const checkList = async (
     return;
   }
 
-  // Skip anything already decided on: a suggestion the owner kept should not
-  // come back, and one still pending does not need recomputing.
+  // Skip titles already decided: a kept suggestion shouldn't return, and a
+  // pending one needn't be recomputed.
   const existing = await getRepository(MediaListWatchSuggestion).find({
     where: { itemId: In(items.map((item) => item.id)) },
   });
@@ -160,18 +160,18 @@ const checkList = async (
 
     const isSeries = item.mediaType === 'tv';
 
-    // For a series, "watched" means every episode Seerr knows is available.
+    // For a series, "watched" means every available episode Seerr knows of.
     let available: Set<string> | undefined;
 
     if (isSeries) {
       available = new Set<string>();
 
-      // The episode number lives on Episode and the season number on its
-      // Season, so walk the seasons the media already carries.
+      // Episode numbers live on Episode and season numbers on Season, so walk
+      // the media's seasons.
       for (const season of media.seasons ?? []) {
-        // Specials never count towards a series being finished, matching how
-        // Seerr decides availability. An unwatched special should not keep a
-        // show on a list forever.
+        // Specials never count towards finishing, matching Seerr's
+        // availability, so an unwatched special can't keep a show on a list
+        // forever.
         if (season.seasonNumber < 1) {
           continue;
         }
@@ -199,7 +199,7 @@ const checkList = async (
       viewers,
       ITEM_CONCURRENCY,
       async (viewer) => {
-        // Could not ask is not watched: no suggestion this time.
+        // Unreachable is not watched: no suggestion this time.
         const plays = await source
           .playsSince(viewer, media, item.createdAt)
           .catch(() => []);

@@ -199,8 +199,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   const showAllStudios = data.productionCompanies.length <= minStudios + 1;
   const mediaLinks: PlayButtonLink[] = [];
 
-  // A Play button for each server that has the movie, the viewer's own
-  // servers first.
+  // One Play button per server with the movie, the viewer's own first.
   if (
     hasPermission([Permission.REQUEST, Permission.REQUEST_MOVIE], {
       type: 'or',
@@ -266,13 +265,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     (r) => r.iso_3166_1 === discoverRegion
   )?.release_dates;
 
-  // Release date types:
-  // 1. Premiere
-  // 2. Theatrical (limited)
-  // 3. Theatrical
-  // 4. Digital
-  // 5. Physical
-  // 6. TV
+  // TMDB release types: 1 premiere, 2 limited theatrical, 3 theatrical,
+  // 4 digital, 5 physical, 6 TV.
   const filteredReleases = uniqBy(
     releases?.filter((r) => r.type > 2 && r.type < 6),
     'type'
@@ -410,7 +404,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         { appearance: 'success', autoDismiss: true }
       );
 
-      // Blocklisted, but a Radarr/Sonarr removal did not go through.
+      // Blocklisted, but a Radarr/Sonarr removal failed.
       const failed = res.data?.failed ?? [];
       if (failed.length) {
         addToast(
@@ -601,7 +595,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             </Tooltip>
           )}
           {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            // Someone with Plex keeps their watchlist on Plex.
+            // Plex users keep their watchlist on Plex.
             !hasAccountOn(user, 'plex') && (
               <>
                 {toggleWatchlist ? (

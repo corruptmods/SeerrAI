@@ -23,9 +23,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Watch history with several media servers connected: each server's
- * history is read and put together, a person's accounts on two servers
- * count as one person, and one server failing still gives the others'.
+ * Several servers: histories merge, one user's accounts on two servers count
+ * as one person, and one server failing still returns the others'.
  */
 
 setupTestDb();
@@ -33,7 +32,7 @@ setupTestDb();
 const DAY = 86_400;
 const now = Math.floor(Date.now() / 1000);
 
-/** Connects the servers given, the first as the primary one. */
+/** Connects the given servers; the first is primary. */
 const connect = (...kinds: MediaServerKind[]) => {
   const settings = getSettings();
   settings.main.mediaServerType = typeOfKind(kinds[0]);
@@ -74,7 +73,7 @@ const play = (fields: Partial<Play>): Play => ({
   ...fields,
 });
 
-/** A stand-in server's history. */
+/** A fake server's history. */
 const fakeSource = (
   label: string,
   {

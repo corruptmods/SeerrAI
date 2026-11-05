@@ -103,7 +103,7 @@ describe('music’s pictures', () => {
   });
 
   it('offer a picture of an artist smaller too, for the tiles it fills', () => {
-    // fanart.tv's are 1000 square; a tile is a few hundred pixels wide.
+    // fanart.tv photos are 1000 square; tiles are a few hundred pixels wide.
     const [photo] = sourcesFor('/imageproxy/artist/3c9e5f21');
     assert.equal(photo.responsive, true);
     assert.equal(

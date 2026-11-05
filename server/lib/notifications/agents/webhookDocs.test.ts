@@ -4,11 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-/*
- * Settings → Notifications → Webhook links to this guide for the variables
- * a payload can use. Seerr's own guide lacks the ones added here, and this
- * one lacked Emby's.
- */
+// The webhook settings page links to this guide for the template variables.
 const GUIDE = path.join(
   __dirname,
   '../../../../docs/using-seerr/notifications/webhook.md'

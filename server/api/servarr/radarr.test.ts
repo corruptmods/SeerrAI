@@ -123,10 +123,9 @@ describe('RadarrAPI getMovieByTmdbId', () => {
 });
 
 /*
- * A request searches straight away only when Radarr says the movie is
- * available, which it works out from the movie's Minimum Availability.
- * Otherwise the movie is added and monitored, and Radarr grabs it once it
- * becomes available.
+ * A request searches at once only when Radarr says the movie is available
+ * (from its Minimum Availability); otherwise it is added monitored and Radarr
+ * grabs it later.
  */
 describe('RadarrAPI addMovie', () => {
   afterEach(() => mock.restoreAll());
@@ -172,7 +171,7 @@ describe('RadarrAPI addMovie', () => {
         addOptions: { searchForMovie: boolean };
       };
       assert.strictEqual(body.monitored, true);
-      // Radarr would search on its own when adding with this set.
+      // With this true, Radarr would search on add.
       assert.strictEqual(body.addOptions.searchForMovie, false);
       assert.deepStrictEqual(
         search.mock.calls.map((c) => c.arguments[0]),

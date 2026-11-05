@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
 /*
- * A playlist's song as Deezer lists it: the same artist, title and take,
- * as long as the playlist says, for its ISRC and album. Names are invented.
+ * Matching a playlist song to a Deezer track by artist, title, take and
+ * length, for its ISRC and album. Names are invented.
  */
 
 const track = (
@@ -42,7 +42,7 @@ describe('the Deezer track a playlist song is', () => {
       track(4, 'Lantern Song', 216),
     ];
     assert.equal(trackFor(tracks, 'Lantern Song', 'Glasswing', 214_500)?.id, 4);
-    // No length to go by: the best known of the rest.
+    // No length: Deezer's first match.
     assert.equal(trackFor(tracks, 'Lantern Song', 'Glasswing', null)?.id, 3);
     assert.equal(trackFor(tracks, 'Night Swim', 'Glasswing', null), undefined);
   });
@@ -107,7 +107,7 @@ describe('a song looked up on Deezer', () => {
       'Glasswing & Harbour Lights',
       215_000
     );
-    // As credited first, then the first artist of several.
+    // Full credit first, then the first of several artists.
     assert.deepEqual(searched, [
       'Glasswing & Harbour Lights: Lantern Song',
       'Glasswing: Lantern Song',

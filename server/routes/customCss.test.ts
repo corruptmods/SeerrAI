@@ -21,10 +21,10 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * Custom CSS and theme files on the server: the admin's Server CSS and
- * whether people may add their own (Settings → Appearance), a person's own
- * CSS (Profile → Settings → Appearance), the stylesheets pages load, and a
- * theme file as the server's default.
+ * Server-side custom CSS and themes: the admin's Server CSS and whether people
+ * may add their own (Settings → Appearance), personal CSS (Profile → Settings →
+ * Appearance), the stylesheets pages load, and a theme file as the server
+ * default.
  */
 
 setupTestDb();
@@ -102,7 +102,7 @@ describe('Server CSS', () => {
     assert.match(server ?? '', /^[0-9a-f]{12}$/);
     assert.equal(personal, true);
 
-    // No one needs to be signed in to fetch it.
+    // Fetchable without signing in.
     const sheet = await request(app).get(
       `/api/v1/style/server.css?v=${server}`
     );
@@ -112,7 +112,7 @@ describe('Server CSS', () => {
     assert.equal(sheet.text, nord);
     assert.match(sheet.headers['cache-control'], /immutable/);
 
-    // An old version's address is never kept.
+    // An old version's URL is never cached.
     const old = await request(app).get('/api/v1/style/server.css?v=0ld');
     assert.equal(old.text, nord);
     assert.equal(old.headers['cache-control'], 'no-store');
@@ -174,7 +174,7 @@ describe('a person’s own CSS', () => {
     assert.match(sheet.headers['content-type'], /^text\/css/);
     assert.match(sheet.headers['cache-control'], /^private/);
 
-    // Not someone else's, nor anyone's before they sign in.
+    // Not someone else's, nor anyone's before sign-in.
     const admin = await signIn('admin@seerr.dev');
     assert.equal(
       (await admin.agent.get('/api/v1/style/personal.css')).text,
@@ -190,7 +190,7 @@ describe('a person’s own CSS', () => {
       ''
     );
 
-    // Switched off, it stops at once, though it is kept for them.
+    // Switched off, it stops at once, though it's kept for them.
     getSettings().appearance.personalCss = false;
     assert.equal((await agent.get('/api/v1/style/personal.css')).text, '');
     assert.equal(

@@ -41,10 +41,7 @@ interface ModalProps {
   backdrop?: string;
   children?: React.ReactNode;
   dialogClass?: string;
-  /**
-   * An X in the top corner that does what Cancel does, so a long dialog can
-   * be closed without scrolling to its buttons.
-   */
+  /** A corner X that cancels, so a long dialog closes without scrolling. */
   showCloseButton?: boolean;
 }
 
@@ -84,7 +81,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ) => {
     const intl = useIntl();
     const modalRef = useRef<HTMLDivElement>(null);
-    const backgroundClickableRef = useRef(backgroundClickable); // This ref is used to detect state change inside the useClickOutside hook
+    // Latest value for the outside-click and Escape handlers.
+    const backgroundClickableRef = useRef(backgroundClickable);
     useEffect(() => {
       backgroundClickableRef.current = backgroundClickable;
     }, [backgroundClickable]);
@@ -94,8 +92,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       }
     });
     useLockBodyScroll(true, disableScrollLock);
-    // Escape closes it as a click outside would; a dialog that may not be
-    // closed by a stray click (one holding unsaved work) keeps to its buttons.
+    // Escape acts as a click outside; a dialog that ignores stray clicks
+    // (unsaved work) ignores Escape too.
     useDialogFocus(modalRef, {
       onEscape: () => {
         if (onCancel && backgroundClickableRef.current) {
@@ -157,9 +155,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           ref={modalRef}
         >
           {/*
-            Sticky, in a zero-height strip at the top of the panel, which is
-            what scrolls: the X stays in reach however far down a long dialog
-            has been scrolled.
+            Sticky in a zero-height strip at the top of the scrolling panel,
+            so the X stays in reach.
           */}
           {showCloseButton && onCancel && (
             <div className="sticky top-0 z-20 flex h-0 justify-end">
@@ -185,7 +182,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 // The dialog is at most 48rem wide.
                 sizes="(min-width: 640px) 768px, 100vw"
               />
-              {/* Fades into the window's own colour, light or dark. */}
+              {/* Fades into the dialog's colour in either theme. */}
               <div
                 className="absolute inset-0"
                 style={{

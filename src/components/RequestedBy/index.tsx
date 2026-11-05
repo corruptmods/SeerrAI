@@ -30,8 +30,7 @@ const statusMessages: Record<MediaRequestStatus, keyof typeof globalMessages> =
     [MediaRequestStatus.COMPLETED]: 'completed',
   };
 
-// Whole class names, so the stylesheet keeps them. Light mode has darker
-// ones, readable on a light page.
+// Whole class names so Tailwind keeps them; darker variants for light mode.
 const statusColors: Record<MediaRequestStatus, string> = {
   [MediaRequestStatus.PENDING]: 'text-yellow-500 light:text-warning-text',
   [MediaRequestStatus.APPROVED]: 'text-green-400 light:text-success-text',
@@ -41,11 +40,9 @@ const statusColors: Record<MediaRequestStatus, string> = {
 };
 
 /**
- * Who asked for this title, as a row in the title's facts: each request
- * with its requester, newest first, and what it was for (4K, which
- * seasons), how it stands and when it was made. Only what the server sends
- * for the person looking (lib/mediaForViewer). Nothing when no one has
- * requested it.
+ * Facts row of the title's requests, newest first: requester, scope (4K,
+ * seasons), status and date, as filtered for the viewer by
+ * lib/mediaForViewer. Nothing when unrequested.
  */
 const RequestedBy = ({ requests }: { requests?: MediaRequest[] }) => {
   const intl = useIntl();

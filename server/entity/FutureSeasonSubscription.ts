@@ -10,8 +10,8 @@ import {
 } from 'typeorm';
 
 /**
- * Someone wants a series from here on: each season from `fromSeason` onward
- * is requested for them as it premieres, and nothing before it.
+ * A user following a series: each season from `fromSeason` on is requested for
+ * them as it premieres, nothing before.
  */
 @Entity()
 @Unique('UNIQUE_FUTURE_SEASON_SUBSCRIPTION', ['user', 'tmdbId'])
@@ -27,7 +27,7 @@ export class FutureSeasonSubscription {
   @Index()
   public tmdbId: number;
 
-  /** The next season to request. Moves on each time one is requested. */
+  /** The next season to request; advances each time one is requested. */
   @Column({ type: 'int' })
   public fromSeason: number;
 

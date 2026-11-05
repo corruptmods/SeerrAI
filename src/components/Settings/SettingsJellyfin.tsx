@@ -97,8 +97,8 @@ interface SyncStatus {
 interface SettingsJellyfinProps {
   isSetupSettings?: boolean;
   /**
-   * The server these settings are for. Left out, it is Jellyfin, or Emby
-   * while Emby is connected and Jellyfin is not.
+   * The server these settings are for. Defaults to Jellyfin, or Emby when Emby
+   * is connected and Jellyfin isn't.
    */
   kind?: 'jellyfin' | 'emby';
 }
@@ -108,8 +108,8 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
   kind: kindProp,
 }) => {
   const settings = useSettings();
-  // The old address of Emby's settings, /settings/jellyfin, still shows
-  // them while Emby is connected and Jellyfin is not.
+  // /settings/jellyfin, Emby's old address, still shows Emby's settings when
+  // Emby is connected and Jellyfin isn't.
   const connected = settings.currentSettings.mediaServers.map((s) => s.kind);
   const kind =
     kindProp ??
@@ -234,8 +234,8 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
     }
   };
 
-  // In first-time setup the server has only just been connected: its
-  // libraries are listed straight away, without pressing Sync Libraries.
+  // In first-time setup, list the just-connected server's libraries without
+  // needing Sync Libraries.
   const syncedForSetup = useRef(false);
   useEffect(() => {
     if (isSetupSettings && data?.ip && !syncedForSetup.current) {

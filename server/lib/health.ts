@@ -66,12 +66,12 @@ import {
 import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
 
 /*
- * What the admin health page shows: whether each connected service answers,
- * and what has quietly gone wrong with requests, titles and users. Each check
- * says ok, warning or error, and lists up to ITEM_LIMIT of what it found.
+ * The admin health page: whether each connected service answers, and what
+ * has silently gone wrong with requests, titles and users. Each check is ok,
+ * warning or error, listing up to ITEM_LIMIT findings.
  *
- * TMDB is deliberately not checked: its responses are cached, so a check
- * would report healthy from the cache during an outage.
+ * TMDB isn't checked: responses are cached, so it would read healthy during
+ * an outage.
  */
 
 export type HealthStatus = 'ok' | 'warning' | 'error';
@@ -80,9 +80,9 @@ export interface HealthItem {
   title: string;
   detail?: string;
   href?: string;
-  /** A title Radarr or Sonarr has, that can be searched for from here. */
+  /** A title Radarr or Sonarr has, searchable from here. */
   searchable?: { mediaId: number; is4k: boolean; mediaType: MediaType };
-  /** When it was found, for a list that says. */
+  /** When it was found, for lists that show it. */
   at?: string;
   /** A wrong Plex match Seerr AI can fix: the problem's key. */
   fix?: string;
@@ -92,8 +92,8 @@ export interface HealthCheck {
   id: string;
   group: 'services' | 'backfill' | 'requests' | 'media' | 'users';
   /**
-   * For a service: it answered, so a problem is what it reported, not that
-   * it is down.
+   * For a service: it answered, so a problem is what it reported, not an
+   * outage.
    */
   reachable?: boolean;
   /** Service checks carry the server's own name; the rest are named by id. */
@@ -103,16 +103,15 @@ export interface HealthCheck {
   detail?: string;
   items: HealthItem[];
   /**
-   * Match Check: what the check of new requests found and is not yet put
-   * right, newest first, shown above the nightly list.
+   * Match Check: unfixed findings from the new-request check, newest first,
+   * shown above the nightly list.
    */
   recent?: HealthItem[];
-  /** Of those, how many the nightly list does not have too. */
+  /** Of those, how many the nightly list lacks. */
   recentCount?: number;
   /**
-   * A service that answered, but some of what it reports (its own health
-   * list, its disks) could not be read this time. What that would have
-   * said is unknown, which is not the same as nothing being wrong.
+   * A service answered but part of its report (health list, disks) couldn't
+   * be read. Unknown, not the same as nothing wrong.
    */
   partial?: boolean;
 }
@@ -121,15 +120,15 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const ITEM_LIMIT = 10;
 
-/** Which slice of a check's list to return: the page shows ten at a time. */
+/** Which slice of a check's list to return; the page shows ten at a time. */
 interface Page {
   skip: number;
   take: number;
 }
 const FIRST_PAGE: Page = { skip: 0, take: ITEM_LIMIT };
-/** Everything, for Search all, which needs every title but no names. */
+/** Everything, for Search all (every title, no names). */
 const EVERYTHING: Page = { skip: 0, take: 100_000 };
-/** Name lookups at once, so a long list does not flood TMDB. */
+/** Concurrent name lookups, so long lists don't flood TMDB. */
 const LOOKUP_CONCURRENCY = 8;
 
 /** Like Promise.all over a map, with at most `limit` running at once. */
@@ -195,11 +194,11 @@ const serviceCheck = async (
 };
 
 const GB = 1024 ** 3;
-/** Free space below these shares of a disk is a warning, then a problem. */
+/** Free disk share below which it is a warning, then an error. */
 const DISK_WARNING_SHARE = 0.1;
 const DISK_ERROR_SHARE = 0.03;
 
-/** A list a service sent, or nothing if it sent something else. */
+/** The list a service sent, or [] if it sent something else. */
 const listOf = <T>(value: T[]): T[] => (Array.isArray(value) ? value : []);
 
 const worst = (statuses: HealthStatus[]): HealthStatus =>
@@ -215,8 +214,8 @@ const size = (bytes: number) =>
     : `${Math.round(bytes / GB)} GB`;
 
 /**
- * For the lookups a service that answered still makes: notes that one
- * failed or was too slow, and stands in for its answer with an empty list.
+ * For follow-up lookups on a service that answered: records a failed or slow
+ * one and substitutes an empty list.
  */
 const unreadTracker = () => {
   const state = { partial: false };
@@ -229,7 +228,7 @@ const unreadTracker = () => {
   };
 };
 
-/** The check, marked partial when some of the service's report was missed. */
+/** Marks the check partial when part of the service's report was missed. */
 const withPartial = (
   check: HealthCheck,
   state: { partial: boolean }
@@ -254,9 +253,9 @@ const reported = (
 });
 
 /**
- * Radarr, Sonarr or Lidarr: whether it answers, what its own health page says is
- * wrong (indexers or a download client it cannot reach, a missing root
- * folder, failed imports), and how full its disks are.
+ * Radarr, Sonarr or Lidarr: whether it answers, what its health page reports
+ * (unreachable indexers or download client, missing root folder, failed
+ * imports), and disk usage.
  */
 const arrCheck = async (
   id: string,
@@ -340,7 +339,7 @@ const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
   const found: { status: HealthStatus; item: HealthItem }[] = [
     ...failing
       // Prowlarr keeps a status for every indexer that ever failed; only
-      // one still paused, or failing in the last day, matters.
+      // those still paused or failing in the last day matter.
       .filter(
         (indexer) =>
           (indexer.disabledTill &&
@@ -365,7 +364,7 @@ const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
       })),
     ...issues
       .filter((issue) => issue.type === 'warning' || issue.type === 'error')
-      // Each failing indexer is listed above already.
+      // Failing indexers are already listed above.
       .filter((issue) => !/^Indexer/i.test(issue.source) || !failing.length)
       .map((issue) => ({
         status: issue.type as HealthStatus,
@@ -376,9 +375,8 @@ const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
 };
 
 /**
- * Bazarr: answering, what its own status page lists, and subtitle providers
- * it has paused after an error. A paused WhisperAI is why "Transcribe" can
- * do nothing for a while, which was otherwise only found by asking.
+ * Bazarr: answering, its status page, and subtitle providers paused after an
+ * error. A paused WhisperAI makes "Transcribe" do nothing for a while.
  */
 const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
   const started = Date.now();
@@ -430,10 +428,9 @@ const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
 };
 
 /**
- * A download client: answering, which one and which version, and, for one
- * Backfill sends downloads to, what keeps Backfill from using it fully
- * (Deluge's Label plugin off, rTorrent refusing to delete files, an NZBGet
- * too old to add to).
+ * A download client: answering, type and version, and for Backfill's
+ * clients, what limits Backfill (Deluge's Label plugin off, rTorrent
+ * refusing deletes, an NZBGet too old to add to).
  */
 const downloadClientCheck = async (
   client: DownloadClientSettings
@@ -471,8 +468,8 @@ const downloadClientCheck = async (
 };
 
 /**
- * The AI model: the key still works (listing models costs nothing), and
- * the account has not run out of credit.
+ * The AI model: the key works (listing models is free) and the account has
+ * credit.
  */
 const aiCheck = async (): Promise<HealthCheck> => {
   const settings = getSettings();
@@ -505,8 +502,8 @@ const aiCheck = async (): Promise<HealthCheck> => {
 };
 
 /**
- * Postgres connections in use against its limit. Running out stops every
- * page and sign-in at once, so it is worth seeing coming.
+ * Postgres connections in use against the limit; running out stops every page
+ * and sign-in.
  */
 const databaseCheck = async (): Promise<HealthCheck> => {
   const started = Date.now();
@@ -542,7 +539,7 @@ const databaseCheck = async (): Promise<HealthCheck> => {
   );
 };
 
-/** How long until a time to come, in words. */
+/** Time until a future date, in words. */
 const until = (date: Date) => {
   const minutes = Math.max(
     1,
@@ -564,9 +561,8 @@ const serviceDown = (id: string, name: string, e: unknown): HealthCheck => ({
 });
 
 /**
- * Jellyfin or Emby: answering, with its version, or why not in words. The
- * API key is what Seerr uses for scans and watch history, so it is the one
- * checked.
+ * Jellyfin or Emby: answering with its version, or why not. Checks the API
+ * key, since scans and watch history use it.
  */
 export const mediaServerCheck = async (
   kind: 'jellyfin' | 'emby',
@@ -617,16 +613,15 @@ export const mediaServerCheck = async (
   }
 };
 
-/** People told MusicBrainz was busy, in an hour, before it is worth a look. */
+/** Users told MusicBrainz was busy in an hour before it warns. */
 const MB_BUSY_WARNING = 5;
 /** Failures in a row before MusicBrainz counts as not answering. */
 const MB_DOWN_AFTER = 3;
 
 /**
- * MusicBrainz, judged by how its shared line has fared over the last hour
- * rather than by a call of its own: it allows one request a second, and a
- * check would spend one. Over its limit, failing, or turning people away
- * as busy are each worth a look; failing every time is a problem.
+ * MusicBrainz, judged by its shared queue's last hour rather than its own
+ * call (the limit is one request a second). Over limit, failing, or turning
+ * users away as busy warns; failing every time is an error.
  */
 const musicBrainzCheck = (): HealthCheck => {
   const health = musicBrainzQueue.health();
@@ -747,7 +742,7 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
     );
   }
 
-  // Music's Lidarr, unless music is turned off for everyone.
+  // Lidarr, unless music is off globally.
   if (featureEnabled('music')) {
     for (const lidarr of settings.lidarr) {
       pending.push(
@@ -795,7 +790,7 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
     pending.push(
       serviceCheck(`maintainerr:${server.id}`, server.name, async () => {
         await new MaintainerrAPI(server).getVersion();
-        // Answering is not enough if reading its schedule keeps failing.
+        // Answering isn't enough if reading its schedule keeps failing.
         const lastError = scheduleErrors.get(server.id);
         if (lastError) {
           throw new Error(`Answers, but its schedule: ${lastError.message}`);
@@ -807,7 +802,7 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
   return Promise.all(pending);
 };
 
-/** Names for titles, so items read as names rather than ids. */
+/** A title's name, so items show names rather than ids. */
 const titleOf = async (media: Pick<Media, 'tmdbId' | 'mediaType'>) => {
   try {
     const tmdb = new TheMovieDb();
@@ -844,9 +839,8 @@ const fromRequests = async (
   status: count > 0 ? status : 'ok',
   count,
   items: await mapLimit(requests, LOOKUP_CONCURRENCY, async (request) =>
-    // A request can outlive its title's link — leftovers of the old
-    // duplicate-request bug, for one. Listed as what it is, rather than
-    // taking the page down.
+    // A request can outlive its title's link (e.g. from a duplicate-request
+    // bug); list it as such rather than failing the page.
     request.media
       ? {
           title: await titleOf(request.media),
@@ -879,7 +873,7 @@ const fromMedia = async (
   })),
 });
 
-/** Radarr or Sonarr refused it, or it could not be sent at all. */
+/** Requests Radarr or Sonarr refused, or that couldn't be sent. */
 const failedRequests = (page: Page): Promise<HealthCheck> =>
   getRepository(MediaRequest)
     .findAndCount({
@@ -902,10 +896,9 @@ const failedRequests = (page: Page): Promise<HealthCheck> =>
     );
 
 /**
- * Approved over an hour ago, yet Radarr or Sonarr never gave the title an
- * id: the request did not reach them. (Approval marks the title Processing
- * straight away, so its status cannot tell; the id is only stored once it
- * has actually been added.)
+ * Approved over an hour ago, but Radarr or Sonarr never gave the title an
+ * id: the request never reached them. (Approval sets Processing at once, so
+ * status can't tell; the id is stored only once added.)
  */
 const neverSent = (page: Page): Promise<HealthCheck> => {
   const hourAgo = new Date(Date.now() - HOUR_MS);
@@ -963,9 +956,8 @@ const awaitingApproval = (page: Page): Promise<HealthCheck> =>
     );
 
 /**
- * Requests whose title link is gone. They cannot be sent, shown or
- * fulfilled; listed on their own rather than mixed into the checks above,
- * where they looked like failed or unsent requests.
+ * Requests whose title link is gone: they can't be sent, shown or fulfilled.
+ * Listed separately so they don't look like failed or unsent requests.
  */
 const unlinkedRequests = (page: Page): Promise<HealthCheck> =>
   getRepository(MediaRequest)
@@ -1011,15 +1003,12 @@ const STATUS_NAMES: Record<number, string> = {
 
 /*
  * "Processing for over a week", counting only titles that should have
- * arrived by now. Seerr keeps a requested title Processing until it is out,
- * so on its own this flagged every unreleased film and every series waiting
- * on its next episode. Radarr and Sonarr know better than a release date:
- * Radarr says whether a film has reached the minimum availability set for
- * it — cinemas, digital or physical — and Sonarr counts monitored episodes
- * that have aired against the files it has.
+ * arrived. Requested titles stay Processing until out, so Radarr and Sonarr
+ * decide instead of release dates: Radarr says whether a film reached its
+ * minimum availability (cinemas, digital or physical), and Sonarr compares
+ * aired monitored episodes against files.
  *
- * A title Radarr or Sonarr cannot be asked about stays listed, saying so,
- * rather than quietly dropping out.
+ * A title Radarr or Sonarr can't be asked about stays listed, saying so.
  */
 type Verdict = { stuck: boolean; why: string; searchable?: boolean };
 
@@ -1045,7 +1034,7 @@ const stuckProcessing = async (
     order: { updatedAt: 'ASC' },
   });
 
-  // Each server's catalogue, fetched once and only if needed.
+  // Each server's catalogue, fetched once, only if needed.
   const catalogues = new Map<string, Promise<Map<number, unknown> | null>>();
   const catalogue = (kind: 'radarr' | 'sonarr', serverId: number) => {
     const key = `${kind}:${serverId}`;
@@ -1178,21 +1167,19 @@ const stuckProcessing = async (
 };
 
 /*
- * Music, judged apart from films and series (stuckProcessing is theirs):
- * an album is on its way from being approved, and is stuck in one of two
- * ways. Lidarr has its files but no media server lists it a day later
- * (the music library is off, or not scanned, or the album is filed where
- * the server does not look). Or Lidarr has found no release for it a week
- * after it was approved, which a search may fix.
+ * Music, separate from films and series (stuckProcessing): an approved album
+ * is stuck if Lidarr has its files but no media server lists it a day later
+ * (music library off, unscanned, or filed where the server doesn't look), or
+ * Lidarr has found no release a week after approval (a search may fix it).
  */
 
-/** "Sing to the Ferryman — Glasswing", or the album alone. */
+/** "Lantern Song — Glasswing", or the album alone. */
 const albumTitle = (title: string, artist?: string | null) =>
   artist ? `${title} — ${artist}` : title;
 
 const musicNotOnServer = async (page: Page): Promise<HealthCheck> => {
   if (lidarrOnly()) {
-    // Lidarr's files decide on their own: such an album is already here.
+    // Lidarr's files alone decide: such an album is already here.
     return {
       id: 'musicNotOnServer',
       group: 'media',
@@ -1280,14 +1267,13 @@ const musicNoRelease = async (page: Page): Promise<HealthCheck> => {
     .orderBy('request.updatedAt', 'ASC')
     .getRawMany<WaitingAlbum>();
 
-  // An album not out yet has nothing to find. MusicBrainz's dates can be
-  // just a year, or a year and month: those count from their start.
+  // Unreleased albums have nothing to find. MusicBrainz dates may be just a
+  // year or year and month; those count from their start.
   const due = rows.filter(
     (row) => !row.releaseDate || row.releaseDate.slice(0, 10) <= today
   );
 
-  // When each was approved, read through the entity: a raw date from
-  // SQLite would be taken for local time.
+  // Approval times via the entity: a raw SQLite date would parse as local time.
   const approvedAt = new Map(
     (
       await getRepository(MediaRequest).find({
@@ -1340,19 +1326,18 @@ const musicNoRelease = async (page: Page): Promise<HealthCheck> => {
   };
 };
 
-/** Whether music is set up and on for everyone, for its checks. */
+/** Whether music is set up and on globally. */
 const musicOn = () => featureEnabled('music') && musicReady();
 
-/** The music checks, while music is on. */
 /**
- * Finished downloads Lidarr won't import, most often a single missing
- * tracks of its edition. Those with a requested song are imported by Seerr
- * AI (lib/music/blockedImports); what's left needs a manual import.
+ * Finished downloads Lidarr won't import, usually for a missing track of the
+ * edition. Those with a requested song are imported by Seerr AI
+ * (lib/music/blockedImports); the rest need a manual import.
  */
 const musicImportBlocked = async (page: Page): Promise<HealthCheck> => {
   const held: HealthItem[] = [];
   for (const server of getSettings().lidarr) {
-    // A Lidarr not answering is the services check's to say.
+    // An unanswering Lidarr is the services check's to report.
     const queue = await lidarrApi(server)
       .getMusicQueue()
       .catch(() => []);
@@ -1379,12 +1364,13 @@ const musicImportBlocked = async (page: Page): Promise<HealthCheck> => {
   };
 };
 
+/** The music checks, while music is on. */
 const musicChecks = (page: Page): Promise<HealthCheck>[] =>
   musicOn()
     ? [musicNotOnServer(page), musicNoRelease(page), musicImportBlocked(page)]
     : [];
 
-/** Sonarr needs a TVDB id; without one a series request cannot be sent. */
+/** Series without a TVDB id; Sonarr needs one to send a request. */
 const missingTvdb = (page: Page): Promise<HealthCheck> =>
   getRepository(Media)
     .findAndCount({
@@ -1421,9 +1407,9 @@ const titled = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
 
 /**
- * How to fix a match on this server: Plex's "Fix Match" finds a title by
- * its id typed as "tmdb-123" (or "imdb-tt123"); Jellyfin's and Emby's
- * "Identify" has a box for each id. `also` is a second id to try.
+ * How to fix a match on this server: Plex's "Fix Match" takes "tmdb-123" (or
+ * "imdb-tt123"); Jellyfin's and Emby's "Identify" has a box per id. `also` is
+ * a second id to try.
  */
 export const fixMatchText = (
   server: string,
@@ -1447,7 +1433,7 @@ export const fixMatchText = (
 const albumBy = (t: { title: string; year?: number; artist?: string }) =>
   `${titled(t)}${t.artist ? ` by ${t.artist}` : ''}`;
 
-/** A music problem in words: albums go by MusicBrainz ids, not TMDB's. */
+/** A music problem in words; albums use MusicBrainz ids, not TMDB's. */
 const musicMatchText = (
   p: PlexMatchProblem
 ): { title: string; detail: string } => {
@@ -1466,12 +1452,10 @@ const musicMatchText = (
 };
 
 /**
- * One Match Check problem in words. The ids are shown because names can't
- * tell two films apart: two can share a name and a year. They are the ids
- * the two sides were compared by, so a server with only an IMDb id shows
- * it. For a film, the file's length against the film's says whose mistake
- * it is: a file far off the film is likely another film, which fixing the
- * match would only hide.
+ * One Match Check problem in words. Shows the compared ids, since two films
+ * can share a name and year (a server with only an IMDb id shows that). For a
+ * film, file length vs. runtime says whose mistake it is: a file far off is
+ * likely another film, which fixing the match would only hide.
  */
 export const plexMatchText = (
   p: PlexMatchProblem
@@ -1546,9 +1530,9 @@ export const plexMatchText = (
 };
 
 /**
- * Folders the media server matched to another title than Sonarr or Radarr
- * has in them, from the nightly Match Check. Each opens the title Sonarr or Radarr
- * has, whose page says the same.
+ * Folders the media server matched to a different title than Sonarr or
+ * Radarr has, from the nightly Match Check. Each opens Sonarr's or Radarr's
+ * title, whose page says the same.
  */
 const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
   const fixable = (p: PlexMatchProblem) => fixingOn() && canFix(p);
@@ -1568,7 +1552,7 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
       })
     ).map((m) => [m.id, m])
   );
-  // The nightly list may have the same problem: counted once.
+  // Count problems also on the nightly list once.
   const nightly = new Set(
     report.problems.map(
       (p) => `${p.mediaServer ?? 'Plex'}|${p.folder.toLowerCase()}`
@@ -1578,7 +1562,7 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
     const p = JSON.parse(row.problem) as PlexMatchProblem;
     return !nightly.has(`${row.mediaServer}|${p.folder.toLowerCase()}`);
   }).length;
-  // Sonarr may not know a series' TMDB id; Seerr's own row for it does.
+  // Sonarr may lack a series' TMDB id; Seerr's row has it.
   const byTvdb = new Map(
     (
       await getRepository(Media).find({
@@ -1649,9 +1633,8 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
 };
 
 /**
- * Collections the library has part of. Not a problem, so never a warning:
- * listed for finishing a series of films off. The list is built in the
- * background; until the first one is ready, the row says so.
+ * Partly owned collections. Never a warning: listed to help complete a film
+ * series. Built in the background; the row says so until first ready.
  */
 const collectionGapsCheck = (page: Page): HealthCheck => {
   const gaps = getCollectionGaps();
@@ -1685,25 +1668,18 @@ const collectionGapsCheck = (page: Page): HealthCheck => {
 };
 
 /**
- * Backfill: titles it could not search, packs waiting on an admin, and
- * downloads that failed this week; Download Check's findings and the admin
- * agent's conversations waiting on an admin, while each is on. Only when
- * Backfill is on.
- */
-/**
- * Seerr AI's quality profiles (Settings → Quality), on servers an admin
- * manages: one someone changed or removed in Radarr or Sonarr, a TRaSH
- * Guides update that changes a format an admin moved (the admin's choice
- * stays), a server that couldn't be checked, and TRaSH Guides not reached
- * for 3 days. From the last hourly check.
+ * Seerr AI's quality profiles (Settings → Quality) on managed servers: one
+ * changed or removed in Radarr or Sonarr, a TRaSH Guides update to a format
+ * an admin moved (the admin's choice stays), a server that couldn't be
+ * checked, and TRaSH Guides unreachable for 3 days. From the last hourly
+ * check.
  */
 const qualityChecks = async (): Promise<HealthCheck[]> => {
   const managed = getSettings().quality.servers.filter((s) => s.managed);
   if (!managed.length) return [];
   const href = '/settings/quality';
   const items: HealthItem[] = [];
-  // Only servers still managed: one that was stopped or removed keeps its
-  // last state.
+  // Only servers still managed; a stopped or removed one keeps its last state.
   const keys = new Set(managed.map((s) => `${s.kind}:${s.serverId}`));
   const states = lastStates().filter((s) =>
     keys.has(`${s.kind}:${s.serverId}`)
@@ -1758,6 +1734,11 @@ const qualityChecks = async (): Promise<HealthCheck[]> => {
   ];
 };
 
+/**
+ * Backfill, while on: titles it couldn't search, packs awaiting an admin,
+ * downloads failed this week; plus Download Check findings and admin agent
+ * conversations awaiting an admin, while each is on.
+ */
 const backfillChecks = async (
   page: Page = FIRST_PAGE
 ): Promise<HealthCheck[]> => {
@@ -1926,8 +1907,8 @@ const userChecks = async (page: Page = FIRST_PAGE): Promise<HealthCheck[]> => {
 };
 
 /**
- * A group that throws becomes one row saying so, rather than failing the
- * whole page: the other checks still say what they found.
+ * A group that throws becomes one row saying so, instead of failing the whole
+ * page.
  */
 const guarded = async (
   group: HealthCheck['group'],
@@ -1957,8 +1938,7 @@ export const runHealthChecks = async (): Promise<{
   activity?: HealthActivity;
 }> => {
   const [activity, ...groups] = await Promise.all([
-    // Only worth counting while Backfill is on; a week it can't count is
-    // left out rather than failing the page.
+    // Only while Backfill is on; a failed count is left out, not fatal.
     getSettings().backfill.enabled
       ? healthActivity().catch(() => undefined)
       : undefined,
@@ -2024,7 +2004,7 @@ const PAGED = new Map<string, OneCheck>([
 /** Further than any list goes. */
 const LAST_PAGE = 100_000;
 
-/** One page of one check's list: the page shows ten at a time. */
+/** One page of one check's list; the page shows ten at a time. */
 export const runHealthCheck = async (
   id: string,
   pageNumber: number

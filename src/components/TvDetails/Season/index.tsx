@@ -28,7 +28,7 @@ const messages = defineMessages('components.TvDetails.Season', {
     '{count, plural, one {# episode is} other {# episodes are}} not in the library yet.',
 });
 
-/** An episode on its way: its download's stage, and how far it has got. */
+/** Download stage and progress for an incoming episode. */
 const DownloadPill = ({ download }: { download: EpisodeDownload }) => {
   const intl = useIntl();
   const { label, badgeType } = stageBadge(intl, download.stage);
@@ -50,9 +50,9 @@ const DownloadPill = ({ download }: { download: EpisodeDownload }) => {
 type SeasonProps = {
   seasonNumber: number;
   tvId: number;
-  /** Given when the whole season can be requested. */
+  /** Set when the whole season can be requested. */
   onRequestSeason?: () => void;
-  /** Given when the user may request; offered per episode that needs it. */
+  /** Set when the user may request; offered per episode that needs it. */
   onRequestEpisode?: (episodeNumber: number) => void;
 };
 
@@ -66,8 +66,7 @@ const Season = ({
   const { data, error } = useSWR<SeasonWithEpisodes>(
     `/api/v1/tv/${tvId}/season/${seasonNumber}`,
     {
-      // While anything is on its way, it is looked at again, so a download
-      // starting, moving along and finishing shows as it happens.
+      // Poll while anything is downloading so progress shows live.
       refreshInterval: (latest) =>
         latest?.episodes.some(
           (episode) =>
@@ -77,7 +76,7 @@ const Season = ({
           : 0,
     }
   );
-  // The episode whose subtitles are open under it.
+  // Episode number with its subtitle panel open.
   const [subtitlesOpen, setSubtitlesOpen] = useState<number | null>(null);
 
   if (!data && !error) {
@@ -88,7 +87,6 @@ const Season = ({
     return <div>{intl.formatMessage(messages.somethingwentwrong)}</div>;
   }
 
-  // Available, or already requested, means there is nothing to ask for.
   const needsRequest = (episode: SeasonWithEpisodes['episodes'][number]) =>
     !episode.available && !episode.requested;
   const missing = data.episodes.filter(needsRequest).length;
@@ -201,7 +199,7 @@ const Season = ({
                     </div>
                   )}
                 </div>
-                {/* Under the whole episode, still and all. */}
+                {/* Spans the whole episode row, still included. */}
                 {subtitlesOpen === episode.episodeNumber && (
                   <EpisodeSubtitlePanel
                     tvId={tvId}

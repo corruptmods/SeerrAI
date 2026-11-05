@@ -1,8 +1,6 @@
 /**
- * Lists: watch lists, and playlists.
- *
- * Split by concern: the lists themselves, the titles on them, and importing.
- * Each module registers onto the same router.
+ * Lists (watch lists and playlists): the lists, their titles, and importing,
+ * each module registered on one router.
  */
 import importRoutes from '@server/routes/list/import';
 import itemRoutes from '@server/routes/list/items';
@@ -12,8 +10,8 @@ import { Router } from 'express';
 
 const router = Router();
 
-// Order matters: the literal paths in items and import must be matched before
-// the ":listId" patterns in lists, or "/markers" would be read as a list id.
+// Order matters: items' and import's literal paths must match before lists'
+// ":listId", or "/markers" would be read as a list id.
 router.use(itemRoutes);
 router.use(importRoutes);
 router.use(playlistRoutes);

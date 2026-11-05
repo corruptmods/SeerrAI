@@ -21,7 +21,7 @@ const messages = defineMessages('components.MetadataSelector', {
 
 interface MetadataSelectorProps {
   testId: string;
-  /** The id of the text box, for a label to point at. */
+  /** The text box id, for a <label>. */
   inputId?: string;
   value: MetadataProviderType;
   onChange: (value: MetadataProviderType) => void;

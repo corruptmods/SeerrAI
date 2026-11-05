@@ -28,8 +28,8 @@ class DiscoverSlider {
           label: 'Discover Slider',
           slider,
         });
-        // A row added in an update goes where it belongs among the ones
-        // already there, rather than sharing a position with one of them.
+        // A row added by an update slots in among existing ones rather than
+        // sharing a position.
         if (slider.order !== undefined) {
           await sliderRepository.increment(
             { order: MoreThanOrEqual(slider.order) },
@@ -58,8 +58,7 @@ class DiscoverSlider {
   public enabled: boolean;
 
   @Column({ nullable: true })
-  // Title is not required for built in sliders because we will
-  // use translations for them.
+  // Optional for built-in sliders, which use translations.
   public title?: string;
 
   @Column({ nullable: true })

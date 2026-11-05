@@ -2,11 +2,11 @@ import type { DownloadStage, DownloadStep } from '@server/constants/downloads';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { createHash } from 'node:crypto';
 
-/** One download as its download client reports it, right now. */
+/** One download as its client currently reports it. */
 export interface LiveDownload {
   size: number;
   sizeLeft: number;
-  /** Until it finishes downloading, when the client can say. */
+  /** Until done, when the client estimates it. */
   secondsLeft?: number;
   stage: DownloadStage;
   step?: DownloadStep;
@@ -16,92 +16,86 @@ export interface DownloadClient {
   /** The client's version; also proves the address and sign-in work. */
   getVersion(): Promise<string>;
   /**
-   * The downloads among `ids` that this client holds, by id in lower case.
-   * Ids that aren't this client's are passed over.
+   * The downloads among `ids` this client holds, keyed by lower-case id.
+   * Other ids are skipped.
    */
   getDownloads(ids: string[]): Promise<Map<string, LiveDownload>>;
 }
 
 /*
- * What Backfill does with a download client, which it adds to, follows and
- * removes from itself. Every client implements one of the two below, in its
- * own API, so the engine treats them all alike.
+ * Clients Backfill adds to, follows and removes from itself. Each implements
+ * one of the two interfaces below so the engine treats them alike.
  */
 
-/** What a torrent is doing, whichever client has it. */
+/** A torrent's state, normalised across clients. */
 export type TorrentState =
-  /** Fetching its file list from the swarm (a magnet link). */
+  /** Fetching its file list from the swarm (magnet link). */
   | 'metadata'
-  /** Checking what it has on disk. */
+  /** Checking data on disk. */
   | 'checking'
-  /** Waiting its turn behind the client's own limit on downloads. */
+  /** Waiting behind the client's own download limit. */
   | 'queued'
   | 'paused'
   | 'downloading'
-  /** Being moved to another folder by the client. */
+  /** The client is moving it to another folder. */
   | 'moving'
-  /** Everything wanted is in, seeding or stopped. */
+  /** All wanted data is in; seeding or stopped. */
   | 'done'
-  /** Stopped on an error of its own (disk full, files gone). */
+  /** Stopped on its own error (disk full, files gone). */
   | 'error';
 
 export interface ClientTorrent {
-  /** The info hash, in lower case. */
+  /** Lower-case info hash. */
   hash: string;
   name: string;
   state: TorrentState;
-  /** The client's own words, when the state is 'error'. */
+  /** The client's message when the state is 'error'. */
   error?: string;
-  /** 0 to 1, of what is wanted. */
+  /** 0 to 1, of the wanted data. */
   progress: number;
   /** Bytes a second. */
   speed: number;
-  /** Until it is downloaded; undefined when the client has no estimate. */
+  /** Until done; undefined when the client has no estimate. */
   secondsLeft?: number;
-  /**
-   * The folder its files' names are under, in the client's own paths: a
-   * file is at savePath/name.
-   */
+  /** In the client's own paths; a file is at savePath/name. */
   savePath: string;
-  /** When it was added (ms); undefined when the client cannot say. */
+  /** When added (ms); undefined when the client cannot say. */
   addedAt?: number;
   /**
-   * Bytes of what is wanted and not yet in that no peer connected has;
-   * undefined when the client cannot say.
+   * Wanted bytes not yet in that no connected peer has; undefined when the
+   * client cannot say.
    */
   unavailable?: number;
 }
 
 export interface ClientTorrentFile {
-  /** Its position in the torrent, as the .torrent file lists them. */
+  /** Position in the .torrent file's list. */
   index: number;
-  /** Its path, with the torrent's folder in front for a multi-file one. */
+  /** Path, prefixed by the torrent's folder for a multi-file torrent. */
   name: string;
   size: number;
   /** 0 to 1. */
   progress: number;
   /**
-   * 0 to 1: the share of its pieces some peer connected has (or that are
-   * in); undefined when the client cannot say.
+   * 0 to 1: share of its pieces that are in or held by a connected peer;
+   * undefined when the client cannot say.
    */
   availability?: number;
 }
 
 export interface TorrentClient extends DownloadClient {
-  /** The product, for what Backfill shows: "Paused in Transmission". */
+  /** Product name for display ("Paused in Transmission"). */
   readonly product: string;
   /**
-   * Whether a magnet link added with metadataOnly stops by itself once its
-   * file list is in. A client that cannot is watched closely until it is,
-   * and its download speed for that torrent is held down meanwhile where
-   * the client allows it.
+   * Whether a magnet added with metadataOnly stops itself once its file list
+   * is in. Otherwise it is polled closely until then, with its download speed
+   * capped where the client allows.
    */
   readonly stopsAtMetadata: boolean;
   /**
-   * Adds a torrent from its .torrent file (stopped, so its files can be
-   * chosen before anything downloads) or a magnet link (started, to fetch
-   * its file list). Backfill stops it once its files are in; nothing set
-   * on it lets the client remove it before they are imported.
+   * Adds a .torrent file (stopped, so files can be chosen first) or a magnet
+   * link (started, to fetch its file list). Backfill stops it once its files
+   * are in; nothing set on it lets the client remove it before import.
    */
   addTorrent(options: {
     torrent?: Buffer;
@@ -109,13 +103,13 @@ export interface TorrentClient extends DownloadClient {
     category: string;
     metadataOnly?: boolean;
   }): Promise<void>;
-  /** Makes sure Backfill's category (or label) can be used. */
+  /** Ensures Backfill's category (or label) exists. */
   ensureCategory(category: string): Promise<void>;
-  /** The torrent with this hash, or undefined if the client has none. */
+  /** The torrent with this hash, or undefined. */
   findTorrent(hash: string): Promise<ClientTorrent | undefined>;
-  /** The torrents in a category (label), for clearing probes left behind. */
+  /** Torrents in a category (label), for clearing leftover probes. */
   listCategory(category: string): Promise<ClientTorrent[]>;
-  /** A torrent's files, in index order; empty until its file list is in. */
+  /** Files in index order; empty until the file list is in. */
   getFiles(hash: string): Promise<ClientTorrentFile[]>;
   /** 0 skips the files, 1 downloads them. */
   setFilePriority(
@@ -125,15 +119,15 @@ export interface TorrentClient extends DownloadClient {
   ): Promise<void>;
   startTorrent(hash: string): Promise<void>;
   stopTorrent(hash: string): Promise<void>;
-  /** Removes the torrent and whatever of it is on disk. */
+  /** Removes the torrent and its data on disk. */
   deleteTorrent(hash: string): Promise<void>;
-  /** What keeps Backfill from using it fully, in words; empty if nothing. */
+  /** Problems that limit Backfill's use of the client; empty if none. */
   backfillProblems(): Promise<string[]>;
 }
 
 /**
- * A Usenet job as Backfill follows it. Its status, in lower case, is one
- * of SABnzbd's words, which every Usenet client's are put into:
+ * A Usenet job as Backfill follows it. Status is a lower-case SABnzbd word,
+ * which every Usenet client's statuses are mapped to:
  * - in the queue: downloading, queued, paused, fetching (the NZB itself),
  *   propagating, checking
  * - after downloading: queued (for post-processing), verifying, repairing,
@@ -148,29 +142,29 @@ export interface UsenetJob {
   sizeLeft: number;
   secondsLeft?: number;
   /**
-   * Bytes a second: 0 while it waits its turn, undefined when several jobs
-   * download at once and the client's one figure cannot be split.
+   * Bytes a second: 0 while waiting, undefined when several jobs download
+   * at once and the client's single figure cannot be split.
    */
   speed?: number;
-  /** Where the finished job's files are, in the client's own paths. */
+  /** Finished files' folder, in the client's own paths. */
   storage?: string;
   failMessage?: string;
 }
 
 export interface UsenetClient extends DownloadClient {
   readonly product: string;
-  /** Adds an NZB file; answers the client's id for the new job. */
+  /** Adds an NZB file; returns the client's id for the new job. */
   addNzb(nzb: Buffer, name: string, category: string): Promise<string>;
-  /** Where a job is and what the client says about it; undefined if gone. */
+  /** The job's place and status; undefined if gone. */
   getJob(id: string): Promise<UsenetJob | undefined>;
   pauseJob(id: string): Promise<void>;
   resumeJob(id: string): Promise<void>;
-  /** Removes the job, wherever it is, and as much of its files as it can. */
+  /** Removes the job (queue or history) and as many of its files as it can. */
   deleteJob(id: string): Promise<void>;
   backfillProblems(): Promise<string[]>;
 }
 
-/** Long enough for a busy client, short enough never to hold up a page. */
+/** Long enough for a busy client, short enough not to hold up a page. */
 export const CLIENT_TIMEOUT_MS = 8_000;
 
 export const clientBaseUrl = (
@@ -186,10 +180,9 @@ export const clientBaseUrl = (
 };
 
 /**
- * What a client's signed-in session is kept under: its address and the
- * sign-in, the password only as a digest. Another password signs in afresh
- * rather than riding on the session the saved one opened, so testing a
- * wrong one fails.
+ * Session cache key: address, username and a password digest. A different
+ * password signs in afresh instead of reusing the saved one's session, so
+ * testing a wrong password fails.
  */
 export const sessionKeyOf = (
   baseUrl: string,

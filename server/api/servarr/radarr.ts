@@ -19,13 +19,13 @@ export interface RadarrMovie {
   id: number;
   title: string;
   isAvailable: boolean;
-  /** Which release Radarr waits for: 'announced', 'inCinemas' or 'released'. */
+  /** 'announced', 'inCinemas' or 'released'. */
   minimumAvailability?: string;
   inCinemas?: string;
   digitalRelease?: string;
   physicalRelease?: string;
   year?: number;
-  /** The film's running time on TMDB, in minutes. */
+  /** TMDB runtime in minutes. */
   runtime?: number;
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
   monitored: boolean;
@@ -160,7 +160,7 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
         return movie;
       }
 
-      // movie exists in Radarr but is neither downloaded nor monitored
+      // In Radarr but neither downloaded nor monitored.
       if (movie.id && !movie.monitored) {
         const response = await this.axios.put<RadarrMovie>(`/movie`, {
           ...movie,
@@ -174,7 +174,7 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
           tags: Array.from(new Set([...movie.tags, ...options.tags])),
           rootFolderPath: options.rootFolderPath,
           monitored: options.monitored,
-          // Searched below, only once Radarr says the movie is available.
+          // searchIfAvailable searches only once Radarr says it's available.
           addOptions: {
             searchForMovie: false,
           },
@@ -207,7 +207,6 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
       }
 
       if (movie.id) {
-        // Movie exists and is already monitored
         logger.info('Movie is already monitored in Radarr.', {
           label: 'Radarr',
           movieId: movie.id,
@@ -215,8 +214,6 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
           hasFile: movie.hasFile,
         });
 
-        // It has no file (one with a file was returned above), so search
-        // for it if Radarr says it is available.
         this.searchIfAvailable(movie, options);
 
         return movie;
@@ -233,8 +230,8 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
         rootFolderPath: options.rootFolderPath,
         monitored: options.monitored,
         tags: options.tags,
-        // Radarr would search as it adds the movie, available or not. It is
-        // searched below instead, once Radarr's answer says it is available.
+        // Radarr would search on add even if unavailable; searchIfAvailable
+        // searches only once it is available.
         addOptions: {
           searchForMovie: false,
         },
@@ -270,12 +267,10 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
   };
 
   /**
-   * Searches for a requested movie now if Radarr says it is available, which
-   * Radarr works out from the movie's Minimum Availability (and its delay
-   * setting). A movie not available yet is left monitored, and Radarr grabs
-   * it once it is. Radarr does not hold a search asked for like this to
-   * Minimum Availability, so searching early could grab a release the
-   * admin chose to wait past, such as a cinema recording.
+   * Searches now if Radarr says the movie is available (from its Minimum
+   * Availability and delay). Otherwise it stays monitored and Radarr grabs it
+   * later. A manual search ignores Minimum Availability, so searching early
+   * could grab a release the admin chose to wait past, such as a cam.
    */
   private searchIfAvailable(
     movie: RadarrMovie,
@@ -284,8 +279,7 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
     if (!options.searchNow) {
       return;
     }
-    // An answer without isAvailable (an older Radarr, say) is searched as
-    // before rather than left waiting for good.
+    // Without isAvailable (older Radarr), search rather than wait forever.
     if (movie.isAvailable === false) {
       logger.info(
         'Movie is not available yet in Radarr; it stays monitored and Radarr will grab it once it is',
@@ -307,9 +301,9 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
   }
 
   /**
-   * Changes a movie's root folder or quality profile with Radarr's movie
-   * editor. A new root folder moves its files there; Radarr does the move
-   * itself, in the background.
+   * Changes a movie's root folder or quality profile via Radarr's movie
+   * editor. A new root folder moves the files; Radarr does it in the
+   * background.
    */
   public async editMovie(
     movieId: number,
@@ -348,9 +342,9 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
     }
   }
   /**
-   * Searches for several films in one command, and reports failure — unlike
-   * searchMovie, which logs and carries on, as Seerr's request flow expects.
-   * Used where the person pressing Search must be told if it did not start.
+   * Searches several movies in one command and throws on failure, unlike
+   * searchMovie, which logs and continues as the request flow expects. For
+   * when the user pressing Search must learn it did not start.
    */
   public async searchMovies(movieIds: number[]): Promise<void> {
     if (!movieIds.length) {
@@ -360,9 +354,8 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
   }
 
   /**
-   * Films with a cinema, digital or physical release in the range, from
-   * Radarr's calendar. Monitored ones only: an unmonitored film is not
-   * coming.
+   * Monitored movies with a cinema, digital or physical release in the
+   * range, from Radarr's calendar.
    */
   public async getCalendar(start: Date, end: Date): Promise<RadarrMovie[]> {
     const response = await this.axios.get<RadarrMovie[]>('/calendar', {
@@ -381,8 +374,8 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
       addImportExclusion = false,
     }: {
       /**
-       * Also stop the *arr's own import lists from adding it back. Used when
-       * a title is blocklisted; plain file removal leaves it off.
+       * Also stop the *arr's import lists re-adding it. Set when blocklisting;
+       * plain file removal leaves it off.
        */
       addImportExclusion?: boolean;
     } = {}

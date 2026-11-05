@@ -10,9 +10,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * The plain rules behind music matching and status: names and folders as
- * compared, which album a folder or title is, and how an artist's status
- * follows their albums'.
+ * Pure music matching rules: name and folder normalisation, folder/title
+ * matching, and artist status from album statuses.
  */
 
 describe('names and folders', () => {
@@ -61,7 +60,7 @@ describe('matching an album by folder or title', () => {
       ),
       'kid-a'
     );
-    // A folder Seerr saw this album in before.
+    // A folder stored for this album earlier.
     assert.equal(
       matchByFolderOrTitle(
         { path: '/m/R/Bootleg-1995', title: 'x' },
@@ -77,7 +76,7 @@ describe('matching an album by folder or title', () => {
       matchByFolderOrTitle({ title: 'Live', year: 2001 }, candidates),
       'live-2'
     );
-    // Two albums of that name and no year to tell them apart.
+    // Two albums with that title and no year: ambiguous.
     assert.equal(
       matchByFolderOrTitle({ title: 'Live' }, candidates),
       undefined
@@ -118,7 +117,7 @@ describe('statuses', () => {
       ]),
       PARTIALLY_AVAILABLE
     );
-    // Nothing wanted: some of their music is here, not all of it.
+    // Nothing wanted: some music is here, so partly available.
     assert.equal(
       artistStatus(UNKNOWN, [album(AVAILABLE)]),
       PARTIALLY_AVAILABLE

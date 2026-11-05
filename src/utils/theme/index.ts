@@ -1,23 +1,20 @@
 /*
- * What a look turns into on the page.
+ * Renders a look onto the page.
  *
- * Components use semantic colours (bg-page, text-strong, bg-accent, …, set
- * up in tailwind.config.js), and gray-* and indigo-* still work for anything
- * not yet given one; every one of them reads a CSS variable. A look is the
- * values of those variables, written as a small stylesheet for each mode it
- * uses, plus attributes on <html>:
+ * Semantic colours (bg-page, text-strong, bg-accent, …; tailwind.config.js)
+ * and gray-* / indigo-* all read CSS variables. A look is those variables as
+ * one stylesheet per mode, plus attributes on <html>:
  *
- *   data-mode="dark|light"      what is showing now
+ *   data-mode="dark|light"      the mode showing now
  *   data-mode-choice            dark, light or auto ("Match my device")
  *   data-theme="classic|…"      the dark background
  *   data-accent="indigo|…"      the accent
  *   data-spacing, data-corners, data-blur, data-solid
- *                               the extras, only when not the usual
- *   data-season="halloween|…"   a seasonal theme on top, while one shows
+ *                               extras, only when non-default
+ *   data-season="halloween|…"   a seasonal overlay, while one shows
  *
- * The server writes both into the page (pages/_document), so it arrives
- * looking right; THEME_SCRIPT then picks light or dark for "Match my
- * device" before anything is drawn, and follows the device from then on.
+ * The server writes both (pages/_document); THEME_SCRIPT resolves "Match my
+ * device" before first paint and follows the device afterwards.
  */
 import type {
   Appearance,
@@ -51,10 +48,7 @@ import { accentWithThemeFile, neutralsWithThemeFile } from './themeFileColours';
 
 export type ShownMode = 'dark' | 'light';
 
-/**
- * The accent's colours; a custom one is made from its colour, and a theme
- * file's take their place where it gives them.
- */
+/** The accent's colours; theme file colours override where given. */
 export const accentColours = (
   appearance: Pick<Appearance, 'accent' | 'customAccent' | 'theme'>
 ): AccentColours =>
@@ -75,11 +69,8 @@ export const neutralsFor = (
   );
 
 /*
- * The text of the count beside the page you are on (sidebar and the phone's
- * bar), on the accent's deep gradient: its 700 into its partner's 700. The
- * accent's palest shade where that reads, as Indigo's always has, and
- * white where it doesn't (Amber's partner is too light for its pale
- * shades).
+ * Text for the active-page count badge on the accent's 700→partner-700
+ * gradient: the palest shade where it reads, else white (e.g. Amber).
  */
 const deepInk = ({ scale, alt }: AccentColours) => {
   const worst = (hex: string) =>
@@ -91,10 +82,9 @@ const deepInk = ({ scale, alt }: AccentColours) => {
 const channels = (hex: string) => hexToRgb(hex).join(' ');
 
 /**
- * Every variable for one mode, by name without the leading "--". Numbers
- * for the opacities, "r g b" for the colours. A season on top brings its
- * accent, its night in place of the dark background, and its mark's
- * colour (--season-mark).
+ * Every variable for one mode, keyed without "--": numbers for opacities,
+ * "r g b" for colours. A season supplies its accent, night background and
+ * --season-mark.
  */
 export const themeVariables = (
   appearance: Appearance,
@@ -146,8 +136,7 @@ export const themeVariables = (
     'on-accent-chip': channels(forMode.onChip),
     'on-accent-deep': channels(deepInk(accent)),
   });
-  // Classic's page keeps today's status colours; every other dark one (True
-  // black, Slate, Warm, a season's night, a theme file's) has its own.
+  // Classic keeps the original status colours; other dark backgrounds have their own.
   const statuses =
     mode === 'dark' && n.page !== DARK_BACKGROUNDS.classic.page
       ? OTHER_DARK_STATUS
@@ -158,13 +147,10 @@ export const themeVariables = (
     vars[`${status}-text`] = channels(colours.text);
     vars[`${status}-soft`] = channels(colours.soft);
   }
-  // How see-through fills (buttons, badges), panels (menus, slide-overs,
-  // the top bar once scrolled) and the phone's bars are. Light mode's fills
-  // are solid so white text keeps its contrast, and so are its panels: a
-  // white panel over the dimmed page turns grey and loses its dividers.
-  // "Reduce see-through panels" makes everything solid. The accent's own
-  // fills are solid too when its button text is dark: see-through over a
-  // dark page, a bright fill turns too dark for that text.
+  // Opacity of fills, panels and phone bars. Light mode is solid: white text
+  // keeps contrast and white panels over the dim page don't turn grey.
+  // Accent fills are solid with dark ink, which a dark page behind would
+  // make unreadable.
   const solid = appearance.solidPanels;
   vars['fill-opacity'] = solid || mode === 'light' ? '1' : '0.8';
   vars['accent-fill-opacity'] =
@@ -177,11 +163,11 @@ export const themeVariables = (
   return vars;
 };
 
-/** The modes a look can show: one, or both for "Match my device". */
+/** Modes a look can show: both for "Match my device". */
 const modesOf = (mode: ThemeMode): ShownMode[] =>
   mode === 'auto' ? ['dark', 'light'] : [mode];
 
-/** The stylesheet for a look: its variables, under each mode it uses. */
+/** A look's stylesheet: its variables under each mode it uses. */
 export const themeCss = (appearance: Appearance, season?: SeasonId): string =>
   modesOf(appearance.mode)
     .map(
@@ -194,12 +180,12 @@ export const themeCss = (appearance: Appearance, season?: SeasonId): string =>
     )
     .join('');
 
-/** The attributes on <html> for a look. */
+/** A look's <html> attributes. */
 export const themeAttributes = (
   appearance: Appearance,
   season?: SeasonId
 ): Record<string, string> => ({
-  // "Match my device" is drawn dark until THEME_SCRIPT has asked the device.
+  // "Match my device" is dark until THEME_SCRIPT asks the device.
   'data-mode': appearance.mode === 'light' ? 'light' : 'dark',
   'data-mode-choice': appearance.mode,
   'data-theme': appearance.background,
@@ -211,7 +197,7 @@ export const themeAttributes = (
   ...(season && { 'data-season': season }),
 });
 
-/** Every attribute a look can set, so a change can clear the old ones. */
+/** Every attribute a look can set, so a change can clear old ones. */
 const THEME_ATTRIBUTES = [
   'data-mode',
   'data-mode-choice',
@@ -224,10 +210,7 @@ const THEME_ATTRIBUTES = [
   'data-season',
 ];
 
-/**
- * The colour of the browser's bar (the theme-color meta) for each mode a
- * look can show: the colour of the top bar and sidebar.
- */
+/** The theme-color meta (top bar and sidebar colour) for each mode a look can show. */
 export const themeColour = (
   appearance: Appearance,
   season?: SeasonId
@@ -242,9 +225,8 @@ export const themeColour = (
   );
 
 /**
- * Whose look a page shows: a signed-in person's own, or the server's if
- * they have not chosen; before anyone signs in, the copy kept on this
- * device, or the server's.
+ * The look a page shows: the user's, else the device's copy when signed
+ * out, else the server default.
  */
 export const chosenAppearance = ({
   signedIn,
@@ -258,18 +240,17 @@ export const chosenAppearance = ({
   server: ThemeDefaults;
 }): Appearance => (signedIn ? own : device) ?? appearanceFromDefaults(server);
 
-/** The id of the <style> the server writes the look into. */
+/** Id of the server-written theme <style>. */
 export const THEME_STYLE_ID = 'seerr-theme';
 
 /*
- * Runs in the page before anything is drawn (pages/_document). With "Match
- * my device", it shows light or dark as the device is, and switches when
- * the device does, for as long as the page is open.
+ * Runs before first paint (pages/_document). For "Match my device", shows
+ * the device's mode and follows its changes.
  */
 export const THEME_SCRIPT =
   "(function(){try{var d=document.documentElement,q=window.matchMedia('(prefers-color-scheme: light)'),f=function(){if(d.getAttribute('data-mode-choice')==='auto'){d.setAttribute('data-mode',q.matches?'light':'dark')}};f();q.addEventListener?q.addEventListener('change',f):q.addListener(f)}catch(e){}})()";
 
-/** What "Match my device" shows right now. */
+/** The mode "Match my device" shows now. */
 export const deviceMode = (): ShownMode =>
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-color-scheme: light)').matches
@@ -277,10 +258,8 @@ export const deviceMode = (): ShownMode =>
     : 'dark';
 
 /**
- * Shows a look on this page at once: its stylesheet and attributes, with a
- * season on top if one shows. With `remember`, the look is also kept on
- * the device for the sign-in page; with `forget`, the copy is removed (back
- * to the server's default).
+ * Applies a look (and any season) to the page now. `remember` stores it on
+ * the device for the sign-in page; `forget` removes that copy.
  */
 export const applyAppearance = (
   appearance: Appearance,

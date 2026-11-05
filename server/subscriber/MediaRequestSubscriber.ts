@@ -56,7 +56,7 @@ import type {
 } from 'typeorm';
 import { EventSubscriber, In, Not } from 'typeorm';
 
-/** Lidarr could not look something up yet; trying again later may work. */
+/** Lidarr lookup failed transiently; a retry may succeed. */
 class LidarrLookupError extends Error {}
 
 const sanitizeDisplayName = (displayName: string): string => {
@@ -70,8 +70,8 @@ const sanitizeDisplayName = (displayName: string): string => {
 };
 
 /**
- * What a music request asked for, as its history says it: the album's or
- * song's title, or how many and the first few.
+ * A music request's scope for its history: the one title, or a count and the
+ * first few.
  */
 const musicScope = (albums: string[], songs: string[]): string | undefined => {
   const titles = [...albums, ...songs];
@@ -88,9 +88,8 @@ const musicScope = (albums: string[], songs: string[]): string | undefined => {
 };
 
 /**
- * A watcher's copy of an availability notification: for them alone, about
- * the request as it is. The channels and admins hear once, from the
- * requester's copy, not once more for every watcher.
+ * A watcher's copy of an availability notification. Channels and admins are
+ * notified only from the requester's copy.
  */
 const forWatcher = (
   payload: NotificationPayload,
@@ -103,12 +102,11 @@ const forWatcher = (
 });
 
 /**
- * Reconciles Sonarr's episode monitoring for every season this request
- * touches, against the union of all live requests for the same series.
+ * Reconciles Sonarr episode monitoring for this request's seasons against the
+ * union of all live requests for the series.
  *
- * Episodes nobody asked for are unmonitored, so a request for two episodes
- * really does mean two episodes. Episodes anyone asked for stay monitored,
- * so a second user's request never cancels the first one's.
+ * Episodes nobody asked for are unmonitored; episodes anyone asked for stay
+ * monitored, so one user's request never cancels another's.
  */
 export const applySeasonMonitoring = async (
   sonarr: SonarrAPI,
@@ -154,7 +152,7 @@ export const applySeasonMonitoring = async (
           toUnmonitor.push(episode.id);
         }
 
-        // Only chase episodes that are wanted and not already on disk.
+        // Search only wanted episodes not already on disk.
         if (wanted && !episode.hasFile) {
           toSearch.push(episode.id);
         }
@@ -179,8 +177,8 @@ export const applySeasonMonitoring = async (
       requestId: entity.id,
       errorMessage: message,
     });
-    // Visible on the title, not only in the log: Sonarr may now download the
-    // whole season, or never search the episodes that were asked for.
+    // Record on the title: Sonarr may now grab the whole season, or never
+    // search the requested episodes.
     if (entity.media?.tmdbId) {
       await recordMediaEvent({
         tmdbId: entity.media.tmdbId,
@@ -193,17 +191,6 @@ export const applySeasonMonitoring = async (
   }
 };
 
-/**
- * Re-reconciles Sonarr monitoring after a request is removed.
- *
- * Without this, deleting a request leaves Sonarr monitoring episodes nobody
- * asked for. The reconcile is against the union of whatever requests remain,
- * so removing one user's request never cancels another user's episodes.
- *
- * Skipped when the media row itself is gone: that is the removal-tool path
- * (Maintainerr deleting a whole show), where the series is being taken out
- * entirely and there is nothing left to monitor for.
- */
 interface RemovalContext {
   mediaId: number;
   is4k: boolean;
@@ -211,10 +198,18 @@ interface RemovalContext {
   seasonNumbers: number[];
 }
 
-// By afterRemove the season relations are already cleared by the cascade, so
-// the details needed to reconcile are captured in beforeRemove.
+// afterRemove runs after the cascade clears season relations, so beforeRemove
+// captures what the reconcile needs.
 const pendingRemovals = new Map<number, RemovalContext>();
 
+/**
+ * Re-reconciles Sonarr monitoring after a request is removed, against the
+ * remaining requests, so removing one user's request never cancels another's
+ * episodes.
+ *
+ * Skipped when the media row is gone (e.g. Maintainerr deleting a whole show):
+ * nothing is left to monitor.
+ */
 const reconcileMonitoringAfterRemoval = async (
   context: RemovalContext,
   requestId: number,
@@ -293,8 +288,8 @@ const reconcileMonitoringAfterRemoval = async (
       requestId,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
-    // Visible on the title: Sonarr may keep monitoring, and downloading,
-    // episodes nobody wants any more.
+    // Record on the title: Sonarr may keep monitoring and downloading unwanted
+    // episodes.
     if (title) {
       await recordMediaEvent({
         tmdbId: title.tmdbId,
@@ -310,14 +305,14 @@ const reconcileMonitoringAfterRemoval = async (
 };
 
 /**
- * Music requests waiting to go to Lidarr until the save that approved them
- * has committed, by the database connection that save runs on.
+ * Lidarr sends deferred until the approving save commits, keyed by that save's
+ * connection.
  */
 const lidarrSendsAfterCommit = new WeakMap<QueryRunner, (() => void)[]>();
 
 /**
- * Whether Lidarr refused to add an artist or album because it has it now:
- * its own words, in the body of its answer.
+ * Whether Lidarr refused an add because it already has the artist or album (per
+ * its response body).
  */
 const addedMeanwhile = (e: unknown): boolean => {
   for (let at: unknown = e; at; at = (at as { cause?: unknown }).cause) {
@@ -332,7 +327,7 @@ const addedMeanwhile = (e: unknown): boolean => {
   return false;
 };
 
-/** A request's albums and songs still to come: not done, not declined. */
+/** Statuses of a request's albums and songs still to come. */
 const OPEN_PARTS = [
   MediaRequestStatus.PENDING,
   MediaRequestStatus.APPROVED,
@@ -342,9 +337,8 @@ const OPEN_PARTS = [
 @EventSubscriber()
 export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
   /**
-   * A blocklisted title is never sent to Radarr or Sonarr, whatever state a
-   * request for it is in: one approved from before the blocklist would
-   * otherwise bring it straight back.
+   * Blocklisted titles are never sent to Radarr or Sonarr, even for requests
+   * approved before the blocklist.
    */
   private async titleBlocklisted(
     entity: MediaRequest,
@@ -374,21 +368,12 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     entity: MediaRequest,
     event?: UpdateEvent<MediaRequest>
   ) {
-    // Get fresh media state using event manager
-    let latestMedia: Media | null = null;
-    if (event?.manager) {
-      latestMedia = await event.manager.findOne(Media, {
-        where: { id: entity.media.id },
-      });
-    }
-    if (!latestMedia) {
-      const mediaRepository = getRepository(Media);
-      latestMedia = await mediaRepository.findOne({
-        where: { id: entity.media.id },
-      });
-    }
+    // Prefer the save's own manager, which sees its uncommitted status.
+    const query = { where: { id: entity.media.id } };
+    const latestMedia =
+      (event?.manager && (await event.manager.findOne(Media, query))) ||
+      (await getRepository(Media).findOne(query));
 
-    // Check availability using fresh media state
     if (
       !latestMedia ||
       latestMedia[entity.is4k ? 'status4k' : 'status'] !== MediaStatus.AVAILABLE
@@ -454,27 +439,19 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     entity: MediaRequest,
     event?: UpdateEvent<MediaRequest>
   ) {
-    // Get fresh media state with seasons using event manager
-    let latestMedia: Media | null = null;
-    if (event?.manager) {
-      latestMedia = await event.manager.findOne(Media, {
-        where: { id: entity.media.id },
-        relations: { seasons: true },
-      });
-    }
-    if (!latestMedia) {
-      const mediaRepository = getRepository(Media);
-      latestMedia = await mediaRepository.findOne({
-        where: { id: entity.media.id },
-        relations: { seasons: true },
-      });
-    }
+    // Prefer the save's own manager, which sees its uncommitted status.
+    const query = {
+      where: { id: entity.media.id },
+      relations: { seasons: true },
+    };
+    const latestMedia =
+      (event?.manager && (await event.manager.findOne(Media, query))) ||
+      (await getRepository(Media).findOne(query));
 
     if (!latestMedia) {
       return;
     }
 
-    // Check availability using fresh media state
     const requestedSeasons =
       entity.seasons?.map((entitySeason) => entitySeason.seasonNumber) ?? [];
     const availableSeasons = latestMedia.seasons.filter(
@@ -565,8 +542,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       try {
         const mediaRepository = manager.getRepository(Media);
         const settings = getSettings();
-        // No Radarr at all is a choice (requests fulfilled by hand): the
-        // request stays approved.
+        // No Radarr at all means requests are fulfilled by hand: stay approved.
         if (settings.radarr.length === 0 && !settings.radarr[0]) {
           logger.info(
             'No Radarr server configured, skipping request processing',
@@ -607,8 +583,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           return;
         }
 
-        // Its server was removed, or none is the default: failed, saying
-        // which, rather than left approved with nothing ever sent.
+        // Server removed or no default: fail with the reason instead of staying
+        // approved with nothing sent.
         const serverIssue = requestServerIssue(entity, settings);
         if (serverIssue) {
           await markUndispatchable(
@@ -628,7 +604,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           entity.serverId >= 0 &&
           radarrSettings?.id !== entity.serverId
         ) {
-          // Of its 4K kind: requestServerIssue has made sure there is one.
+          // requestServerIssue guarantees a server of the right 4K kind.
           radarrSettings = chosenServerFor(entity, settings) as
             | typeof radarrSettings
             | undefined;
@@ -730,13 +706,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           searchNow: !radarrSettings.preventSearch,
         };
 
-        // Run entity asynchronously so we don't wait for it on the UI side
+        // Not awaited, so the UI doesn't wait on Radarr.
         radarr
           .addMovie(radarrMovieOptions)
           .then(async (radarrMovie) => {
-            // Needs its own repository as this runs detached from the request transaction
+            // Runs detached from the request transaction, so use the global
+            // repository and refetch media.
             const mediaRepository = getRepository(Media);
-            // We grab media again here to make sure we have the latest version of it
             const media = await mediaRepository.findOne({
               where: { id: entity.media.id },
             });
@@ -909,7 +885,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           entity.serverId >= 0 &&
           sonarrSettings?.id !== entity.serverId
         ) {
-          // Of its 4K kind: requestServerIssue has made sure there is one.
+          // requestServerIssue guarantees a server of the right 4K kind.
           sonarrSettings = chosenServerFor(entity, settings) as
             | typeof sonarrSettings
             | undefined;
@@ -936,18 +912,12 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         const tvdbId = series.external_ids.tvdb_id ?? media.tvdbId;
 
         if (!tvdbId) {
-          /*
-           * Upstream deleted the media row and the request here. That left
-           * no trace of the attempt, so watchlist sync saw the title as
-           * never requested and tried again on every run — each time
-           * inserting, notifying, and deleting again. It happened with
-           * "HOLLOWAY - Phantom" once TVDB folded it into the Phantom
-           * anthology, leaving the TMDB entry without a TVDB id of its own.
-           *
-           * Keep both and mark the request failed instead. The failure is
-           * visible to an admin, the duplicate guard sees the existing
-           * auto-request, and the loop stops.
-           */
+          // Keep the media row and request and mark the request failed.
+          // Deleting both left no trace, so watchlist sync re-requested the
+          // title every run (insert, notify, delete), e.g. when TVDB folded a
+          // series into an anthology and the TMDB entry lost its TVDB id. A
+          // failed request is visible to admins and stops the loop via the
+          // duplicate guard.
           await markUndispatchable(
             entity,
             'No TVDB ID could be resolved for this series, so it cannot be sent to Sonarr; marked failed',
@@ -1052,13 +1022,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           searchNow: !sonarrSettings.preventSearch,
         };
 
-        // Run entity asynchronously so we don't wait for it on the UI side
+        // Not awaited, so the UI doesn't wait on Sonarr.
         sonarr
           .addSeries(sonarrSeriesOptions)
           .then(async (sonarrSeries) => {
-            // Needs its own repository as this runs detached from the request transaction
+            // Runs detached from the request transaction, so use the global
+            // repository and refetch media.
             const mediaRepository = getRepository(Media);
-            // We grab media again here to make sure we have the latest version of it
             const media = await mediaRepository.findOne({
               where: { id: entity.media.id },
             });
@@ -1167,10 +1137,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * Sends an approved music request to Lidarr. Which Lidarr is decided here,
-   * in the request's own save; talking to Lidarr then happens behind it,
-   * once that save has committed (dispatchToLidarr), so approving does not
-   * wait on Lidarr and its metadata service.
+   * Sends an approved music request to Lidarr. The server is chosen in the
+   * request's save; the Lidarr calls run after that save commits
+   * (dispatchToLidarr), so approval doesn't wait on Lidarr or its metadata
+   * service.
    */
   public async sendToLidarr(
     entity: MediaRequest,
@@ -1182,8 +1152,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     ) {
       return;
     }
-    // Songs go as the singles they are on; one only on albums is not sent
-    // anywhere yet, and a request with nothing else to send stays approved.
+    // Songs go via their singles. A song only on albums isn't sent yet; a
+    // request with nothing else to send stays approved.
     if (!lidarrTargets(entity, OPEN_PARTS).length) {
       return;
     }
@@ -1192,7 +1162,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
 
     const settings = getSettings();
-    // As for Radarr and Sonarr: no Lidarr at all leaves it approved.
+    // As with Radarr and Sonarr, no Lidarr at all leaves it approved.
     if (!settings.lidarr.length) {
       logger.info('No Lidarr server configured, skipping request processing', {
         label: 'Media Request',
@@ -1221,13 +1191,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       return;
     }
 
-    // Never rejects: a failure marks the request failed and says why.
+    // Never rejects: failures mark the request failed with the reason.
     const send = () => void this.dispatchToLidarr(entity, lidarrSettings);
 
-    // Sent once the request's own save has committed. Started inside it, a
-    // quick failure was written on another connection that could not see
-    // the new request yet (on Postgres), so the request stayed approved
-    // while "failed" went out to people.
+    // Send after the save commits. Started inside it, a quick failure was
+    // written on another connection that couldn't see the new request yet
+    // (Postgres), so the request stayed approved while "failed" notifications
+    // went out.
     const queryRunner = manager.queryRunner;
     if (!queryRunner?.isTransactionActive) {
       send();
@@ -1235,7 +1205,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
     const waiting = lidarrSendsAfterCommit.get(queryRunner) ?? [];
     waiting.push(() => {
-      // Unless that save was undone, or the request changed since.
+      // Skip if the save was rolled back or the request changed since.
       getRepository(MediaRequest)
         .exists({
           where: { id: entity.id, status: MediaRequestStatus.APPROVED },
@@ -1257,7 +1227,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   public afterTransactionCommit(event: TransactionCommitEvent): void {
-    // Releasing a savepoint inside the transaction is not its commit.
+    // Releasing a savepoint is not the outer commit.
     if (event.queryRunner.isTransactionActive) {
       return;
     }
@@ -1273,19 +1243,18 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * The Lidarr half of sendToLidarr. Lidarr is only ever told to monitor
-   * and search for what was asked: nothing is unmonitored, and an artist
-   * Lidarr already has keeps its folder, profiles and new-release setting,
-   * so one request never undoes another.
+   * The Lidarr half of sendToLidarr. Lidarr is only told to monitor and search
+   * for what was asked: nothing is unmonitored, and an existing artist keeps
+   * its folder, profiles and new-release setting, so one request never undoes
+   * another.
    *
-   * - An artist Lidarr does not have, for one album: the album is added
-   *   with the artist set up around it, nothing else of theirs monitored.
-   * - For several albums: the artist is added with exactly those albums to
-   *   monitor (Lidarr's albumsToMonitor, which leaves every other album
-   *   unmonitored, so it is only used for a new artist).
-   * - An artist Lidarr has: the albums it has are monitored, the ones it
-   *   lacks are added, the artist is monitored if it was not, and the
-   *   albums it had are searched for.
+   * - New artist, one album: add the album with the artist set up around it,
+   *   nothing else monitored.
+   * - New artist, several albums: add the artist with exactly those albums
+   *   monitored (albumsToMonitor unmonitors every other album, so it is only
+   *   used for new artists).
+   * - Existing artist: monitor the albums it has, add the missing ones, monitor
+   *   the artist if needed, and search the albums it had.
    */
   public async dispatchToLidarr(
     entity: MediaRequest,
@@ -1294,8 +1263,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     const lidarr = lidarrApi(lidarrSettings);
     const search = !lidarrSettings.preventSearch;
-    // Its albums, and the singles its songs come on, but for those done
-    // (retried, a request asks only for what it still lacks).
+    // Its albums and its songs' singles, minus those done (on retry, only
+    // what's still missing).
     const wanted = lidarrTargets(entity, OPEN_PARTS).map(
       (target) => target.mbId
     );
@@ -1369,8 +1338,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
             'Lidarr couldn’t look up this artist yet. Retry later.'
           );
         }
-        // Albums outside the metadata profile are not listed yet; music
-        // sync adds them once Lidarr has refreshed the artist.
+        // Albums outside the metadata profile aren't listed yet; music sync
+        // adds them after Lidarr refreshes the artist.
         artist = await lidarr.addArtist(found, {
           ...setup,
           addOptions: {
@@ -1458,8 +1427,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         mediaId: entity.media.id,
       });
     } catch (e) {
-      // Added meanwhile by the music sync, which also adds what requests
-      // ask for: sent again, it finds them there.
+      // Music sync added it meanwhile; resending finds it there.
       if (!again && addedMeanwhile(e)) {
         return this.dispatchToLidarr(entity, lidarrSettings, true);
       }
@@ -1472,17 +1440,17 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       await markUndispatchable(entity, reason);
       await this.failSongsThroughSingles(entity);
 
-      // Told by the notification reconciler, within minutes: a playlist's
-      // requests together once they settle, any other on its own. Told
-      // here, a playlist's would go one by one, as the playlist may not
-      // have noted the request as its own yet.
+      // No failure notification here: the notification reconciler sends it
+      // within minutes, batching a playlist's requests once they settle. From
+      // here a playlist's would go one by one, before the playlist may have
+      // claimed the request.
     }
   }
 
   /**
-   * A request Lidarr couldn't take: its songs that were to come through
-   * their singles won't, so they fail with it (and can be tried again).
-   * Songs taken from albums are fetched by Seerr AI, and carry on.
+   * Fails the songs that were to come via singles when Lidarr can't take a
+   * request (they can be retried). Songs taken from albums are fetched by Seerr
+   * AI and continue.
    */
   private async failSongsThroughSingles(
     entity: MediaRequest,
@@ -1502,9 +1470,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * The requester's tag ("12-alex") in Radarr, Sonarr or Lidarr, made if it
-   * is not there. Only a label to sort by: when it cannot be had, the
-   * request is sent without it rather than failed over it.
+   * The requester's tag ("12-alex") in Radarr, Sonarr or Lidarr, created if
+   * missing. Only a sorting label: if it can't be had, the request is sent
+   * without it rather than failed.
    */
   private async requesterTag(
     api: Pick<RadarrAPI, 'getTags' | 'createTag'>,
@@ -1515,7 +1483,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       entity.requestedBy.displayName
     )}`;
     try {
-      // Older tags had spaces around the hyphen; spaces are no longer allowed.
+      // Older tags had spaces around the hyphen, which are no longer allowed.
       const existing = (await api.getTags()).find(
         (tag) =>
           tag.label.startsWith(`${entity.requestedBy.id} - `) ||
@@ -1546,15 +1514,15 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * An approved or declined music request's albums: approved ones are on
-   * their way, declined ones go back to nobody having asked, unless another
-   * request still waits for them.
+   * Updates an approved or declined music request's albums: approved ones are
+   * on their way; declined ones revert to unrequested unless another request
+   * still wants them.
    */
   private async updateMusicAlbums(
     manager: EntityManager,
     entity: MediaRequest
   ): Promise<void> {
-    // Its songs follow it: on their way or declined with it.
+    // Its songs follow its status.
     const songs = (entity.songs ?? []).filter(
       (song) =>
         song.status !== MediaRequestStatus.COMPLETED &&
@@ -1574,13 +1542,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       songs.forEach((song) => (song.status = entity.status));
     }
 
-    // Approved again (retried): what of it is done or declined stays so.
+    // On re-approval (retry), done or declined albums keep their status.
     const albums = (entity.albums ?? []).filter(
       (album) =>
         entity.status !== MediaRequestStatus.APPROVED ||
         OPEN_PARTS.includes(album.status)
     );
-    // Its albums' rows, and those of its songs' singles.
+    // Its albums' rows plus its songs' singles.
     const mbIds = lidarrTargets(
       entity,
       entity.status === MediaRequestStatus.APPROVED ? OPEN_PARTS : undefined
@@ -1641,8 +1609,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * Albums another open request for the artist is waiting for: asked for,
-   * or the single a song of it comes on.
+   * Albums another open request for the artist still wants, directly or as a
+   * song's single.
    */
   private async albumsStillWanted(
     manager: EntityManager,
@@ -1702,14 +1670,14 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     const statusKey = entity.is4k ? 'status4k' : 'status';
     const seasonRequestRepository = manager.getRepository(SeasonRequest);
     const requestRepository = manager.getRepository(MediaRequest);
-    // Only taking it off the blocklist changes a blocklisted title's status:
-    // approving, declining or deleting a request for it leaves it there.
+    // Only unblocklisting changes a blocklisted title's status; request
+    // approvals, declines and deletes leave it.
     const blocklisted = media[statusKey] === MediaStatus.BLOCKLISTED;
 
     if (
       entity.status === MediaRequestStatus.APPROVED &&
       !blocklisted &&
-      // Do not update the status if the item is already partially available or available
+      // Don't downgrade partially available or available media.
       media[statusKey] !== MediaStatus.AVAILABLE &&
       media[statusKey] !== MediaStatus.PARTIALLY_AVAILABLE &&
       media[statusKey] !== MediaStatus.PROCESSING
@@ -1728,12 +1696,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       await mediaRepository.save(media);
     }
 
-    /**
-     * If the media type is TV, and we are declining a request,
-     * we must check if its the only pending request and that
-     * there the current media status is just pending (meaning no
-     * other requests have yet to be approved)
-     */
+    // Declining a TV request: only reset if it's the sole pending request and
+    // the media is just pending (nothing else approved yet).
     if (
       (media.mediaType === MediaType.TV ||
         media.mediaType === MediaType.MUSIC) &&
@@ -1750,7 +1714,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       });
 
       if (pendingCount === 0) {
-        // Re-fetch media without requests to avoid cascade issues
+        // Refetch without requests to avoid cascade issues on save.
         const freshMedia = await mediaRepository.findOne({
           where: { id: media.id },
         });
@@ -1761,7 +1725,6 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
     }
 
-    // Reset season statuses when a TV request is declined
     if (
       media.mediaType === MediaType.TV &&
       entity.status === MediaRequestStatus.DECLINED
@@ -1805,7 +1768,6 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
     }
 
-    // Approve child seasons if parent is approved
     if (
       media.mediaType === MediaType.TV &&
       entity.status === MediaRequestStatus.APPROVED
@@ -1846,7 +1808,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         request.status !== MediaRequestStatus.DECLINED
     );
 
-    // A blocklisted title stays blocklisted when its requests go.
+    // A blocklisted title stays blocklisted when its requests are removed.
     const needsStatusUpdate =
       !hasActive &&
       fullMedia.status !== MediaStatus.AVAILABLE &&
@@ -1860,7 +1822,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       fullMedia.status4k !== MediaStatus.BLOCKLISTED;
 
     if (needsStatusUpdate || needs4kStatusUpdate) {
-      // Re-fetch WITHOUT requests to avoid cascade issues on save
+      // Refetch without requests to avoid cascade issues on save.
       const cleanMedia = await manager.findOneOrFail(Media, {
         where: { id: entity.media.id },
       });
@@ -1886,7 +1848,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       await manager.save(cleanMedia);
     }
 
-    // Reset stale seasons or re-requests fail ("No seasons available to request")
+    // Reset stale seasons, or re-requests fail with "No seasons available to
+    // request".
     if (fullMedia.mediaType === MediaType.TV) {
       const statusKey = entity.is4k ? 'status4k' : 'status';
       const removedSeasonNumbers = new Set(
@@ -1920,8 +1883,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
     }
 
-    // Albums only this request was waiting for go back to nobody having
-    // asked, so they can be requested again. Lidarr is left as it is.
+    // Albums only this request wanted revert to unrequested so they can be
+    // requested again. Lidarr is left untouched.
     if (fullMedia.mediaType === MediaType.MUSIC) {
       const removed = lidarrTargets(entity).map((target) => target.mbId);
       const stillWanted = new Set(
@@ -1950,8 +1913,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   }
 
   /**
-   * A request's part of its title's history: that it was asked for, and each
-   * change of status. Written through the save's own connection.
+   * Records a request's history on its title: the request and each status
+   * change. Written through the save's own connection.
    */
   private async recordRequestHistory(
     request: MediaRequest,
@@ -1969,7 +1932,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       )?.media as Media;
     }
 
-    // Films and series by their TMDB id; music by the artist's own.
+    // Films and series by TMDB id; music by the artist's id.
     if (!media?.tmdbId && !media?.foreignId) {
       return;
     }
@@ -2049,9 +2012,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           type,
           userId:
             type === MediaEventType.FAILED ? null : request.modifiedBy?.id,
-          // Why it was declined, when whoever declined it said; where a
-          // retry sent it, when it went to another server. Only on the
-          // approval: sending it on can fail within the same save.
+          // The decline reason when given, or the retry's new server. Only on
+          // approval, since sending on can still fail within the same save.
           detail:
             type === MediaEventType.DECLINED
               ? request.declineReason || undefined
@@ -2078,11 +2040,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.manager
     );
 
-    // Sending on and the title's status follow a change of status. A save
-    // that changed something else must not send an approved request to
-    // Radarr or Sonarr again (a fresh search), or reset its title. A plain
-    // update() of a few columns arrives with only those columns and nothing
-    // to compare against, and is not a request to act on either.
+    // Dispatch and media status follow only a status change. Other saves must
+    // not resend an approved request (a fresh search) or reset its title. A
+    // plain update() carries only its columns and nothing to compare against,
+    // so it's ignored too.
     const statusChanged =
       previousStatus !== undefined && previousStatus !== event.entity.status;
 
@@ -2107,8 +2068,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         });
       }
 
-      // A plain update() of the status arrives without the request's
-      // media: whatever made it says so itself (music's completion does).
+      // A plain update() of the status has no media loaded; its caller handles
+      // the follow-up (music completion does).
       if (event.entity.status === MediaRequestStatus.COMPLETED) {
         if (event.entity.media?.mediaType === MediaType.MOVIE) {
           await this.notifyAvailableMovie(event.entity as MediaRequest, event);
@@ -2176,15 +2137,15 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       return;
     }
 
-    // Through the removal's own connection: a request created and removed in
-    // one transaction is invisible to the global one on Postgres, and its
-    // Sonarr clean-up would be skipped.
+    // Use the removal's connection: on Postgres a request created and removed
+    // in one transaction is invisible to the global one, and its Sonarr
+    // clean-up would be skipped.
     const seasons = await event.manager.getRepository(SeasonRequest).find({
       where: { request: { id: entity.id } },
     });
 
-    // databaseEntity is a bare row with no relations loaded, so the media id
-    // has to be resolved explicitly rather than read off the relation.
+    // databaseEntity has no relations loaded, so resolve the media id
+    // explicitly.
     let mediaId: number | undefined = entity.media?.id;
 
     if (mediaId === undefined) {
@@ -2218,8 +2179,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.entity as MediaRequest
     );
 
-    // TypeORM clears the primary key on the removed entity, so the id has to
-    // come from the database copy captured before the delete.
+    // TypeORM clears the removed entity's primary key, so take the id from the
+    // database copy.
     const removedId =
       (event.databaseEntity as MediaRequest | undefined)?.id ??
       (event.entity as MediaRequest).id;

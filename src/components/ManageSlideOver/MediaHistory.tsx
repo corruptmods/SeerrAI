@@ -56,8 +56,7 @@ interface HistoryEvent {
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-// Class names written out in full: assembled ones are stripped from the
-// production stylesheet.
+// Full class names: Tailwind purges assembled ones.
 const ICONS: Record<string, { icon: Icon; className: string }> = {
   requested: {
     icon: ArrowDownTrayIcon,
@@ -106,16 +105,14 @@ const ICONS: Record<string, { icon: Icon; className: string }> = {
 
 const SHOWN_AT_FIRST = 10;
 
-/** A film or series by its TMDB id, or an artist by their MusicBrainz id. */
+/** TMDB id for films and series, MusicBrainz id for artists. */
 type MediaHistoryProps =
   | { tmdbId: number; mediaType: 'movie' | 'tv' }
   | { artistId: string };
 
 /**
- * What has happened to a title, newest first: requests and their approval,
- * processing and availability, removals, blocklisting and keeps, with who
- * did it. Keyed by the title, so it survives Seerr deleting the media row.
- * For an artist, each album arriving or leaving names the album.
+ * A title's event history, newest first, with who did each. Keyed by the
+ * title so it survives deletion of the media row. Artist events name the album.
  */
 const MediaHistory = (props: MediaHistoryProps) => {
   const intl = useIntl();

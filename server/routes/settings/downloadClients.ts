@@ -8,12 +8,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Download clients Seerr reads directly, managed like Maintainerr: a list,
- * added and edited through a dialog, each tested before it is saved.
+ * Download clients Seerr reads directly, managed like Maintainerr; each is
+ * tested before saving.
  *
- * API keys and passwords are never sent back.
- * Each client says only whether one is saved, and a blank one on saving or
- * testing means "keep the saved one".
+ * API keys and passwords are never sent back, only whether one is saved; a
+ * blank one keeps the saved one.
  */
 const downloadClientRoutes = Router();
 
@@ -36,7 +35,7 @@ const clientBody = z.object({
 
 type ClientBody = z.infer<typeof clientBody>;
 
-/** What the settings page is shown: no key or password, only that one is set. */
+/** Client as shown to the page: no key or password, only whether one is set. */
 const shown = (client: DownloadClientSettings) => ({
   ...client,
   apiKey: '',
@@ -45,12 +44,12 @@ const shown = (client: DownloadClientSettings) => ({
   hasPassword: !!client.password,
 });
 
-/** Every client but SABnzbd, which uses an API key. */
+/** Whether the client signs in: all but SABnzbd, which uses an API key. */
 const signsIn = (type: DownloadClientSettings['type']) => type !== 'sabnzbd';
 
 /**
- * The client as it will be saved, keeping a saved secret left blank, but only
- * for the same kind of client at the same address.
+ * The client to save. A blank secret keeps the saved one, only for the same
+ * client type at the same address.
  */
 const withSecrets = (
   body: ClientBody,
@@ -85,8 +84,8 @@ const connectionFailed = (client: DownloadClientSettings, e: unknown) => {
     client: client.name,
     errorMessage: message,
   });
-  // The client's own words when they say what is wrong (a wrong key or
-  // password); otherwise that it couldn't be reached.
+  // Use the client's message when it explains the failure (wrong key or
+  // password); otherwise report it unreachable.
   return {
     status: 400,
     message:
@@ -139,8 +138,8 @@ downloadClientRoutes.post('/', async (req, res, next) => {
     return next(connectionFailed(client, e));
   }
 
-  // Never a removed client's id: Backfill's downloads keep the id of the
-  // client they were sent to.
+  // Never reuse a removed client's id: Backfill's downloads keep the id of
+  // their client.
   client.id = settings.newId('downloadClients');
   settings.downloadClients = [...settings.downloadClients, client];
   await settings.save();
@@ -187,8 +186,8 @@ downloadClientRoutes.delete<{ id: string }>('/:id', async (req, res, next) => {
   settings.downloadClients = settings.downloadClients.filter(
     (c) => c !== saved
   );
-  // Backfill stops sending packs to it, rather than keeping a choice its
-  // settings page can no longer show or save.
+  // Stop Backfill sending packs to it, rather than keep a choice its settings
+  // page can't show or save.
   const backfill = settings.backfill;
   if (
     backfill.torrentClientId === saved.id ||

@@ -71,26 +71,25 @@ export class DuplicateMediaRequestError extends Error {}
 export class NoSeasonsAvailableError extends Error {}
 export class BlocklistedMediaError extends Error {}
 /**
- * Every album or song asked for is already here or already asked for (a
- * song also when an album it is on is).
+ * Every album or song asked for is already here or requested (a song also when
+ * an album containing it is).
  */
 export class NoAlbumsAvailableError extends Error {}
-/** A music request that cannot be made as asked: no albums, too many. */
+/** A music request that can't be made as asked (no albums, too many). */
 export class InvalidMusicRequestError extends Error {}
 
-/** How a music request is made, beyond what was asked for. */
+/** Music request options beyond what was asked for. */
 export interface MusicRequestOptions {
   /**
-   * Waits for an admin, whatever the requester may do on their own, and
-   * so isn't counted against their limit: a big playlist import.
+   * Always waits for an admin and isn't counted against the requester's quota
+   * (e.g. a big playlist import).
    */
   needsApproval?: boolean;
 }
 
-/** The most songs one request may ask for. */
 export const MAX_SONGS_PER_REQUEST = 50;
 
-/** Why the songs asked for are not requested: each is here or coming. */
+/** Why the songs asked for aren't requested: each is here or coming. */
 const coveredMessage = (
   versions: SongVersion[],
   covered: Map<string, SongCovered>
@@ -111,17 +110,16 @@ const coveredMessage = (
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
   /**
-   * A series someone chose to follow, asking for a season that has just
-   * started. Their earlier automatic request for other seasons must not stop
-   * it: the guard below is for automatic requests repeating themselves.
+   * A new season of a followed series. Skips the guard against automatic
+   * requests repeating, so an earlier auto-request for other seasons doesn't
+   * block it.
    */
   newSeasonOfFollowedSeries?: boolean;
 };
 
 /**
- * On an approval, roughly when the request should arrive — "Digital release
- * expected Nov 3" — as an Expected field. Nothing for other notifications, or
- * when the title is already out.
+ * On approval, an Expected field with the estimated arrival ("Digital release
+ * expected Nov 3"). Nothing for other notifications or titles already out.
  */
 const approvalExtra = (
   type: Notification,
@@ -138,15 +136,15 @@ const approvalExtra = (
   return expected ? [{ name: 'Expected', value: expected }] : [];
 };
 
-/** A song as a notification names it: "Song (radio edit)". */
+/** A song as notifications name it: "Song (radio edit)". */
 const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
   song.version ? `${song.title} (${song.version})` : song.title;
 
 /**
- * What a music notification says, from what Seerr kept when the albums and
- * songs were asked for, so nothing waits on MusicBrainz: "Album — Artist
- * (2003)" for one album, "Song — Artist" for one song, "Artist — 3 albums,
- * 2 songs" for more, with their titles and the first one's cover.
+ * A music notification built from what was stored at request time, so nothing
+ * waits on MusicBrainz: "Album — Artist (2003)" for one album, "Song — Artist"
+ * for one song, "Artist — 3 albums, 2 songs" for more, with titles and the
+ * first cover.
  */
 const musicNotification = async (
   request: MediaRequest,
@@ -160,8 +158,8 @@ const musicNotification = async (
 }> => {
   let asked = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
   let songs = [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
-  // A failure names what failed: one song that couldn't be got fails its
-  // request, while the others in it still come.
+  // Name what failed: one unobtainable song fails its request while the others
+  // still come.
   if (type === Notification.MEDIA_FAILED) {
     const failed = (item: { status: MediaRequestStatus }) =>
       item.status === MediaRequestStatus.FAILED;
@@ -210,19 +208,16 @@ const musicNotification = async (
 };
 
 /**
- * Each request's status as last read from or written to the database, so the
- * approval hook can tell a save that changed it from one that only touched
- * another column. Kept beside the entity rather than on it, so it is never
- * sent anywhere with the request.
+ * Each request's status as last read or written, so the approval hook can tell
+ * a status change from a save that touched another column. Kept off the entity
+ * so it's never serialized.
  */
 const savedStatus = new WeakMap<MediaRequest, MediaRequestStatus>();
 
 /**
- * A new request as it stands once saved. Saving it approves it, sends it
- * on and marks its title requested, each on its own copy, so the object
- * that was saved still says what it was beforehand: a request approved at
- * once would still say pending, and its title not yet requested. Read
- * back, unless saving it removed it.
+ * The request as saved. Approval, dispatch and marking the title requested each
+ * work on their own copy, so the saved object is stale (an auto-approved one
+ * still says pending). Reread unless the save removed it.
  */
 const asSaved = async (request: MediaRequest): Promise<MediaRequest> =>
   (await getRepository(MediaRequest).findOneBy({ id: request.id })) ?? request;
@@ -234,18 +229,19 @@ export class MediaRequest {
     user: User,
     options: MediaRequestOptions = {}
   ): Promise<MediaRequest> {
-    // is4k is optional, and an undefined one binds as null in the duplicate query
+    // is4k is optional, and undefined binds as null in the duplicate query.
     const body = { ...requestBody, is4k: !!requestBody.is4k };
 
-    // Only a caller allowed to set the request user may queue on their lock
+    // Only callers allowed to set the request user may queue on that user's
+    // lock.
     const lockUserId =
       body.userId &&
       user.hasPermission([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS])
         ? body.userId
         : user.id;
 
-    // No is4k in the key: one media row holds both statuses, so a 4k and a
-    // non-4k request for the same title race to create it
+    // No is4k in the key: one media row holds both statuses, so 4K and non-4K
+    // requests for a title race to create it.
     return requestLock.dispatch(userKey(lockUserId), () =>
       mediaLock.dispatch(mediaKey(body.mediaType, body.mediaId), () =>
         MediaRequest.createRequest(body, user, options)
@@ -254,9 +250,8 @@ export class MediaRequest {
   }
 
   /**
-   * Albums of one artist, as one request: one album, several, or a whole
-   * discography, and songs of theirs, one version each. Sent to Lidarr once
-   * approved.
+   * Requests albums of one artist (one, several or a whole discography) and
+   * their songs, one version each. Sent to Lidarr once approved.
    */
   public static async requestMusic(
     requestBody: MusicRequestBody,
@@ -301,8 +296,8 @@ export class MediaRequest {
       });
     }
 
-    // Request covers music as it covers films and series; Request Music is
-    // for someone who should only ask for music.
+    // Request covers music like films and series; Request Music is for
+    // music-only requesters.
     if (
       !requestUser.hasPermission(
         [Permission.REQUEST, Permission.REQUEST_MUSIC],
@@ -351,10 +346,11 @@ export class MediaRequest {
     }
 
     const quotas = await requestUser.getQuota();
-    // Songs count against a limit of their own when they have one.
+    // Songs use their own quota when one is set.
     const songQuota = quotas.song ?? quotas.music;
     const canBypassQuota = user.hasPermission(Permission.MANAGE_REQUESTS);
-    // One an admin must approve is not counted: their approval is the check.
+    // Requests needing admin approval aren't counted: the approval is the
+    // check.
     const ignoreQuota =
       needsApproval ||
       (requestBody.ignoreQuota === true &&
@@ -374,7 +370,7 @@ export class MediaRequest {
       }
     }
 
-    // Loaded on its own: the artist is changed with update(), never saved
+    // Loaded without requests: the artist is changed with update(), never saved
     // with its requests attached.
     const media = await mediaRepository.findOne({
       where: { mediaType: MediaType.MUSIC, foreignId: artistMbid },
@@ -388,9 +384,9 @@ export class MediaRequest {
       ? await albumRepository.find({ where: { mediaId: media.id } })
       : [];
 
-    // Albums someone else is already waiting for, and albums already here
-    // or on their way, are left out; the rest are requested. One only partly
-    // here (songs taken from it) can be asked for whole.
+    // Skip albums already requested by someone else, here or on their way;
+    // request the rest. An album only partly here (songs taken from it) can be
+    // requested whole.
     const openRequests = media
       ? await requestRepository.find({
           where: {
@@ -423,8 +419,8 @@ export class MediaRequest {
       );
     }
 
-    // Songs already asked for, or on an album here or on its way (this
-    // request's own albums too), are left out the same way.
+    // Likewise skip songs already requested or on an album here or coming
+    // (including this request's albums).
     const versions = await resolveRequestSongs(artistMbid, askedSongs);
     const covered = await songsCovered(versions);
     const songs = versions.filter(
@@ -440,9 +436,9 @@ export class MediaRequest {
           : coveredMessage(versions, covered)
       );
     }
-    // A song is fetched through a single or EP that has it, or, where
-    // Settings → Music allows and Backfill is set up, taken from one of the
-    // artist's albums.
+    // A song is fetched via a single or EP containing it, or, when Settings →
+    // Music allows and Backfill is set up, taken from one of the artist's
+    // albums.
     const fromAlbums = !songFetchProblem();
     const unfetchable = songs.find(
       (song) => !singleFor(song) && !(fromAlbums && albumFor(song))
@@ -513,7 +509,7 @@ export class MediaRequest {
       );
     }
 
-    // Each album asked for has a row on the artist, waiting like a season.
+    // Each requested album gets a row on the artist, pending like a season.
     for (const album of albums) {
       const row = knownAlbums.find((known) => known.mbId === album.mbId);
       if (row) {
@@ -540,7 +536,7 @@ export class MediaRequest {
       }
     }
 
-    // And each single a song is fetched through, waiting the same way.
+    // Likewise each single a song is fetched through.
     const singles = new Map(
       songs
         .map((song) => singleFor(song))
@@ -741,18 +737,11 @@ export class MediaRequest {
     });
 
     if (!media) {
-      /*
-       * tvdbId is unique across the whole media table, but media is looked up
-       * by tmdbId — so a TVDB id that already belongs to another title makes
-       * the insert fail and loses the request entirely. It happens when Plex
-       * maps two TMDB entries onto one TVDB id, typically a remake and its
-       * original.
-       *
-       * The id is only used to find the series in Sonarr, so dropping it is
-       * far better than dropping the request: the title still gets created
-       * and requested, and the warning names the collision so it can be
-       * sorted out.
-       */
+      // tvdbId is unique across media, but media is looked up by tmdbId, so a
+      // TVDB id already on another title (Plex mapping two TMDB entries,
+      // typically a remake and its original, to one TVDB id) fails the insert
+      // and loses the request. The id is only used to find the series in
+      // Sonarr, so drop it and warn about the collision instead.
       let tvdbId = requestBody.tvdbId ?? tmdbMedia.external_ids.tvdb_id;
 
       if (tvdbId) {
@@ -783,7 +772,7 @@ export class MediaRequest {
         mediaType: requestBody.mediaType,
       });
     } else {
-      // Blocklisting sets both, but either one is enough to refuse.
+      // Blocklisting sets both, but either is enough to refuse.
       if (
         media.status === MediaStatus.BLOCKLISTED ||
         media.status4k === MediaStatus.BLOCKLISTED
@@ -797,8 +786,8 @@ export class MediaRequest {
         throw new BlocklistedMediaError('This media is blocklisted.');
       }
 
-      // An automatic request for a film already here would only be marked
-      // complete at once, telling the user it is available all over again.
+      // An auto-request for a film already here would be completed at once,
+      // re-notifying the user it's available.
       if (
         options.isAutoRequest &&
         requestBody.mediaType === MediaType.MOVIE &&
@@ -839,10 +828,8 @@ export class MediaRequest {
       .getMany();
 
     if (existing && existing.length > 0) {
-      // If any existing movie request is still open (not declined or
-      // completed), don't allow a new one. Every one is checked: they come
-      // back in no particular order, and an old declined one listed first
-      // used to let a duplicate through.
+      // Refuse a new movie request while any existing one is open (not declined
+      // or completed). Check all of them: they come back unordered.
       if (
         requestBody.mediaType === MediaType.MOVIE &&
         existing.some(
@@ -863,8 +850,7 @@ export class MediaRequest {
         );
       }
 
-      // If an existing auto-request for this media exists from the same user,
-      // don't allow a new one.
+      // Refuse a repeat auto-request from the same user.
       const statusKey = requestBody.is4k ? 'status4k' : 'status';
       if (
         !options.newSeasonOfFollowedSeries &&
@@ -885,14 +871,14 @@ export class MediaRequest {
     let profileId = requestBody.profileId;
     let tags = requestBody.tags;
 
-    // Anime or not as the requester ticked it, which stands over the
-    // title's own setting, rules and detection.
+    // The requester's anime choice overrides the title's setting, rules and
+    // detection.
     const chosenSeriesType =
       requestBody.seriesType == null
         ? null
         : toSeriesTypeFor(requestBody.mediaType, requestBody.seriesType);
-    // Rules belong to a server, so they are matched against the one the
-    // request goes to: the server chosen with it, or else the default one.
+    // Rules belong to a server, so match against the target: the chosen server,
+    // else the default.
     const chosenServerId = chosenServerFor(
       {
         type: requestBody.mediaType,
@@ -916,7 +902,7 @@ export class MediaRequest {
       [Permission.MANAGE_REQUESTS, Permission.REQUEST_ADVANCED],
       { type: 'or' }
     );
-    // Advanced users pick these in the modal, so we don't want to override them if they are set
+    // Advanced users pick these in the modal, so don't override them.
     const overrideRulesResult = isAdvanced
       ? {
           rootFolder: rootFolder ? null : ruleResult.rootFolder,
@@ -933,10 +919,9 @@ export class MediaRequest {
     if (overrideRulesResult.tags) {
       tags = overrideRulesResult.tags;
     }
-    // The requester's choice, or else a matching rule's series type unless
-    // it disagrees with the title's own setting, which then decides when the
-    // request is sent (lib/animeDecision). For a movie, only 'anime' or
-    // 'standard'.
+    // The requester's choice, else a matching rule's series type unless it
+    // disagrees with the title's setting, which then decides at send time
+    // (lib/animeDecision). Movies only use 'anime' or 'standard'.
     const ruleSeriesType =
       ruleResult.seriesType &&
       (media.animeSetting == null ||
@@ -963,7 +948,7 @@ export class MediaRequest {
         type: MediaType.MOVIE,
         media,
         requestedBy: requestUser,
-        // If the user is an admin or has the "auto approve" permission, automatically approve the request
+        // Auto-approve for admins and users with an auto-approve permission.
         status: user.hasPermission(
           [
             requestBody.is4k
@@ -1023,9 +1008,8 @@ export class MediaRequest {
 
       let existingSeasons: number[] = [];
 
-      // We need to check existing requests on this title to make sure we don't double up on seasons that were
-      // already requested. In the case they were, we just throw out any duplicates but still approve the request.
-      // (Unless there are no seasons, in which case we abort)
+      // Drop seasons already requested but still approve the rest; abort if
+      // none remain.
       if (media.requests) {
         existingSeasons = media.requests
           .filter(
@@ -1043,7 +1027,7 @@ export class MediaRequest {
           }, [] as number[]);
       }
 
-      // We should also check seasons that are available/partially available but don't have existing requests
+      // Also exclude available or partially available seasons without requests.
       if (media.seasons) {
         existingSeasons = [
           ...existingSeasons,
@@ -1079,7 +1063,7 @@ export class MediaRequest {
         type: MediaType.TV,
         media,
         requestedBy: requestUser,
-        // If the user is an admin or has the "auto approve" permission, automatically approve the request
+        // Auto-approve for admins and users with an auto-approve permission.
         status: user.hasPermission(
           [
             requestBody.is4k
@@ -1162,17 +1146,15 @@ export class MediaRequest {
   public media: Media;
 
   /**
-   * Set when the requester turns off notifications for their own request.
-   * Muting is separate from the request itself, so the request stands until
-   * it is deliberately deleted.
+   * Set when the requester mutes notifications for their own request. Muting
+   * never deletes the request.
    */
   @Column({ default: false })
   public requesterMuted: boolean;
 
   /**
-   * Why it was declined, in the words of whoever declined it, if they gave
-   * a reason. Shown to the requester and to admins, and sent in the
-   * declined notification. Plain text, never markup.
+   * The decliner's reason, if given. Shown to the requester and admins and sent
+   * in the declined notification. Plain text, never markup.
    */
   @Column({ type: 'varchar', nullable: true })
   public declineReason?: string | null;
@@ -1205,9 +1187,8 @@ export class MediaRequest {
   public type: MediaType;
 
   /**
-   * Season count, populated by whichever query needs it rather than by
-   * TypeORM's @RelationCount. That decorator ran a parallel batch of count
-   * queries on one connection, which pg deprecates.
+   * Season count, filled by queries that need it. Not @RelationCount: that runs
+   * parallel count queries on one connection, which pg deprecates.
    */
   public seasonCount?: number;
 
@@ -1217,14 +1198,14 @@ export class MediaRequest {
   })
   public seasons: SeasonRequest[];
 
-  /** For music: the albums asked for. */
+  /** Music: the requested albums. */
   @OneToMany(() => AlbumRequest, (album) => album.request, {
     eager: true,
     cascade: true,
   })
   public albums: AlbumRequest[];
 
-  /** For music: the songs asked for, each one version of a song. */
+  /** Music: the requested songs, one version each. */
   @OneToMany(() => SongRequest, (song) => song.request, {
     eager: true,
     cascade: true,
@@ -1246,15 +1227,14 @@ export class MediaRequest {
   @Column({ nullable: true })
   public languageProfileId: number;
 
-  /** For music: the Lidarr metadata profile chosen for the artist. */
+  /** Music: the Lidarr metadata profile chosen for the artist. */
   @Column({ type: 'int', nullable: true })
   public metadataProfileId?: number | null;
 
   /**
-   * Anime or not for this request, as its requester ticked it or as an
-   * override rule set it (a rule's may be any Sonarr series type); for a
-   * movie, only 'anime' or 'standard'. Null leaves it to the title's own
-   * setting (Media.animeSetting) and then anime detection (lib/animeDecision).
+   * Anime or not, as the requester chose or an override rule set (a rule's may
+   * be any Sonarr series type); movies only use 'anime' or 'standard'. Null
+   * defers to Media.animeSetting, then anime detection (lib/animeDecision).
    */
   @Column({ type: 'varchar', nullable: true })
   public seriesType?: SeriesType | null;
@@ -1276,8 +1256,7 @@ export class MediaRequest {
         if (value) {
           const finalValue = value.join(',');
 
-          // We want to keep the actual state of an "empty array" so we use
-          // the keyword "none" to track this.
+          // Store "none" to preserve an explicitly empty array.
           if (!finalValue) {
             return 'none';
           }
@@ -1297,15 +1276,15 @@ export class MediaRequest {
   public ignoreQuota: boolean;
 
   /**
-   * Why a request still to be sent (pending or failed) has no server to go
-   * to: its Radarr, Sonarr or Lidarr server was removed, or there is none.
-   * Worked out from the settings whenever it is loaded; never stored.
+   * Why a pending or failed request has no server to go to (its Radarr, Sonarr
+   * or Lidarr server was removed, or none exists). Computed from settings on
+   * load; never stored.
    */
   public serverIssue?: RequestServerIssue;
 
   /**
-   * A line for the title's history to go with the change of status this
-   * save makes (where Retry sent it, say). Never stored.
+   * History line for this save's status change (e.g. where Retry sent it).
+   * Never stored.
    */
   public historyNote?: string;
 
@@ -1342,23 +1321,21 @@ export class MediaRequest {
   }
 
   /**
-   * Notification for approval
+   * Sends the approved or declined notification.
    *
-   * We only check on AfterUpdate as to not trigger this for
-   * auto approved content
+   * Only on AfterUpdate, so auto-approved requests don't trigger it here.
    */
   @AfterUpdate()
   public async notifyApprovedOrDeclined(autoApproved = false): Promise<void> {
-    // Read once: sending the request on can mark it complete while the media
-    // is looked up below, and a request no longer approved must not then be
-    // reported as declined.
+    // Read once: dispatch can complete the request during the media lookup
+    // below, and a no-longer-approved request must not then be reported as
+    // declined.
     const status = this.status;
     const before = savedStatus.get(this);
     savedStatus.set(this, status);
 
-    // A save that left the status as it was (a change to the request's
-    // options, say) is not a new approval or decline, and telling everyone
-    // again would be wrong.
+    // A save that didn't change the status (e.g. options only) is not a new
+    // approval or decline.
     if (!autoApproved && before !== undefined && before === status) {
       return;
     }
@@ -1380,8 +1357,8 @@ export class MediaRequest {
         return;
       }
 
-      // An artist counts as available for the albums it has, not for the
-      // new ones a request asks for.
+      // An artist is available for the albums it has, not the new ones
+      // requested.
       if (
         status === MediaRequestStatus.APPROVED &&
         this.type !== MediaType.MUSIC &&
@@ -1428,8 +1405,8 @@ export class MediaRequest {
     savedStatus.set(this, this.status);
 
     if (this.status === MediaRequestStatus.APPROVED) {
-      // Not waited for, so a failure here (the media lookup, say) is caught
-      // and logged: left unhandled, it would stop the whole server.
+      // Not awaited, so catch and log: an unhandled rejection would stop the
+      // server.
       this.notifyApprovedOrDeclined(true).catch((e) => {
         logger.error('Could not send the automatic approval notification', {
           label: 'Media Request',
@@ -1466,17 +1443,15 @@ export class MediaRequest {
     media: Media,
     type: Notification,
     /**
-     * Overrides the event line. An ongoing series that has only started
-     * arriving is not "now available", and saying so sends people looking for
-     * episodes that are not there yet. Plain text is shown as written in
-     * every channel; one from eventTitles is put in each channel's language.
+     * Overrides the event line, e.g. an ongoing series that has only started
+     * arriving is not "now available". Plain text is shown as written in every
+     * channel; an eventTitles event is localized per channel.
      */
     eventOverride?: string | NotificationEvent,
     extraFields?: { name: string; value: string }[],
     /**
-     * Someone watching this request, not its requester: the notification is
-     * sent to them alone, whether or not the requester muted it, and the
-     * channels and admins are not told again.
+     * A watcher (not the requester): notified alone, even if the requester
+     * muted it; channels and admins aren't notified again.
      */
     watcher?: User
   ): Promise<boolean> {
@@ -1593,9 +1568,8 @@ export class MediaRequest {
         label: 'Notifications',
         errorMessage: e.message,
         requestId: entity.id,
-        // Optional: a request can outlive its title. Reading through a
-        // missing one here threw from inside the error handler, turning a
-        // failed send into an error that aborted the whole reconcile pass.
+        // Optional: a request can outlive its title, and throwing here from the
+        // error handler aborted the whole reconcile pass.
         mediaId: entity.media?.id ?? media?.id,
       });
 

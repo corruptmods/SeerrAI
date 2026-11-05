@@ -17,11 +17,10 @@ import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 
 /*
- * "Future seasons only": someone wants a series from here on without the
- * seasons already out. Each subscribed series is checked on a schedule, and a
- * season is requested for that person, as an ordinary automatic request, once
- * it premieres. Approval, quotas, Sonarr, notifications and arrival estimates
- * then all work as they do for any request.
+ * "Future seasons only": follow a series without the seasons already out.
+ * Subscribed series are checked on a schedule, and each new season is
+ * requested for the follower as an ordinary automatic request once it
+ * premieres, so approval, quotas, Sonarr and notifications apply as usual.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -38,9 +37,8 @@ const airTime = (date: string | null | undefined) => {
 };
 
 /**
- * The first season that has not premiered yet: one past the latest season
- * with an air date already reached. A season still airing counts as out, so
- * it is not included; request it the usual way.
+ * The first unpremiered season: one past the latest aired one. A season
+ * still airing counts as out; request it the usual way.
  */
 export const firstFutureSeason = (
   show: Pick<TmdbTvDetails, 'seasons'>,
@@ -58,9 +56,8 @@ export const firstFutureSeason = (
 
 /**
  * Seasons from `fromSeason` on that premiere within a day. TMDB dates are the
- * network's local date, so a day's grace keeps a premiere from waiting a whole
- * extra check because of time zones; nothing downloads before an episode
- * airs anyway.
+ * network's local date, so a day's grace avoids a time-zone delay of a whole
+ * check; nothing downloads before an episode airs anyway.
  */
 export const dueSeasons = (
   show: Pick<TmdbTvDetails, 'seasons'>,
@@ -89,9 +86,8 @@ export const getSubscription = (userId: number, tmdbId: number) =>
   });
 
 /**
- * Who else gets new seasons of a series, and the next season due for any of
- * them. Following is shown on the series for everyone, since each new season
- * comes whoever asked for it.
+ * Other followers of a series and the earliest season due for any of them.
+ * Shown to everyone, since each new season arrives for all.
  */
 export const otherFollowers = async (
   userId: number,
@@ -112,7 +108,7 @@ export const otherFollowers = async (
   };
 };
 
-/** Start getting new seasons of a series. Returns the first one to come. */
+/** Follows a series' new seasons; returns the subscription. */
 export const subscribe = async (
   user: User,
   tmdbId: number
@@ -143,14 +139,17 @@ export const unsubscribe = async (userId: number, tmdbId: number) => {
   });
 };
 
-/** Stop new seasons of a series coming for anyone. */
+/** Removes every follower of a series. */
 export const unsubscribeEveryone = async (tmdbId: number) => {
   await getRepository(FutureSeasonSubscription).delete({ tmdbId });
 };
 
 type Outcome = 'requested' | 'already' | 'retry' | 'drop';
 
-/** Ask for the due seasons as this person; what that means for the subscription. */
+/**
+ * Requests the due seasons as the follower; returns what to do with the
+ * subscription.
+ */
 const requestSeasons = async (
   subscription: FutureSeasonSubscription,
   show: TmdbTvDetails,
@@ -170,18 +169,18 @@ const requestSeasons = async (
     );
     return 'requested';
   } catch (e) {
-    // Already requested or already here, by anyone: nothing left to do.
+    // Already requested or available.
     if (
       e instanceof DuplicateMediaRequestError ||
       e instanceof NoSeasonsAvailableError
     ) {
       return 'already';
     }
-    // Over quota for now: try again on a later check.
+    // Over quota: retry later.
     if (e instanceof QuotaRestrictedError) {
       return 'retry';
     }
-    // They can no longer request series, or it was blocklisted: stop.
+    // No longer allowed to request, or blocklisted.
     if (
       e instanceof RequestPermissionError ||
       e instanceof BlocklistedMediaError
@@ -243,7 +242,7 @@ class FutureSeasons {
         );
 
         for (const subscription of followers) {
-          // Turned off, for everyone or by this person: kept, but paused.
+          // Feature off (globally or for this user): paused, not removed.
           if (!featureEnabled('newSeasons', subscription.user)) {
             continue;
           }

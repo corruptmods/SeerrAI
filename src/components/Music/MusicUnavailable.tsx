@@ -12,9 +12,8 @@ const messages = defineMessages('components.Music.MusicUnavailable', {
 });
 
 /**
- * What a music page says when it cannot be shown. MusicBrainz answers one
- * request a second for the whole server, so "busy" is ordinary and worth a
- * retry; something that does not exist, or music being off, is a 404.
+ * A music page's error. MusicBrainz allows one request a second per server,
+ * so "busy" is common and offers a retry; missing, or music off, is a 404.
  */
 const MusicUnavailable = ({
   error,

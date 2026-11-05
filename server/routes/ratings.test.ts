@@ -13,8 +13,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * The combined ratings on a title page: Rotten Tomatoes and IMDb are asked
- * separately, and one of them being down must not hide the other.
+ * Combined ratings on a title page: Rotten Tomatoes and IMDb are queried
+ * separately, and one being down must not hide the other.
  */
 
 setupTestDb();
@@ -58,7 +58,7 @@ const imdb = {
   criticsScoreCount: 1000,
 };
 
-// Each source either answers, has nothing, or is down.
+// Each source answers, has nothing, or is down.
 let rtAnswer: () => Promise<typeof rt | null>;
 let imdbAnswer: () => Promise<typeof imdb | null>;
 const down = () => Promise.reject(new Error('503 Service Unavailable'));

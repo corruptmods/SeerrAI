@@ -18,9 +18,8 @@ const messages = defineMessages('components.Themes.SafeModeLink', {
 });
 
 /**
- * Where custom CSS is set: a way into safe mode (this page without custom
- * CSS or theme files), or out of it when it is on. A plain link, so the
- * page loads again from scratch.
+ * Toggles safe mode (no custom CSS or theme files). A plain link so the page
+ * fully reloads.
  */
 const SafeModeLink = () => {
   const intl = useIntl();

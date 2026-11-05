@@ -15,42 +15,40 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Roughly when a request should arrive, from what Radarr, Sonarr and this
- * server's own history already know. Always an estimate: release dates slip,
- * and a release can be out without being findable yet. So it says
- * "expected" and "usually", and when it cannot tell it says nothing rather
- * than guess.
+ * Rough arrival estimate for a request, from Radarr, Sonarr and this server's
+ * history. Always an estimate: release dates slip, and a release can be out
+ * before it is findable. So it says "expected" and "usually", and says
+ * nothing rather than guess.
  */
 
 export type RequestEta =
   | { stage: 'awaiting_approval' }
-  /** Not out yet: when it is due, and which kind of release that is. */
+  /** Not out yet: when it is due, and which kind of release. */
   | {
       stage: 'unreleased';
       date: string;
       kind: 'cinemas' | 'digital' | 'physical' | 'airs';
     }
   /**
-   * Being searched for; how long it usually takes here, if known. `released`
-   * is false when no release date is known, so it cannot be said to be out.
+   * Being searched for; the usual time here, if known. `released` is false
+   * when no release date is known, so it can't be called out.
    */
   | {
       stage: 'searching';
       typicalDays?: number;
       released?: boolean;
-      /** Which release has happened, so the wording can name it. */
+      /** Which release has happened, for the wording. */
       releasedAs?: 'digital' | 'physical' | 'cinemas' | 'aired';
     }
   | {
       stage: 'downloading';
       minutesLeft?: number;
       /**
-       * Why there is no time left to give: nothing is downloading because it
-       * is stalled, a torrent is getting its details, it is waiting its turn
-       * in the download client, it is paused there, or it is held by a delay
-       * profile; or everything is in, and the furthest-behind part is held
-       * up (an admin is needed), failed and being looked for again,
-       * finishing in the client, or being imported.
+       * Why there is no time left to show: nothing is downloading because it is
+       * stalled, a torrent is fetching metadata, it is queued or paused in the
+       * client, or held by a delay profile; or everything is in and the
+       * furthest-behind part is blocked (needs an admin), failed and
+       * re-searching, finishing in the client, or importing.
        */
       phase?:
         | 'waiting'
@@ -69,11 +67,11 @@ export type RequestEta =
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOOKUP_TTL_MS = 10 * 60 * 1000;
 const TYPICAL_TTL_MS = 60 * 60 * 1000;
-/** Fewer finished requests than this and "usually" would be a guess. */
+/** Below this many finished requests, "usually" would be a guess. */
 const MIN_SAMPLES = 5;
 /**
- * Waits longer than this after approval were almost always for a release
- * date, not the search; left out of "how long it usually takes".
+ * Waits after approval longer than this were almost always for a release
+ * date, not the search; excluded from "usually takes".
  */
 const SEARCH_WINDOW_DAYS = 14;
 
@@ -93,10 +91,10 @@ interface TmdbReleaseResults {
 }
 
 /**
- * A region's cinema, digital and physical release dates, by the title page's
- * own rule: the viewer's discover region, else the server's, else the US;
- * the first date of each of TMDB's types 3, 4 and 5. Using the same dates
- * means an estimate never disagrees with the release dates on the page.
+ * A region's cinema, digital and physical release dates by the title page's
+ * rule: viewer's discover region, else the server's, else US; first date of
+ * each of TMDB types 3, 4 and 5. Same dates, so the estimate never disagrees
+ * with the page.
  */
 export const regionReleases = (
   releaseDates: TmdbReleaseResults | undefined,
@@ -138,9 +136,9 @@ const lookups = new Map<string, { at: number; value: Promise<unknown> }>();
 let lastSweep = 0;
 
 /**
- * Drops expired lookups. An entry was otherwise only replaced when the same
- * title was asked about again, so every title ever estimated stayed in memory
- * for the life of the server — for a series, Sonarr's whole episode list.
+ * Drops expired lookups. Otherwise entries were replaced only on a repeat
+ * lookup, so every title ever estimated (for a series, Sonarr's whole episode
+ * list) stayed in memory for the server's lifetime.
  */
 const sweepLookups = () => {
   const now = Date.now();
@@ -162,7 +160,7 @@ const cached = <T>(key: string, load: () => Promise<T>): Promise<T> => {
     return hit.value as Promise<T>;
   }
   const value = load().catch((e) => {
-    // A failed lookup is not cached: the next ask tries again.
+    // Failed lookups aren't cached, so the next call retries.
     lookups.delete(key);
     throw e;
   });
@@ -195,10 +193,9 @@ const sonarrEpisodes = (serverId: number, seriesId: number) =>
 let typicalCache: { at: number; value: Map<MediaType, number> } | null = null;
 
 /**
- * For each kind of title, the number of days within which most requests
- * arrived after being approved — the 80th percentile, from this server's
- * history. Only waits of up to two weeks count, which leaves out ones that
- * were waiting for a release date.
+ * Per media type, the 80th-percentile days from approval to arrival on this
+ * server. Only waits up to two weeks count, which excludes those waiting on a
+ * release date.
  */
 export const typicalDays = async (): Promise<Map<MediaType, number>> => {
   if (typicalCache && Date.now() - typicalCache.at < TYPICAL_TTL_MS) {
@@ -254,7 +251,7 @@ type RequestEtaKind = 'cinemas' | 'digital' | 'physical';
 
 export const estimateRequest = async (
   request: MediaRequest,
-  /** The viewer's discover region, for the release dates the page shows. */
+  /** The viewer's discover region, matching the page's release dates. */
   region: string = defaultRegion()
 ): Promise<RequestEta> => {
   const media = request.media;
@@ -263,8 +260,8 @@ export const estimateRequest = async (
   if (request.status === MediaRequestStatus.PENDING) {
     return { stage: 'awaiting_approval' };
   }
-  // Music has no release dates or Radarr and Sonarr history to go by; an
-  // artist being here says nothing about the albums a request asked for.
+  // Music has no release dates or *arr history to use; the artist being here
+  // says nothing about the requested albums.
   if (request.type === MediaType.MUSIC) {
     return {
       stage:
@@ -290,19 +287,19 @@ export const estimateRequest = async (
 };
 
 /**
- * Roughly when a title should arrive, from its own state: what the request
- * part hands over once a request is approved, and — for a title being
- * processed with no request, as when it was added in Radarr or Sonarr
- * directly — the whole estimate. Without seasons, a whole series counts.
+ * Rough arrival for a title from its own state: what the request part hands
+ * over once approved, and the whole estimate for a title processing with no
+ * request (added in Radarr or Sonarr directly). Without seasons, the whole
+ * series counts.
  */
 export const estimateTitle = async (
   media: Media,
   is4k: boolean,
   region: string = defaultRegion(),
   scope: {
-    /** The seasons, and episodes, a request asked for; all when absent. */
+    /** Requested seasons and episodes; all when absent. */
     seasons?: MediaRequest['seasons'];
-    /** For log lines only. */
+    /** Only for log lines. */
     requestId?: number;
   } = {}
 ): Promise<RequestEta> => {
@@ -312,9 +309,9 @@ export const estimateTitle = async (
 
   const downloading = media[is4k ? 'downloadStatus4k' : 'downloadStatus'] ?? [];
   if (downloading.length) {
-    // Anything still to arrive decides it: the request isn't here until the
-    // last part is. Only once every part is in does the phase after it show.
-    // A copy saved before stages were sent counts as downloading.
+    // Anything still arriving decides it: the request isn't here until its last
+    // part is. Only once every part is in does the next phase show. A copy
+    // saved before stages were sent counts as downloading.
     const moving = (stage?: string) => !stage || stage === 'downloading';
     const arriving = downloading.filter(
       (item) =>
@@ -325,8 +322,8 @@ export const estimateTitle = async (
         item.stage === 'waiting'
     );
     if (arriving.length) {
-      // A part that isn't downloading has no estimate, so neither has the
-      // request; and if none is downloading, say why.
+      // A part not downloading has no estimate, so neither has the request; if
+      // none is downloading, say why.
       if (!arriving.some((item) => moving(item.stage))) {
         const has = (stage: string, step?: string) =>
           arriving.some(
@@ -385,9 +382,8 @@ export const estimateTitle = async (
   });
 
   if (media.mediaType === MediaType.MOVIE) {
-    // Radarr, when it can be asked, knows whether the file is there and
-    // which release it waits for. A film it cannot be asked about still has
-    // release dates.
+    // Radarr, when reachable, knows if the file is there and which release it
+    // waits for. A film Radarr can't answer for still has release dates.
     let movie: RadarrDates | undefined;
     if (linked) {
       try {
@@ -404,8 +400,7 @@ export const estimateTitle = async (
       return { stage: 'available' };
     }
 
-    // The dates the title page shows; Radarr's own only when TMDB has none
-    // for the region.
+    // The title page's dates; Radarr's only when TMDB has none for the region.
     let dates: RegionReleases = {};
     try {
       dates = regionReleases(
@@ -442,8 +437,8 @@ export const estimateTitle = async (
         kind: d.kind,
       }) as const;
 
-    // The release this film waits for: cinemas for "announced" and "in
-    // cinemas"; for "released", whichever of digital or physical is first.
+    // The awaited release: cinemas for "announced" and "in cinemas"; for
+    // "released", the earlier of digital or physical.
     const waitsFor =
       movie?.minimumAvailability ??
       getSettings().radarr.find((r) => r.isDefault && r.is4k === is4k)
@@ -458,14 +453,14 @@ export const estimateTitle = async (
     if (wanted && wanted.at > now) {
       return unreleased(wanted);
     }
-    // Nothing out yet, and not the release it waits for known: the next date
-    // there is, as "In cinemas Oct 30".
+    // Nothing out and the awaited release unknown: the next known date, as
+    // "In cinemas Oct 30".
     if (known.length && known.every((d) => d.at > now)) {
       return unreleased(known.sort((a, b) => a.at - b.at)[0]);
     }
-    // In cinemas but not yet out digitally or on disc: a proper release
-    // arrives with those, so that is the date worth showing — even when
-    // Radarr may already search, as with minimum availability "announced".
+    // In cinemas but not yet digital or on disc: a proper release comes with
+    // those, so show that date, even if Radarr may already search (minimum
+    // availability "announced").
     const atHome = known
       .filter((d) => d.kind !== 'cinemas')
       .sort((a, b) => a.at - b.at);
@@ -474,8 +469,8 @@ export const estimateTitle = async (
       return unreleased(nextAtHome);
     }
 
-    // Out. Only Radarr can say it is being searched for; a film it does not
-    // have, or cannot be asked about, is not.
+    // Out. Only Radarr can say it is being searched for; a film it lacks or
+    // can't answer for is not.
     if (!movie) {
       return { stage: 'unknown' };
     }
@@ -494,8 +489,8 @@ export const estimateTitle = async (
     };
   }
 
-  // A series Sonarr cannot be asked about: when its next episode airs, if
-  // the request asked for that season, from TMDB.
+  // Sonarr unreachable: TMDB's next episode air date, if the request covers
+  // that season.
   const tvFallback = async (): Promise<RequestEta> => {
     try {
       const next = (await new TheMovieDb().getTvShow({ tvId: media.tmdbId }))
@@ -510,8 +505,8 @@ export const estimateTitle = async (
             season.episodes.some(
               (e) => e.episodeNumber === next?.episode_number
             )));
-      // TMDB gives the date only; noon UTC keeps it on the same day in every
-      // American and European time zone.
+      // TMDB gives a date only; noon UTC keeps it on the same day across
+      // American and European time zones.
       const at = next?.air_date
         ? new Date(`${next.air_date}T12:00:00Z`).getTime()
         : NaN;
@@ -532,8 +527,7 @@ export const estimateTitle = async (
   }
 
   try {
-    // Only the episodes this request asked for: whole seasons, or the named
-    // episodes of a season.
+    // Only requested episodes: whole seasons, or named episodes of a season.
     const wanted = new Map<number, Set<number> | 'all'>();
     for (const season of scope.seasons ?? []) {
       wanted.set(
@@ -601,9 +595,8 @@ interface TmdbNextEpisode {
 }
 
 /**
- * TMDB's release and air dates are calendar dates at midnight UTC; in the
- * server's time zone west of UTC they would fall a day early, so they are
- * written in UTC.
+ * TMDB dates are midnight UTC; in a server time zone west of UTC they'd fall
+ * a day early, so they are formatted in UTC.
  */
 const approvalDate = (at: number) =>
   new Date(at).toLocaleDateString('en-US', {
@@ -617,12 +610,11 @@ const approvalDate = (at: number) =>
   });
 
 /**
- * "Digital release expected Nov 3", for the approval notification. At the
- * moment of approval the title is usually not in Radarr or Sonarr yet, so this
- * reads TMDB, by the same rule as the screens: for a film, the release the
- * default Radarr's minimum availability waits for, earliest anywhere; for a
- * series, the next episode due among those the request asked for. Nothing
- * when the title is already out, or nothing is known.
+ * "Digital release expected Nov 3" for the approval notification. At approval
+ * the title is usually not in Radarr or Sonarr yet, so this reads TMDB by the
+ * screens' rule: for a film, the release the default Radarr's minimum
+ * availability waits for, earliest anywhere; for a series, the next requested
+ * episode due. Nothing when already out or nothing is known.
  */
 export const expectedOnApproval = (
   request: MediaRequest,
@@ -632,7 +624,7 @@ export const expectedOnApproval = (
   }
 ): string | undefined => {
   if (request.type === MediaType.MOVIE) {
-    // The requester's region, as their title page shows release dates.
+    // The requester's region, as their title page uses.
     const dates = regionReleases(
       tmdb.release_dates,
       request.requestedBy?.settings?.discoverRegion || defaultRegion()
@@ -655,9 +647,8 @@ export const expectedOnApproval = (
     const wanted = known.find((d) =>
       waitsFor === 'released' ? d.kind !== 'cinemas' : d.kind === 'cinemas'
     );
-    // As on the screens: the release it waits for; else, with nothing out,
-    // the first date; else, in cinemas but not out at home, the digital or
-    // physical date.
+    // As on the screens: the awaited release; else, with nothing out, the first
+    // date; else, in cinemas but not at home, the digital or physical date.
     const atHome = known.filter((d) => d.kind !== 'cinemas');
     const next =
       wanted && wanted.at > now

@@ -50,15 +50,15 @@ const PermissionOption = ({
   let checked = hasPermission(option.permission, currentPermission);
 
   if (
-    // Permissions for user ID 1 (Plex server owner) cannot be changed
+    // User ID 1 (the owner) has fixed permissions.
     (currentUser && currentUser.id === 1) ||
-    // Admin permission automatically bypasses/grants all other permissions
+    // Admin grants all other permissions.
     (option.permission !== Permission.ADMIN &&
       hasPermission(Permission.ADMIN, currentPermission)) ||
-    // Manage Requests permission automatically grants all Auto-Approve permissions
+    // Manage Requests grants all Auto-Approve permissions.
     (autoApprovePermissions.includes(option.permission) &&
       hasPermission(Permission.MANAGE_REQUESTS, currentPermission)) ||
-    // Selecting a parent permission automatically selects all children
+    // A granted parent grants its children.
     (!!parent?.permission &&
       hasPermission(parent.permission, currentPermission))
   ) {
@@ -67,7 +67,7 @@ const PermissionOption = ({
   }
 
   if (
-    // Only the owner can modify the Admin permission
+    // Only the owner can change Admin.
     actingUser?.id !== 1 &&
     option.permission === Permission.ADMIN
   ) {
@@ -75,23 +75,23 @@ const PermissionOption = ({
   }
 
   if (
-    // Some permissions are dependent on others; check requirements are fulfilled
+    // Required permissions must be held.
     (option.requires &&
       !option.requires.every((requirement) =>
         hasPermission(requirement.permissions, currentPermission, {
           type: requirement.type ?? 'and',
         })
       )) ||
-    // Request 4K and Auto-Approve 4K require both 4K movie & 4K series requests to be enabled
+    // Request/Auto-Approve 4K need both 4K movies and 4K series enabled.
     ((option.permission === Permission.REQUEST_4K ||
       option.permission === Permission.AUTO_APPROVE_4K) &&
       (!settings.currentSettings.movie4kEnabled ||
         !settings.currentSettings.series4kEnabled)) ||
-    // Request 4K Movie and Auto-Approve 4K Movie require 4K movie requests to be enabled
+    // 4K Movie permissions need 4K movies enabled.
     ((option.permission === Permission.REQUEST_4K_MOVIE ||
       option.permission === Permission.AUTO_APPROVE_4K_MOVIE) &&
       !settings.currentSettings.movie4kEnabled) ||
-    // Request 4K Series and Auto-Approve 4K Series require 4K series requests to be enabled
+    // 4K Series permissions need 4K series enabled.
     ((option.permission === Permission.REQUEST_4K_TV ||
       option.permission === Permission.AUTO_APPROVE_4K_TV) &&
       !settings.currentSettings.series4kEnabled)

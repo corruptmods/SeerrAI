@@ -1,7 +1,7 @@
 type SlideCheckboxProps = {
   onClick: () => void;
   checked?: boolean;
-  /** What it turns on, for screen readers. */
+  /** Accessible name. */
   label?: string;
 };
 

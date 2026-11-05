@@ -33,7 +33,7 @@ export interface SystemStatus {
   packageUpdateMechanism: string;
 }
 
-/** One problem Sonarr, Radarr or Prowlarr reports on its own health page. */
+/** One issue from a Sonarr, Radarr or Prowlarr health page. */
 export interface ServarrHealthIssue {
   source: string;
   type: 'ok' | 'notice' | 'warning' | 'error';
@@ -80,10 +80,10 @@ export interface Tag {
 
 /** A download Radarr or Sonarr imported, from its history. */
 export interface ImportRecord {
-  /** Its history id, which only grows. */
+  /** History id; only increases. */
   id: number;
   date: string;
-  /** None for a file imported by hand. */
+  /** None for a manual import. */
   downloadId?: string;
   sourceTitle: string;
   movieId?: number;
@@ -143,8 +143,8 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     );
 
     this.apiName = apiName;
-    // Turned away for the name it was reached by: every error says how to
-    // let Seerr AI in, rather than "status code 400".
+    // Refused for the hostname used: say how to allow Seerr AI instead of
+    // "status code 400".
     this.axios.interceptors.response.use(undefined, (e) => {
       const host = refusedHost(e);
       if (host !== undefined && e instanceof Error) {
@@ -201,15 +201,15 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     }
   };
 
-  /** Root folders as they are now, free space included: never cached. */
+  /** Root folders with current free space; never cached. */
   public getRootFolderSpace = async (): Promise<RootFolder[]> => {
     const response = await this.axios.get<RootFolder[]>('/rootfolder');
     return response.data;
   };
 
   /**
-   * What the app itself says is wrong: indexers or download clients it
-   * cannot reach, missing root folders, failing imports and the like.
+   * The app's health issues: unreachable indexers or download clients,
+   * missing root folders, failing imports and the like.
    */
   public getHealth = async (): Promise<ServarrHealthIssue[]> => {
     const response = await this.axios.get<ServarrHealthIssue[]>('/health');
@@ -217,15 +217,15 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
   };
 
   /**
-   * Everything in the download queue. `include` asks for what each item is
-   * for: Sonarr's episodes by default, Lidarr's albums and artists.
+   * The whole download queue. `include` adds what each item is for: Sonarr
+   * episodes by default, or Lidarr albums and artists.
    */
   public getQueue = async (
     include: Record<string, boolean> = { includeEpisode: true }
   ): Promise<(QueueItem & QueueItemAppendT)[]> => {
     try {
-      // The queue comes in pages (10 items unless asked for more): every
-      // page, so a busy queue does not leave titles without progress.
+      // Read every page (10 items by default) so a busy queue doesn't leave
+      // titles without progress.
       const records: (QueueItem & QueueItemAppendT)[] = [];
       for (let page = 1; page <= QUEUE_MAX_PAGES; page++) {
         const response = await this.axios.get<QueueResponse<QueueItemAppendT>>(
@@ -256,10 +256,7 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     }
   };
 
-  /**
-   * What Radarr or Sonarr imported from downloads since a moment: for
-   * Sonarr, one record for each episode.
-   */
+  /** Imports from downloads since a time; Sonarr has one record per episode. */
   public getImportsSince = async (since: Date): Promise<ImportRecord[]> => {
     const response = await this.axios.get<ImportRecord[]>('/history/since', {
       params: {

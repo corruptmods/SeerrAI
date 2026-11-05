@@ -25,9 +25,9 @@ import {
 } from 'node:test';
 
 /*
- * Lidarr's settings (Settings → Services), music's own settings (Settings
- * → Music) and what the request window reads about a Lidarr, against a
- * fake Lidarr that answers as Lidarr's API does.
+ * Lidarr settings (Settings → Services), music settings (Settings → Music)
+ * and what the request window reads about a Lidarr, against a fake Lidarr
+ * API.
  */
 
 setupTestDb();
@@ -63,7 +63,7 @@ const lidarr = http.createServer((req, res) => {
       { id: 5, path: '/music', freeSpace: 10, totalSpace: 20 },
     ],
     '/api/v1/tag': [{ id: 7, label: 'music' }],
-    // The folders Lidarr sees: only slskd's downloads, among the data's.
+    // Folders Lidarr sees: of the data folders, only slskd's downloads.
     '/api/v1/filesystem': {
       directories:
         url.searchParams.get('path') === '/data/soulseek/'
@@ -262,10 +262,10 @@ describe('Lidarr servers', () => {
       (await call('DELETE', `/settings/lidarr/${added.id}`)).status,
       404
     );
-    // Without a default, music is not there.
+    // Without a default, music is off.
     assert.equal(getSettings().fullPublicSettings.musicReady, false);
 
-    // A removed server's id is not given out again.
+    // A removed server's id is never reused.
     const third = (await call('POST', '/settings/lidarr', server()))
       .body as LidarrSettings;
     assert.ok(third.id > second.id);
@@ -309,12 +309,12 @@ describe('music settings', () => {
     });
     assert.equal(getSettings().music.theAudioDbApiKey, 'secret');
 
-    // Saved again without a key: the key stays. Blank address: the public one.
+    // Resaving without a key keeps it; a blank address means the public one.
     await call('POST', '/settings/music', { musicbrainzUrl: '' });
     assert.equal(getSettings().music.theAudioDbApiKey, 'secret');
     assert.equal(getSettings().music.musicbrainzUrl, 'https://musicbrainz.org');
 
-    // Deezer stays as it was unless sent.
+    // Deezer changes only when sent.
     await call('POST', '/settings/music', { deezer: false });
     assert.equal(getSettings().music.deezer, false);
     await call('POST', '/settings/music', { musicbrainzUrl: '' });
@@ -346,7 +346,7 @@ describe('music settings', () => {
       songsFromAlbums: false,
     });
     assert.equal(off.status, 200);
-    // A save that leaves them out keeps them off.
+    // A save without them keeps them off.
     await call('POST', '/settings/music', { listenBrainz: true });
     assert.deepEqual(
       [getSettings().music.songRequests, getSettings().music.songsFromAlbums],
@@ -366,7 +366,7 @@ describe('music settings', () => {
     });
     assert.equal(getSettings().fullPublicSettings.musicSongs, true);
 
-    // A save that leaves them out keeps them.
+    // A save without them keeps them.
     await call('POST', '/settings/music', { listenBrainz: true });
     assert.equal(getSettings().music.songRequests, true);
     assert.equal(getSettings().music.songQuota.quotaLimit, 5);
@@ -419,7 +419,7 @@ describe('how music is searched', () => {
       { inAll: true }
     );
 
-    // A save that leaves it out keeps it.
+    // A save without it keeps it.
     await call('POST', '/settings/music', { listenBrainz: true });
     assert.deepEqual(getSettings().music.search, { inAll: true });
   });
@@ -428,7 +428,7 @@ describe('how music is searched', () => {
     const search = async () =>
       ((await call('GET', '/settings/music')).body as { search: unknown })
         .search;
-    // Nothing chosen: off without Lidarr, on with one.
+    // Unset: off without Lidarr, on with one.
     assert.deepEqual(getSettings().music.search, {});
     assert.deepEqual(await search(), { inAll: false });
     assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, false);
@@ -436,18 +436,18 @@ describe('how music is searched', () => {
     assert.deepEqual(await search(), { inAll: true });
     assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, true);
 
-    // Saving the rest leaves it to follow Lidarr.
+    // Saving other settings leaves it following Lidarr.
     await call('POST', '/settings/music', { listenBrainz: true });
     assert.deepEqual(getSettings().music.search, {});
 
-    // Turned off by an admin, it stays off with Lidarr there.
+    // Turned off by an admin, it stays off even with Lidarr.
     await call('POST', '/settings/music', { search: { inAll: false } });
     assert.deepEqual(await search(), { inAll: false });
     assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, false);
   });
 
   it('keeps nothing but whether music is in All', async () => {
-    // A page from before the trim may still send the settings that went.
+    // An older page may still send removed settings.
     const saved = await call('POST', '/settings/music', {
       search: {
         inAll: true,
@@ -595,8 +595,8 @@ describe('Soulseek', () => {
       getSettings().music.soulseek?.apiKey,
       'a-key-long-enough-for-slskd'
     );
-    // Saved again without the key: the key stays. Settings → Music saved:
-    // Soulseek stays.
+    // Resaving without the key keeps it; saving Settings → Music keeps
+    // Soulseek.
     await call('PUT', '/settings/music/soulseek', { ...slskd, apiKey: '' });
     await call('POST', '/settings/music', { listenBrainz: true });
     assert.equal(

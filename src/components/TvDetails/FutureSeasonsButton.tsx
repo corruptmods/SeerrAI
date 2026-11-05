@@ -36,31 +36,30 @@ const messages = defineMessages('components.TvDetails.FutureSeasonsButton', {
   failed: 'Something went wrong. Try again.',
 });
 
-/** TMDB's statuses for a series that will have no more seasons. */
+/** TMDB statuses meaning no more seasons. */
 const FINISHED = ['Ended', 'Canceled'];
 
 interface FutureSeasonsButtonProps {
   tmdbId: number;
   title: string;
-  /** TMDB's status for the series. */
+  /** TMDB status. */
   seriesStatus?: string;
 }
 
 export interface FutureSeasonsState {
   following: boolean;
   fromSeason?: number;
-  /** Someone else follows the series, so its new seasons come anyway. */
+  /** Another user follows it, so new seasons arrive anyway. */
   othersFollow?: boolean;
   othersFrom?: number;
-  /** Who they are; only told to those who manage requests. */
+  /** Their names; only sent to request managers. */
   others?: string[];
 }
 
 /**
- * Get a series from here on: every season that has not premiered yet is
- * requested as it premieres, and nothing already out. Shown on for everyone
- * once anyone follows it, since the seasons come for all; people who manage
- * requests can stop it for everyone.
+ * Follow a series: each unpremiered season is requested as it premieres,
+ * nothing already out. Shows as on for everyone once anyone follows, since
+ * seasons arrive for all; request managers can stop it for everyone.
  */
 const FutureSeasonsButton = ({
   tmdbId,
@@ -83,8 +82,8 @@ const FutureSeasonsButton = ({
   const allowed = on && canRequest;
   const finished = !!seriesStatus && FINISHED.includes(seriesStatus);
 
-  // Fetched even when following is not allowed right now: someone already
-  // following can always stop, whatever has changed since.
+  // Fetched even when following isn't allowed, so an existing follower can
+  // always stop.
   const { data, mutate } = useSWR<FutureSeasonsState>(
     `/api/v1/tv/${tmdbId}/future-seasons`
   );
@@ -99,7 +98,7 @@ const FutureSeasonsButton = ({
   const shared = !!data.othersFollow;
   const followed = mine || shared;
   const paused = mine && !allowed && !shared;
-  // Someone else's follow is theirs to stop, or a manager's.
+  // Only the follower or a manager can stop someone else's follow.
   const canToggle = !followed || mine || manager;
   const season = Math.min(
     ...[data.fromSeason, data.othersFrom].filter(

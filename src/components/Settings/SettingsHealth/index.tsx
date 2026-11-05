@@ -168,9 +168,8 @@ const StatusDot = ({ status }: { status: HealthStatus }) => {
 };
 
 /**
- * Asks Radarr, Sonarr or Lidarr to search now for what the title is
- * missing. After one press it says what was asked for and stays done, so
- * it is not sent again by a second tap.
+ * Asks Radarr, Sonarr or Lidarr to search for what the title is missing.
+ * Stays done after one press, so a second tap doesn't resend it.
  */
 const SearchButton = ({
   mediaId,
@@ -237,9 +236,9 @@ const SearchButton = ({
 };
 
 /**
- * Searches for every stuck title Radarr or Sonarr can act on — not just the
- * ones on screen. Confirmed first, saying what it costs: each search is a
- * query to the indexers, which often cap queries a day.
+ * Searches for every stuck title Radarr or Sonarr can act on, not only those on
+ * screen. Confirms first with the cost: each search queries the indexers,
+ * which often cap queries a day.
  */
 const SearchAll = ({ onDone }: { onDone: () => void }) => {
   const intl = useIntl();
@@ -366,9 +365,8 @@ const MatchSetting = ({
 );
 
 /**
- * Match Check's settings: whether titles just requested and imported are
- * looked at as they arrive, as well as nightly; whether wrong Plex matches
- * get a Fix button; and whether they're fixed without asking.
+ * Match Check's settings: also check new imports as they arrive (not only
+ * nightly), offer Fix for wrong Plex matches, and fix them without asking.
  */
 const MatchSettings = ({ onChanged }: { onChanged: () => void }) => {
   const intl = useIntl();
@@ -643,11 +641,11 @@ const CheckRow = ({
 }) => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  // Ten to a page. Page one comes with the check; others are fetched as they
-  // are stepped to, keeping the current page on screen meanwhile.
+  // Ten per page. Page one comes with the check; others load when stepped to,
+  // keeping the current page shown meanwhile.
   const [chosenPage, setPage] = useState(1);
   const pages = Math.max(1, Math.ceil(check.count / PAGE_SIZE));
-  // A list that has shrunk since a later page was opened shows its last page.
+  // A list that shrank since a later page was opened shows its last page.
   const page = Math.min(chosenPage, pages);
   const {
     data: paged,
@@ -657,7 +655,7 @@ const CheckRow = ({
     page > 1 ? `/api/v1/settings/health/checks/${check.id}?page=${page}` : null,
     { revalidateOnFocus: false, keepPreviousData: true }
   );
-  // After Check Again, a later page is fetched again too, not left as it was.
+  // After Check Again, refetch a later page too.
   useEffect(() => {
     void refreshPage();
   }, [checkedAt, refreshPage]);
@@ -797,9 +795,8 @@ const CheckRow = ({
                 {items.map((item, index) => (
                   <li
                     key={keys[index]}
-                    // Stacked: the title on its line, the detail wrapping
-                    // beneath. Side by side, a long detail squeezed the
-                    // title to a couple of letters on a phone.
+                    // Stacked, so a long detail can't squeeze the title to a few letters on
+                    // a phone.
                     className="py-1.5 text-sm"
                   >
                     <ItemText item={item} />
@@ -948,9 +945,8 @@ const GROUPS: { id: HealthCheck['group']; label: keyof typeof messages }[] = [
 ];
 
 /**
- * One screen for what is quietly wrong. Checked when opened and on demand,
- * not in the background: service checks make real calls, and a page nobody
- * is looking at should not be making them.
+ * One screen for what is quietly wrong. Checked on open and on demand, not in
+ * the background: service checks make real calls.
  */
 const SettingsHealth = () => {
   const intl = useIntl();
@@ -1028,10 +1024,7 @@ const SettingsHealth = () => {
             </span>
           </div>
 
-          {/*
-            One column on a phone; on a wide screen the groups sit side by
-            side instead of leaving most of it empty.
-          */}
+          {/* One column on a phone; groups side by side on wide screens. */}
           <div className="space-y-8 xl:grid xl:grid-cols-2 xl:items-start xl:gap-x-6 xl:gap-y-8 xl:space-y-0">
             {GROUPS.map((group) => {
               const checks = data.checks.filter((c) => c.group === group.id);

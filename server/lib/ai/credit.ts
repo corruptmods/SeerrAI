@@ -18,20 +18,19 @@ import { LessThan, MoreThanOrEqual } from 'typeorm';
 /*
  * What the AI account has spent and has left.
  *
- * Neither OpenAI nor Anthropic lets a program read an account's balance, so
- * it is worked out: the balance an admin last entered, less what has been
- * spent since. What was spent comes from the provider's own report when an
- * admin key is saved (everything the account spent, Seerr or not), and is
- * otherwise estimated from the tokens Seerr's own requests used, at the
- * prices an admin entered for each model.
+ * Neither OpenAI nor Anthropic exposes an account's balance, so it is the
+ * balance an admin last entered less spend since. Spend comes from the
+ * provider's cost report when an admin key is saved (the whole account, not
+ * only Seerr), otherwise it is estimated from Seerr's own token counts at
+ * the prices an admin entered per model.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A little over a year of daily counts is kept. */
+/** Days of daily counts kept: a little over a year. */
 const KEEP_DAYS = 400;
 
-/** Both reports are asked for at most this often. */
+/** Each report is fetched at most this often. */
 const REPORT_TTL_MS = 10 * 60 * 1000;
 const REPORT_TIMEOUT_MS = 15_000;
 
@@ -57,7 +56,7 @@ export const recordSpend = async (
       inputTokens: 0,
       outputTokens: 0,
     });
-    // The first answer of a day clears out anything older than a year.
+    // The day's first answer also deletes rows older than KEEP_DAYS.
     await repository.delete({
       day: LessThan(today(new Date(Date.now() - KEEP_DAYS * DAY_MS))),
     });
@@ -94,9 +93,9 @@ const saveSettings = () =>
     );
 
 /**
- * An answer came back: counted, and the account plainly has credit. Done
- * once the count is written, for a caller that waits (the admin agent);
- * a count that cannot be written is only logged.
+ * Counts an answer and clears the out-of-credit mark. Resolves once the
+ * count is written, for callers that wait (the admin agent); a failed write
+ * is only logged.
  */
 export const countAnswer = async (
   model: string,
@@ -113,7 +112,7 @@ export const countAnswer = async (
   }
 };
 
-/** An answer came back: counted in the background. */
+/** Counts an answer in the background. */
 export const noteAnswer = (model: string, answer: Completion) => {
   void countAnswer(model, answer);
 };
@@ -127,7 +126,7 @@ export const clearOutOfCredit = () => {
   }
 };
 
-/** A request failed: remembered if it was for want of credit. */
+/** Marks the account out of credit if that is why a request failed. */
 export const noteFailure = (e: unknown) => {
   if (!(e instanceof AiProviderError) || !e.outOfCredit) {
     return;
@@ -216,7 +215,7 @@ const anthropicSpend = async (adminKey: string, since: Date) => {
   return total;
 };
 
-/** A failed report, as something an admin can act on. */
+/** A failed report, explained so an admin can act on it. */
 const explainReport = (
   e: unknown,
   provider: 'anthropic' | 'openai',
@@ -249,8 +248,8 @@ const explainReport = (
 const reports = new Map<string, { until: number; spent: number }>();
 
 /**
- * What the whole account has spent since the start of the UTC day `since`
- * falls in: both reports count whole days.
+ * The whole account's spend since the start of the UTC day holding `since`;
+ * both reports count whole days.
  */
 export const providerSpend = async (
   provider: 'anthropic' | 'openai',
@@ -279,7 +278,7 @@ export const providerSpend = async (
   }
 };
 
-/** Forgets the reports read, as when the key or balance changes. */
+/** Clears cached reports, as when the key or balance changes. */
 export const forgetSpendReports = () => reports.clear();
 
 // ---- the report shown in settings -------------------------------------------
@@ -294,13 +293,12 @@ export interface ModelSpend {
 }
 
 export interface CreditReport {
-  /** Who bills for the AI settings; null for a server that does not. */
+  /** Who bills for the AI settings; null for a server that doesn't bill. */
   billedBy: 'anthropic' | 'openai' | null;
   outOfCreditAt: string | null;
   hasAdminKey: boolean;
   balance: number | null;
   balanceAt: string | null;
-  /** Where the spending figures come from. */
   source: 'provider' | 'estimate';
   /** Why the provider's report was not used, when an admin key is saved. */
   providerProblem?: string;
@@ -309,7 +307,7 @@ export interface CreditReport {
   spentThisMonth: number;
   spentSinceBalance: number | null;
   remaining: number | null;
-  /** Models Seerr used without a price, whose cost is left out of an estimate. */
+  /** Models used without a price, left out of an estimate. */
   unpriced: string[];
   /** Seerr's own requests this month, by model. */
   models: ModelSpend[];
@@ -361,10 +359,10 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
   const credit = settings.aiCredit;
   const provider = billedBy(ai);
 
-  // This month by the server's clock, as Seerr's own counts are kept. The
-  // provider's report counts whole UTC days, so it is asked from the 1st in
-  // UTC: local midnight on the 1st, east of UTC, is still the last day of
-  // the month before there, and that whole day was counted in.
+  // This month by the server's clock, like Seerr's own counts. The
+  // provider's report counts whole UTC days, so it starts from the 1st in
+  // UTC: east of UTC, local midnight on the 1st is still the previous
+  // month's last day in UTC, and that whole day would be counted.
   const monthStart = today(new Date(now.getFullYear(), now.getMonth(), 1));
   const providerMonthStart = new Date(
     Date.UTC(now.getFullYear(), now.getMonth(), 1)
@@ -374,8 +372,8 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
   const month = await ownSpend(monthStart);
   const sinceBalance = balanceAt ? await ownSpend(today(balanceAt)) : null;
 
-  // The models this month, and the ones set up but not used yet, so a price
-  // can be entered before it is needed.
+  // This month's models plus configured unused ones, so a price can be
+  // entered before it is needed.
   const configured = [ai.model, ...Object.values(ai.featureModels ?? {})]
     .map((m) => m?.trim())
     .filter((m): m is string => !!m);
@@ -406,7 +404,7 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
   if (provider && credit.adminKey) {
     try {
       const [thisMonth, since] = await Promise.all([
-        // In its first hours here, the month may not have begun in UTC:
+        // Early in the local month, east of UTC, the UTC month hasn't begun:
         // nothing is spent in it yet.
         providerMonthStart > now
           ? Promise.resolve(0)

@@ -17,7 +17,7 @@ interface JellyfinQuickConnectModalProps {
   onAuthenticated: () => void;
   onError: (error: string) => void;
   mediaServerName: string;
-  /** What to say when the account's name is already another's email. */
+  /** Shown when the username is already another account's email. */
   existingAccountMessage: string;
 }
 
@@ -37,7 +37,7 @@ const JellyfinQuickConnectModal = ({
           secret,
         });
       } catch (e) {
-        // Said in words, not as the server's code for it.
+        // Replace the server's error code with readable text.
         if (
           isAxiosError(e) &&
           e.response?.data?.message === ApiErrorCode.ExistingAccount

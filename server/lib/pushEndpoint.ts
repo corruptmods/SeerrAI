@@ -1,10 +1,9 @@
 /*
- * The push services browsers hand out subscriptions on: Chrome, Edge's
- * Chromium builds, Opera, Brave and Samsung Internet (Google's FCM),
- * Firefox (Mozilla), Safari (Apple) and older Edge (Windows). Seerr posts
- * every web push notification to the address a browser registered, so an
- * address anywhere else (a machine on the home network, the server itself)
- * is refused rather than called.
+ * Push services browsers issue subscriptions on: Chrome, Chromium Edge, Opera,
+ * Brave and Samsung Internet (Google FCM), Firefox (Mozilla), Safari (Apple)
+ * and legacy Edge (Windows). Seerr posts every web push to the registered
+ * address, so any other address (a LAN machine, the server itself) is refused
+ * rather than called.
  */
 const PUSH_HOSTS = ['fcm.googleapis.com', 'android.googleapis.com'];
 const PUSH_DOMAINS = [

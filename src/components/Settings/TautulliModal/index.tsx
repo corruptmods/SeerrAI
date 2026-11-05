@@ -34,7 +34,7 @@ const messages = defineMessages('components.Settings.TautulliModal', {
   validationApiKeyRequired: 'You must provide the API key',
 });
 
-/** As the settings page is sent it: no key, only that one is set. */
+/** As sent to the settings page: no key, only whether one is set. */
 export type ShownTautulli = TautulliSettings & { hasApiKey?: boolean };
 
 interface TautulliModalProps {
@@ -48,8 +48,7 @@ const TautulliModal = ({ tautulli, onClose, onSave }: TautulliModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from a Tautulli that already worked; a new one must pass
-  // a test before it can be added.
+  // Editing starts from a working Tautulli; a new one must pass a test first.
   const [isValidated, setIsValidated] = useState(!!tautulli);
 
   const schema = Yup.object().shape({
@@ -126,8 +125,7 @@ const TautulliModal = ({ tautulli, onClose, onSave }: TautulliModalProps) => {
     }
   };
 
-  // Changing where Tautulli is, or its key, means the earlier test no longer
-  // counts.
+  // A new address or key voids the earlier test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,

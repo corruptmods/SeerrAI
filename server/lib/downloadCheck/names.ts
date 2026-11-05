@@ -1,14 +1,14 @@
 /*
- * Reading a release's name the way people do, for one question: is this
- * download the series or movie Sonarr or Radarr filed it under?
+ * Reads a release name to answer one question: is this download the series
+ * or movie Sonarr or Radarr filed it under?
  *
- * Sonarr and Radarr answer that themselves when the name matches one of
- * their titles. When it doesn't, but the indexer said which title it was
- * (a TVDB, TMDB or IMDb id), they grab it anyway and then refuse to import
- * it ("matched to series by ID"). Most of those are the right title under
- * another name: Snack.Kingdom.2013, Bramble.&amp;.Finch-Trick.Us. Some are
- * not: The.Turnstile.AU is Australia's version of The Turnstile, Gurneys.2026 is the
- * revival, filed under the 2001 series' episodes. The name says which.
+ * Sonarr and Radarr decide that themselves when the name matches a title.
+ * When it doesn't but the indexer gave an id (TVDB, TMDB or IMDb), they grab
+ * it and then refuse to import it ("matched to series by ID"). Most are the
+ * right title under another name: Snack.Kingdom.2013,
+ * Bramble.&amp;.Finch-Trick.Us. Some aren't: The.Turnstile.AU is Australia's
+ * version of The Turnstile; Gurneys.2026 is the revival, filed under the 2001
+ * series' episodes. The name tells which.
  */
 
 const ENTITIES: Record<string, string> = {
@@ -20,7 +20,7 @@ const ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
-/** "&amp;" as "&", "&#39;" as "'": indexers send names HTML-escaped. */
+/** Unescapes HTML entities ("&amp;" → "&"); indexers send names escaped. */
 export const unescapeName = (value: string): string =>
   value.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (whole, code: string) => {
     if (code[0] === '#') {
@@ -36,7 +36,7 @@ export const unescapeName = (value: string): string =>
   });
 
 /**
- * A name as words: lower case, accents and punctuation gone, "&" as "and".
+ * A name as words: lower case, no accents or punctuation, "&" as "and".
  * "Bramble & Finch: Trick Us" and "Bramble.&amp;.Finch-Trick.Us" both read
  * "bramble and finch trick us".
  */
@@ -44,8 +44,8 @@ export const normalize = (value: string): string =>
   wordsOf(value).join(' ').toLowerCase();
 
 /**
- * A name's words with their case kept, for telling "The.Turnstile.AU" (a
- * country) from "Trick.Us" (a word).
+ * A name's words with case kept, to tell "The.Turnstile.AU" (a country)
+ * from "Trick.Us" (a word).
  */
 const wordsOf = (value: string): string[] =>
   unescapeName(value)
@@ -56,7 +56,7 @@ const wordsOf = (value: string): string[] =>
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
 
-/** The countries releases mark their own version of a show with. */
+/** Country codes releases use to mark their own version of a show. */
 const COUNTRIES = new Set([
   'us',
   'uk',
@@ -84,26 +84,26 @@ const COUNTRIES = new Set([
   'ph',
 ]);
 
-/** Where a release's quality, source and group start after its title. */
+/** Tokens that start a release's quality, source and group after its title. */
 const TECHNICAL =
   /^(\d{3,4}[pi]|4k|uhd|hdr\d*|sdr|dv|web|webdl|web-dl|webrip|web-rip|hdtv|pdtv|sdtv|dsr|bluray|blu-ray|bdrip|brrip|bdremux|remux|dvd|dvdrip|dvd-rip|hdrip|x26[45]|h26[45]|h\.26[45]|hevc|avc|xvid|divx|aac\d*(\.\d)?|ac3|eac3|dd\+?\d*(\.\d)?|ddp\d*(\.\d)?|dts(-hd)?|truehd|atmos|flac|opus|amzn|nf|netflix|dsnp|hmax|atvp|pmtp|hulu|pcok|cr|crunchyroll|itunes|dscp|shahid|repack\d*|proper|internal|multi|dual|complete|extended|uncut|remastered|imax|hybrid|10bit|8bit|english|subbed|dubbed|\d+ch|\d\.\d)$/i;
 
 export interface ReleaseName {
-  /** The title before the season, year and country, as words. */
+  /** The title before season, year and country, as words. */
   title: string;
   year?: number;
-  /** A country the name marks its version with ("au" in The.Turnstile.AU). */
+  /** Country marking the version ("au" in The.Turnstile.AU). */
   country?: string;
-  /** The episode's own title, as words, when the name carries one. */
+  /** The episode's own title as words, if the name has one. */
   episodeTitle?: string;
-  /** Whether a season or episode marker was found at all. */
+  /** Whether any season or episode marker was found. */
   hasEpisode: boolean;
 }
 
-/** Brackets around a group or a hash at the start: "[Concur] ". */
+/** Leading bracketed group or hash tags: "[Concur] ". */
 const LEADING_TAGS = /^(\s*\[[^\]]*\]\s*)+/;
 
-/** S01E02, S01, 1x02, Season 3: the first one splits title from the rest. */
+/** S01E02, S01, 1x02, Season 3; the first match splits title from the rest. */
 const EPISODE_MARK =
   /(^|[\s._-])(s\d{1,4}([\s._-]?e\d{1,4})*([\s._-]?-?e\d{1,4})*|\d{1,2}x\d{2,3}|season[\s._]?\d{1,3})(?=$|[\s._-])/i;
 
@@ -111,9 +111,9 @@ const EPISODE_MARK =
 const MOVIE_YEAR = /(^|[\s._([-])((?:19|20)\d{2})(?=$|[\s._)\]-])/g;
 
 /**
- * Takes a year, then a country, off the end of a title (either order). A
- * country is two capitals, as releases and Sonarr's titles write them:
- * "The.Turnstile.AU", "The Schemers (US)"; "Trick.Us" ends with a word.
+ * Strips a trailing year and country (either order). A country is two
+ * capitals, as releases and Sonarr titles write it: "The.Turnstile.AU",
+ * "The Schemers (US)"; "Trick.Us" ends in a word.
  */
 const splitTail = (
   raw: string[]
@@ -138,7 +138,7 @@ const splitTail = (
   return { words: rest.map((w) => w.toLowerCase()), year, country };
 };
 
-/** The words after the episode marker, up to the quality or the group. */
+/** Words after the episode marker, up to the quality or group. */
 export const episodeTitleOf = (rest: string): string | undefined => {
   const words: string[] = [];
   for (const raw of rest.split(/[\s._]+/)) {
@@ -150,7 +150,7 @@ export const episodeTitleOf = (rest: string): string | undefined => {
   return title || undefined;
 };
 
-/** A TV release's name, read. */
+/** Parses a TV release name. */
 export const readEpisodeRelease = (name: string): ReleaseName => {
   const clean = unescapeName(name).replace(LEADING_TAGS, '');
   const mark = EPISODE_MARK.exec(clean);
@@ -170,12 +170,12 @@ export const readEpisodeRelease = (name: string): ReleaseName => {
   };
 };
 
-/** A movie release's name, read: the title is what comes before its year. */
+/** Parses a movie release name: the title is everything before its year. */
 export const readMovieRelease = (name: string): ReleaseName => {
   const clean = unescapeName(name).replace(LEADING_TAGS, '');
   let found: RegExpExecArray | null = null;
-  // The last year-like number that still has a title before it: in
-  // "2087.A.Tidal.Voyage.1968" the title is "2087 A Tidal Voyage".
+  // Use the last year-like number with a title before it:
+  // "2087.A.Tidal.Voyage.1968" has the title "2087 A Tidal Voyage".
   for (const match of clean.matchAll(MOVIE_YEAR)) {
     if (match.index > 0) found = match as RegExpExecArray;
   }
@@ -197,13 +197,13 @@ export const readMovieRelease = (name: string): ReleaseName => {
   };
 };
 
-/** One of a title's names, without a year or a country at its end. */
+/** One of a title's names, without a trailing year or country. */
 interface TitleName {
   words: string;
   country?: string;
 }
 
-/** "The Turnstile (2016)", "The Schemers (US)", "The Turnstile US" as their parts. */
+/** Splits "The Turnstile (2016)", "The Schemers (US)", "The Turnstile US" into parts. */
 const nameOf = (title: string): TitleName => {
   const { words, country } = splitTail(wordsOf(title));
   return { words: words.join(' '), country };
@@ -216,13 +216,13 @@ const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'to', 'for']);
 const meaningful = (words: string): string[] =>
   words.split(' ').filter((w) => w && !STOP.has(w));
 
-/** Titles Sonarr gives episodes nobody has named yet (test normalized). */
+/** Sonarr's placeholder titles for unnamed episodes (test normalized). */
 export const GENERIC_EPISODE =
   /^((episode|chapter|part|ep|folge|episodio|episode n|capitulo|capitolo)\s*\d+|tba|tbd|pilot|special|untitled)$/;
 
 /**
- * How alike two episode titles are: 1 when one holds the other, else the
- * share of words they have in common.
+ * How alike two episode titles are: 1 if one contains the other, else the
+ * share of words in common.
  */
 export const episodeTitleLikeness = (a: string, b: string): number => {
   const x = normalize(a);
@@ -259,11 +259,11 @@ export interface TitleFacts {
 }
 
 export type Verdict =
-  /** The name is this title: safe to import under it. */
+  /** The name is this title; safe to import under it. */
   | 'same'
   /**
-   * The right show, numbered another way: its episode title is another
-   * episode's (`episode`). Snack.Kingdom.2013.S09E11.Pretzel.Champions is
+   * The right show, numbered differently: its episode title matches another
+   * episode (`episode`). Snack.Kingdom.2013.S09E11.Pretzel.Champions is
    * Sonarr's S14E03, "Pretzel Champions".
    */
   | 'renumbered'
@@ -284,17 +284,17 @@ export type VerdictReason =
 export interface Evidence {
   verdict: Verdict;
   reason: VerdictReason;
-  /** What the release names, for showing: its title, year, country. */
+  /** What the release names, for display: title, year, country. */
   named: { title: string; year?: number; country?: string };
-  /** The release's episode title, when it decided. */
+  /** The release's episode title, when it decided the verdict. */
   episodeTitle?: string;
-  /** Sonarr's title for the episode, when the episode title decided. */
+  /** Sonarr's episode title, when the episode title decided. */
   expected?: string;
-  /** Renumbered: the episode the release really is. */
+  /** Renumbered: the episode the release actually is. */
   episode?: SeriesEpisode;
 }
 
-/** An episode of the series, as Sonarr lists them. */
+/** A series episode as Sonarr lists it. */
 export interface SeriesEpisode {
   id: number;
   seasonNumber: number;
@@ -304,11 +304,10 @@ export interface SeriesEpisode {
 }
 
 /**
- * Whether a release a server matched only by an indexer's id is the title
- * it was filed under. `episodes` are the episodes it was filed as, with
- * Sonarr's titles for them; none for a movie. `allEpisodes`, the series'
- * every episode, lets a single episode numbered another way be found by
- * its title.
+ * Whether a release a server matched only by indexer id is the title it was
+ * filed under. `episodes` are those it was filed as, with Sonarr's titles;
+ * none for a movie. `allEpisodes` (the whole series) lets a renumbered
+ * single episode be found by its title.
  */
 export const judgeName = (
   release: ReleaseName,
@@ -342,7 +341,7 @@ export const judgeName = (
     return { verdict: 'different', reason: 'country', named };
   }
 
-  // The episode's own title, when the name has one, settles it.
+  // The episode's own title, when present, decides.
   const releaseEpisode = release.episodeTitle;
   const known = episodes
     .map((e) => e.title)
@@ -373,8 +372,8 @@ export const judgeName = (
       };
     }
     if (best.score < 0.2) {
-      // One episode, numbered another way: the episode with its title,
-      // when exactly one has it.
+      // A renumbered single episode: the one with this title, if exactly
+      // one has it.
       const filed = new Set(episodes.map((e) => e.id));
       const elsewhere =
         episodes.length === 1 && (sameWords.length || sharesWords)
@@ -417,8 +416,8 @@ export const judgeName = (
     return { verdict: 'same', reason: 'title', named };
   }
 
-  // The title with more words after it: a spin-off, a subtitle or a longer
-  // name of the same show. Only someone who knows can say.
+  // The title followed by more words: a spin-off, subtitle or longer name
+  // of the same show. Only a person can tell.
   if (names.some((n) => bare.startsWith(`${withoutThe(n.words)} `))) {
     return { verdict: 'unsure', reason: 'extraWords', named };
   }

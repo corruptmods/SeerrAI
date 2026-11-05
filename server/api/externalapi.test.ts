@@ -19,10 +19,7 @@ import {
   mock,
 } from 'node:test';
 
-/*
- * The shared client every outside service is reached through: its cache,
- * its background refresh, and how long it waits.
- */
+/* ExternalAPI: caching, background refresh and timeouts. */
 
 /** A cache whose entries can be made to look old. */
 class TestCache implements CacheStore {
@@ -46,7 +43,7 @@ class TestCache implements CacheStore {
   flushAll(): void {
     this.entries.clear();
   }
-  /** Every entry as if it had been kept this long ago. */
+  /** Backdates every entry by `ms`. */
   age(ms: number) {
     for (const entry of this.entries.values()) {
       entry.expires -= ms;
@@ -69,7 +66,7 @@ class Probe extends ExternalAPI {
 let server: Server;
 let base = '';
 let failing = false;
-/** Holds answers to /profiles open until released. */
+/** Holds /profiles responses until released. */
 let gate: Promise<void> | undefined;
 const asked: string[] = [];
 

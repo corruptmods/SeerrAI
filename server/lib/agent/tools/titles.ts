@@ -37,8 +37,7 @@ import { In, MoreThan } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * Finding a title, and what it has and lacks: find_title and
- * title_status.
+ * find_title and title_status: finding a title, and what it has and lacks.
  */
 
 const librarySeries = async (state: AgentState, serverId: number) => {
@@ -90,20 +89,20 @@ const albumName = async (title: TitleRef): Promise<string> => {
   return artist ? `${album.title} by ${artist.artistName}` : album.title;
 };
 
-/** Albums are for Backfill only while it does music. */
+/** Albums are available only while Backfill handles music. */
 export const musicOn = () => backfill.readiness().music;
 
-/** Outside lookups, as a seam for tests. */
+/** External lookups, stubbed in tests. */
 export const lookups = {
   tmdb: (query: string) => new TheMovieDb().searchMulti({ query }),
-  /** Albums on MusicBrainz, as music search ranks them, with Seerr's status. */
+  /** MusicBrainz albums, ranked as music search does, with Seerr's status. */
   albums: async (query: string): Promise<MusicAlbumResult[]> => {
     const page = await musicBrainz().searchReleaseGroups(query, { limit: 10 });
     const groups = rankAlbums(page['release-groups'] ?? [], 6);
     const statuses = await albumStatuses(groups.map((g) => g.id));
     return groups.map((group) => mapAlbumResult(group, statuses));
   },
-  /** An album's own artist, its first credited, on MusicBrainz. */
+  /** An album's first credited artist on MusicBrainz. */
   albumArtist: async (
     albumMbid: string
   ): Promise<{ title: string; artistMbid?: string; artist?: string }> => {
@@ -288,7 +287,7 @@ export const findTitle: AgentTool = {
 
 const MAX_LISTED_MISSING = 150;
 
-/** Backfill's row for a title, and its downloads under way. */
+/** Backfill's row for a title, and its running downloads. */
 export const backfillOf = async (title: TitleRef) => {
   const row = await getRepository(BackfillSeries).findOne({
     where: { kind: title.kind, serverId: title.serverId, arrId: title.arrId },
@@ -349,9 +348,8 @@ const backfillLine = async (title: TitleRef) => {
 };
 
 /**
- * Which releases failed to download for a title before: the same release
- * by its link, its torrent's hash or its name (a post found again on
- * another indexer).
+ * A test for releases that failed for this title before, matched by link,
+ * torrent hash or name (the same post found on another indexer).
  */
 export const failedReleases = async (
   title: TitleRef | null
@@ -495,7 +493,7 @@ export const titleStatus: AgentTool = {
       sonarr.getSeriesQueueEpisodes(series.id).catch(() => [] as number[]),
     ]);
     const now = Date.now();
-    // What the files on disk are, and the audio Sonarr heard in them.
+    // Per-season qualities of the files on disk, and their audio languages.
     const qualities = new Map<number, Map<string, number>>();
     const audio = new Map<number, Map<string, number>>();
     const count = (
@@ -550,8 +548,8 @@ export const titleStatus: AgentTool = {
       (ep) =>
         !ep.hasFile && ep.airDateUtc && new Date(ep.airDateUtc).getTime() > now
     ).length;
-    // A file about twice an episode's length, linked to one episode, most
-    // likely holds two: relink_file links it to all it holds.
+    // A file about twice an episode's length linked to one episode likely
+    // holds two; relink_file can fix that.
     const minutes = (runTime?: string) => {
       const parts = (runTime ?? '').split(':').map(Number);
       if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) return 0;

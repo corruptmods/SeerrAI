@@ -116,8 +116,8 @@ interface Shown extends Omit<BackfillSettings, 'prowlarr'> {
 }
 
 /**
- * The client chosen, or "Not used" for none, or for one that has since been
- * removed, so the form can still be saved.
+ * The chosen client, or "Not used" for none or a removed one, so the form can
+ * still be saved.
  */
 const chosen = (id: number | null, clients: { id: number }[]): number | '' =>
   id !== null && clients.some((c) => c.id === id) ? id : '';

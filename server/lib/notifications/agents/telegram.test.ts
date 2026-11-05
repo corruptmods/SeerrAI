@@ -9,10 +9,9 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 /**
- * Reads a message the way Telegram reads MarkdownV2, returning the words a
- * person sees and the links in it, and throwing where Telegram would refuse
- * the message: a reserved character left unescaped outside the bold and link
- * markup, or a link address with an unescaped ")" or "\".
+ * Parses MarkdownV2 as Telegram does, returning visible text and links. Throws
+ * where Telegram would reject: a bare reserved character, or a link URL with
+ * an unescaped ")" or "\".
  */
 const readMarkdownV2 = (text: string) => {
   const reserved = '_*[]()~`>#+-=|{}.!\\';
@@ -28,7 +27,7 @@ const readMarkdownV2 = (text: string) => {
       if (label !== null) label += next;
       else shown += next;
     } else if (ch === '*') {
-      // Bold on or off: markup, not words.
+      // Bold toggle, not text.
     } else if (ch === '[' && label === null) {
       label = '';
     } else if (ch === ']' && label !== null) {
@@ -209,7 +208,7 @@ describe('Telegram messages', () => {
       }
     ) as { text?: string; caption?: string; photo?: string };
 
-    // Telegram refuses a caption over 1024 characters outright.
+    // Telegram rejects captions over 1024 characters.
     assert.equal(built.photo, undefined);
     assert.equal(built.caption, undefined);
     assert.ok(readMarkdownV2(built.text!).shown.includes('r.'.repeat(250)));

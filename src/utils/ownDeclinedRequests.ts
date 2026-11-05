@@ -1,6 +1,6 @@
 import { MediaRequestStatus } from '@server/constants/media';
 
-/** The parts of a request this reads. */
+/** The request fields this reads. */
 export interface RequestLike {
   id: number;
   status: MediaRequestStatus;
@@ -11,9 +11,8 @@ export interface RequestLike {
 }
 
 /**
- * What a person is told on a title's page about their own declined requests:
- * for each quality (4K or not), their latest request, if it was declined with
- * a reason. A request made since takes its place, and says nothing here.
+ * The viewer's declined requests to show on a title page: per quality (4K or
+ * not), their latest request if declined with a reason. A newer request hides it.
  */
 export const ownDeclinedRequests = (
   requests: RequestLike[] | undefined,

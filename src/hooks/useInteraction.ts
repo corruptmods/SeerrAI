@@ -6,7 +6,7 @@ export const INTERACTION_TYPE = {
   TOUCH: 'touch',
 };
 
-const UPDATE_INTERVAL = 1000; // Throttle updates to the type to prevent flip flopping
+const UPDATE_INTERVAL = 1000; // Throttle type changes to avoid flip-flopping.
 
 const useInteraction = (): boolean => {
   const [isTouch, setIsTouch] = useState(false);

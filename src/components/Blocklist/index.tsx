@@ -75,11 +75,9 @@ const Blocklist = () => {
   const updateQueryParams = useUpdateQueryParams({ page: page.toString() });
 
   /*
-   * Keep the filter, page size and search across opening a title and coming
-   * back. The Requests, Issues and Users pages already saved theirs; this one
-   * reset to "Manual" and 10 per page every time. Filter and page size are
-   * remembered like on those pages; the search only for this browser tab, so
-   * it survives Back without lingering into a later visit.
+   * Restore filter, page size and search after visiting a title. Filter and
+   * page size persist like the Requests page; search only for this tab, so it
+   * survives Back without lingering into a later visit.
    */
   useEffect(() => {
     try {
@@ -100,9 +98,9 @@ const Blocklist = () => {
         setSearchFilter(search);
       }
     } catch {
-      // Unreadable settings just mean starting from the defaults.
+      // Unreadable: use defaults.
     }
-    // Restores once on arrival; saving is handled separately below.
+    // Restore once on mount; saving is below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,12 +111,11 @@ const Blocklist = () => {
         JSON.stringify({ currentFilter, currentPageSize })
       );
     } catch {
-      // Storage can be unavailable (private mode); nothing to do.
+      // Storage unavailable (private mode).
     }
   }, [currentFilter, currentPageSize]);
 
-  // Skips the save on arrival, which would otherwise write an empty search
-  // over the saved one before the restored value has come through.
+  // Skip the first save, which would overwrite the saved search before the restore lands.
   const skipFirstSearchSave = useRef(true);
   useEffect(() => {
     if (skipFirstSearchSave.current) {
@@ -149,16 +146,12 @@ const Blocklist = () => {
     }
   );
 
-  // check if there's no data and no errors in the table
-  // so as to show a spinner inside the table and not refresh the whole component
   if (!data && error) {
     return <ErrorPage statusCode={500} />;
   }
 
   const searchItem = (e: ChangeEvent<HTMLInputElement>) => {
-    // Remove the "page" query param from the URL
-    // so that the "skip" query param on line 62 is empty
-    // and the search returns results without skipping items
+    // Drop ?page so the new search starts at the first page.
     if (router.query.page) router.replace(router.basePath);
 
     setSearchFilter(e.target.value as string);
@@ -338,8 +331,7 @@ interface BlocklistedItemProps {
 const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const { addToast } = useToasts();
-  // The title, and with it the pictures, load once the row is near the
-  // screen, so they are there by the time it is scrolled to.
+  // Load the title and images once the row is near the screen.
   const { ref, near, nearness } = useNearScreen();
   const intl = useIntl();
   const { hasPermission } = useUser();

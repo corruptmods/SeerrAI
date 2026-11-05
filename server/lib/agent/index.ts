@@ -75,24 +75,23 @@ import type { FindOptionsWhere } from 'typeorm';
 import { In, LessThan, MoreThan } from 'typeorm';
 
 /*
- * The admin agent: a model with the tools an admin would use to get a
- * stuck title downloaded. It starts on its own for a requested title that
- * Backfill's search found nothing usable for, and runs when an admin asks
- * it something. One run at a time; each is kept with every step it took,
- * and any download it starts is told to admins.
+ * The admin agent: a model with an admin's tools for getting a stuck title
+ * downloaded. It starts on its own for a requested title Backfill's search
+ * found nothing usable for, and when an admin asks it something. One run at
+ * a time; each keeps every step, and admins are told of any download.
  *
- * It decides what to try. What it may change is decided by the tools: on
- * its own, only missing episodes, within a size and a daily limit, in
- * English or the title's own language. Anything more an admin asks for
- * (replacing a file, blocking a release group, deleting files, marking a
- * download failed, changing a profile) it only proposes: the run waits,
- * and nothing happens until an admin approves.
+ * The model decides what to try; the tools decide what it may change. On
+ * its own: only missing episodes, within size and daily limits, in English
+ * or the title's original language. Anything more (replacing a file,
+ * blocking a release group, deleting files, marking a download failed,
+ * changing a profile) it only proposes, and nothing happens until an admin
+ * approves.
  */
 
 export { answerCalls, compact } from '@server/lib/agent/conversation';
 
 const LABEL = 'Agent';
-/** Tools run in one go at most; more would hammer the indexers. */
+/** Max tool calls per turn; more would hammer the indexers. */
 const MAX_CALLS_PER_TURN = 12;
 const readOnly = (name: string) =>
   !!TOOLS.find((tool) => tool.name === name)?.readOnly;
@@ -102,22 +101,22 @@ const MAX_STEPS_KEPT = 400;
 /** How often old conversations are cleared out. */
 const PURGE_EVERY_MS = 6 * 60 * 60 * 1000;
 const FINISHED: AgentRun['status'][] = ['done', 'failed'];
-/** How often a held report is checked on. */
+/** How often held reports are checked. */
 const HOLD_CHECK_MS = 60 * 1000;
-/** A report is held no longer than this for searches still going. */
+/** Longest a report is held for searches still running. */
 const HOLD_LONGEST_MS = 6 * 60 * 60 * 1000;
 /**
- * Waits before each new try while the AI service can't be reached, is busy
- * or too slow, all within the run: about eight minutes in all.
+ * Waits between retries within a run while the AI service is unreachable,
+ * busy or too slow: about eight minutes in all.
  */
 const OUTAGE_WAITS_MS = [15_000, 30_000, 60_000, 120_000, 240_000];
 /**
- * A run that failed so is picked up again once the service answers: asked
- * this often, for up to a day after the run first lost it.
+ * A run that failed that way resumes once the service answers: checked this
+ * often, for up to a day after the run first lost it.
  */
 const OUTAGE_CHECK_MS = 5 * 60 * 1000;
 const OUTAGE_LONGEST_MS = DAY;
-/** A replaced season is followed this long for its new files to import. */
+/** How long a replaced season is followed for its new files to import. */
 const FOLLOW_LONGEST_MS = 2 * 24 * 60 * 60 * 1000;
 const UNFINISHED: AgentRun['status'][] = [
   'held',
@@ -126,9 +125,8 @@ const UNFINISHED: AgentRun['status'][] = [
   'waiting',
 ];
 /**
- * A run that failed for want of the AI service, waiting for it to answer:
- * since when it first lost it. `lostSince` stays on a run picked up again,
- * so losing it again doesn't start its day afresh.
+ * When a run waiting on the AI service first lost it. `lostSince` stays on
+ * a resumed run, so losing it again doesn't restart its day.
  */
 const outageOf = (run: AgentRun) =>
   (run.memory as { outage?: { since: string } } | null)?.outage;
@@ -147,13 +145,13 @@ const withoutOutage = (run: AgentRun): AgentRun['memory'] => {
 };
 
 /**
- * Replacements of a failed download (for the same episodes) that may fail
- * in a day before the agent stops looking for more and tells admins.
+ * How many replacements of a failed download (same episodes) may fail in a
+ * day before the agent stops and tells admins.
  */
 const MAX_FAILED_REPLACEMENTS = 3;
 /**
- * The runs that are its own looking: they count towards the runs it starts
- * in a day. One that went on after a failed download is still the run it was.
+ * Purposes that count toward the runs it starts in a day. A run continued
+ * after a failed download is still the same run.
  */
 const COUNTED: AgentRun['purpose'][] = ['work', 'retry'];
 const SEARCH_COMMANDS = new Set([
@@ -164,7 +162,7 @@ const SEARCH_COMMANDS = new Set([
   'MoviesSearch',
 ]);
 
-/** An admin's answer to a proposal, carried out when the run goes on. */
+/** An admin's answer to a proposal, carried out when the run resumes. */
 interface Decision {
   by: string;
   changes: ProposedChange[];
@@ -173,7 +171,7 @@ interface Decision {
 export const proposalOf = (run: AgentRun): Proposal | undefined =>
   (run.memory as { proposal?: Proposal } | null)?.proposal;
 
-/** What an admin approved that a run never got to, said so. */
+/** Says what an admin approved that the run never got to. */
 const notDone = (decision: Decision): string =>
   `What ${decision.by} approved was not done: ${decision.changes
     .map((c) => c.headline)
@@ -186,7 +184,7 @@ const trimSteps = (run: AgentRun): void => {
   }
 };
 
-/** The downloads these runs started since a time. */
+/** Count of downloads these runs started since `since`. */
 const grabsSince = (runs: Pick<AgentRun, 'actions'>[], since: number) =>
   runs.reduce(
     (n, r) =>
@@ -197,38 +195,38 @@ const grabsSince = (runs: Pick<AgentRun, 'actions'>[], since: number) =>
     0
   );
 
-/** Where a report's run was asked from, kept with it. */
+/** The report a run came from, kept with it. */
 interface ReportMemory {
   issueId?: number;
   seasonNumber?: number;
-  /** Reported by an admin: their ask, not the agent starting on its own. */
+  /** Reported by an admin: their ask, not the agent acting on its own. */
   byAdmin?: boolean;
   /**
-   * The issue has had its answer: an admin's follow-ups after it stay
-   * between them and the agent.
+   * The issue has been answered; an admin's later follow-ups stay between
+   * them and the agent.
    */
   answered?: boolean;
-  /** The files are there but bad: they are to be replaced, not filled. */
+  /** The files exist but are bad: replace, don't fill. */
   replace?: boolean;
   /**
-   * Not a search: a replaced season, followed until its new files have
-   * imported, to tell whoever reported it.
+   * Not a search: a replaced season, followed until its new files import,
+   * to tell whoever reported it.
    */
   follow?: { episodeIds: number[] };
 }
 
-/** What a run asked of an admin without the model, from a report. */
+/** A run that asked an admin directly from a report, without the model. */
 interface DirectMemory {
-  /** Approved, its change is made and the run ends; no model is asked. */
+  /** On approval the change is made and the run ends; no model is asked. */
   direct?: boolean;
 }
 
 const directOf = (run: AgentRun): boolean =>
   !!(run.memory as DirectMemory | null)?.direct && !run.conversation.length;
 
-/** Downloads it started that failed, which it was told to look again for. */
+/** Failed downloads it started and was told to look again for. */
 interface FollowUpMemory {
-  /** Told, and not yet settled: replaced, or nothing else found. */
+  /** Told but not yet settled (replaced, or nothing else found). */
   lookingFor?: number[];
 }
 
@@ -236,8 +234,8 @@ const lookingForOf = (run: AgentRun): number[] =>
   (run.memory as FollowUpMemory | null)?.lookingFor ?? [];
 
 /**
- * "S06E03", "S06E01-E02, S06E05", "the movie" or "4 tracks": what a
- * download was for.
+ * What a download was for: "S06E03", "S06E01-E02, S06E05", "the movie" or
+ * "4 tracks".
  */
 const jobWhat = (job: BackfillJob, kind: AgentRun['kind']): string =>
   kind === 'movie'
@@ -257,9 +255,7 @@ const jobWhat = (job: BackfillJob, kind: AgentRun['kind']): string =>
           ),
         ].join(', ');
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** The runs among these with a Backfill download they started still going. */
+/** Runs among these with a Backfill download they started still running. */
 const downloading = async (runs: AgentRun[]): Promise<Set<number>> => {
   const byJob = new Map<number, number>();
   for (const run of runs) {
@@ -280,9 +276,9 @@ const downloading = async (runs: AgentRun[]): Promise<Set<number>> => {
 };
 
 /**
- * Deletes finished conversations matching `where`, leaving any whose
- * downloads are still going: a conversation is not over until they have
- * imported or failed.
+ * Deletes finished conversations matching `where`, except those with
+ * downloads still running: a conversation isn't over until they import or
+ * fail.
  */
 const deleteFinished = async (
   where: FindOptionsWhere<AgentRun>
@@ -301,8 +297,8 @@ const deleteFinished = async (
 };
 
 /**
- * Failed downloads that deleted conversations were to look again for: with
- * the conversation gone, nothing else will be found.
+ * Clears the follow-up on failed downloads of deleted conversations, since
+ * nothing will look again for them.
  */
 const stopLooking = (runIds: number[]) =>
   getRepository(BackfillJob).update(
@@ -310,7 +306,7 @@ const stopLooking = (runIds: number[]) =>
     { followUp: 'none' }
   );
 
-/** Whether it has already looked for this title on its own. */
+/** Whether the agent has already run on its own for this title. */
 const triedOn = async (title: {
   kind: 'series' | 'movie' | 'album';
   serverId: number;
@@ -326,7 +322,7 @@ const triedOn = async (title: {
 const reportOf = (run: AgentRun): ReportMemory =>
   ((run.memory ?? {}) as { report?: ReportMemory }).report ?? {};
 
-/** A series, movie or album (the agent's titles) as its runs are kept by. */
+/** A series, movie or album, as runs are keyed. */
 interface AgentTitle {
   kind: 'series' | 'movie' | 'album';
   serverId: number;
@@ -339,21 +335,21 @@ const sameTitle = (title: AgentTitle): AgentTitle => ({
   arrId: title.arrId,
 });
 
-/** A conversation that isn't there (deleted, or never was). */
+/** A conversation that doesn't exist (deleted, or never did). */
 export class NoSuchRun extends Error {}
 
-/** What an admin said or did to a run while it works. */
+/** What admins said or did to a run while it works. */
 interface Live {
   /** Who stopped it; it stops before its next step. */
   stopBy?: string;
-  /** What admins said, read before its next step. */
+  /** Admins' messages, read before its next step. */
   notes: { by: string; text: string }[];
 }
 
-/** The most that can wait to be read at once. */
+/** Max notes waiting to be read at once. */
 const MAX_NOTES = 10;
 
-/** A run asked to get everything missing, not one particular thing. */
+/** An ask for everything missing, not one particular thing. */
 const BROAD_ASK =
   /\b(missing|whatever|everything|all of it|the rest|complete)\b/i;
 
@@ -367,12 +363,12 @@ class Agent {
   private purgeTimer?: NodeJS.Timeout;
   private holdTimer?: NodeJS.Timeout;
   private checkingHeld = false;
-  /** When the AI service was last asked whether it answers again. */
+  /** When the AI service was last checked for answering again. */
   private outageCheckedAt = 0;
-  /** Changed only by tests, which can't wait minutes. */
+  /** Overridden only by tests, which can't wait minutes. */
   public outageWaitsMs = OUTAGE_WAITS_MS;
 
-  /** Picks up after a restart, and hears of Backfill's empty searches. */
+  /** Resumes after a restart and subscribes to Backfill's empty searches. */
   public async init(): Promise<void> {
     if (this.started) return;
     this.started = true;
@@ -423,10 +419,10 @@ class Agent {
   }
 
   /**
-   * Someone reported a title missing, and Sonarr's or Radarr's search and
-   * Backfill's have been started for it. The agent looks further once they
-   * are over, if they found nothing: held until then. Only when it may run
-   * on its own, and not while it is already on the title.
+   * After a title is reported missing and Sonarr's or Radarr's and
+   * Backfill's searches have started, holds a run that looks further if
+   * they find nothing. Only when it may run on its own and isn't already
+   * on the title.
    */
   public async afterReport(report: {
     kind: 'series' | 'movie';
@@ -436,7 +432,7 @@ class Agent {
     reporter: User;
     issueId?: number;
     seasonNumber?: number;
-    /** The files are there but bad, and should be replaced. */
+    /** The files exist but are bad, and should be replaced. */
     replace?: boolean;
   }): Promise<AgentRun | null> {
     const settings = getSettings().backfill;
@@ -448,8 +444,8 @@ class Agent {
       serverId: report.serverId,
       arrId: report.arrId,
     };
-    // Only work under way holds a report up: not a change waiting for an
-    // admin, a season being followed, or a go looking again by itself.
+    // Only active work blocks a report, not a change awaiting an admin, a
+    // followed season, or a retry on its own.
     if (
       await runs.count({
         where: { ...title, status: In(UNFINISHED), purpose: 'work' },
@@ -457,8 +453,8 @@ class Agent {
     ) {
       return null;
     }
-    // An admin reporting it is asking; anyone else's report is the agent
-    // starting on its own, which it does once per title.
+    // An admin's report is an ask; anyone else's starts the agent on its
+    // own, which happens once per title.
     const byAdmin = report.reporter.hasPermission(Permission.ADMIN);
     if (!byAdmin && (await triedOn(title))) return null;
     if ((await this.runsToday()) >= settings.agent.maxAutoRunsPerDay) {
@@ -492,10 +488,10 @@ class Agent {
   }
 
   /**
-   * Puts a change to admins on someone's behalf, without the model: a run
-   * waiting for approval, told to admins as any proposal is. Approved, the
-   * change is made and the run ends; declined, nothing happens. Null when
-   * the agent cannot work, so nobody could approve it.
+   * Proposes a change to admins on someone's behalf, without the model: a
+   * run awaiting approval, announced like any proposal. Approved, the change
+   * is made and the run ends; declined, nothing happens. Null when the agent
+   * cannot work, so nobody could approve it.
    */
   public async awaitApproval(input: {
     title: TitleRef;
@@ -504,7 +500,7 @@ class Agent {
     reporter: User;
     issueId?: number;
     seasonNumber?: number;
-    /** What they asked, in their words. */
+    /** Their request, in their words. */
     ask: string;
   }): Promise<AgentRun | null> {
     if (this.problem(await owner())) return null;
@@ -551,8 +547,8 @@ class Agent {
   }
 
   /**
-   * Follows a replaced season until its new files have imported, then says
-   * so on the issue it was reported on. Checked with the held reports.
+   * Follows a replaced season until its new files import, then says so on
+   * the reported issue. Checked with the held reports.
    */
   public async follow(input: {
     title: TitleRef;
@@ -587,9 +583,9 @@ class Agent {
   }
 
   /**
-   * Runs that failed because the AI service couldn't be reached carry on
-   * once it answers again: asked every few minutes, without spending
-   * anything, for a day after each first lost it.
+   * Resumes runs that failed because the AI service was unreachable, once it
+   * answers again. Checked every few minutes at no cost, for a day after
+   * each first lost it.
    */
   public async checkOutages(now = Date.now()): Promise<void> {
     if (now - this.outageCheckedAt < OUTAGE_CHECK_MS) return;
@@ -627,7 +623,7 @@ class Agent {
         kind: 'error',
         text: 'The AI service answers again, so it carries on.',
       });
-      // Only while it is still as it was: an admin may have replied.
+      // Only if still failed: an admin may have replied meanwhile.
       const queued = await runs.update(
         { id: run.id, status: 'failed' },
         { status: 'queued', error: null }
@@ -643,8 +639,8 @@ class Agent {
   }
 
   /**
-   * One turn of the model, tried again while its service can't be reached,
-   * is busy or too slow. Null when an admin stopped the run meanwhile.
+   * One model turn, retried while the service is unreachable, busy or too
+   * slow. Null when an admin stopped the run meanwhile.
    */
   private async turnOf(
     runId: number,
@@ -676,7 +672,7 @@ class Agent {
     }
   }
 
-  /** Looks at every held report; one at a time. */
+  /** Checks every held report; one check at a time. */
   public async checkHeld(now = Date.now()): Promise<void> {
     if (this.checkingHeld) return;
     this.checkingHeld = true;
@@ -702,10 +698,10 @@ class Agent {
           }
         }
         if ('wait' in verdict) continue;
-        // Only while it is still held: an admin may have replied to it
-        // while it was being checked on, and their reply stands.
+        // Only if still held: an admin may have replied during the check,
+        // and their reply stands.
         const held = { id: run.id, status: 'held' as const };
-        // A followed season tells whoever reported it how it ended.
+        // A followed season tells its reporter how it ended.
         const following = !!reportOf(run).follow;
         if ('notNeeded' in verdict) {
           const settled = await runs.update(held, {
@@ -739,9 +735,9 @@ class Agent {
   }
 
   /**
-   * A held report that could not be checked on is given up when its title
-   * or its server is gone, or once it has been held as long as a report is.
-   * Otherwise it is tried again at the next check.
+   * Gives up a held report that couldn't be checked when its title or
+   * server is gone, or it has been held the maximum time. Otherwise null,
+   * to retry at the next check.
    */
   private cannotCheck(
     run: AgentRun,
@@ -774,8 +770,8 @@ class Agent {
   }
 
   /**
-   * Whether a replaced season is back: every episode a new release was
-   * grabbed for has a file again. Given up on after two days.
+   * Whether a replaced season is back: every episode grabbed for has a file
+   * again. Given up after two days.
    */
   private async followVerdict(
     run: AgentRun,
@@ -803,7 +799,7 @@ class Agent {
     }
     const names = waiting
       .slice(0, 12)
-      .map((ep) => `S${pad(ep.seasonNumber)}E${pad(ep.episodeNumber)}`)
+      .map((ep) => episodeLabel(ep.seasonNumber, ep.episodeNumber))
       .join(', ');
     return {
       failed: `${season} of ${run.title ?? 'the series'} is not all back after two days: ${names} still ${
@@ -813,9 +809,9 @@ class Agent {
   }
 
   /**
-   * Whether a held report goes ahead: not while Sonarr or Radarr is still
-   * searching for the title or Backfill is (for a few hours at most), not
-   * when either found something, and not when nothing is missing now.
+   * Whether a held report goes ahead: not while Sonarr, Radarr or Backfill
+   * is still searching (for a few hours at most), not when either found
+   * something, and not when nothing is missing now.
    */
   private async holdVerdict(
     run: AgentRun,
@@ -825,8 +821,8 @@ class Agent {
   > {
     const report = reportOf(run);
     if (report.follow) return this.followVerdict(run, report.follow, now);
-    // Bad files to replace: Sonarr's search for another release is already
-    // over, and nothing is missing to wait for.
+    // Bad files to replace: Sonarr's search is already over, and nothing is
+    // missing to wait for.
     if (report.replace) return { go: true };
     const young = now - new Date(run.createdAt).getTime() < HOLD_LONGEST_MS;
     const { seasonNumber } = report;
@@ -907,8 +903,8 @@ class Agent {
   }
 
   /**
-   * Finished conversations older than the days kept, gone. A conversation
-   * waiting on an answer stays. What a run downloaded is not touched.
+   * Deletes finished conversations older than the days kept. Conversations
+   * awaiting an answer stay; downloaded files are not touched.
    */
   public async purge(now = Date.now()): Promise<number> {
     const days = getSettings().backfill.agent.keepDays;
@@ -924,7 +920,7 @@ class Agent {
     return deleted;
   }
 
-  /** One conversation gone, unless it is working right now. */
+  /** Deletes one conversation, unless it is working or downloading. */
   public async remove(id: number): Promise<boolean> {
     const runs = getRepository(AgentRun);
     const run = await runs.findOne({ where: { id } });
@@ -943,14 +939,14 @@ class Agent {
   }
 
   /**
-   * Every finished conversation gone. Ones waiting on an answer stay, and
-   * so do ones whose downloads are still going.
+   * Deletes every finished conversation, except those awaiting an answer or
+   * with downloads still running.
    */
   public async clearFinished(): Promise<number> {
     return deleteFinished({});
   }
 
-  /** Why the agent cannot work for this person now, or null. */
+  /** Why the agent cannot work for this user now, or null. */
   public problem(user?: User | null): string | null {
     if (!aiFeatureOn('aiAgent', user)) {
       return 'The admin agent needs AI set up, with Admin Agent turned on, in Settings → AI.';
@@ -960,8 +956,8 @@ class Agent {
   }
 
   /**
-   * An admin's ask, about any title or (from a title's page) about that
-   * one, which the run is then bound to from the start.
+   * An admin's ask, about any title, or from a title's page about that one,
+   * binding the run to it from the start.
    */
   public async ask(
     text: string,
@@ -995,8 +991,8 @@ class Agent {
   }
 
   /**
-   * An admin's answer, correction or follow-up to a run: it goes on from
-   * where it was, with everything it found so far.
+   * An admin's answer, correction or follow-up; the run resumes where it
+   * was, with everything found so far.
    */
   public async reply(id: number, text: string, user: User): Promise<AgentRun> {
     const problem = this.problem(user);
@@ -1005,9 +1001,9 @@ class Agent {
     let run = await runs.findOne({ where: { id } });
     if (!run) throw new NoSuchRun('There is no such conversation.');
     const said = text.trim().slice(0, MAX_ASK);
-    // Working on it, or waiting its turn: read before its next step. Told
-    // apart by what is in hand now, not by the status read above, which a
-    // run finishing meanwhile leaves out of date.
+    // Working or queued: read before its next step. Decided by in-memory
+    // state, not the status read above, which may be stale if the run just
+    // finished.
     if (this.current === id || this.queue.includes(id)) {
       const live = this.live.get(id) ?? { notes: [] };
       if (live.stopBy) throw new Error('It is stopping.');
@@ -1019,7 +1015,7 @@ class Agent {
       return run;
     }
     if (run.status === 'queued' || run.status === 'running') {
-      // It finished between the read above and now: read it again.
+      // It finished since the read above: read it again.
       run = await runs.findOne({ where: { id } });
       if (!run) throw new NoSuchRun('There is no such conversation.');
       if (run.status === 'queued' || run.status === 'running') {
@@ -1031,9 +1027,9 @@ class Agent {
       kind: 'reply',
       text: `${user.displayName}: ${said}`,
     });
-    // Answering instead of approving leaves the proposal undone. An
-    // approval a failed run never got to is not carried out now either:
-    // the admin approved it for then, not for whenever it is next replied to.
+    // Replying instead of approving drops the proposal. An approval a failed
+    // run never got to is dropped too: it was approved for then, not for
+    // whenever the run is next replied to.
     const pending = proposalOf(run);
     const {
       proposal: _dropped,
@@ -1060,9 +1056,9 @@ class Agent {
     run.status = 'queued';
     run.question = null;
     run.error = null;
-    // An admin talking to it makes it their work again.
+    // An admin's reply makes it their work again.
     if (run.purpose === 'retry') run.purpose = 'work';
-    // The rest of the conversation acts as whoever is talking to it now.
+    // The rest of the conversation acts as whoever is replying now.
     run.requestedById = user.id;
     run.requestedByName = run.requestedByName ?? user.displayName;
     await runs.save(run);
@@ -1072,9 +1068,8 @@ class Agent {
   }
 
   /**
-   * Stops a run that is waiting its turn or working, before its next step.
-   * What it already started carries on, and it can be replied to later to
-   * pick up where it was.
+   * Stops a queued or working run before its next step. What it started
+   * carries on, and a later reply resumes it where it was.
    */
   public async stop(id: number, user: User): Promise<AgentRun> {
     const runs = getRepository(AgentRun);
@@ -1089,9 +1084,8 @@ class Agent {
     if (!this.queue.includes(id)) {
       throw new Error('It is not working on this one.');
     }
-    // Out of the queue first, so it cannot start; anything said to it
-    // while it waited is kept, for when it is replied to; then read
-    // afresh, as nothing else writes it now.
+    // Dequeue first so it cannot start, keep anything said while it waited
+    // for a later reply, then reread it, as nothing else writes it now.
     this.queue = this.queue.filter((queued) => queued !== id);
     const notes = this.live.get(id)?.notes ?? [];
     this.live.delete(id);
@@ -1116,10 +1110,9 @@ class Agent {
   }
 
   /**
-   * What admins said as a run finished, too late for it to read: added to
-   * the conversation, each in its sayer's words. A run that finished goes
-   * on with it, unless it was stopped; one waiting on an admin keeps its
-   * question or proposal, and reads it when it goes on.
+   * Adds what admins said too late for a finishing run to read. With
+   * `resume`, a finished run goes on with it; one waiting on an admin keeps
+   * its question or proposal and reads it when it resumes.
    */
   private async deliverLate(
     id: number,
@@ -1147,9 +1140,9 @@ class Agent {
   }
 
   /**
-   * An admin approves what a run proposed: it goes on, carrying the changes
-   * out first, each checked again against how things are now. Only the
-   * proposal shown to them, and only once.
+   * Approves a run's proposal: the run resumes, first carrying out the
+   * changes, each rechecked against the current state. Only the proposal
+   * shown, and only once.
    */
   public async approve(
     id: number,
@@ -1159,7 +1152,7 @@ class Agent {
     return this.decide(id, proposalId, user, true);
   }
 
-  /** An admin declines it: nothing is changed, and the run is over. */
+  /** Declines a run's proposal: nothing changes, and the run ends. */
   public async decline(
     id: number,
     proposalId: string,
@@ -1217,7 +1210,7 @@ class Agent {
         };
         run.memory = { ...memory, decision };
         run.status = 'queued';
-        // It carries on as the admin who approved.
+        // It continues as the approving admin.
         run.requestedById = user.id;
         await runs.save(run);
         this.queue.push(run.id);
@@ -1235,7 +1228,7 @@ class Agent {
       run.status = 'done';
       run.summary = `${user.displayName} declined: ${headlines}. Nothing was changed.`;
       run.finishedAt = new Date();
-      // Asked for on someone's behalf: they hear it was turned down.
+      // Proposed on someone's behalf: they hear it was declined.
       if (direct && this.reportSettled(run)) {
         await runs.save(run);
         await this.comment(
@@ -1251,7 +1244,7 @@ class Agent {
     }
   }
 
-  /** Carries out approved changes, one by one; what came of each. */
+  /** Carries out approved changes in order, returning what came of each. */
   private async carryOut(
     decision: Decision,
     state: AgentState
@@ -1260,7 +1253,7 @@ class Agent {
     for (const change of decision.changes) {
       try {
         if (change.kind === 'replace' || change.kind === 'oversizeGrab') {
-          // The grab records itself, as any download it starts.
+          // The grab records itself, like any download it starts.
           const said = await startApprovedGrab(
             state,
             change.params.grab,
@@ -1284,7 +1277,7 @@ class Agent {
             detail: `${change.headline} (approved by ${decision.by}): ${outcome.message}`,
           });
           lines.push(`Done: ${outcome.message}`);
-          // Whoever reported it hears when the season is back.
+          // The reporter hears when the season is back.
           const report = reportOf(state.run);
           if (report.issueId && change.title) {
             await this.follow({
@@ -1328,9 +1321,9 @@ class Agent {
   }
 
   /**
-   * Backfill found nothing it could use for a title: look further, if
-   * someone asked for it, the agent has not tried it lately, and today's
-   * runs are not used up.
+   * When Backfill found nothing usable for a title, looks further if it was
+   * requested, the agent hasn't tried it lately, and today's runs aren't
+   * used up.
    */
   public async afterEmptySearch(row: BackfillSeries): Promise<AgentRun | null> {
     const settings = getSettings().backfill;
@@ -1383,9 +1376,8 @@ class Agent {
   }
 
   /**
-   * The runs it started in the last day without an admin asking: on its
-   * own, or for a report. A change waiting for approval and a followed
-   * season are not runs of its own.
+   * Runs started in the last day without an admin asking (automatic or for
+   * a report). Approval-only runs and followed seasons don't count.
    */
   private runsToday(): Promise<number> {
     return getRepository(AgentRun).count({
@@ -1416,9 +1408,9 @@ class Agent {
         errorMessage: e instanceof Error ? e.message : String(e),
       });
     } finally {
-      // Said as it finished, too late to be read: added for it to go on
-      // with. Still its run while this is done, so anything said meanwhile
-      // waits here too; then let go of at once, nothing in between.
+      // Deliver notes that arrived too late to read. It stays the current
+      // run meanwhile so new notes also land here, then is released with
+      // nothing in between.
       for (;;) {
         const live = this.live.get(id);
         if (!live?.notes.length) break;
@@ -1439,9 +1431,9 @@ class Agent {
   }
 
   /**
-   * Puts something to a run as its next message. One that has not had its
-   * first turn (stopped before it, a report replied to while held, a change
-   * approved on someone's behalf) is told what it was asked first.
+   * Adds a user message to a run. A run without a first turn yet (stopped
+   * before it, a held report replied to, a change approved on someone's
+   * behalf) gets its opening message first.
    */
   private tellRun(run: AgentRun, text: string): void {
     const opening = run.conversation.length
@@ -1454,11 +1446,7 @@ class Agent {
   }
 
   private firstMessage(run: AgentRun): string {
-    if (
-      run.trigger === 'ask' &&
-      run.arrId !== null &&
-      run.arrId !== undefined
-    ) {
+    if (run.trigger === 'ask' && run.arrId != null) {
       const ref = titleRef({
         kind: run.kind ?? 'series',
         serverId: run.serverId ?? 0,
@@ -1488,8 +1476,8 @@ class Agent {
     }
     if (run.trigger === 'report') {
       const { seasonNumber } = reportOf(run);
-      // Not the reporter's name: they chose it, and it is not for the model
-      // to read as anything. The page still shows who it was.
+      // Not the reporter's name: they chose it, so the model must not read
+      // it as anything. The page still shows who it was.
       return `Someone reported that ${run.title} (${ref}) is missing${
         seasonNumber !== undefined ? ` episodes in season ${seasonNumber}` : ''
       }. ${
@@ -1537,10 +1525,9 @@ class Agent {
         throw new Error(problem ?? 'There is no owner account.');
       }
 
-      // Downloads count by when each was started, in any conversation: an
-      // old one replied to today has no fresh day's worth. A go ends with
-      // its finish time set, so any run that started one in the last day
-      // finished a go since.
+      // Downloads count by start time across all conversations, so an old
+      // one replied to today gets no fresh day's worth. Each go sets the
+      // finish time, so any run that grabbed in the last day finished since.
       const dayAgo = Date.now() - DAY;
       const others = await runs.find({
         select: { id: true, actions: true },
@@ -1563,7 +1550,7 @@ class Agent {
         movies: new Map(),
         grabsToday,
         bind: (title: TitleRef, name: string) => {
-          if (run.arrId === null || run.arrId === undefined) {
+          if (run.arrId == null) {
             run.kind = title.kind;
             run.serverId = title.serverId;
             run.arrId = title.arrId;
@@ -1581,9 +1568,8 @@ class Agent {
           proposed.push(change);
         },
       };
-      // What it does is kept with the title, for later conversations about
-      // it, once it knows which title it works on.
-      // Each with the title its call named, or else the one it works on.
+      // Notes are kept per title for later conversations, once the title is
+      // known: the title its call named, else the bound one.
       const unfiled: { title?: TitleRef; note: AgentNote }[] = [];
       const fileNotes = () => {
         const bound = boundTitle(run);
@@ -1623,8 +1609,8 @@ class Agent {
 
       const ai = settings.ai;
       const model = modelFor('aiAgent');
-      // Read again each turn: an admin who replies while it works is in the
-      // conversation from then on.
+      // Recomputed each turn: an admin who replies mid-run is present from
+      // then on.
       const toolsNow = () =>
         TOOLS.filter((tool) => !tool.askOnly || adminPresent(run)).map(
           ({ name, description, parameters }) => ({
@@ -1642,11 +1628,11 @@ class Agent {
         : [{ role: 'user', text: this.firstMessage(run) }];
       let answer = '';
       const decision = (run.memory as { decision?: Decision }).decision;
-      // Asked for on someone's behalf, without the model: once approved,
-      // the change is made and that is all.
+      // Proposed on someone's behalf without the model: once approved, the
+      // change is made and that is all.
       const direct = directOf(run) && !!decision;
       if (decision) {
-        // Taken off first: whatever happens, an approval is carried out once.
+        // Removed first, so an approval runs once whatever happens.
         const { decision: _done, ...rest } = run.memory as {
           decision?: Decision;
         };
@@ -1663,9 +1649,9 @@ class Agent {
         }
       }
       const maxSteps = settings.backfill.agent.maxSteps;
-      // A go that runs out of steps mid-task carries on by itself, while it
-      // is getting somewhere: the first time always, after that only when
-      // the go before started a download.
+      // A go that runs out of steps continues on its own while making
+      // progress: the first time always, then only if the previous go
+      // started a download.
       const extraGoes = settings.backfill.agent.autoContinue;
       let goes = 0;
       let actionsAtGo = run.actions.length;
@@ -1673,8 +1659,8 @@ class Agent {
       let warned = false;
       // Who stopped it, if an admin did.
       let stoppedBy: string | undefined;
-      // Its searches over the whole conversation, to tell what it never
-      // looked for; and whether it was told so this time.
+      // Searches across the whole conversation, to find what it never
+      // looked for, and whether it was told so this time.
       const searched: MadeCall[] = [
         ...((run.memory as { searched?: MadeCall[] }).searched ?? []),
       ];
@@ -1685,15 +1671,15 @@ class Agent {
         BROAD_ASK.test(run.ask ?? '');
 
       for (; !direct; ) {
-        // An admin may stop it or tell it something while it works: read
-        // before every step.
+        // An admin may stop it or say something mid-run: checked before every
+        // step.
         const live = this.live.get(run.id);
         if (live?.stopBy) {
           stoppedBy = live.stopBy;
           break;
         }
-        // What earlier conversations tried for the title, told once it is
-        // known: at the start, or once it has found the title.
+        // What earlier conversations tried for the title, told once the title
+        // is known.
         const told = (run.memory as { notesTold?: boolean }).notesTold;
         const title = boundTitle(run);
         if (!told && title) {
@@ -1705,7 +1691,7 @@ class Agent {
             )
           );
           if (earlier) {
-            // Set apart from what the admin said: it is Seerr's record.
+            // Set apart from the admin's words: it is Seerr's record.
             const told = `---\n${earlier}`;
             const last = messages[messages.length - 1];
             if (last?.role === 'user') {
@@ -1760,9 +1746,8 @@ class Agent {
           calls: turn.calls,
           raw: turn.raw,
         });
-        // Done, by its own account, after searching: first, any missing
-        // episode its searches never named is put to it, once, when it was
-        // asked for everything.
+        // When it says it's done after searching for everything, it is told
+        // once about missing episodes its searches never named.
         if (
           !turn.calls.length &&
           !warned &&
@@ -1794,8 +1779,8 @@ class Agent {
           }
         }
         if (!turn.calls.length || warned) {
-          // Told to stop, it may still ask for tools: none is run, and
-          // each is answered so, or the conversation could not go on.
+          // Told to stop, it may still call tools: none run, but each gets
+          // an answer, or the conversation could not continue.
           if (turn.calls.length) {
             messages.push({
               role: 'tool',
@@ -1809,12 +1794,11 @@ class Agent {
           answer = turn.text;
           break;
         }
-        // Answers go in as they come back, so that should it stop part way,
-        // the ones it has are kept.
+        // Results are added as they arrive, so a partial stop keeps them.
         const results: ToolResult[] = [];
         messages.push({ role: 'tool', results });
-        // Calls that only look run together (searches can take minutes);
-        // anything that changes something runs alone, in the order asked.
+        // Consecutive read-only calls run together (searches can take
+        // minutes); anything that changes something runs alone, in order.
         const batches: (typeof turn.calls)[] = [];
         const skipped = turn.calls.slice(MAX_CALLS_PER_TURN);
         for (const call of turn.calls.slice(0, MAX_CALLS_PER_TURN)) {
@@ -1870,7 +1854,7 @@ class Agent {
                 }
                 unfiled.push({ title, note });
               }
-              // Its answer goes right after its call, as it comes back.
+              // Insert the result right after its call step.
               const answer: AgentStep = {
                 at: new Date().toISOString(),
                 kind: result.isError ? 'error' : 'result',
@@ -1985,7 +1969,7 @@ class Agent {
       run.status = 'failed';
       run.error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (isOutage(e)) {
-        // Picked up again by itself once the service answers.
+        // Resumes on its own once the service answers.
         const since = lostSince(run) ?? new Date().toISOString();
         run.memory = { ...withoutOutage(run), outage: { since } };
         run.error = `${run.error} It carries on by itself once the AI service answers again, for up to a day; or reply to have it try now.`;
@@ -1993,8 +1977,8 @@ class Agent {
         run.memory = withoutOutage(run);
       }
       step('error', run.error);
-      // An approval it never got to is dropped, not left to be carried out
-      // whenever the run is next replied to; the admin is told.
+      // Drop an approval it never got to, rather than carry it out on the
+      // next reply, and tell the admin.
       const { decision: undone, ...rest } = (run.memory ?? {}) as {
         decision?: Decision;
       };
@@ -2005,8 +1989,8 @@ class Agent {
         run.error = `${run.error}\n\n${note}`;
       }
     } finally {
-      // Kept as far as it got, with every call it made answered, so it can
-      // be replied to.
+      // Keep it as far as it got, with every call answered, so it can be
+      // replied to.
       if (messages) run.conversation = answerCalls(messages);
       run.finishedAt = new Date();
       answerIssue = this.reportSettled(run);
@@ -2017,14 +2001,14 @@ class Agent {
       () => undefined
     );
     if (answerIssue) await this.answerReport(run);
-    // Downloads it was looking again for are settled, and any that failed
-    // while it worked are handed to it now.
+    // Settle downloads it was looking again for, and hand it any that
+    // failed while it worked.
     await this.followFailures(run.id);
   }
 
   /**
-   * A download it started that failed, kept with its title. Best effort:
-   * what it does next doesn't wait on it working.
+   * Notes a failed download it started on its title. Best effort: nothing
+   * depends on it succeeding.
    */
   private async noteFailed(job: BackfillJob): Promise<void> {
     try {
@@ -2052,9 +2036,9 @@ class Agent {
 
   /**
    * A download it started failed for its release (Backfill found no good
-   * pack to take its place). It looks again in the same conversation, with
-   * the same say as before, unless replacements for the same episodes have
-   * failed three times today or its downloads for the day are used up.
+   * pack to replace it). It looks again in the same conversation, with the
+   * same permissions, unless replacements for those episodes failed
+   * MAX_FAILED_REPLACEMENTS times today or today's downloads are used up.
    * Null when it can't look: the conversation is gone or it can't work.
    */
   public async afterFailedDownload(job: BackfillJob): Promise<AgentHandBack> {
@@ -2080,8 +2064,7 @@ class Agent {
       (other) =>
         startedByAgent(other) && jobEpisodes(other).some((id) => wanted.has(id))
     );
-    // The first of them was the download it was asked for; the rest were
-    // replacements.
+    // The first was the original download; the rest were replacements.
     const replacements = failed.length - 1;
     if (replacements >= MAX_FAILED_REPLACEMENTS) {
       return {
@@ -2105,8 +2088,7 @@ class Agent {
     if (job.agentRunId) {
       return runs.findOne({ where: { id: job.agentRunId } });
     }
-    // Started before downloads kept their conversation: found by what each
-    // recent one started.
+    // Jobs without agentRunId: found through recent runs' grabs.
     const recent = await runs.find({
       select: { id: true, actions: true },
       where: { createdAt: MoreThan(new Date(Date.now() - 30 * DAY)) },
@@ -2130,14 +2112,14 @@ class Agent {
     return grabsSince(runs, dayAgo);
   }
 
-  /** One at a time, so two failures at once tell a conversation once. */
+  /** Serializes follow-ups, so concurrent failures tell a run once. */
   private following: Promise<void> = Promise.resolve();
 
   /**
-   * After a go, or when a download it started fails: what it looked again
-   * for is settled (replaced, or nothing else found, which admins hear),
-   * and failed downloads it has not been told of start a go of their own.
-   * Only once a go is over: while it works or waits on an admin, they wait.
+   * After a go, or when a download it started fails: settles what it looked
+   * again for (replaced, or nothing else found, which admins hear), and
+   * starts a go for failed downloads it hasn't been told of. Only once a go
+   * is over; while it works or waits on an admin, they wait.
    */
   public followFailures(runId: number): Promise<void> {
     const next = this.following.then(() =>
@@ -2157,7 +2139,7 @@ class Agent {
     const runs = getRepository(AgentRun);
     const jobs = getRepository(BackfillJob);
     const run = await runs.findOne({ where: { id: runId } });
-    // While it works or waits on an admin, the conversation is theirs.
+    // While it works or waits on an admin, leave the conversation alone.
     if (!run || !FINISHED.includes(run.status)) return;
     const row = run.kind
       ? await getRepository(BackfillSeries).findOne({
@@ -2185,8 +2167,8 @@ class Agent {
         url: `/backfill/jobs/${job.id}`,
       });
 
-    // What it was told of: replaced since, or, once the conversation is
-    // over without that, nothing else was found.
+    // What it was told of was either replaced since or, with the go over,
+    // nothing else was found.
     const told = lookingForOf(run);
     for (const job of told.length
       ? await jobs.find({ where: { id: In(told) } })
@@ -2204,7 +2186,7 @@ class Agent {
       }
     }
 
-    // Failed downloads it started that it has not been told of yet.
+    // Failed downloads it started and hasn't been told of yet.
     const started = run.actions
       .filter((a) => a.type === 'grab' && !a.extended && a.jobId)
       .map((a) => a.jobId!);
@@ -2258,7 +2240,7 @@ class Agent {
     void this.pump();
   }
 
-  /** What it is told when downloads it started failed. */
+  /** The message telling it downloads it started failed. */
   private lookAgainText(failed: BackfillJob[], kind: AgentRun['kind']) {
     const what = [...new Set(failed.map((job) => jobWhat(job, kind)))].join(
       ', '
@@ -2288,10 +2270,10 @@ class Agent {
   }
 
   /**
-   * Whether this go answers the issue a title was reported on: the first
-   * go of the report's conversation to finish (one waiting on an admin, or
-   * failed, is for admins to see to first). Marks the report answered, so
-   * an admin's later follow-ups stay off the issue.
+   * Whether this go answers the reported issue: the first go of the
+   * report's conversation to finish done (waiting or failed ones are for
+   * admins first). Marks the report answered, so an admin's later
+   * follow-ups stay off the issue.
    */
   private reportSettled(run: AgentRun): boolean {
     const report = reportOf(run);
@@ -2308,21 +2290,21 @@ class Agent {
   }
 
   /**
-   * After each go: the title's history says what the agent did, and a run
-   * it started on its own marks the title, as it does that only once per
-   * title. After that only an admin starts it.
+   * After each go, records what the agent did in the title's history, and
+   * marks the title when the run was its own, since it runs on its own only
+   * once per title.
    */
   private async remember(
     run: AgentRun,
     actions: AgentRun['actions']
   ): Promise<void> {
     if (!run.kind || run.arrId == null) return;
-    // A go that ends waiting on an admin is noted for what it did; the rest
-    // is noted when the conversation is over.
+    // A go waiting on an admin is noted only for its actions; the rest when
+    // the conversation is over.
     const over = run.status === 'done' || run.status === 'failed';
     if (!over && !actions.length) return;
-    // A change asked for on someone's behalf is not the agent starting on
-    // its own, which it does once per title.
+    // A change proposed on someone's behalf isn't the agent acting on its
+    // own.
     const own =
       run.trigger === 'auto' ||
       (run.trigger === 'report' &&
@@ -2386,7 +2368,7 @@ class Agent {
     }
   }
 
-  /** A reported title's outcome, on the issue it was reported on. */
+  /** Posts a reported title's outcome on its issue. */
   private async answerReport(run: AgentRun): Promise<void> {
     await this.comment(
       run,
@@ -2394,7 +2376,7 @@ class Agent {
     );
   }
 
-  /** A comment on the issue a run's title was reported on, if any. */
+  /** Comments on the run's reported issue, if any. */
   private async comment(run: AgentRun, message: string): Promise<void> {
     const { issueId } = reportOf(run);
     if (!issueId) return;
@@ -2417,8 +2399,8 @@ class Agent {
   }
 
   /**
-   * A question goes to admins at once. What it did goes with Backfill's
-   * other news, gathered, so one busy run is one notification among them.
+   * Sends a question to admins at once. What it did is batched with
+   * Backfill's other news, so a busy run is one notification among them.
    */
   private async tell(run: AgentRun, actions: AgentRun['actions']) {
     if (!actions.length && run.status !== 'waiting') return;
@@ -2433,13 +2415,13 @@ class Agent {
           ? `${name}: the admin agent needs your approval`
           : `${name}: the admin agent has a question`,
         message: run.question ?? '',
-        // To the proposal, or the question and the box to answer it.
+        // Links to the proposal, or to the question's answer box.
         actionUrl: `/backfill/agent/${run.id}${
           proposal ? '#review' : '#answer'
         }`,
         actionUrlTitle: proposal ? 'Review' : 'Answer',
       });
-      // What it did before it stopped to ask is told as any other go's.
+      // What it did before asking is reported like any other go.
       if (!actions.length) return;
     }
     const count = (type: string) =>
@@ -2455,7 +2437,7 @@ class Agent {
       .map(([n, one, many]) => `${n} ${n === 1 ? one : many}`)
       .join(', ');
     const row =
-      run.kind && run.arrId !== null && run.arrId !== undefined
+      run.kind && run.arrId != null
         ? await getRepository(BackfillSeries)
             .findOne({
               where: {
@@ -2480,7 +2462,7 @@ class Agent {
 
 const agent = new Agent();
 
-// Told of every failed download it started, from the moment it is loaded.
+// Hears of every failed download it started, from load.
 backfill.onAgentDownloadFailed = (job) => agent.afterFailedDownload(job);
 
 export default agent;

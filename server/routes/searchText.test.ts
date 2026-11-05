@@ -10,8 +10,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * What each poster on a page can be filtered by, from stubbed TMDB details,
- * behind the real API validator.
+ * Filterable text for each poster on a page, from stubbed TMDB details, behind
+ * the real API validator.
  */
 
 setupTestDb();
@@ -30,7 +30,7 @@ stub('getMovie', async ({ movieId }: { movieId: number }) => {
   if (movieId === 404) {
     throw new Error('not found');
   }
-  // TMDB taking longer than the server waits before answering.
+  // TMDB slower than the server waits before answering.
   if (movieId === 777) {
     await new Promise((resolve) => setTimeout(resolve, 6500));
   }
@@ -173,8 +173,8 @@ describe('GET /discover/search-text', () => {
   });
 
   it('refuses an address with unescaped ":" and ",", so the page escapes them', async () => {
-    // Seerr's API validator rejects reserved characters in a query. The page
-    // once let axios send them as they were, and every request failed.
+    // Seerr's API validator rejects reserved characters in a query, so the
+    // client must encode them or every request fails.
     const res = await fetch(
       `http://127.0.0.1:${port}/api/v1/discover/search-text?ids=movie:11,tv:22`
     );
@@ -199,7 +199,7 @@ describe('GET /discover/search-text, when TMDB is slow', () => {
     assert.deepEqual(Object.keys(first.text), ['movie:776']);
     assert.deepEqual(first.pending, ['movie:777']);
 
-    // The lookup carried on in the background: asked again, it is there.
+    // The lookup continued in the background: asked again, it's there.
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const second = await get('movie:777');
 

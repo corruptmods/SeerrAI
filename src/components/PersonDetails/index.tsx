@@ -34,7 +34,7 @@ const PersonDetails = () => {
   const intl = useIntl();
   const router = useRouter();
   const updateQueryParams = useUpdateQueryParams({});
-  // In the page address, so it survives opening a title and coming back.
+  // In the URL, so it survives visiting a title and going back.
   const currentMediaType =
     router.query.mediaType === 'movie' || router.query.mediaType === 'tv'
       ? router.query.mediaType
@@ -43,7 +43,6 @@ const PersonDetails = () => {
     `/api/v1/person/${router.query.personId}`
   );
   const [showBio, setShowBio] = useState(false);
-  // Picking several of their films and series to request together.
   const { selecting, statusOf, pick, selectButton, bar } = useBulkRequest();
 
   const { data: combinedCredits, error: errorCombinedCredits } =
@@ -170,7 +169,7 @@ const PersonDetails = () => {
   );
 
   const controls = (
-    // The picker and Select side by side, the same height.
+    // Picker and Select side by side, equal height.
     <div className="mb-2 flex items-stretch gap-2 lg:mb-0">
       {mediaTypePicker}
       {selectButton}

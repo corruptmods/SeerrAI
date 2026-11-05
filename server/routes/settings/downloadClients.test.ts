@@ -11,8 +11,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Download clients in settings, against a stand-in SABnzbd that checks its
- * key as the real one does, behind the real OpenAPI validator.
+ * Download client settings against a stand-in SABnzbd that checks its key
+ * like the real one, behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -45,7 +45,7 @@ before(async () => {
     res.end(JSON.stringify({ queue: { slots: [] } }));
   });
 
-  // NZBGet behind basic auth, answering its version.
+  // NZBGet behind basic auth, answering with its version.
   nzbgetPort = await listen((req, res) => {
     const auth = Buffer.from(
       String(req.headers.authorization ?? '').replace(/^Basic /, ''),
@@ -74,7 +74,7 @@ before(async () => {
       err: { status?: number; message: string },
       _req: express.Request,
       res: express.Response,
-      // Express tells an error handler by its four parameters.
+      // Express detects an error handler by its four parameters.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: express.NextFunction
     ) => res.status(err.status ?? 500).json({ message: err.message })

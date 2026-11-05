@@ -27,9 +27,9 @@ const messages = defineMessages('components.Settings.SettingsFeatures', {
 });
 
 /**
- * The features turned off for everyone, and a change to one, saved at once.
- * Settings → Features switches all but music with it, and Settings → Music
- * switches music, so both change the one list.
+ * Features turned off for everyone, saved on each change. Settings → Features
+ * switches all but music and Settings → Music switches music; both edit this
+ * one list.
  */
 export const useFeaturesForEveryone = () => {
   const intl = useIntl();

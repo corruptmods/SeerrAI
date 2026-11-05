@@ -16,8 +16,7 @@ export const useToasts = () => {
     ) => {
       const id = toast.custom(
         (t) => {
-          // Our custom Toast component handles transitionState internally using `t.visible`
-          // We will pass appearance from options
+          // Toast handles transitions via `t.visible`; appearance comes from options.
           return (
             <Toast
               appearance={options?.appearance || 'info'}

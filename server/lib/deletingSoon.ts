@@ -8,17 +8,16 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
 /*
- * What each Maintainerr server is going to delete, and when, kept in memory.
+ * Each Maintainerr server's deletion schedule, in memory.
  *
- * Each server's schedule is held separately: if one cannot be reached, its
- * last good answer is kept and the others carry on, and the error is recorded
- * for the health page. Refreshed whenever it is older than REFRESH_AFTER_MS
- * when someone asks.
+ * Servers are held separately: an unreachable one keeps its last good answer
+ * and records the error for the health page. Refreshed on read once older
+ * than REFRESH_AFTER_MS.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REFRESH_AFTER_MS = 15 * 60 * 1000;
-/** How soon a Keep for a title not on the schedule may ask again. */
+/** Minimum wait before a Keep on an unscheduled title refreshes again. */
 const MISS_REFRESH_AFTER_MS = 60 * 1000;
 
 export interface DeletingSoonCollection {
@@ -46,7 +45,7 @@ interface ServerSnapshot {
   entries: Map<string, ServerEntry>;
 }
 
-/** A title as shown to people: soonest date, and what they may do. */
+/** A title as shown to users: soonest date and allowed actions. */
 export interface DeletingSoonItem {
   tmdbId: number;
   mediaType: VideoMediaType;
@@ -54,8 +53,8 @@ export interface DeletingSoonItem {
   showBadge: boolean;
   showInRow: boolean;
   /**
-   * Only when every server about to delete it allows Keep. Otherwise a Keep
-   * would postpone one deletion while another still went ahead.
+   * Only when every server about to delete it allows Keep; otherwise Keep
+   * would postpone one deletion while another goes ahead.
    */
   canKeep: boolean;
 }
@@ -77,9 +76,8 @@ export const isMaintainerrConfigured = (): boolean =>
   configuredServers().length > 0;
 
 /**
- * Whether a collection will actually delete its items. Season and episode
- * collections delete part of a show, so a "deleting" mark on the whole series
- * would be wrong; they are left out.
+ * Whether a collection deletes its items. Season and episode collections are
+ * excluded: they delete part of a show, so marking the whole series is wrong.
  */
 export const collectionDeletes = (collection: MaintainerrCollection): boolean =>
   collection.isActive &&
@@ -94,8 +92,7 @@ const fetchServer = async (
   const api = new MaintainerrAPI(server);
   const collections = (await api.getCollections()).filter(collectionDeletes);
 
-  // One at a time: a household has a handful of rules, and Maintainerr is not
-  // built for bursts.
+  // Sequential: there are few rules, and Maintainerr doesn't handle bursts.
   for (const collection of collections) {
     const mediaType =
       collection.type === 'movie' ? MediaType.MOVIE : MediaType.TV;
@@ -142,7 +139,7 @@ export const refreshDeletingSoon = async (): Promise<void> => {
     inFlight = (async () => {
       const servers = configuredServers();
 
-      // Forget servers that have been removed.
+      // Forget removed servers.
       for (const id of [...snapshots.keys()]) {
         if (!servers.some((server) => server.id === id)) {
           snapshots.delete(id);
@@ -161,8 +158,7 @@ export const refreshDeletingSoon = async (): Promise<void> => {
           snapshots.set(server.id, await fetchServer(server));
           lastErrors.delete(server.id);
         } catch (e) {
-          // Keep this server's last good answer rather than wiping its
-          // badges; the others are unaffected.
+          // Keep this server's last good answer instead of wiping its badges.
           lastErrors.set(server.id, { at: new Date(), message: e.message });
           logger.warn('Could not read the deletion schedule from Maintainerr', {
             label: 'Maintainerr',
@@ -182,8 +178,8 @@ export const refreshDeletingSoon = async (): Promise<void> => {
 };
 
 /**
- * When the server asked longest ago was last asked, answered or not; 0 for
- * a server just added, which has not been asked at all.
+ * Last attempt time of the least recently asked server; 0 if one was never
+ * asked.
  */
 const oldestAttempt = (): number =>
   Math.min(
@@ -197,9 +193,8 @@ const ensureFresh = async (): Promise<void> => {
     return;
   }
 
-  // By when each server was last asked, not last answered: one that cannot
-  // be reached is tried again after the same wait, rather than on every call
-  // (or, if it never answered, never).
+  // Go by last attempt, not last answer, so an unreachable server is retried
+  // after the same wait instead of on every call (or never).
   if (Date.now() - oldestAttempt() > REFRESH_AFTER_MS) {
     // Answer from what we have; refresh in the background.
     void refreshDeletingSoon();
@@ -217,9 +212,8 @@ const allKeys = (): Set<string> =>
   new Set([...snapshots.values()].flatMap((s) => [...s.entries.keys()]));
 
 /**
- * Reduces one title's plans to what people see: the soonest deletion that
- * falls within its server's "soon" window, and the features those servers
- * allow.
+ * Reduces a title's plans to what users see: the soonest deletion within its
+ * server's "soon" window, and the features those servers allow.
  */
 const toItem = (key: string): DeletingSoonItem | undefined => {
   const servers = new Map(configuredServers().map((s) => [s.id, s]));
@@ -269,8 +263,8 @@ export class NotScheduledError extends Error {}
 export class KeepNotAllowedError extends Error {}
 
 /**
- * Keeps a title by postponing it in every rule, on every server, that would
- * delete it — postponing in only one would leave another to delete it anyway.
+ * Keeps a title by postponing it in every rule on every server that would
+ * delete it; postponing in only one would let another delete it anyway.
  */
 export const keepTitle = async (
   mediaType: MediaType,
@@ -282,8 +276,7 @@ export const keepTitle = async (
   await ensureFresh();
 
   let item = toItem(key);
-  // It may have joined a rule since: ask again, though not more than once
-  // a minute however often someone asks to keep what isn't there.
+  // It may have joined a rule since: refresh, at most once a minute.
   if (!item && Date.now() - oldestAttempt() > MISS_REFRESH_AFTER_MS) {
     await refreshDeletingSoon();
     item = toItem(key);
@@ -303,8 +296,8 @@ export const keepTitle = async (
   for (const hold of holdsFor(key)) {
     const server = servers.get(hold.serverId);
 
-    // A server that doesn't allow Keep is left alone, even when its own
-    // deletion is too far off to stop Keep being offered.
+    // Skip servers that disallow Keep, even when their deletion is too far
+    // off to stop Keep being offered.
     if (!server?.allowKeep) {
       continue;
     }

@@ -14,7 +14,7 @@ const messages = defineMessages('components.Ai.IssueTriage', {
   caveat: 'From the report and comments only; check before acting on it.',
 });
 
-/** The likely cause and fix for a reported problem, for issue managers. */
+/** Likely cause and fix for an issue, for issue managers. */
 const IssueTriage = ({ issueId }: { issueId: number }) => {
   const intl = useIntl();
   const { on } = useAi();

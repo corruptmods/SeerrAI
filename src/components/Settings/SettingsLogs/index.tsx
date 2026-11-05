@@ -127,8 +127,7 @@ const SettingsLogs = () => {
     });
   };
 
-  // check if there's no data and no errors in the table
-  // so as to show a spinner inside the table and not refresh the whole component
+  // Error page only when nothing has loaded.
   if (!data && error) {
     return <ErrorPage statusCode={500} />;
   }

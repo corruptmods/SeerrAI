@@ -11,9 +11,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Which albums and artists a music search shows first. MusicBrainz scores
- * every exact match the same, so among those the most released album, then
- * the album over the single, comes first.
+ * Music search ranking. MusicBrainz scores every exact match the same, so
+ * release count, then album over single, decides.
  */
 
 const group = (

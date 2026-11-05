@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /*
- * Episode Sync reads Sonarr's series list once a pass, and a series' episodes
- * only when its counts there have moved since it was last synced.
+ * Episode Sync reads Sonarr's series list once per pass, and a series'
+ * episodes only when its counts changed since the last sync.
  */
 
 setupTestDb();
@@ -160,8 +160,8 @@ describe('Episode Sync', () => {
   });
 
   it('reads a just-requested show again once its season rows exist', async () => {
-    // Requested a moment ago: Sonarr already has files, but the scan that
-    // adds the show's season rows has not run yet.
+    // Just requested: Sonarr has files, but the scan that adds season rows
+    // hasn't run.
     const media = await getRepository(Media).save(
       new Media({
         tmdbId: 70005,
@@ -184,8 +184,7 @@ describe('Episode Sync', () => {
         media: Promise.resolve(media),
       } as never)
     );
-    // Sonarr's counts have not moved since: it is still read, as it was
-    // never stored.
+    // Counts unchanged, but read anyway since it was never stored.
     await episodeSync.run();
     assert.deepEqual(episodeCalls, [505, 505]);
     assert.equal(await availableOf(media), 3);
@@ -198,8 +197,8 @@ describe('Episode Sync', () => {
     await episodeSync.run();
     assert.equal(await availableOf(first), 2);
 
-    // Cleared, taking its seasons and episodes with it, then requested
-    // again: the same Sonarr series, whose counts have not moved.
+    // Cleared (with seasons and episodes) and requested again: same Sonarr
+    // series, unchanged counts.
     await getRepository(Media).delete(first.id);
     const again = await show(70006, 506);
 

@@ -28,9 +28,8 @@ import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 
 /*
- * What a music request's card and list row share: how it is named, where
- * it links, its picture, its albums and songs, its status, and approving, retrying
- * and removing it. Nothing here asks TMDB: music has no TMDB id.
+ * Shared by the music request card and list row. Nothing here calls TMDB:
+ * music has no TMDB id.
  */
 
 export const messages = defineMessages('components.Music.MusicRequest', {
@@ -51,7 +50,7 @@ const albumsOf = (request: Request) =>
 const songsOf = (request: Request) =>
   [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
 
-/** The one album, or one song, a request asked for, if that is all. */
+/** The request's single album or song, if it has only one. */
 const onlyOne = (request: Request) => {
   const albums = albumsOf(request);
   const songs = songsOf(request);
@@ -67,11 +66,11 @@ const onlyOne = (request: Request) => {
   return undefined;
 };
 
-/** Whom a music request is for. */
+/** The request's artist name. */
 export const musicRequestArtist = (request: Request, intl: IntlShape): string =>
   request.media?.foreignTitle || intl.formatMessage(messages.unknownArtist);
 
-/** What a music request asks for: the one album or song, or how many. */
+/** The single album or song name, or the counts. */
 export const musicRequestName = (request: Request, intl: IntlShape): string => {
   const one = onlyOne(request);
   if (one) {
@@ -95,10 +94,7 @@ export const musicRequestName = (request: Request, intl: IntlShape): string => {
 export const musicRequestTitle = (request: Request, intl: IntlShape): string =>
   `${musicRequestArtist(request, intl)} — ${musicRequestName(request, intl)}`;
 
-/**
- * The album's page for one album (or the one a song is from), the
- * artist's for more.
- */
+/** The album page for a single album or song, else the artist page. */
 export const musicRequestHref = (request: Request): string => {
   const album = onlyOne(request)?.albumMbid;
   return album
@@ -106,10 +102,7 @@ export const musicRequestHref = (request: Request): string => {
     : `/music/artist/${request.media?.foreignId}`;
 };
 
-/**
- * The album's cover for one album (or the one a song is from), a picture
- * of the artist otherwise.
- */
+/** The album cover for a single album or song, else the artist picture. */
 export const musicRequestImage = (request: Request): string | undefined => {
   const album = onlyOne(request)?.albumMbid;
   if (album) {
@@ -120,18 +113,18 @@ export const musicRequestImage = (request: Request): string | undefined => {
     : undefined;
 };
 
-/** What stands in for a missing picture: a record, or a person. */
+/** Fallback icon for a missing picture. */
 export const musicRequestFallback = (request: Request): 'album' | 'artist' =>
   onlyOne(request)?.albumMbid ? 'album' : 'artist';
 
-/** A song asked for, as a status: waiting, on its way, or here. */
+/** A song request's status as a media status. */
 const SONG_STATUS: Partial<Record<MediaRequestStatus, MediaStatus>> = {
   [MediaRequestStatus.PENDING]: MediaStatus.PENDING,
   [MediaRequestStatus.APPROVED]: MediaStatus.PROCESSING,
   [MediaRequestStatus.COMPLETED]: MediaStatus.AVAILABLE,
 };
 
-/** How many songs, with each one and where it is, on hover. */
+/** Song count, with each song's status on hover. */
 export const SongsField = ({
   request,
   className = 'card-field',
@@ -203,7 +196,7 @@ export const SongsField = ({
   );
 };
 
-/** How many albums, with each one and where it is, on hover. */
+/** Album count, with each album's status on hover. */
 export const AlbumsField = ({
   request,
   className = 'card-field',
@@ -249,7 +242,7 @@ export const AlbumsField = ({
   );
 };
 
-/** The request's status, as far as its albums have come. */
+/** The request's status, from its albums' progress. */
 export const MusicRequestBadge = ({ request }: { request: Request }) => {
   const intl = useIntl();
   if (request.status === MediaRequestStatus.DECLINED) {
@@ -274,7 +267,7 @@ export const MusicRequestBadge = ({ request }: { request: Request }) => {
       downloads={[
         ...albumDownloads(request.media?.downloadStatus, [
           ...albums.map((album) => album.albumMbid),
-          // The singles its songs come on.
+          // The singles its songs are on.
           ...songsOf(request).flatMap((song) =>
             song.singleMbid ? [song.singleMbid] : []
           ),
@@ -294,8 +287,8 @@ export const MusicRequestBadge = ({ request }: { request: Request }) => {
 };
 
 /**
- * The request as it is now (asked about again while it can be seen and is
- * still on its way), and what can be done to it.
+ * The live request (refreshed while in view and in progress) and its
+ * actions.
  */
 export const useMusicRequest = (request: Request, inView: boolean) => {
   const intl = useIntl();

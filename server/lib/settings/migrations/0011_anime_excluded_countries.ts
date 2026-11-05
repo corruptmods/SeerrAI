@@ -1,10 +1,8 @@
 import type { AllSettings } from '@server/lib/settings';
 
 /**
- * What counts as anime became a setting: the countries whose anime is left
- * out unless it is in Japanese. Until then, American titles were always left
- * out, so a server from before the setting keeps that rule. A new server
- * already has the setting (empty) when it first saves, and is left alone.
+ * Existing servers get US in animeExcludedCountries, the rule they had
+ * before it was a setting. New servers already have it (empty) and are skipped.
  */
 const migrateAnimeExcludedCountries = (settings: any): AllSettings => {
   if (

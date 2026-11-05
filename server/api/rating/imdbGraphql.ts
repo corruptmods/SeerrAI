@@ -24,7 +24,7 @@ const TITLE_RATING_QUERY = `query TitleRating($id: ID!) {
   }
 }`;
 
-/** The rating in a reply, or null when the title has none (yet). */
+/** The rating in a reply, or null when the title has none yet. */
 export const ratingFromResponse = (
   imdbId: string,
   response: IMDBTitleResponse
@@ -43,9 +43,8 @@ export const ratingFromResponse = (
 };
 
 /**
- * IMDb user ratings for any title, series included, from the API IMDb's own
- * site uses. Radarr's proxy (IMDBRadarrProxy) only knows movies, so series
- * ratings come from here. Like that proxy it is best-effort: unofficial, and
+ * IMDb user ratings for any title from the API IMDb's site uses; series come
+ * from here since IMDBRadarrProxy only has movies. Best effort: unofficial,
  * for limited non-commercial use, which a private Seerr is.
  */
 class IMDBGraphQL extends ExternalAPI {
@@ -77,7 +76,7 @@ class IMDBGraphQL extends ExternalAPI {
         43200
       );
       if (response.errors?.length && !response.data?.title) {
-        // GraphQL reports failures in a successful reply: don't keep it.
+        // GraphQL reports failures in a successful reply: don't cache it.
         this.removeCache('/', { data: body });
         throw new Error(response.errors[0].message);
       }

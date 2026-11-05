@@ -11,10 +11,7 @@ import type { AxiosInstance } from 'axios';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
-/*
- * The smaller music services: ListenBrainz for Discover, the Cover Art
- * Archive for covers, and TheAudioDB for artist pictures.
- */
+/* ListenBrainz (Discover), Cover Art Archive, TheAudioDB (artist pictures). */
 
 const ALBUM = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';

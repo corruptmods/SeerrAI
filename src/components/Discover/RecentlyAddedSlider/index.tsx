@@ -44,7 +44,7 @@ const RecentlyAddedSlider = () => {
             id={item.id}
             tmdbId={item.tmdbId}
             tvdbId={item.tvdbId}
-            // Films and series only: /media lists music only when asked to.
+            // /media returns music only when asked, so this is video only.
             type={item.mediaType as VideoMediaType}
           />
         ))}

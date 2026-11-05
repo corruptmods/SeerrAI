@@ -41,8 +41,7 @@ const StatusChecker = () => {
     !alertDismissed &&
     ((hasPermission(Permission.ADMIN) && data.restartRequired) ||
       data.commitTag !== process.env.commitTag);
-  // Still loading counts as nothing to say: an update is rare, and it jumps
-  // the queue when it does come.
+  // Loading counts as hidden: updates are rare and jump the queue anyway.
   const myTurn = useNotice('appUpdated', wanted ? 'show' : 'hide');
 
   if (!data && !error) {

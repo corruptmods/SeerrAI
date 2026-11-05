@@ -13,10 +13,7 @@ interface FollowNewSeasonsProps {
   onChange: (checked: boolean) => void;
 }
 
-/**
- * In the series request dialog: follow the series from here on, so every
- * season that has not premiered yet is requested as it premieres.
- */
+/** Series request option to request each future season as it premieres. */
 const FollowNewSeasons = ({ checked, onChange }: FollowNewSeasonsProps) => {
   const intl = useIntl();
 

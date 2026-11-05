@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { SCHEDULE_CHOICES, choiceFor, scheduleFor } from './schedule';
 
-// When a six-field schedule runs within a day, read plainly: each second of
-// the day whose seconds, minutes and hours fields match.
+// Seconds of the day a six-field schedule runs at, from its s/m/h fields.
 const runsInADay = (schedule: string): number[] => {
   const [s, m, h] = schedule.split(' ');
   const matches = (field: string, value: number) =>
@@ -63,7 +62,7 @@ describe('job schedules', () => {
   });
 
   it('opens on no choice for a schedule it does not offer', () => {
-    // Saved before Watchlist Sync was edited in minutes, or set by hand.
+    // An older Watchlist Sync schedule, or one set by hand.
     assert.equal(choiceFor('minutes', '*/30 * * * * *'), undefined);
     assert.equal(choiceFor('hours', '0 0 3 * * *'), undefined);
     assert.equal(choiceFor('minutes', 'not a schedule'), undefined);

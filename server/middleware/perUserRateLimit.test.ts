@@ -5,10 +5,8 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { describe, it, mock } from 'node:test';
 
-/*
- * Behind a reverse proxy ("trust proxy" on), the limit counts people, not
- * the forwarded addresses anyone can set, and says nothing to the log.
- */
+// Behind a reverse proxy ("trust proxy" on), the limit counts users, not
+// spoofable forwarded addresses, and logs nothing.
 
 const serve = async () => {
   const app = express();
@@ -39,9 +37,9 @@ describe('perUserRateLimit', () => {
     try {
       assert.equal(await get(1, '10.0.0.1'), 200);
       assert.equal(await get(1, '10.0.0.2'), 200);
-      // A new forwarded address does not buy another try.
+      // A new forwarded address doesn't reset the count.
       assert.equal(await get(1, '10.0.0.3'), 429);
-      // Someone else has their own count.
+      // Other users have their own count.
       assert.equal(await get(2, '10.0.0.1'), 200);
       assert.equal(errors.mock.callCount(), 0);
     } finally {

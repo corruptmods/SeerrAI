@@ -24,41 +24,39 @@ import type {
 } from '@server/lib/backfill/sonarr';
 
 /*
- * Judging a pack against one movie. A pack may be the movie alone or a
- * collection; each video in it is read by Radarr as named. A file Radarr
- * cannot place because its name has no year (as collections often have
- * it) is renamed with the movie's title and year and the pack's quality
- * tags, then read again, but only when the title it gives is exactly this
- * movie's ("Tin Parade 2" is not "Tin Parade"), or when it is the only video
+ * Judges a pack (the movie alone or a collection) against one movie. Radarr
+ * parses each video as named. A file it cannot place for lack of a year, as
+ * in many collections, is renamed with the movie's title, year and the
+ * pack's quality tags and parsed again, but only if its title is exactly
+ * this movie's ("Tin Parade 2" is not "Tin Parade") or it is the only video
  * in a pack that is this movie by name and year. Only files Radarr maps to
- * this movie are used; the rest of a collection is left out of the
- * download.
+ * this movie are downloaded.
  */
 
 export interface MovieContext {
   movie: RadarrMovieDetail;
   file: RadarrMovieFile | null;
   profile: SonarrQualityProfile;
-  /** The names the movie goes by: Radarr's title, its aliases, added ones. */
+  /** Radarr's title, its aliases, and added names. */
   names: string[];
   radarr: BackfillRadarr;
 }
 
-/** Below this a video is a sample or an extra, not a movie. */
+/** Below this a video is a sample or extra. */
 const MIN_MOVIE_BYTES = 100 * 1024 * 1024;
-/** More files than any real collection: each is a question to Radarr. */
+/** More than any real collection; each file costs a Radarr parse call. */
 const MAX_PACK_FILES = 200;
 
 type Judgement = Omit<PlanEntry, 'action' | 'reason' | 'replaces'> & {
   problem?: string;
 };
 
-/** A year close enough to the movie's to be the same release. */
+/** A year close enough to be the same release. */
 export const sameYear = (year: number, movie: RadarrMovieDetail): boolean =>
   Math.abs(year - movie.year) <= 1 || year === movie.secondaryYear;
 
 /**
- * The title a name gives, before its year, tags or brackets, without a
+ * The title in a name, before its year, tags or brackets, without a
  * collection's running number: "02 - Tin.Parade.2.1080p" is "Tin Parade 2".
  */
 export const namedTitle = (name: string): string => {
@@ -77,7 +75,7 @@ export const namedTitle = (name: string): string => {
   return words.slice(0, end < 0 ? words.length : end).join(' ');
 };
 
-/** The movie's name in the form Radarr matches, with the file's tags. */
+/** The movie's name as Radarr matches it, with the file's tags. */
 export const movieName = (options: {
   fileName: string;
   packTitle: string;
@@ -111,8 +109,8 @@ const accepted = (
 });
 
 /**
- * One file, judged. `alone` is set when it is the only video in a pack
- * that is this movie by name and year, so a bare file name still counts.
+ * Judges one file. `alone` means it is the only video in a pack that is
+ * this movie by name and year, so a bare file name still counts.
  */
 export const judgeMovieFile = async (
   file: PackFile,
@@ -166,7 +164,7 @@ export const judgeMovieFile = async (
   return accepted(base, ctx.movie.id, judgedAs, judged);
 };
 
-/** The movie and its file in the shapes the plan judges episodes in. */
+/** The movie and its file as episode shapes, for the plan. */
 const asEpisodes = (ctx: MovieContext) => {
   const { movie, file } = ctx;
   const episode: SonarrEpisode = {
@@ -195,7 +193,7 @@ const asEpisodes = (ctx: MovieContext) => {
   };
 };
 
-/** A pack's files, judged against the movie, and what they add up to. */
+/** Judges a pack's files against the movie, with a summary. */
 export const judgeMoviePack = async (
   files: PackFile[],
   packTitle: string,

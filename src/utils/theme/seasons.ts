@@ -1,11 +1,9 @@
 /*
- * The colours of each seasonal theme (server/lib/seasons says when they
- * run). A season sits on top of the person's own look: its accent replaces
- * theirs, in dark mode its night-time background replaces their dark
- * background, and light mode stays light. Their extras (spacing, corners,
- * solid panels) are kept. seasons.test.ts checks every colour reads.
+ * Seasonal theme colours (dates in server/lib/seasons). A season replaces the
+ * user's accent and, in dark mode, their background; light stays light and
+ * extras are kept. seasons.test.ts checks contrast.
  *
- * Halloween, Holidays and New Year are the approved design's colours.
+ * Halloween, Holidays and New Year use the approved design's colours.
  */
 import type { SeasonId } from '@server/lib/seasons';
 import type { AccentColours, Oklch, Scale, ScaleStep } from './colour';
@@ -21,17 +19,17 @@ import { asDesigned } from './palette';
 
 export interface SeasonLook {
   accent: AccentColours;
-  /** Dark mode's background while the season runs. */
+  /** Dark mode background during the season. */
   night: Neutrals;
-  /** The mark by the logo, in dark and in light. */
+  /** Mark colour beside the logo, dark and light. */
   mark: { dark: string; light: string };
-  /** The mark's drawing: lines on a 24-unit square, in the mark's colour. */
+  /** Mark paths on a 24-unit square. */
   icon: { d: string }[];
 }
 
 const oklch = (hex: string): Oklch => toOklch(hexToRgb(hex));
 
-/** A colour part of the way from one to another, as the eye sees it. */
+/** Perceptual interpolation between two colours. */
 const between = (from: string, to: string, part: number): string => {
   const a = oklch(from);
   const b = oklch(to);
@@ -45,10 +43,8 @@ const between = (from: string, to: string, part: number): string => {
 };
 
 /**
- * A season's night from the few colours the design gives it. The greys in
- * between run from its panels to its quiet text and on to its text, so
- * anything still using a grey (gray-300, gray-600, …) takes the season's
- * tint too.
+ * A season's night background from the design's few colours. Intermediate
+ * greys are interpolated so gray-* classes take the season's tint too.
  */
 const night = ({
   page,
@@ -74,9 +70,8 @@ const night = ({
     400: muted,
     500: between(raised, muted, 2 / 3),
     600: between(raised, muted, 1 / 3),
-    // Lines are often drawn in gray-700 on gray-800: a little lighter than
-    // the raised panels the design pairs with its surface, so they show as
-    // clearly as in the other dark backgrounds.
+    // Borders are often gray-700 on gray-800: slightly lighter than raised
+    // panels so they show as clearly as in other dark backgrounds.
     700: between(raised, muted, 0.1),
     800: surface,
     900: page,
@@ -133,8 +128,7 @@ export const SEASON_LOOKS: Record<SeasonId, SeasonLook> = {
     mark: { dark: '#fb923c', light: '#c2410c' },
     icon: [{ d: MOON }],
   },
-  // Evergreen with a gold star; no snow, as December is summer for half
-  // the world.
+  // Evergreen with a gold star; no snow, since December is summer for half the world.
   holidays: {
     accent: asDesigned(
       accentFromColour('#15803d'),

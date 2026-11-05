@@ -30,7 +30,7 @@ import Document, { Head, Html, Main, NextScript } from 'next/document';
 
 import type { JSX } from 'react';
 
-/** What _app worked out for the page, which the look depends on. */
+/** _app's props that the page's theme depends on. */
 type ThemeAppProps = AppProps & {
   user?: User;
   currentSettings?: PublicSettingsResponse;
@@ -47,8 +47,7 @@ class MyDocument extends Document<ThemedDocumentProps> {
   static async getInitialProps(
     ctx: DocumentContext
   ): Promise<ThemedDocumentProps> {
-    // The page's look comes from who it is for and the server's default,
-    // both of which _app has already fetched: read them as it renders.
+    // The theme depends on the user and server default, which _app already fetched.
     let appProps: ThemeAppProps | undefined;
     const renderPage = ctx.renderPage;
     ctx.renderPage = () =>
@@ -71,8 +70,7 @@ class MyDocument extends Document<ThemedDocumentProps> {
           server: appProps.currentSettings.themeDefault,
         })
       : appearanceFromDefaults(SERVER_THEME_DEFAULTS);
-    // A seasonal theme on top, if one runs today and they haven't turned
-    // it off.
+    // Seasonal theme on top, if one runs today and isn't turned off.
     const season = shownSeason({
       calendar: appProps?.currentSettings?.seasons ?? [],
       seasonal: chosen.seasonal,
@@ -80,8 +78,7 @@ class MyDocument extends Document<ThemedDocumentProps> {
       today: appProps?.seasonDay ?? localDay(new Date()),
     })?.id;
 
-    // Safe mode (?safe) leaves out custom CSS and theme files
-    // (utils/theme/safeMode), but not the season: seasons are built in.
+    // Safe mode (?safe) drops custom CSS and theme files, not the built-in season.
     const safe = ctx.query[SAFE_MODE_PARAM] !== undefined;
     const appearance: Appearance = safe ? withoutThemeFile(chosen) : chosen;
     const links =
@@ -92,10 +89,8 @@ class MyDocument extends Document<ThemedDocumentProps> {
             appProps.user?.settings?.personalCssVersion
           );
 
-    // These go after the app's own stylesheets, so custom CSS wins over
-    // them. The script then takes custom CSS and theme files out again if
-    // this tab is in safe mode, before anything is drawn; the copy it puts
-    // in the look's place keeps the season.
+    // After the app's stylesheets so custom CSS wins. In safe mode the script
+    // removes custom CSS and theme files before first paint, keeping the season.
     const styles = (
       <>
         {initialProps.styles}
@@ -123,12 +118,11 @@ class MyDocument extends Document<ThemedDocumentProps> {
 
   render(): JSX.Element {
     const { appearance, season } = this.props;
-    // The page has been rendered with its strings; the browser loads them
-    // as a file it keeps (_app's startStrings), so they aren't sent again
-    // in the page's data, about 400 KB of every page.
+    // The browser loads strings as a cached file (_app's startStrings); drop
+    // them from page data (about 400 KB).
     delete (this.props.__NEXT_DATA__.props as { messages?: unknown }).messages;
-    // The look is in the page before anything is drawn: the attributes and
-    // colours here, and the script for "Match my device" (utils/theme).
+    // Theme attributes, colours and the "Match my device" script are in the
+    // page before first paint.
     return (
       <Html {...themeAttributes(appearance, season)}>
         <Head>

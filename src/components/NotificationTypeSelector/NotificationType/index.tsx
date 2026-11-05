@@ -6,7 +6,7 @@ interface NotificationTypeProps {
   currentTypes: number;
   parent?: NotificationItem;
   onUpdate: (newTypes: number) => void;
-  /** Said under a type the admin turned off for everyone. */
+  /** Note under a type the admin disabled for everyone. */
   turnedOffNote?: string;
 }
 

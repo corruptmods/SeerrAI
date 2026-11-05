@@ -13,9 +13,9 @@ async function getFiles(dir: string): Promise<string[]> {
 }
 
 /**
- * The inside of a single-quoted JavaScript string as the inside of a JSON
- * one: the same escapes mean the same thing (`\n` stays a line break), `\'`
- * becomes a plain quote and a bare `"` is escaped.
+ * Converts a single-quoted JS string's contents to a JSON string's: shared
+ * escapes keep their meaning (`\n` stays a line break), `\'` becomes a plain
+ * quote and a bare `"` is escaped.
  */
 const jsonEscapes = (js: string): string => {
   let out = '';

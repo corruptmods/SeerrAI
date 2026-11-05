@@ -14,8 +14,8 @@ import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
 
 /*
- * The pieces the Subtitles card and an episode's subtitle panel share, so a
- * movie, a series and one episode look and read the same.
+ * Shared by the Subtitles card and the episode panel, so movies, series and
+ * episodes look the same.
  */
 
 export const messages = defineMessages('components.Subtitles', {
@@ -59,8 +59,7 @@ export const messages = defineMessages('components.Subtitles', {
 });
 
 /**
- * The connected media servers' names, for wording that is not Plex's
- * alone: "Plex", or "Plex and Jellyfin" with both connected, since each
+ * The connected media servers' names ("Plex", "Plex and Jellyfin"): each
  * picks up a subtitle file beside the title.
  */
 export const useMediaServerName = (): string => {
@@ -73,9 +72,8 @@ export const useMediaServerName = (): string => {
 };
 
 /**
- * Why something to do with a title's subtitles did not work, in the
- * viewer's language. The server answers with a code for that; anything
- * without one (no answer at all) reads as Bazarr not answering.
+ * Localized reasons for subtitle failures, from the server's error code; no
+ * code (no answer) reads as Bazarr not answering.
  */
 export const useSubtitleReasons = (kind: SubtitlesKind) => {
   const intl = useIntl();
@@ -124,7 +122,7 @@ export const useSubtitleReasons = (kind: SubtitlesKind) => {
   };
   return {
     describe,
-    /** The reason in a failed request's answer. */
+    /** The reason from a failed request's response. */
     reasonOf: (e: unknown) =>
       describe(
         isAxiosError(e)
@@ -173,7 +171,7 @@ export const Pill = ({
   </span>
 );
 
-/** "ON DISK", "MISSING": what the rows under it are. */
+/** A heading for the rows below: "ON DISK", "MISSING". */
 export const GroupLabel = ({ children }: { children: ReactNode }) => (
   <div className="px-4 pb-0.5 pt-2.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
     {children}
@@ -197,9 +195,8 @@ export const TrackTags = ({ track }: { track: SubtitleTrack }) => {
 };
 
 /**
- * Where a subtitle file came from, as Bazarr recorded it: transcribed by
- * Whisper, downloaded from a provider, uploaded, translated; or, with no
- * record, simply the file beside the video.
+ * A subtitle's origin from Bazarr's history (Whisper, a provider, upload,
+ * translation); with no record, the file beside the video.
  */
 export const originOf = (
   intl: IntlShape,
@@ -245,9 +242,8 @@ export const deleteButtonClass =
   'inline-flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-600 bg-gray-700 text-red-300 light:text-danger-text transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
 
 /**
- * One subtitle on disk, with Replace and Delete when allowed. A track
- * inside the video has no Delete: replacing it adds a file that plays
- * instead.
+ * One subtitle, with Replace and Delete when allowed. Embedded tracks have
+ * no Delete: replacing adds a file that plays instead.
  */
 export const TrackRow = ({
   track,

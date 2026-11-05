@@ -10,7 +10,7 @@ import {
 
 const english = createIntl({ locale: 'en', messages: {} });
 
-/** An error as axios gives it for an answer from the server. */
+/** An axios error for a server response. */
 const answered = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
     status,
@@ -60,7 +60,7 @@ describe('why a request has no server to go to', () => {
   it('is in the language of the page', () => {
     const french = createIntl({
       locale: 'fr',
-      // Only the one message is given here.
+      // Only the message is under test.
       onError: () => undefined,
       messages: {
         [messages.removed.id]: 'Son serveur {service} a été supprimé.',

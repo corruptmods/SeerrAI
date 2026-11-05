@@ -18,7 +18,7 @@ interface PlexImportProps {
 interface PlexImportResponse {
   createdUsers: unknown[];
   refreshedUsers: number;
-  /** People left out, because another account has their email. */
+  /** Users skipped because another account has their email. */
   skippedUsers?: { id: string; name: string; reason: string }[];
 }
 

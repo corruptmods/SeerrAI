@@ -20,8 +20,8 @@ export function DbAwareColumn(columnOptions: ColumnOptions) {
 }
 
 /**
- * For bigint columns holding sizes past 2 GB: Postgres hands bigints back
- * as text, so they are read back as numbers.
+ * For bigint columns holding sizes past 2 GB: Postgres returns bigints as text,
+ * so this converts them to numbers.
  */
 export const bigNumber = {
   to: (value?: number | null) => value,

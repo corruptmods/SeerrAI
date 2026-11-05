@@ -33,8 +33,8 @@ describe('web push', () => {
     });
 
     assert.equal(sent, true);
-    // Counted rather than compared: each recorded call holds the repository,
-    // and printing that in a failure message runs out of memory.
+    // Count, don't compare: printing recorded calls (they hold the repository)
+    // in a failure message runs out of memory.
     assert.equal(
       find.mock.calls.filter(
         (call) =>
@@ -51,7 +51,7 @@ describe('web push', () => {
       where: { email: 'friend@seerr.dev' },
     });
     const subs = getRepository(UserPushSubscription);
-    // One saved before addresses were checked when a device signed up.
+    // Saved before endpoints were validated at signup.
     await subs.save([
       new UserPushSubscription({
         user,
@@ -93,7 +93,7 @@ describe('web push', () => {
   });
 });
 
-/** The payload a device is sent, as the agent builds it. */
+/** The payload the agent builds for a device. */
 const payloadFor = (type: Notification, subject: string) =>
   new WebPushAgent()['getNotificationPayload'](type, {
     subject,

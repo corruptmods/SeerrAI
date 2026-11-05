@@ -97,7 +97,7 @@ const PLACES = [
 ];
 
 /**
- * How music is searched and where its details come from, loaded and saved
+ * How music is searched and where its details come from; loaded and saved
  * together.
  */
 const MusicSettingsForm = () => {
@@ -129,8 +129,7 @@ const MusicSettingsForm = () => {
       enableReinitialize
       onSubmit={async ({ inAll, ...sources }) => {
         try {
-          // Sent only when changed: left alone, it stays on while Lidarr
-          // is set up and off while it isn't.
+          // Sent only when changed; otherwise it follows whether Lidarr is set up.
           const response = await axios.post<ShownMusicSettings>(
             '/api/v1/settings/music',
             {
@@ -139,8 +138,7 @@ const MusicSettingsForm = () => {
             }
           );
           await mutate(response.data, { revalidate: false });
-          // The search page reads whether music is in All from the public
-          // settings.
+          // The search page reads whether music is in All from the public settings.
           await globalMutate('/api/v1/settings/public');
           addToast(intl.formatMessage(sourceMessages.saved), {
             appearance: 'success',
@@ -204,10 +202,9 @@ const MusicSettingsForm = () => {
 };
 
 /**
- * Settings → Music: the Music switch (the only place it is, for everyone),
- * how music is searched, where its details come from, and links to music's
- * settings elsewhere. There before a Lidarr is added, since that is where
- * music starts.
+ * Settings → Music: the Music switch (its only place, for everyone), search,
+ * detail sources, and links to music settings elsewhere. Shown before a Lidarr
+ * is added, since music starts here.
  */
 const SettingsMusicTab = () => {
   const intl = useIntl();

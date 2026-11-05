@@ -3,10 +3,9 @@ import { useEffect, useState } from 'react';
 type Loader<T> = () => Promise<T>;
 
 /*
- * Code loaded on demand (a dialog, an edit mode), remembered once it has
- * loaded. A failed load is not remembered: the next attempt tries again,
- * where next/dynamic would keep the failure until the page reloads — and an
- * installed app on a phone has no reload button.
+ * On-demand modules, cached once loaded. Failures aren't cached, so the next
+ * attempt retries; next/dynamic keeps failures until reload, and installed
+ * phone apps have no reload button.
  */
 const loaded = new Map<Loader<unknown>, unknown>();
 const loading = new Map<Loader<unknown>, Promise<unknown>>();
@@ -28,7 +27,7 @@ export const loadModule = <T>(loader: Loader<T>): Promise<T> => {
   return pending;
 };
 
-/** Fetches the code while the browser is otherwise idle; failures are quiet. */
+/** Preloads the module when idle; failures are silent. */
 export const preloadModule = <T>(loader: Loader<T>): void => {
   if (loaded.has(loader) || loading.has(loader)) {
     return;
@@ -49,17 +48,15 @@ export const preloadModule = <T>(loader: Loader<T>): void => {
 };
 
 /**
- * The module once `wanted` becomes true and it has loaded; undefined until
- * then. `onError` runs if it could not be loaded, so the caller can say so
- * and close whatever was waiting for it.
+ * The module once `wanted` and loaded; undefined until then. `onError` runs
+ * on failure so the caller can report it and close what was waiting.
  */
 const useLazyModule = <T>(
   loader: Loader<T>,
   wanted: boolean,
   onError: () => void
 ): T | undefined => {
-  // Kept with the loader it came from, so a caller that switches to another
-  // loader never gets the previous one's module.
+  // Stored with its loader, so switching loaders never returns the old module.
   const [state, setState] = useState<{ loader: Loader<T>; module: T }>();
   const current =
     state?.loader === loader

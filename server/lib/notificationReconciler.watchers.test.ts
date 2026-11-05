@@ -19,9 +19,9 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /*
- * What the reconciler sends when it is the path that catches a missed
- * notification: the requester's own copy with their own settings, and each
- * watcher a copy of their own that leaves the request as it is.
+ * What the reconciler sends when it catches a missed notification: the
+ * requester's copy with their own settings, and each watcher their own copy
+ * that leaves the request unchanged.
  */
 
 setupTestDb();
@@ -61,7 +61,7 @@ const makeUser = async (name: string) => {
 let requester: User;
 let watcher: User;
 
-/** A movie request moved to the given status without the save hooks. */
+/** A movie request set to the given status, bypassing save hooks. */
 const requestIn = async (
   tmdbId: number,
   status: MediaRequestStatus,

@@ -162,7 +162,7 @@ const SeriesReview = () => {
   const [selectedId, setSelectedId] = useState<number>();
   const [expanded, setExpanded] = useState<number>();
   const [approving, setApproving] = useState(false);
-  // The pack the Approve dialog was opened for, as it was then.
+  // Snapshot of the pack the Approve dialog opened for.
   const [approveTarget, setApproveTarget] = useState<CandidateView>();
   const [searchOpen, setSearchOpen] = useState(false);
   const [problem, setProblem] = useState<string>();
@@ -178,7 +178,7 @@ const SeriesReview = () => {
     }
   );
 
-  // The same answer the agent's section on the page reads.
+  // Same key as the page's agent section, so SWR shares it.
   const { data: agentData } = useSWR<AgentOverview>(
     data
       ? `/api/v1/agent?kind=${data.series.kind}&serverId=${data.series.serverId}&arrId=${data.series.arrId}`
@@ -200,22 +200,20 @@ const SeriesReview = () => {
     [data]
   );
   const bestId = ranked[0]?.id;
-  // A notification about one pack links to it (?pack=), so that's the one
-  // on show until another is picked.
+  // Notifications link a pack via ?pack=; it shows until another is picked.
   const linked = Number(router.query.pack) || undefined;
   const selected =
     data?.candidates.find(
       (c) => c.id === (selectedId ?? linked) && c.status === 'ready'
     ) ?? ranked[0];
 
-  // Keep the pack on show, even when the page refreshes and another ranks
-  // above it, so Approve and Skip act on the pack the admin is reading. It
-  // changes only when they pick another, or when it stops being usable.
+  // Pin the shown pack across refreshes so Approve and Skip act on what the
+  // admin is reading; it changes only on a new pick or once unusable.
   useEffect(() => {
     if (selected && selected.id !== selectedId) setSelectedId(selected.id);
   }, [selected, selectedId]);
 
-  // From a notification (#review): the plan, with Approve, once it's drawn.
+  // Notifications link to #review.
   useScrollToHash(!!data);
 
   if (error && !data) {
@@ -230,8 +228,7 @@ const SeriesReview = () => {
   const names = sonarr?.names ?? movie?.names ?? album?.names;
   const mediaHref = titleHref(series);
   const activeJob = data.jobs.find((j) => ACTIVE_JOB.includes(j.status));
-  // A series can have more than one download running, for other episodes;
-  // a movie only the one.
+  // Series may run several downloads at once; movies and albums only one.
   const blocked =
     !!activeJob && (series.kind === 'movie' || series.kind === 'album');
 
@@ -262,7 +259,7 @@ const SeriesReview = () => {
     }
   }
 
-  // The dialog's pack as it is now, while it can still be approved.
+  // The dialog's pack in its latest state, while still approvable.
   const approveCandidate = data.candidates.find(
     (c) => c.id === approveTarget?.id && c.status === 'ready'
   );
@@ -367,7 +364,7 @@ const SeriesReview = () => {
                   </Button>
                 </Link>
               )}
-              {/* While it searches, the badge and the note below say so. */}
+              {/* While searching, the badge and note below say so. */}
               {!blocked && series.status !== 'searching' && (
                 <Button
                   onClick={() => setSearchOpen(true)}
@@ -501,7 +498,7 @@ const SeriesReview = () => {
                     <span className="w-8 shrink-0 text-right tabular-nums text-gray-500">
                       {track.number}
                     </span>
-                    {/* Green: the chosen pack has it. */}
+                    {/* Green: the chosen pack covers it. */}
                     <span
                       className={`min-w-0 flex-1 break-words ${
                         covered.has(track.id)

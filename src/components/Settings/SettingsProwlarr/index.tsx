@@ -31,8 +31,8 @@ const messages = defineMessages('components.Settings.SettingsProwlarr', {
 
 /*
  * Prowlarr, laid out like the other services: its tile with Edit and Delete
- * once it is set up, a dashed tile to add it before. Its connection is kept
- * with Backfill's settings, which use it.
+ * once set up, else a dashed tile to add it. Its connection is kept with
+ * Backfill's settings, which use it.
  */
 const SettingsProwlarr = () => {
   const intl = useIntl();
@@ -50,8 +50,7 @@ const SettingsProwlarr = () => {
     void globalMutate('/api/v1/settings/backfill');
   };
 
-  // A blank address takes Prowlarr out; the server refuses while Backfill
-  // is on, and says so.
+  // A blank address removes Prowlarr; the server refuses while Backfill is on.
   const disconnect = async () => {
     try {
       await axios.put('/api/v1/settings/backfill/prowlarr', {

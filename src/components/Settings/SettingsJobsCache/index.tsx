@@ -188,8 +188,8 @@ const jobModalReducer = (
       };
 
     case 'open': {
-      // Open on the job's own schedule where it is one of the choices, so
-      // saving without a change keeps it.
+      // Open on the job's own schedule when it is a choice, so saving unchanged
+      // keeps it.
       const saved = (interval: ScheduleInterval) =>
         action.job?.interval === interval
           ? choiceFor(interval, action.job.cronSchedule)

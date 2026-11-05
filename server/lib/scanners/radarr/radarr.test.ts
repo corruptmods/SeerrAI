@@ -353,7 +353,7 @@ describe('Radarr Scanner', () => {
     it('does not reset TV media that is missing from Radarr', async () => {
       const mediaRepository = getRepository(Media);
 
-      // TV show stuck in processing so Radarr scanner should not touch it
+      // A TV show stuck in processing; the Radarr scanner must not touch it.
       const media = new Media();
       media.tmdbId = 800;
       media.mediaType = MediaType.TV;
@@ -386,7 +386,7 @@ describe('Radarr Scanner', () => {
       existing.status = MediaStatus.PROCESSING;
       await mediaRepository.save(existing);
 
-      // Two servers but movie exists on server 1 only
+      // Two servers; the movie exists on server 1 only.
       configureRadarr([
         { syncEnabled: true, id: 0, hostname: 'server-a' },
         { syncEnabled: true, id: 1, hostname: 'server-b' },
@@ -734,7 +734,7 @@ describe('Radarr Scanner', () => {
       getMoviesImpl = async () => {
         callCount++;
         if (callCount === 1) {
-          // standard server still has the movie
+          // The standard server still has the movie.
           return [
             fakeRadarrMovie({
               tmdbId: 1003598,
@@ -744,7 +744,7 @@ describe('Radarr Scanner', () => {
             }),
           ];
         }
-        // 4k server: populated but the movie is absent, so 4k dimension orphaned
+        // The 4K server is populated but lacks the movie, so 4K is orphaned.
         return [fakeRadarrMovie({ tmdbId: 2, id: 88 })];
       };
 

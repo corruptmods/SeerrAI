@@ -29,10 +29,10 @@ import type { ObjectLiteral } from 'typeorm';
 import { Repository } from 'typeorm';
 
 /*
- * The real OpenAPI validator sits in front of the routers here, as it does in
- * production. A route or body field missing from seerr-api.yml is rejected
- * before it reaches the router; that has silently disabled finished features
- * before, and a harness that mounts routers directly cannot see it.
+ * The real OpenAPI validator sits in front of the routers, as in production. A
+ * route or body field missing from seerr-api.yml is rejected before the router,
+ * which has silently disabled finished features; a harness mounting routers
+ * directly can't see that.
  */
 
 setupTestDb();
@@ -131,7 +131,7 @@ const makeUser = async (name: string, permissions: number) => {
   return getRepository(User).findOneOrFail({ where: { plexUsername: name } });
 };
 
-/** A movie Radarr holds, with a request against it. */
+/** A movie in Radarr with a request against it. */
 const seedHeldMovie = async (
   tmdbId: number,
   requester: User,
@@ -202,8 +202,8 @@ beforeEach(async () => {
       OpenApiValidator.middleware({
         apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
         validateRequests: true,
-        // Authentication is the routers' job (isAuthenticated); the point here
-        // is whether paths and bodies are declared.
+        // Auth is the routers' job (isAuthenticated); this checks that paths
+        // and bodies are declared.
         validateSecurity: false,
       })
     );
@@ -237,7 +237,7 @@ after(() => {
 
 describe('routes declared in the API spec', () => {
   it('has the validator active (control)', async () => {
-    // Without this, every declaration check below would pass vacuously.
+    // Without this, every declaration check below passes vacuously.
     const { status, body } = await call<{ message: string }>(
       'GET',
       '/api/v1/list/1/not-a-route'
@@ -312,8 +312,8 @@ describe('blocklisting something already downloaded', () => {
   });
 
   it('leaves a request that was already fulfilled as it was', async () => {
-    // A request for something already in the library is marked completed as
-    // soon as it is saved. It was delivered, so it is not declined.
+    // A request for something already in the library is completed on save. It
+    // was delivered, so it isn't declined.
     await seedHeldMovie(705, moderator, {
       mediaStatus: MediaStatus.AVAILABLE,
       requestStatus: MediaRequestStatus.APPROVED,
@@ -519,8 +519,7 @@ describe('requests for a title being blocklisted', () => {
       async () => true
     );
     const media = await seedHeldMovie(720, moderator);
-    // An approved one too, approved without the save hooks so nothing is
-    // sent to Radarr here.
+    // An approved one too, saved without hooks so nothing goes to Radarr.
     const approved = await getRepository(MediaRequest).save(
       new MediaRequest({
         media,
@@ -570,8 +569,8 @@ describe('requests for a title being blocklisted', () => {
   });
 
   it('copes with a film blocklisted meanwhile, on either engine', async (t) => {
-    // Blocklisted by someone else between the collection being read and its
-    // films being written: the lookup misses it, the insert collides.
+    // Blocklisted by someone else between reading the collection and writing
+    // its films: the lookup misses it, the insert collides.
     await getRepository(Blocklist).save(
       new Blocklist({
         tmdbId: 802,
@@ -632,7 +631,7 @@ describe('removing something from the blocklist', () => {
   });
 
   it('keeps request history when a whole collection comes off the blocklist', async () => {
-    // 801 has been requested; 802 only exists because of the blocklist.
+    // 801 was requested; 802 exists only because of the blocklist.
     await seedHeldMovie(801, admin);
     await call('POST', '/api/v1/blocklist/collection/5', {});
 
@@ -665,7 +664,7 @@ describe('removing something from the blocklist', () => {
 
 describe("the manage panel's remove-file action", () => {
   it('still removes the file, without an import exclusion', async () => {
-    // Refactored onto the shared removal; its behaviour must not change.
+    // Uses the shared removal; behaviour must stay the same.
     const media = await seedHeldMovie(730, admin, {
       mediaStatus: MediaStatus.AVAILABLE,
     });

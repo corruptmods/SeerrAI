@@ -20,7 +20,7 @@ import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 setupTestDb();
 
-/* The agent's routes, behind the real validator and the admin check. */
+/* Agent routes behind the real validator and the admin check. */
 
 let app: Server | undefined;
 let port = 0;
@@ -384,7 +384,7 @@ describe('the admin agent’s routes', () => {
     );
     assert.equal(await runs.count({ where: { id: done.id } }), 0);
 
-    // Counted across every page, so Clear finished is offered from any.
+    // Counted across all pages, so Clear finished is offered on any.
     const later = await call('GET', '/api/v1/agent?page=1');
     assert.deepEqual([later.body.runs.length, later.body.finished], [0, 1]);
 

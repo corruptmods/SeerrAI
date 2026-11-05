@@ -46,9 +46,8 @@ interface MusicManageProps {
 }
 
 /**
- * An artist's manage panel, for request managers and admins: what Lidarr is
- * downloading, the requests, what has happened to the artist and their
- * albums, and (for admins) Lidarr and clearing Seerr's own record.
+ * An artist's manage panel (request managers and admins): downloads,
+ * requests, history, and for admins Lidarr and clearing Seerr's record.
  */
 const MusicManage = ({
   show,

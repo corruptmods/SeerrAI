@@ -157,8 +157,8 @@ describe('otherTake', () => {
       otherTake('Lantern Song (remix)', 'Lantern Song [Remix]'),
       false
     );
-    // A word that is the song's own.
-    assert.equal(otherTake('Live Wire', 'Live Wire'), false);
+    // A take word that is part of the title.
+    assert.equal(otherTake('Harbour Lights', 'Harbour Lights'), false);
   });
 });
 
@@ -190,7 +190,7 @@ describe('toVersion', () => {
         }),
         release('s1', 'Lantern Song', { type: 'Single', date: '2001-01-01' }),
         release('a1', 'Harbour Lights', { date: '2001-03-04' }),
-        // A release without a status is counted, as MusicBrainz often has.
+        // Releases without a status count; MusicBrainz often omits it.
         release('a1', 'Harbour Lights', {
           status: undefined,
           date: '2000-12-01',
@@ -239,7 +239,7 @@ describe('groupSongs', () => {
       songs[0].versions.map((version) => version.version),
       ['radio edit', null, 'Club Mix']
     );
-    // Credited as its best-known version is.
+    // Credit comes from the best-known version.
     assert.equal(songs[0].artistName, 'Glasswing feat. Artist 1');
   });
 

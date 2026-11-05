@@ -13,8 +13,7 @@ export {
 export type { Play, WatchSource } from '@server/lib/watchHistory/types';
 
 /**
- * One connected server's watch history: Tautulli for Plex, when it is set
- * up; the server itself for Jellyfin and Emby.
+ * Tautulli for Plex (if configured); the server itself for Jellyfin and Emby.
  */
 const serverWatchSource = (
   server: MediaServerKind
@@ -30,10 +29,8 @@ const serverWatchSource = (
 };
 
 /**
- * Where watch history comes from on this server: Tautulli for Plex, the
- * server itself for Jellyfin and Emby, for each connected server that has
- * it. With more than one, their history is read together. Undefined when
- * there is none, so features that need it show nothing rather than guess.
+ * The watch history source for all connected servers, merged when several.
+ * Undefined when none, so dependent features show nothing rather than guess.
  */
 export const watchSource = (): WatchSource | undefined => {
   const sources = connectedServers().flatMap((server) => {

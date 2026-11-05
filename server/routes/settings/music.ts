@@ -14,12 +14,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Settings → Music: where music's details come from, and whether music
- * comes below the films and series in All, saved together. The TheAudioDB
- * key is never sent back; saving without one keeps the saved key, and only
- * `removeTheAudioDbApiKey` clears it. A save that leaves out `search`, or
- * the song settings, keeps them as they are. There before a Lidarr is
- * added, gone while music is off for everyone.
+ * Settings → Music: music metadata sources and whether music shows below
+ * films and series in All. The TheAudioDB key is never sent back; saving
+ * without one keeps it, and only `removeTheAudioDbApiKey` clears it. A save
+ * without `search` or the song settings keeps them. Available before a
+ * Lidarr is added, not while music is off for everyone.
  */
 const musicSettingsRoutes = Router();
 
@@ -56,12 +55,12 @@ const musicBody = z.object({
       approveOver: z.coerce.number().int().min(1).max(1000),
     })
     .optional(),
-  // Sent only when the admin changes it; anything else an older page
-  // sends with it is left out.
+  // Sent only when the admin changes it; extra fields from older pages are
+  // dropped.
   search: z.object({ inAll: z.boolean() }).optional(),
 });
 
-/** What the settings page is shown: no key, only that one is set. */
+/** Settings as shown to the page: no key, only whether one is set. */
 const shown = (music: MusicSettings) => ({
   musicbrainzUrl: music.musicbrainzUrl,
   contactEmail: music.contactEmail,
@@ -107,7 +106,7 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
       ? ''
       : body.theAudioDbApiKey || saved.theAudioDbApiKey,
     search: body.search ? { inAll: body.search.inAll } : saved.search,
-    // Set apart, in Settings → Services.
+    // Set separately, in Settings → Services.
     soulseek: saved.soulseek,
   };
   await settings.save();
@@ -115,11 +114,10 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
 });
 
 /*
- * Soulseek, through slskd (Settings → Services): its address, API key and
- * where its finished downloads are as Lidarr sees them. Saved only once
- * slskd answers, is new enough, and Lidarr sees that folder. The key is
- * never sent back; saving without one keeps the saved key, and a blank
- * address removes Soulseek.
+ * Soulseek via slskd (Settings → Services): address, API key and its
+ * downloads folder as Lidarr sees it. Saved only once slskd answers, is new
+ * enough, and Lidarr sees that folder. The key is never sent back; saving
+ * without one keeps it, and a blank address removes Soulseek.
  */
 const soulseekBody = z.object({
   url: z
@@ -146,8 +144,8 @@ const soulseekShown = (soulseek: SoulseekSettings | undefined) => ({
 class SoulseekProblem extends Error {}
 
 /**
- * What slskd says of itself, once it answers with this key, is new enough
- * for downloads in batches, and Lidarr sees its downloads folder.
+ * Returns slskd's own info once it accepts this key, supports batch
+ * downloads, and Lidarr sees its downloads folder.
  */
 const checkSoulseek = async (
   soulseek: SoulseekSettings
@@ -176,7 +174,7 @@ const checkSoulseek = async (
     const seen = await lidarrApi(lidarr)
       .folderExists(soulseek.downloadsPath)
       .catch((e) => {
-        // Lidarr not answering says nothing of the folder.
+        // Lidarr not answering proves nothing about the folder.
         logger.debug('Could not ask Lidarr about slskd’s downloads folder', {
           label: 'Settings',
           errorMessage: e instanceof Error ? e.message : String(e),
@@ -192,13 +190,13 @@ const checkSoulseek = async (
   return { version, signedIn };
 };
 
-/** The key typed, or the saved one when none is. */
+/** Uses the entered key, or the saved one when blank. */
 const withKey = (body: z.infer<typeof soulseekBody>): SoulseekSettings => ({
   ...body,
   apiKey: body.apiKey || getSettings().music.soulseek?.apiKey || '',
 });
 
-/** How fast songs move: each limit, and how much of it is in use. */
+/** Song fetch pace: each limit and how much of it is in use. */
 musicSettingsRoutes.get('/pace', async (_req, res, next) => {
   try {
     res.status(200).json(await songPace());

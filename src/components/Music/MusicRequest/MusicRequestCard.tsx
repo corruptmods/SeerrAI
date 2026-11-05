@@ -44,11 +44,7 @@ const messages = defineMessages('components.Music.MusicRequestCard', {
   cancelrequest: 'Cancel Request',
 });
 
-/**
- * A music request in a row of request cards (Recent Requests, someone's
- * profile): the artist and album or how many, the album's cover or the
- * artist's picture, where the albums are, and what can be done with it.
- */
+/** A music request card for request rows (Recent Requests, profiles). */
 const MusicRequestCard = ({
   request,
 }: {
@@ -56,8 +52,7 @@ const MusicRequestCard = ({
 }) => {
   const intl = useIntl();
   const { user, hasPermission } = useUser();
-  // On screen now, for checking on the request; near the screen, for
-  // loading its picture before it is scrolled to.
+  // In view: refresh the request. Near the screen: preload its picture.
   const { ref: viewRef, inView } = useInView();
   const { ref: nearRef, nearness } = useNearScreen();
   const ref = useMemo(() => bothRefs(viewRef, nearRef), [viewRef, nearRef]);
@@ -104,13 +99,13 @@ const MusicRequestCard = ({
           revalidate();
         }}
       />
-      {/* As tall as a film's or a series' card, whose poster is 2:3. */}
+      {/* As tall as a film's card (2:3 poster). */}
       <div
         className="relative flex min-h-[9.5rem] w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-subtle sm:min-h-[12.5rem] sm:w-96"
         data-testid="request-card"
         ref={ref}
       >
-        {/* The cover behind it, as a film's backdrop is, faded the same. */}
+        {/* Faded cover behind, like a film's backdrop. */}
         {musicRequestImage(requestData) && (
           <div className="absolute inset-0 z-0" aria-hidden>
             <div className="absolute inset-0 scale-110 blur-md">
@@ -135,11 +130,11 @@ const MusicRequestCard = ({
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          {/* The artist on a phone too: the name alone says little. */}
+          {/* Artist shown on phones too: the name alone says little. */}
           <div className="truncate text-xs font-medium text-strong">
             {musicRequestArtist(requestData, intl)}
           </div>
-          {/* A long name takes a second line rather than being cut short. */}
+          {/* Long names wrap to a second line. */}
           <Link
             href={href}
             title={title}
@@ -214,7 +209,7 @@ const MusicRequestCard = ({
                     />
                   </Button>
                 </Tooltip>
-                {/* Another Lidarr, profile or folder, before retrying. */}
+                {/* Change Lidarr, profile or folder before retrying. */}
                 <Tooltip content={intl.formatMessage(messages.editrequest)}>
                   <Button
                     buttonType="default"
@@ -279,7 +274,7 @@ const MusicRequestCard = ({
         <Link
           href={href}
           className="relative z-10 w-20 flex-shrink-0 scale-100 transform-gpu self-center overflow-hidden rounded-md shadow-sm transition duration-300 hover:scale-105 hover:shadow-md sm:w-28"
-          // The title on the card is the same link.
+          // Duplicates the title link.
           tabIndex={-1}
           aria-hidden
         >

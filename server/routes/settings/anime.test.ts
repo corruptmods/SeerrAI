@@ -9,8 +9,8 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * "Leave out anime made in" (Settings → Services → Anime): the countries
- * whose anime does not count as anime unless it is in Japanese.
+ * "Leave out anime made in" (Settings → Services → Anime): countries whose
+ * anime counts as anime only when it is in Japanese.
  */
 
 const app = express();

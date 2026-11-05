@@ -44,11 +44,11 @@ import {
 import type { EntityManager } from 'typeorm';
 
 /*
- * A request whose Radarr, Sonarr or Lidarr server was removed from Settings,
- * Services: it is marked failed rather than left approved, a request
- * manager can point it at another server, and Retry sends it to the default
- * server of its kind or says plainly that one has to be chosen. Through the
- * real OpenAPI validator, with a Lidarr on localhost for music.
+ * A request whose Radarr, Sonarr or Lidarr server was removed from Settings →
+ * Services: marked failed instead of left approved, a request manager can point
+ * it at another server, and Retry sends it to the default server of its kind or
+ * says one must be chosen. Through the real OpenAPI validator, with a localhost
+ * Lidarr for music.
  */
 
 setupTestDb();
@@ -76,7 +76,7 @@ const call = async (
   return { status: res.status, body: text ? JSON.parse(text) : {} };
 };
 
-/** Someone with exactly these permissions, acting from now on. */
+/** Act as someone with exactly these permissions from now on. */
 const actAs = async (permissions: number, email = 'manager@test.local') => {
   const repository = getRepository(User);
   const existing = await repository.findOneBy({ email });
@@ -137,7 +137,7 @@ const requester = () =>
 
 let nextTmdbId = 9000;
 
-/** A film request, saved as it stands (an approved one is sent on). */
+/** A film request saved as given (an approved one is sent on). */
 const movieRequest = async (
   overrides: Partial<MediaRequest> = {},
   status = MediaStatus.PROCESSING
@@ -163,7 +163,7 @@ const movieRequest = async (
   return getRepository(MediaRequest).findOneByOrFail({ id: saved.id });
 };
 
-/** A request for the first season of a series. */
+/** A request for a series' first season. */
 const seriesRequest = async (
   overrides: Partial<MediaRequest> = {},
   status = MediaStatus.PROCESSING
@@ -196,7 +196,7 @@ const seriesRequest = async (
   return getRepository(MediaRequest).findOneByOrFail({ id: saved.id });
 };
 
-/** A music request for one album, saved without being sent anywhere. */
+/** A one-album music request, saved without sending anywhere. */
 const musicRequest = async (overrides: Partial<MediaRequest> = {}) => {
   const manager = dataSource.manager;
   const media = await manager.save(
@@ -257,7 +257,7 @@ const lookedUpAlbum = (): LidarrAlbum => ({
   },
 });
 
-// A film already there is completed and announced: TMDB answered here.
+// A film already available is completed and announced: TMDB stubbed here.
 Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
   configurable: true,
   set() {},
@@ -274,7 +274,7 @@ Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
 const stored = (id: number) =>
   getRepository(MediaRequest).findOneByOrFail({ id });
 
-/** What the title's history says, of one kind, newest last. */
+/** The title's history events of one type, newest last. */
 const history = async (type: MediaEventType) =>
   (
     await getRepository(MediaEvent).find({
@@ -283,7 +283,7 @@ const history = async (type: MediaEventType) =>
     })
   ).map((event) => event.detail ?? '');
 
-/** Sending to Radarr or Sonarr stubbed: which server each went to. */
+/** Stub sending to Radarr or Sonarr, recording each target server. */
 const sentTo = (method: 'sendToRadarr' | 'sendToSonarr') => {
   const servers: (number | null)[] = [];
   mock.method(
@@ -666,7 +666,7 @@ describe('retrying a request whose server is gone', () => {
 
   it('says where it went on the approval only, when sending it fails again', async () => {
     getSettings().radarr = [radarr(0, { isDefault: true })];
-    // Radarr refuses it, as sendToRadarr does: failed, in the same save.
+    // Radarr refuses it, as sendToRadarr does: failed in the same save.
     mock.method(
       MediaRequestSubscriber.prototype,
       'sendToRadarr',
@@ -801,12 +801,11 @@ describe('retrying a request whose server is gone', () => {
 });
 
 /*
- * Some servers run without Radarr, Sonarr or Lidarr on purpose and fulfil
- * those requests by hand. That is a choice, not a problem: nothing changes
- * for them.
+ * Some setups run without Radarr, Sonarr or Lidarr on purpose and fulfil
+ * requests by hand; nothing changes for them.
  */
 describe('with no server of its kind at all', () => {
-  /** Everything said to anyone about the request. */
+  /** Every notification about the request. */
   const notifications = () => {
     const sent: Notification[] = [];
     mock.method(
@@ -909,7 +908,7 @@ describe('with no server of its kind at all', () => {
       status: MediaRequestStatus.PENDING,
       serverId: 5,
     });
-    // Failed for some other reason, before its Radarr went away.
+    // Failed for another reason before its Radarr was removed.
     const failed = await seriesRequest({ serverId: 2 });
 
     await looksFine(pending.id);

@@ -111,12 +111,12 @@ const CollectionRequestModal = ({
     selectedParts.includes(tmdbId);
 
   const togglePart = (tmdbId: number): void => {
-    // If this part already has a pending request, don't allow it to be toggled
+    // Already requested or available.
     if (getAllRequestedParts().includes(tmdbId)) {
       return;
     }
 
-    // If there are no more remaining requests available, block toggle
+    // Quota used up.
     if (
       quota?.movie.limit &&
       currentlyRemaining <= 0 &&
@@ -137,7 +137,7 @@ const CollectionRequestModal = ({
   );
 
   const toggleAllParts = (): void => {
-    // If the user has a quota and not enough requests for all parts, block toggleAllParts
+    // Quota too small for every part.
     if (
       quota?.movie.limit &&
       (quota?.movie.remaining ?? 0) < unrequestedParts.length
@@ -145,11 +145,7 @@ const CollectionRequestModal = ({
       return;
     }
 
-    if (
-      data &&
-      selectedParts.length >= 0 &&
-      selectedParts.length < unrequestedParts.length
-    ) {
+    if (data && selectedParts.length < unrequestedParts.length) {
       setSelectedParts(unrequestedParts);
     } else {
       setSelectedParts([]);

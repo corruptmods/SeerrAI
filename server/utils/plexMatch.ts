@@ -1,7 +1,5 @@
-/*
- * Telling titles apart in the Plex Match Check, shared by the server and
- * the title page. No imports: the browser bundle uses it too.
- */
+// Title disambiguation for the Plex Match Check, shared by the server and the
+// title page. No imports: the browser bundle uses it too.
 
 export interface MatchIds {
   tmdbId?: number;
@@ -11,13 +9,13 @@ export interface MatchIds {
 
 export type MatchKind = 'movie' | 'series' | 'music';
 
-/** One id, as shown and as searched for. */
+/** One id, as displayed and searched. */
 export interface ShownId {
   name: 'tmdb' | 'tvdb' | 'imdb';
   id: number | string;
 }
 
-/** The ids compared, in order: as `sameTitle` on the server compares them. */
+/** Ids compared, in the order `sameTitle` on the server compares them. */
 const ORDER: Record<'movie' | 'series', (keyof MatchIds)[]> = {
   series: ['tvdbId', 'tmdbId', 'imdbId'],
   movie: ['tmdbId', 'imdbId', 'tvdbId'],
@@ -29,7 +27,7 @@ const NAME: Record<keyof MatchIds, ShownId['name']> = {
   imdbId: 'imdb',
 };
 
-/** The id each side goes by first: TVDB for series, TMDB for movies. */
+/** Each side's primary id: TVDB for series, TMDB for movies. */
 export const mainId = (
   kind: MatchKind,
   ids: MatchIds
@@ -40,9 +38,9 @@ export const mainId = (
 };
 
 /**
- * The ids the two sides were told apart by: the first id both have, in the
- * order they are compared, so a server that only has an IMDb id shows that
- * one rather than nothing. Each side's first id when they share none.
+ * The ids that told the sides apart: the first id both have, in comparison
+ * order, so a server with only an IMDb id shows that rather than nothing. Each
+ * side's first id when they share none.
  */
 export const comparedIds = (
   kind: MatchKind,
@@ -67,9 +65,8 @@ export const idLabel = (id: ShownId): string =>
   `${id.name === 'imdb' ? 'IMDb' : id.name.toUpperCase()} ${id.id}`;
 
 /**
- * What to search for in Plex's Fix Match, or enter in Identify: the main
- * id, and the IMDb id as well when that is the one the sides were told
- * apart by.
+ * What to search in Plex's Fix Match or enter in Identify: the primary id, plus
+ * the IMDb id when that's what told the sides apart.
  */
 export const fixSearch = (
   kind: MatchKind,
@@ -87,9 +84,8 @@ export const fixSearch = (
 };
 
 /**
- * Same name, ignoring case, and the same year when both sides have one: a
- * missing year is not known, not different. Telling them apart then needs
- * the ids.
+ * Same name ignoring case, and same year when both have one (a missing year is
+ * unknown, not different). Telling such titles apart needs the ids.
  */
 export const sameName = (
   a: { title: string; year?: number },
@@ -110,9 +106,9 @@ export const runtimeMinutes = (text?: string | null): number | undefined => {
 };
 
 /**
- * The file is far off the length of the film Radarr has for its folder:
- * more likely another film (a short of the same name) than the server's
- * mistake. Every wrong Plex match checked was within a few minutes.
+ * The file's length is far off the film Radarr has for its folder: more likely
+ * another film (a same-named short) than a server mistake. Every wrong Plex
+ * match checked was within a few minutes.
  */
 export const fileLooksWrong = (expected: {
   runtime?: number;
@@ -123,7 +119,7 @@ export const fileLooksWrong = (expected: {
   (expected.fileRuntime < expected.runtime / 2 ||
     Math.abs(expected.fileRuntime - expected.runtime) > 25);
 
-/** Letters and digits only, without accents or case. */
+/** Letters and digits only, ignoring accents and case. */
 const plain = (value: string): string =>
   value
     .normalize('NFKD')
@@ -133,9 +129,9 @@ const plain = (value: string): string =>
     .replace(/[^\p{L}\p{N}]/gu, '');
 
 /**
- * The file is not named after the title (a foreign release title, say):
- * the media server matches by file name, so it can match it wrongly again
- * until the file is renamed.
+ * The file isn't named after the title (e.g. a foreign release title): the
+ * media server matches by file name, so it can mismatch again until the file is
+ * renamed.
  */
 export const fileMisnamed = (expected: {
   title: string;

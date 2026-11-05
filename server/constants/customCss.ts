@@ -1,27 +1,22 @@
-/*
- * Custom CSS (Settings → Appearance and Profile → Settings → Appearance).
- *
- * An admin's Server CSS applies to everyone, the sign-in page included. It
- * is trusted like the rest of the admin's settings and may bring in a
- * stylesheet from elsewhere with @import (a theme.park theme, say); the
- * page's Content-Security-Policy allows the places it names, and only
- * those (server/lib/customCss.ts).
- *
- * A person's own CSS, when an admin allows it, changes only their own
- * screens, but it is often pasted from somewhere. So it may not bring in
- * other stylesheets, may not run anything, and may only use pictures and
- * fonts from this server's own paths (or written into the CSS as data:),
- * so a pasted style can't send anything elsewhere. It is checked as the
- * browser reads it, comments skipped and escapes such as `u\72l(` decoded.
- *
- * Shared by the server, which decides, and the Appearance page, which says
- * what is wrong while someone types.
- */
+// Custom CSS (Settings → Appearance and Profile → Settings → Appearance),
+// shared by the server, which enforces it, and the Appearance page, which
+// reports problems while typing.
+//
+// Server CSS (admin) applies to everyone, sign-in page included. It is trusted
+// like other admin settings and may @import external stylesheets (e.g. a
+// theme.park theme); the Content-Security-Policy allows exactly the hosts it
+// names (server/lib/customCss.ts).
+//
+// Personal CSS (when allowed) affects only its owner but is often pasted from
+// elsewhere. So it may not import stylesheets or run anything, and may only
+// load images and fonts from this server's paths or data: URIs, so it can't
+// send anything elsewhere. It's checked as the browser parses it: comments
+// skipped, escapes such as `u\72l(` decoded.
 
-/** The largest personal stylesheet taken. */
+/** Max personal stylesheet size. */
 export const PERSONAL_CSS_MAX_BYTES = 32 * 1024;
 
-/** The largest Server CSS taken. */
+/** Max Server CSS size. */
 export const SERVER_CSS_MAX_BYTES = 64 * 1024;
 
 export type PersonalCssProblem =
@@ -36,7 +31,9 @@ export type ServerCssProblem = { problem: 'notText' | 'tooLarge' };
 const byteLength = (text: string): number =>
   new TextEncoder().encode(text).length;
 
-/** A placeholder for the n-th string, in text that can't otherwise hold one. */
+/**
+ * Placeholder mark for the n-th string, in text that can't otherwise hold one.
+ */
 const STRING_MARK = '\u0000';
 const stringPlaceholder = (index: number) =>
   `${STRING_MARK}${index}${STRING_MARK}`;
@@ -49,8 +46,8 @@ const isSpace = (char: string | undefined) =>
   char === ' ' || char === '\t' || isNewline(char);
 
 /**
- * Reads the escape at css[at] (a backslash): the character it stands for,
- * and where reading carries on.
+ * Reads the escape at css[at] (a backslash): the character it encodes and the
+ * index after it.
  */
 const readEscape = (css: string, at: number): [string, number] => {
   let i = at + 1;
@@ -66,7 +63,7 @@ const readEscape = (css: string, at: number): [string, number] => {
   while (hex.length < 6 && isHex(css[i])) {
     hex += css[i++];
   }
-  // One space after a hex escape belongs to it.
+  // One whitespace after a hex escape belongs to it.
   if (css[i] === '\r' && css[i + 1] === '\n') {
     i += 2;
   } else if (isSpace(css[i])) {
@@ -78,7 +75,7 @@ const readEscape = (css: string, at: number): [string, number] => {
   return [valid ? String.fromCodePoint(code) : '\ufffd', i];
 };
 
-/** Characters CSS lets a name hold, besides escaped ones. */
+/** Characters a CSS name may hold unescaped. */
 const isNameChar = (char: string) => /[a-zA-Z0-9_\-\u0080-￿]/.test(char);
 
 /** Characters an unquoted url() may not hold. */
@@ -93,12 +90,11 @@ const isNonPrintable = (char: string) => {
 };
 
 /**
- * Reads the unquoted address of a url( whose bracket is at css[open], as
- * the browser does: up to the closing bracket, where comments and quotes
- * are part of the address rather than starting anything. An address the
- * browser would refuse (a quote, a bracket or a space inside it) is given
- * as written, so it is refused here too. Gives the address and where
- * reading carries on, or nothing when the address is a string.
+ * Reads an unquoted url( address whose bracket is at css[open], as the browser
+ * does: up to the closing bracket, with comments and quotes part of the
+ * address. An address the browser would reject (a quote, bracket or space
+ * inside) is returned as written, so it's rejected here too. Returns the
+ * address and the index after it, or undefined when the argument is a string.
  */
 const readUrl = (css: string, open: number): [string, number] | undefined => {
   let i = open + 1;
@@ -140,7 +136,7 @@ const readUrl = (css: string, open: number): [string, number] | undefined => {
     }
   }
   if (bad) {
-    // The rest of a broken address, up to its closing bracket.
+    // Skip the rest of a malformed address, up to its closing bracket.
     while (i < css.length && css[i] !== ')') {
       i =
         css[i] === '\\' && !isNewline(css[i + 1])
@@ -154,16 +150,15 @@ const readUrl = (css: string, open: number): [string, number] | undefined => {
 
 interface ReadCss {
   /**
-   * The CSS as the browser reads it: comments gone, escapes decoded, and
-   * each string, and each unquoted url() address, replaced by a
-   * placeholder.
+   * The CSS as the browser reads it: comments removed, escapes decoded, and
+   * each string and unquoted url() address replaced by a placeholder.
    */
   text: string;
-  /** The same with A–Z in lower case, character for character. */
+  /** `text` with A–Z lowercased, position for position. */
   lower: string;
-  /** The strings' contents, escapes decoded, by placeholder number. */
+  /** The strings' decoded contents, by placeholder number. */
   strings: string[];
-  /** Where the argument of each url() and src() starts in the text. */
+  /** Where each url() and src() argument starts in `text`. */
   calls: number[];
 }
 
@@ -173,9 +168,9 @@ const readCss = (css: string): ReadCss => {
   const strings: string[] = [];
   const calls: number[] = [];
   let text = '';
-  // The name being read (escapes decoded), and the character before it:
-  // url( starts an unquoted address only after the name url on its own,
-  // not part of a #hash or @rule.
+  // The name being read (escapes decoded) and the character before it: url(
+  // starts an unquoted address only after a bare url name, not inside a #hash
+  // or @rule.
   let name = '';
   let beforeName = '';
   const endName = (char: string) => {
@@ -204,7 +199,7 @@ const readCss = (css: string): ReadCss => {
       i = url[1];
       endName(')');
     } else if (source.startsWith('<!--', i)) {
-      // Read by the browser as one piece: a name after it starts afresh.
+      // The browser reads <!-- as one token; a name after it starts afresh.
       text += '<!--';
       i += 4;
       endName(' ');
@@ -213,7 +208,7 @@ const readCss = (css: string): ReadCss => {
       i += 1;
       while (i < source.length && source[i] !== char) {
         if (isNewline(source[i])) {
-          // An unfinished string ends at the line, as the browser has it.
+          // An unterminated string ends at the line break, as in the browser.
           break;
         }
         if (source[i] === '\\') {
@@ -235,7 +230,7 @@ const readCss = (css: string): ReadCss => {
       strings.push(value);
       endName(STRING_MARK);
     } else if (char === '\\' && !isNewline(source[i + 1])) {
-      // An escaped character is part of a name, whatever it is.
+      // An escaped character is always part of a name.
       const [decoded, next] = readEscape(source, i);
       text += decoded;
       name += decoded;
@@ -253,14 +248,14 @@ const readCss = (css: string): ReadCss => {
       }
     }
   }
-  // Only A–Z, so every position in one is the same position in the other.
+  // Only A–Z, so positions match between text and lower.
   const lower = text.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
   return { text, lower, strings, calls };
 };
 
 /**
- * The address given to a function whose argument starts at `at`: a string,
- * or the unquoted text up to the closing bracket.
+ * The address passed to a function whose argument starts at `at`: a string, or
+ * the unquoted text up to the closing bracket.
  */
 const addressAt = (read: ReadCss, at: number): string => {
   let i = at;
@@ -276,17 +271,17 @@ const addressAt = (read: ReadCss, at: number): string => {
 };
 
 /**
- * Anything that looks like url( or src(, as well as those the browser reads
- * as such: an extra one only makes the check stricter. Not after # or @,
- * which make #url( and @url( a name rather than a function.
+ * Anything that looks like url( or src(, a superset of what the browser treats
+ * as such (extras only make the check stricter). Not after # or @, where #url(
+ * and @url( are names, not functions.
  */
 const LOOKS_CALLED = /(?<![a-z0-9_\-\u0080-￿#@])(url|src)\(/g;
 
-/** Every address the CSS uses, in order: imported stylesheets apart. */
+/** Every address the CSS uses, in order, with imports flagged. */
 const addressesIn = (
   read: ReadCss
 ): { address: string; imported: boolean }[] => {
-  // By where each address starts in the text.
+  // Keyed by where each address starts in the text.
   const uses = new Map<number, { address: string; imported: boolean }>();
   const calls = new Set(read.calls);
   for (const match of read.lower.matchAll(LOOKS_CALLED)) {
@@ -295,8 +290,7 @@ const addressesIn = (
   for (const at of calls) {
     uses.set(at, { address: addressAt(read, at), imported: false });
   }
-  // @import with its address, a string or a url(), which is then the
-  // import's.
+  // @import followed by a string or url() makes that address an import.
   for (const match of read.lower.matchAll(/@import/g)) {
     let at = match.index + match[0].length;
     while (isSpace(read.text[at])) {
@@ -313,9 +307,9 @@ const addressesIn = (
 };
 
 /**
- * The addresses a stylesheet uses: the stylesheets it imports, and the
- * pictures and fonts it uses (others). Comments and strings that merely
- * look like addresses are not counted.
+ * The addresses a stylesheet uses: imported stylesheets, and images and fonts
+ * (others). Comments and strings that merely look like addresses aren't
+ * counted.
  */
 export const cssAddresses = (
   css: string
@@ -328,30 +322,26 @@ export const cssAddresses = (
 };
 
 /**
- * Addresses a person's CSS may use: a path on this server (not `//host`,
- * which is another server), a part of the page itself (`#id`, as filters
- * and masks use), or a picture or font written into the CSS (`data:`),
- * which goes nowhere.
+ * Addresses personal CSS may use: a path on this server (not `//host`, another
+ * server), a fragment of the page (`#id`, for filters and masks), or an inline
+ * `data:` image or font.
  */
 const ownAddress = (address: string): boolean =>
   /^\/(?![/\\])[^\s\\"'()<>]*$/.test(address) ||
   /^#[^\s\\"'()<>]*$/.test(address) ||
   /^data:(image|font)\//i.test(address);
 
-/** Written only to run something, in CSS outside strings. */
+/** Constructs that run code, outside strings. */
 const RUNS: [RegExp, string][] = [
   [/(?<![a-z0-9_\-\u0080-￿])expression\s*\(/, 'expression()'],
   [/(?:^|[{;\s])(?:-ms-)?behavior\s*:/, 'behavior'],
   [/-moz-binding/, '-moz-binding'],
 ];
 
-/** Addresses that run something, anywhere, strings included. */
+/** Script URL schemes, matched anywhere, strings included. */
 const SCRIPT_ADDRESSES = ['javascript:', 'vbscript:'];
 
-/**
- * A person's CSS as it is kept (trimmed; '' for none), or what is wrong
- * with it.
- */
+/** Personal CSS as stored (trimmed; '' for none), or its problem. */
 export const checkPersonalCss = (
   css: unknown
 ): { css: string } | PersonalCssProblem => {
@@ -391,7 +381,7 @@ export const checkPersonalCss = (
   return { css: css.trim() };
 };
 
-/** The server's CSS as it is kept (trimmed), or what is wrong with it. */
+/** Server CSS as stored (trimmed), or its problem. */
 export const checkServerCss = (
   css: unknown
 ): { css: string } | ServerCssProblem => {

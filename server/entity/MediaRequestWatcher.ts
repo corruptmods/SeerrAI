@@ -13,11 +13,11 @@ import { MediaRequest } from './MediaRequest';
 import { User } from './User';
 
 /**
- * A user other than the original requester who wants to be notified when a
- * request becomes available.
+ * A user other than the requester who wants to be notified when a request
+ * becomes available.
  *
- * Seerr rejects a second request for media that is already requested, which
- * leaves everyone except the first requester with no way to hear about it.
+ * Seerr rejects a second request for already-requested media, which would leave
+ * everyone but the first requester unnotified.
  */
 @Entity()
 @Unique(['request', 'user'])

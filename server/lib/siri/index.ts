@@ -18,17 +18,16 @@ import { randomBytes } from 'node:crypto';
 import { In } from 'typeorm';
 
 /*
- * "Fix this show" from Siri. The shortcut asks what is playing, asks the
- * person what's wrong, and sends their words here. The report is filed as
- * an issue, as one made in Seerr would be, and fixed in the background:
- * the word rules read it, and the AI model when they can't tell. A fix
- * that replaces files is asked about first, whoever read it, and done
- * only on a "yes". Everything comes back as a sentence for Siri to say.
+ * "Fix this show" from Siri. The shortcut gets what is playing, asks what's
+ * wrong, and sends the words here. The report is filed as an issue, as in
+ * Seerr, and fixed in the background: word rules read it, the AI model when
+ * they can't tell. A fix that replaces files is always asked about first
+ * and done only on "yes". Every reply is a sentence for Siri to say.
  */
 
 /** How long a "Should I go ahead?" waits for its answer. */
 export const ANSWER_WITHIN_MS = 5 * 60 * 1000;
-/** The most a report says, in characters: what Siri heard. */
+/** Max length of a report (what Siri heard), in characters. */
 export const MOST_CHARACTERS = 1000;
 
 /** A refusal with the sentence to say and the HTTP status to send. */
@@ -42,7 +41,7 @@ export class SiriError extends Error {
 }
 
 export interface SiriPlaying {
-  /** What to send back with the report: the title, season and episode. */
+  /** Sent back with the report: the title, season and episode. */
   item: string;
   mediaId: number;
   tmdbId: number;
@@ -57,7 +56,7 @@ export interface SiriPlaying {
 export interface SiriAnswer {
   /** The sentence for Siri to say. */
   say: string;
-  /** A question waits for a yes or no: send this back with the answer. */
+  /** Set when a yes or no is awaited; sent back with the answer. */
   confirm?: string;
   issueId?: number;
 }
@@ -124,7 +123,7 @@ const mayReport = (user: User) =>
 
 class SiriReports {
   private asked = new Map<string, Asked>();
-  /** What each person was last offered, for the title's name. */
+  /** What each user was last offered, to name the title. */
   private offered = new Map<number, { until: number; list: SiriPlaying[] }>();
 
   /** Forgets every question waiting for an answer. For tests. */
@@ -134,8 +133,8 @@ class SiriReports {
   }
 
   /**
-   * What they are watching, and what Siri asks next: "What's wrong with
-   * The Otterkin, season 2 episode 3?", or that nothing is playing.
+   * What the user is watching, and Siri's next question ("What's wrong with
+   * The Otterkin, season 2 episode 3?"), or that nothing is playing.
    */
   public async playing(
     user: User,
@@ -173,7 +172,7 @@ class SiriReports {
     };
   }
 
-  /** Where a report is about: the item sent, or what is playing now. */
+  /** What a report is about: the item sent, or what is playing now. */
   private async target(
     user: User,
     item: string | undefined,
@@ -186,7 +185,7 @@ class SiriReports {
   }> {
     if (item) {
       const parsed = parseItem(item);
-      // Films and series only: what can be playing.
+      // Films and series only, since only those can be playing.
       const media = parsed
         ? await getRepository(Media).findOne({
             where: {
@@ -218,9 +217,8 @@ class SiriReports {
   }
 
   /**
-   * A report of what's wrong. Filed and fixed at once, unless the fix
-   * replaces files: then a question comes back, with a `confirm` to send
-   * with the answer.
+   * Files and fixes a report at once, unless the fix replaces files: then a
+   * question comes back with a `confirm` to send with the answer.
    */
   public async report(
     user: User,
@@ -377,7 +375,7 @@ class SiriReports {
 
   private ask(asked: Asked): string {
     this.forgetOld();
-    // One question waits per person: a new report replaces the last.
+    // One pending question per user: a new report replaces the last.
     for (const [token, waiting] of this.asked) {
       if (waiting.userId === asked.userId) this.asked.delete(token);
     }

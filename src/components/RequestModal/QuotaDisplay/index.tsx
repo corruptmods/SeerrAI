@@ -37,7 +37,7 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
 
 interface QuotaDisplayProps {
   quota?: QuotaStatus;
-  /** Albums are counted for music, as seasons are for series. */
+  /** Music counts albums, as series count seasons. */
   mediaType: 'movie' | 'tv' | 'music';
   userOverride?: number | null;
   remaining?: number;

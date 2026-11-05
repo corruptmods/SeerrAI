@@ -48,23 +48,20 @@ export interface RTRating {
   url: string;
 }
 
-// Tunables
 const INEXACT_TITLE_FACTOR = 0.25;
 const ALTERNATE_TITLE_FACTOR = 0.8;
 const PER_YEAR_PENALTY = 0.4;
 const MINIMUM_SCORE = 0.175;
 
-// Normalization for title comparisons.
-// Lowercase and strip non-alphanumeric (unicode-aware).
+// Lowercase and strip non-alphanumerics (unicode-aware).
 const norm = (s: string): string =>
   s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '');
 
-// Title similarity. 1 if exact, quarter-jaro otherwise.
+// 1 if exact, quarter-Jaro otherwise.
 const similarity = (a: string, b: string): number =>
   a === b ? 1 : jaro(a, b).similarity * INEXACT_TITLE_FACTOR;
 
-// Gets the best similarity score between the searched title and all alternate
-// titles of the search result. Non-main titles are penalized.
+// Best similarity across a hit's titles; non-main titles are penalized.
 const t_score = ({ title, titles, aka }: RTAlgoliaHit, s: string): number => {
   const f = (t: string, i: number) =>
     similarity(norm(t), norm(s)) * (i ? ALTERNATE_TITLE_FACTOR : 1);
@@ -75,32 +72,26 @@ const t_score = ({ title, titles, aka }: RTAlgoliaHit, s: string): number => {
 const y_score = (r: RTAlgoliaHit, y?: number): number =>
   y ? Math.max(0, 1 - Math.abs(r.releaseYear - y) * PER_YEAR_PENALTY) : 1;
 
-// Cut score in half if result has no ratings.
+// Halve the score when a hit has no ratings.
 const extra_score = (r: RTAlgoliaHit): number => (r.rottenTomatoes ? 1 : 0.5);
 
-// Score search result as product of all subscores
 const score = (r: RTAlgoliaHit, name: string, year?: number): number =>
   t_score(r, name) * y_score(r, year) * extra_score(r);
 
-// Score each search result and return the highest scoring result, if any
+// Highest-scoring hit, if any clears MINIMUM_SCORE.
 const best = (rs: RTAlgoliaHit[], name: string, year?: number): RTAlgoliaHit =>
   rs
     .map((r) => ({ score: score(r, name, year), result: r }))
     .filter(({ score }) => score > MINIMUM_SCORE)
     .sort(({ score: a }, { score: b }) => b - a)[0]?.result;
 
-/** A search is a read, so its answer is kept like any other (seconds). */
+/** Searches are reads, so cache them like any other (seconds). */
 const SEARCH_TTL = 300;
 
 /**
- * This is a best-effort API. The Rotten Tomatoes API is technically
- * private and getting access costs money/requires approval.
- *
- * They do, however, have a "public" api that they use to request the
- * data on their own site. We use this to get ratings for movies/tv shows.
- *
- * Unfortunately, we need to do it by searching for the movie name, so it's
- * not always accurate.
+ * Best effort: the official Rotten Tomatoes API is paid and gated, so this
+ * uses the public search API their site uses. Matching is by title search,
+ * so it is not always accurate.
  */
 class RottenTomatoes extends ExternalAPI {
   constructor() {
@@ -125,13 +116,8 @@ class RottenTomatoes extends ExternalAPI {
   }
 
   /**
-   * Search the RT algolia api for the movie title
-   *
-   * We compare the release date to make sure its the correct
-   * match. But it's not guaranteed to have results.
-   *
-   * @param name Movie name
-   * @param year Release Year
+   * Searches RT's Algolia index by title; the release year helps pick the
+   * match. May find nothing.
    */
   public async getMovieRatings(
     name: string,

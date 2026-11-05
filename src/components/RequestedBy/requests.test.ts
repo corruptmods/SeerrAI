@@ -2,21 +2,21 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { newestFirst, seasonGroups } from './requests';
 
-/* How a title page lists the requests made for it. */
+/* Request listing on a title page. */
 
 describe('the requests on a title page', () => {
   it('lists the newest request first', () => {
     const requests = [
       { id: 1, createdAt: new Date('2026-01-05T10:00:00Z') },
       { id: 2, createdAt: new Date('2026-03-01T10:00:00Z') },
-      // As the page receives it: a date written out.
+      // As received: a date string.
       { id: 3, createdAt: '2026-02-01T10:00:00Z' as unknown as Date },
     ];
     assert.deepEqual(
       newestFirst(requests).map((r) => r.id),
       [2, 3, 1]
     );
-    // The page's own copy is left as it was.
+    // The input is not mutated.
     assert.deepEqual(
       requests.map((r) => r.id),
       [1, 2, 3]

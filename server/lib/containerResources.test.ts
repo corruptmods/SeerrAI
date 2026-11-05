@@ -9,8 +9,8 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 
 /*
- * Seerr's own container use, read from a fake cgroup tree in each layout,
- * with readings taken at chosen times.
+ * Seerr's container usage from a fake cgroup tree in each layout, sampled at
+ * chosen times.
  */
 
 const GiB = 1024 ** 3;

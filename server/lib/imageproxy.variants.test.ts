@@ -8,10 +8,9 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import sharp from 'sharp';
 
 /*
- * The image cache's own copies and upkeep: converted and smaller copies,
- * checking a stale image with its host instead of downloading it again, and
- * the size limit. In a cache directory of its own, as the size limit looks
- * at everything in it.
+ * The image cache's derived copies and upkeep: converted and resized copies,
+ * revalidating stale images instead of re-downloading, and the size limit.
+ * Uses its own cache directory, since the size limit counts everything in it.
  */
 
 const configDir = join(tmpdir(), `seerr-images-${process.pid}-${Date.now()}`);
@@ -372,7 +371,7 @@ describe('the size limit', () => {
     const dir = join(imagesDir, source, name);
     await promises.mkdir(dir, { recursive: true });
     const file = join(dir, `31536000.${Date.now() + 1e9}..jpg`);
-    // Sparse: its size is what counts, not what it takes on this disk.
+    // Sparse: the apparent size counts, not disk usage.
     await promises.writeFile(file, '');
     await promises.truncate(file, bytes);
     const when = (Date.now() - minutesAgo * 60000) / 1000;

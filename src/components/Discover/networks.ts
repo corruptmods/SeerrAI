@@ -4,11 +4,11 @@ import { readDiscoverNetworks } from '@server/constants/discoverNetworks';
 export type { DiscoverNetwork };
 
 /*
- * The Networks row's list: the default one, or the admin's own, kept as JSON
- * in the row's data (see server/constants/discoverNetworks.ts).
+ * Networks row list: the default or a custom one, stored as JSON in the row's
+ * data (see server/constants/discoverNetworks.ts).
  */
 
-/** A network's logo in white (CompanyCard turns it dark in light mode). */
+/** White network logo; CompanyCard darkens it in light mode. */
 export const networkLogoUrl = (logoPath: string): string =>
   `https://image.tmdb.org/t/p/w780_filter(duotone,ffffff,bababa)${logoPath}`;
 
@@ -61,8 +61,7 @@ export const parseDiscoverNetworks = (
   }
 
   try {
-    // The same rules the server saves by: names trimmed, a network listed
-    // twice kept once, and anything wrong the default list instead.
+    // Same rules as the server: trim names, dedupe, fall back to the default.
     return readDiscoverNetworks(JSON.parse(data)) ?? defaultDiscoverNetworks;
   } catch {
     return defaultDiscoverNetworks;

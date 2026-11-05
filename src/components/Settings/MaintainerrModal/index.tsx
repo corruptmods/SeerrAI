@@ -45,7 +45,7 @@ const messages = defineMessages('components.Settings.MaintainerrModal', {
 });
 
 interface MaintainerrModalProps {
-  /** The server being edited, or null to add one. */
+  /** Server being edited, or null to add one. */
   maintainerr: MaintainerrSettings | null;
   onClose: () => void;
   onSave: () => void;
@@ -61,8 +61,7 @@ const MaintainerrModal = ({
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from a server that already worked; a new one must pass a
-  // test before it can be added, as with Radarr and Sonarr.
+  // A saved server already passed a test; a new one must pass before adding.
   const [isValidated, setIsValidated] = useState(!!maintainerr);
 
   const range = (min: number, max: number) => {
@@ -85,8 +84,7 @@ const MaintainerrModal = ({
     hostname: Yup.string()
       .trim()
       .required(intl.formatMessage(messages.validationHostnameRequired))
-      // Just the host: no scheme, path, port or spaces. The connection test
-      // catches anything else.
+      // Host only: no scheme, path, port or spaces. The test catches the rest.
       .matches(
         /^[^\s/:]+$/,
         intl.formatMessage(messages.validationHostnameRequired)
@@ -136,7 +134,7 @@ const MaintainerrModal = ({
     }
   };
 
-  // Changing where the server is means the earlier test no longer counts.
+  // Changing a connection field invalidates the last test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,
@@ -188,7 +186,7 @@ const MaintainerrModal = ({
             }
             onSave();
           } catch {
-            // The server tests the connection again before saving.
+            // The server re-tests before saving.
             setIsValidated(false);
             addToast(intl.formatMessage(messages.toastTestFailure), {
               appearance: 'error',
@@ -420,7 +418,7 @@ const MaintainerrModal = ({
                 </label>
                 <div className="form-input-area">
                   <div className="flex items-center">
-                    {/* Its own box: the global input rule outranks a width utility inside a flex row. */}
+                    {/* Width on a wrapper: global input styles beat utilities. */}
                     <div className="w-20 flex-none">
                       <Field
                         id="soonDays"

@@ -30,10 +30,10 @@ import { Router } from 'express';
 import { In, IsNull, Not } from 'typeorm';
 
 /*
- * Music's Discover rows. New releases come from ListenBrainz, and the
- * charts (Top Songs, Trending, Top Albums, Top Artists) from Apple Music;
- * switched off under Settings → Music (New and Popular Music), they are
- * empty. Recently Added is what Seerr's own scans found.
+ * Music Discover rows. New releases from ListenBrainz, charts (Top Songs,
+ * Trending, Top Albums, Top Artists) from Apple Music; both empty when Settings
+ * → Music (New and Popular Music) is off. Recently Added comes from Seerr's own
+ * scans.
  */
 const discoverMusicRoutes = Router();
 
@@ -41,7 +41,7 @@ discoverMusicRoutes.use(requireMusic);
 
 export const MUSIC_PAGE_SIZE = 20;
 
-/** One page of a list worked out in full. */
+/** One page of a fully computed list. */
 const paged = <T>(items: T[], page: number): MusicPage<T> => ({
   page,
   totalPages: Math.max(1, Math.ceil(items.length / MUSIC_PAGE_SIZE)),
@@ -64,7 +64,7 @@ const listenBrainzFailed = (next: NextFunction, e: unknown) => {
   return next({ status: 502, message: 'ListenBrainz did not answer.' });
 };
 
-/** Each album or artist once: ListenBrainz can list one more than once. */
+/** Dedupe by id: ListenBrainz can list an item more than once. */
 const once = <T extends { id: string }>(items: T[]): T[] => {
   const seen = new Set<string>();
   return items.filter((item) => !seen.has(item.id) && !!seen.add(item.id));
@@ -79,7 +79,6 @@ discoverMusicRoutes.get('/new-releases', async (req, res, next) => {
     const found = await new ListenBrainzAPI().getFreshReleases({ days: 14 });
     const releases = (found.payload?.releases ?? [])
       .filter((release) => isMbid(release.release_group_mbid))
-      // Newest first.
       .sort((a, b) =>
         (b.release_date ?? '').localeCompare(a.release_date ?? '')
       );
@@ -99,7 +98,7 @@ discoverMusicRoutes.get('/new-releases', async (req, res, next) => {
   }
 });
 
-/** The charts, or none when New and Popular Music is off. */
+/** Report an Apple Music charts failure. */
 const chartsFailed = (next: NextFunction, e: unknown) => {
   logger.warn('Apple Music’s charts did not answer', {
     label: 'Music',
@@ -108,7 +107,7 @@ const chartsFailed = (next: NextFunction, e: unknown) => {
   return next({ status: 502, message: 'Apple Music’s charts did not answer.' });
 };
 
-/** Chart songs as the rows show them, with where each stands here. */
+/** Chart songs as rows, with their status here. */
 const songRows = async (
   songs: ChartSong[],
   page: number
@@ -128,10 +127,10 @@ const songRows = async (
 };
 
 /*
- * Apple Music's charts for Discover's region (lib/music/charts): the songs
- * and albums played most, the songs among them out in the last month, and
- * their artists. Each row shows what has been matched to MusicBrainz so
- * far; the rest are matched behind the scenes and show on a later visit.
+ * Apple Music charts for the Discover region (lib/music/charts): most-played
+ * songs and albums, the songs among them released in the last month, and their
+ * artists. Each row shows what's matched to MusicBrainz so far; the rest are
+ * matched in the background and show on a later visit.
  */
 discoverMusicRoutes.get('/top-songs', async (req, res, next) => {
   const page = pageOf(req.query.page);
@@ -212,9 +211,8 @@ discoverMusicRoutes.get('/popular-artists', async (req, res, next) => {
 });
 
 /*
- * Each person's own rows, from the music they have asked for (see
- * lib/music/personalRows): only theirs, and empty for someone who has
- * asked for none.
+ * Personal rows from the music this person has requested (see
+ * lib/music/personalRows): only theirs, empty if they've requested none.
  */
 for (const [show, row] of [
   ['your-requests', yourMusicRequests],
@@ -247,8 +245,8 @@ for (const [show, row] of [
 }
 
 /**
- * Albums a media server has, wholly or in part (songs taken from them),
- * newest first, from Seerr's own records.
+ * Albums a media server has wholly or partly (songs taken from them), newest
+ * first, from Seerr's own records.
  */
 discoverMusicRoutes.get('/recently-added', async (req, res) => {
   const page = pageOf(req.query.page);
@@ -288,7 +286,7 @@ discoverMusicRoutes.get('/recently-added', async (req, res) => {
       secondaryTypes: album.secondaryTypes ?? [],
       releaseDate: album.releaseDate ?? undefined,
       artistId: album.media?.foreignId ?? undefined,
-      // The name the music scans keep, so the row asks MusicBrainz nothing.
+      // Name from music scans, so the row needs no MusicBrainz lookup.
       artistName: album.media?.foreignTitle ?? undefined,
       coverUrl: albumCoverUrl(album.mbId as string),
       status: album.status,

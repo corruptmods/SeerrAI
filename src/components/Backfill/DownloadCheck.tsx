@@ -91,7 +91,7 @@ const messages = defineMessages('components.Backfill.DownloadCheck', {
 const appName = (app: 'sonarr' | 'radarr') =>
   app === 'sonarr' ? 'Sonarr' : 'Radarr';
 
-/** What it found, in words. */
+/** A finding as text. */
 export const findingText = (
   intl: IntlShape,
   row: Pick<DownloadCheckRow, 'finding' | 'params' | 'app'>
@@ -170,15 +170,11 @@ const AFTER: Record<RejectAfter, keyof typeof messages> = {
   none: 'afterNone',
 };
 
-/**
- * Why a reject, where the finding alone doesn't say, and what came of it.
- * Empty for anything else.
- */
+/** Extra reason and outcome text for a reject; empty for other actions. */
 const rejectText = (intl: IntlShape, row: DownloadCheckRow): string => {
   if (row.action !== 'reject') return '';
   const parts: string[] = [];
-  // Still downloading: Sonarr or Radarr would bring it in as what it was
-  // grabbed for.
+  // Still downloading: the *arr would import it as what it was grabbed for.
   if (
     row.stage === 'grab' &&
     (row.finding === 'renumbered' || row.finding === 'otherTitle')
@@ -223,7 +219,7 @@ const TONE: Record<CheckStatus, string> = {
   gone: 'bg-gray-700 text-gray-300',
 };
 
-/** What it did, or would do, in a word or two. */
+/** What it did or would do, in a word or two. */
 const outcomeText = (intl: IntlShape, row: DownloadCheckRow): string => {
   const action = row.action;
   switch (row.status) {
@@ -244,7 +240,7 @@ const outcomeText = (intl: IntlShape, row: DownloadCheckRow): string => {
 
 type Choice = 'reject' | 'import' | 'clear' | 'drop' | 'dismiss';
 
-/** What an admin may choose for a row, the suggestion first. */
+/** Admin choices for a row, the suggestion first. */
 const choicesFor = (row: DownloadCheckRow): Choice[] => {
   const action = row.action;
   const canImport = row.stage === 'import';
@@ -273,8 +269,8 @@ const LABEL: Record<Choice, keyof typeof messages> = {
 };
 
 /**
- * Download Check on the Backfill page: what it found lately, what it did
- * (or, with Report only, would do), and what's waiting for an admin.
+ * Download Check panel: recent findings, actions taken (or, with Report only,
+ * proposed), and pending decisions.
  */
 const DownloadCheckPanel = () => {
   const intl = useIntl();

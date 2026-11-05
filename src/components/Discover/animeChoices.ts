@@ -1,7 +1,7 @@
 import type { AnimeSeason } from '@server/utils/animeSeason';
 import { seasonKey, seasonOf, shiftSeason } from '@server/utils/animeSeason';
 
-/** What the Anime page can show, as kept in its address (`?show=`). */
+/** Anime page views, as in `?show=`. */
 export const ANIME_CHOICES = [
   'this',
   'next',
@@ -12,19 +12,16 @@ export const ANIME_CHOICES = [
 
 export type AnimeChoice = (typeof ANIME_CHOICES)[number];
 
-/**
- * The countries the Anime page offers first, where most anime comes from.
- * Any other country can be chosen too.
- */
+/** Countries offered first on the Anime page; any other can be chosen too. */
 export const ANIME_COUNTRIES = ['JP', 'KR', 'CN', 'US'] as const;
 
-/** The choice in the address, or this season for anything else. */
+/** The URL's choice, or `this` for anything invalid. */
 export const readAnimeChoice = (value: unknown): AnimeChoice =>
   ANIME_CHOICES.includes(value as AnimeChoice)
     ? (value as AnimeChoice)
     : 'this';
 
-/** The season a choice is for, or null for one that is not seasonal. */
+/** The season a choice is for; null when not seasonal. */
 export const choiceSeason = (
   choice: AnimeChoice,
   today = new Date()
@@ -42,19 +39,15 @@ export const choiceSeason = (
   }
 };
 
-/**
- * The country in the address (`?country=`), or undefined for every country
- * (and for anything that is not a country code).
- */
+/** The `?country=` code; undefined for all countries or an invalid code. */
 export const readAnimeCountry = (value: unknown): string | undefined =>
   typeof value === 'string' && /^[a-z]{2}$/i.test(value)
     ? value.toUpperCase()
     : undefined;
 
 /**
- * What to ask the server for. The season is worked out here, from the
- * person's own calendar, so the page always lists the season it names.
- * Next season is what premieres then: nothing of it has aired yet.
+ * The server query. The season comes from the client's calendar so the list
+ * matches the season the page names. Next season means premieres.
  */
 export const animeQuery = (
   choice: AnimeChoice,

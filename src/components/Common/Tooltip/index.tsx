@@ -10,7 +10,7 @@ type TooltipProps = {
   className?: string;
 };
 
-/** Whether anything in these children would be read out as text. */
+/** Whether the children contain any readable text. */
 const hasText = (node: React.ReactNode): boolean => {
   if (typeof node === 'string' || typeof node === 'number') {
     return String(node).trim().length > 0;
@@ -25,10 +25,8 @@ const hasText = (node: React.ReactNode): boolean => {
 };
 
 /*
- * A button that is only an icon has no name for a screen reader, and a
- * tooltip is not one. When the tooltip is plain text and the button has no
- * text or label of its own, the tooltip's text names it. Anything with its
- * own text keeps it.
+ * An icon-only button has no accessible name and a tooltip isn't one, so a
+ * plain-text tooltip names a button with no text or label of its own.
  */
 const nameFor = (
   child: React.ReactElement<{

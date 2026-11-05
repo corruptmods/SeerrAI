@@ -1,9 +1,9 @@
 import type { ArrKind } from '@server/lib/quality/types';
 
 /*
- * TRaSH Guides' JSON files, read: what they hold, and which formats and
- * scores a profile uses. Plain data and functions only (no app imports),
- * so the pre-build review (bin/quality-review.mjs) runs the same code.
+ * TRaSH Guides JSON types, and which formats and scores a profile uses.
+ * No app imports, so the pre-build review (bin/quality-review.mjs) runs the
+ * same code.
  * TRaSH Guides: https://trash-guides.info, MIT licence, copyright TRaSH.
  */
 
@@ -78,8 +78,8 @@ export interface TrashData {
 }
 
 /**
- * The profile TRaSH Guides has for each preset, by trash_id. SD and 720p
- * have none: Seerr AI fills those in.
+ * TRaSH Guides profile trash_id per preset. SD and 720p have none; Seerr AI
+ * fills them.
  */
 export const TRASH_PROFILES: Record<
   ArrKind,
@@ -157,7 +157,7 @@ export const compileTrashApp = (
   return app;
 };
 
-/** A TRaSH Guides format as Radarr and Sonarr take one. */
+/** A TRaSH Guides format in the shape Radarr and Sonarr accept. */
 export const toArrFormat = (format: TrashFormat, name: string) => ({
   name,
   includeCustomFormatWhenRenaming:
@@ -174,14 +174,13 @@ export const toArrFormat = (format: TrashFormat, name: string) => ({
   })),
 });
 
-/** Whether a group's or a format's `default` says on. */
+/** Whether a group's or format's `default` means on. */
 const on = (value: boolean | string | undefined) =>
   value === true || value === 'true';
 
 /**
- * The formats a TRaSH Guides profile uses: its own, and those of the
- * groups it is included in by default (each group's required formats and
- * those on by default).
+ * Formats a TRaSH Guides profile uses: its own, plus the required and
+ * default-on formats of each group that includes it by default.
  */
 export const trashProfileFormats = (
   app: TrashApp,

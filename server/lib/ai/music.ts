@@ -18,16 +18,15 @@ import { mapAlbumResult, mapArtistResult } from '@server/models/Music';
 import { z } from 'zod';
 
 /*
- * Music in AI Search, for whoever has music: the model names albums and
- * artists apart from films and series, and each is looked up on
- * MusicBrainz as the music search would find it. Only one whose name is
- * the one given is shown, so a near miss never stands in for it.
+ * Music in AI Search: the model names albums and artists apart from films
+ * and series, and each is looked up on MusicBrainz as music search would.
+ * Only an exact name match is shown, so a near miss never stands in.
  */
 
-/** Most albums and artists one answer looks up: MusicBrainz takes 1 a second. */
+/** Max lookups per answer; MusicBrainz allows 1 request a second. */
 export const AI_MUSIC_MAX = 6;
 
-/** Music is there for this person: set up, and not turned off for them. */
+/** Music is set up and not turned off for this user. */
 export const musicFor = (user: User): boolean =>
   musicReady() && featureEnabled('music', user);
 
@@ -41,7 +40,7 @@ const namedMusic = z.object({
 
 export type NamedMusic = z.infer<typeof namedMusic>;
 
-/** The model's music, each kept only if it reads as one. */
+/** The model's music list, dropping items that don't parse. */
 export const musicReply = z
   .array(z.unknown())
   .catch([])
@@ -54,7 +53,7 @@ export const musicReply = z
       .slice(0, AI_MUSIC_MAX)
   );
 
-/** A name for comparing: case, punctuation and a leading "The" aside. */
+/** Comparison key ignoring case, punctuation and a leading "The". */
 const nameKey = (name: string) =>
   name
     .toLowerCase()
@@ -62,7 +61,7 @@ const nameKey = (name: string) =>
     .trim()
     .replace(/^the /, '');
 
-/** Credited to this artist, under the name on the album or their own. */
+/** Credited to this artist, by the album's credit name or their own. */
 const creditedTo = (group: MbReleaseGroup, artist: string) =>
   (group['artist-credit'] ?? []).some((credit) =>
     [credit.name, credit.artist.name].some(
@@ -70,7 +69,7 @@ const creditedTo = (group: MbReleaseGroup, artist: string) =>
     )
   );
 
-/** The album meant: its name, by its artist when given, in its year first. */
+/** Exact-name album, by its artist when given, preferring the given year. */
 const findAlbum = async (named: NamedMusic) => {
   const query = named.a ? `${named.t} ${named.a}` : named.t;
   const page = await musicBrainz().searchReleaseGroups(query, { limit: 10 });
@@ -95,8 +94,8 @@ const findArtist = async (named: NamedMusic) => {
 };
 
 /**
- * The albums and artists named, as music search shows them, in the order
- * named. MusicBrainz not answering leaves out what was not found by then.
+ * The named albums and artists, in order, as music search shows them. Stops
+ * at the first MusicBrainz error, keeping what was found by then.
  */
 export const resolveMusic = async (
   named: NamedMusic[]

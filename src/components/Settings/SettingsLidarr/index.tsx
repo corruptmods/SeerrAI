@@ -36,8 +36,8 @@ const loadLidarrModal = () =>
   import('@app/components/Settings/LidarrModal').then((m) => m.default);
 
 /*
- * Lidarr servers, for music, laid out like the Radarr and Sonarr sections.
- * The whole section goes while an admin has music turned off for everyone.
+ * Lidarr servers, laid out like Radarr and Sonarr. Hidden while an admin has
+ * music off for everyone.
  */
 const SettingsLidarr = () => {
   const intl = useIntl();

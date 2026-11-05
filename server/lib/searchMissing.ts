@@ -9,21 +9,19 @@ import { getSettings } from '@server/lib/settings';
 import { IsNull, Not } from 'typeorm';
 
 /*
- * Asks Radarr or Sonarr to search now for what a title is missing.
+ * Asks Radarr, Sonarr or Lidarr to search now for what a title is missing.
  *
- * Sonarr grabs new episodes of a monitored series as they are released, but
- * does not go back for ones that were missed: it searches when a series is
- * added, or when someone presses Search. An episode not found around its air
- * date can stay missing indefinitely. This is that Search, aimed precisely:
- * only episodes that are monitored, have aired, and have no file — the ones
- * the health page counts as missing. For a film, Radarr searches for it.
- * For an artist, Lidarr searches for the albums asked for that it has no
- * files for yet.
+ * Sonarr grabs new episodes of a monitored series as they release but doesn't
+ * go back for missed ones: it searches only when a series is added or on
+ * Search. An episode not found around its air date can stay missing forever.
+ * This is that Search, targeted: only monitored, aired episodes with no file
+ * (what the health page counts as missing). Radarr searches for a film;
+ * Lidarr for requested albums it has no files for yet.
  *
- * Each search is a query to the indexers, and many cap queries a day. So a
- * season whose every aired episode is missing gets one season search, which
- * looks for a season pack, instead of one query per episode — as Sonarr's
- * own Search All Missing does. The rest go in a single episode search.
+ * Each search is an indexer query, and many indexers cap queries a day. So a
+ * season with every aired episode missing gets one season search (for a
+ * season pack) instead of one per episode, like Sonarr's Search All Missing;
+ * the rest go in a single episode search.
  */
 
 export class NotInServiceError extends Error {}
@@ -31,9 +29,9 @@ export class NothingMissingError extends Error {}
 
 export interface SearchStarted {
   service: string;
-  /** Episodes searched for; 1 for a film; albums for an artist. */
+  /** Episodes searched; 1 for a film; albums for an artist. */
   searched: number;
-  /** Of those, how many seasons were searched whole. */
+  /** How many of those were whole-season searches. */
   seasons: number;
 }
 
@@ -91,8 +89,8 @@ export const searchMissing = async (
     );
   }
 
-  // A season with every aired episode missing, and more than one of them,
-  // is searched whole; everything else episode by episode.
+  // A season with every aired episode missing, and more than one, is searched
+  // whole; the rest episode by episode.
   const wholeSeasons: number[] = [];
   const episodeIds: number[] = [];
   const seasons = [...new Set(missing.map((episode) => episode.seasonNumber))];
@@ -121,8 +119,8 @@ export const searchMissing = async (
 };
 
 /**
- * An artist's albums asked for (on their way, so processing) that Lidarr
- * has no files for yet: Lidarr searches for each, in one command.
+ * An artist's requested albums (processing) that Lidarr has no files for
+ * yet; Lidarr searches them in one command.
  */
 export const searchMissingAlbums = async (
   media: Media
@@ -166,9 +164,9 @@ export interface SearchAllResult {
 }
 
 /**
- * Searches for everything the health page lists as searchable. Films are
- * sent to each Radarr in a single command; each series gets the search above.
- * One title failing does not stop the rest; failures are reported.
+ * Searches everything the health page lists as searchable. Films go to each
+ * Radarr in one command; each series gets the search above. One failing title
+ * doesn't stop the rest; failures are reported.
  */
 export const searchAllMissing = async (
   media: { media: Media; is4k: boolean }[]

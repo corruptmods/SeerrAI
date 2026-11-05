@@ -10,19 +10,15 @@ import { useIntl } from 'react-intl';
 interface OidcLoginButtonProps {
   provider: { id: string; name: string; logoUrl: string };
   applicationUrl: string;
-  /** Where to go once signed in: a path on this site. */
+  /** Same-site path to go to after signing in. */
   redirect: string;
-  /**
-   * Under "Or sign in with": the button shows just the provider's name
-   * (its full "Sign in with …" is what a screen reader says).
-   */
+  /** Show just the provider name; the full label stays as the aria-label. */
   compact?: boolean;
 }
 
 /**
- * "Sign in with Authentik": a link to the provider's sign-in, by way of the
- * Application URL, which the provider sends people back to. Followed from
- * any address Seerr is reached at, the sign-in ends there.
+ * Link to a provider's sign-in via the Application URL, which the provider
+ * redirects back to, so sign-in ends there whatever address started it.
  */
 const OidcLoginButton = ({
   provider,
@@ -57,7 +53,7 @@ const OidcLoginButton = ({
         </div>
       )}
       {provider.logoUrl ? (
-        // A picture the admin chose, from wherever it is kept.
+        // Admin-chosen logo from any host.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={provider.logoUrl}

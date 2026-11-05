@@ -5,9 +5,8 @@ import { describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 /*
- * The service worker is plain script, so it runs here in a sandbox standing
- * in for the browser: the parts the notification actions touch, and a
- * server that answers every request.
+ * The worker is plain script, run in a sandbox that fakes the browser APIs
+ * the notification actions use, plus a server that answers everything.
  */
 const ORIGIN = 'https://seerr.example';
 const source = readFileSync(join(__dirname, '../../public/sw.js'), 'utf8');
@@ -64,7 +63,7 @@ const loadWorker = (
     fetch: async (request: Request) => {
       sent.push(request);
       if (request.method === 'GET' && jar && !jar['XSRF-TOKEN']) {
-        // CSRF protection on: any answer hands out a fresh token.
+        // CSRF on: any response sets a fresh token.
         jar['XSRF-TOKEN'] = 'fresh-token';
       }
       if (refuse && request.method === 'POST') {
@@ -128,8 +127,8 @@ describe('approving from a notification', () => {
   });
 
   it('still sends the action where cookies cannot be read', async () => {
-    // Without CSRF protection none is needed; with it, the server refuses
-    // and the person is told to open the app.
+    // No token needed without CSRF; with it, the server refuses and the user
+    // is told to open the app.
     const worker = loadWorker(undefined);
 
     await worker.tap('approve');
@@ -192,14 +191,10 @@ describe('the words on a request waiting for approval', () => {
   });
 });
 
-/*
- * The image cache: the worker with a cache standing in for the browser's,
- * and a server whose answers each test sets.
- */
+/* Image cache: a fake Cache API and a server whose responses each test sets. */
 const loadImageWorker = () => {
   const handlers: Record<string, Handler> = {};
-  // The worker's clock, moved on by the test: it trims its cache at most
-  // every few seconds, and keeps what was used last.
+  // Test-controlled clock: trims are throttled and keep the most recently used.
   let now = Date.now();
   class WorkerDate extends Date {
     static now() {
@@ -212,9 +207,9 @@ const loadImageWorker = () => {
     cacheControl: 'public, max-age=31536000, immutable',
     sentAt: new Date(),
     contentType: 'image/jpeg',
-    /** Whether it came by way of a redirect (a sign-in page in front). */
+    /** Whether it was redirected (an SSO page in front). */
     redirected: false,
-    /** The chunks /sw-precache.json lists. */
+    /** Chunks listed by /sw-precache.json. */
     precache: [] as string[],
   };
 
@@ -224,7 +219,7 @@ const loadImageWorker = () => {
     }
   }
 
-  // A path is taken against the worker's own address, as the Cache API does.
+  // Resolve paths against the worker's origin, as the Cache API does.
   const urlOf = (request: Request | string) =>
     typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
   const cache = {
@@ -279,7 +274,7 @@ const loadImageWorker = () => {
     },
   });
 
-  /** The page showing an image: what it is handed, once all is stored. */
+  /** Fetches an image as the page would; resolves once stored. */
   const view = async (path: string) => {
     let response: Promise<Response> | undefined;
     const waits: Promise<unknown>[] = [];
@@ -295,7 +290,7 @@ const loadImageWorker = () => {
     return shown;
   };
 
-  /** The page, settled, asking the worker to fetch the app's code ahead. */
+  /** Sends PRECACHE_ROUTES as a settled page would. */
   const precache = async () => {
     const waits: Promise<unknown>[] = [];
     handlers.message({
@@ -342,9 +337,7 @@ describe('images kept on the device', () => {
   });
 
   it('are kept for a long browse, then the least used make room', async () => {
-    // One trip through Discover, two titles, Movies and a person stores
-    // about 160 pictures; a few such trips should all still be there when
-    // the app is opened again.
+    // One Discover trip stores about 160 images; several trips must fit.
     const worker = loadImageWorker();
     const poster = (n: number) =>
       `/imageproxy/tmdb/t/p/w300_and_h450_face/${n}.jpg?f=avif`;
@@ -376,8 +369,7 @@ describe('images kept on the device', () => {
 
 describe('what the worker never keeps', () => {
   it('a sign-in page answered in a poster’s place', async () => {
-    // A proxy's single sign-on whose session ran out redirects every
-    // request to its own page.
+    // An expired proxy SSO session redirects every request to its own page.
     const worker = loadImageWorker();
     worker.answer.contentType = 'text/html';
     const poster = '/imageproxy/tmdb/t/p/w300_and_h450_face/a.jpg';
@@ -407,7 +399,7 @@ describe('what the worker never keeps', () => {
     await worker.view(chunk);
     assert.equal(worker.fetched.length, 2);
 
-    // A copy stored by an earlier worker is dropped and fetched again.
+    // A copy from an earlier worker is dropped and refetched.
     const kept = '/_next/static/chunks/main-abc.js';
     worker.stored.set(
       `${ORIGIN}${kept}`,
@@ -457,9 +449,8 @@ describe('a push that is not what Seerr sends', () => {
 });
 
 /*
- * Per-person Discover rows: the worker with caches that record what is
- * emptied, and a server that answers every request (a page, or a redirect
- * when it would send the browser on).
+ * Per-user Discover rows: caches that record clears, and a server that
+ * answers everything (a page, or a redirect).
  */
 const loadSessionWorker = () => {
   const handlers: Record<string, Handler> = {};
@@ -501,7 +492,7 @@ const loadSessionWorker = () => {
     clearTimeout,
     fetch: async (request: Request) =>
       /\/(sign-in|link)$/.test(new URL(request.url).pathname)
-        ? // A navigation is fetched with redirects left to the browser.
+        ? // Navigations leave redirects to the browser.
           Object.defineProperty(new Response(null, { status: 200 }), 'type', {
             value: 'opaqueredirect',
           })
@@ -510,11 +501,11 @@ const loadSessionWorker = () => {
           }),
   });
 
-  /** The browser going to a page, or the page making a call. */
+  /** A navigation (GET) or an API call (POST). */
   const go = async (path: string, method: 'GET' | 'POST' = 'GET') => {
     const request = new WorkerRequest(path, { method });
     if (method === 'GET') {
-      // Request cannot be made with mode "navigate" outside a browser.
+      // Node can't construct a Request with mode "navigate".
       Object.defineProperty(request, 'mode', { value: 'navigate' });
     }
     let response: Promise<Response> | undefined;
@@ -574,10 +565,7 @@ describe('Discover rows after a sign-in or sign-out', () => {
   });
 });
 
-/*
- * Discover rows: the worker with a cache standing in for the browser's, and
- * a server whose answer each test sets (or that can't be reached).
- */
+/* Discover rows: a fake cache and a server whose response (or outage) each test sets. */
 const loadRowWorker = () => {
   const handlers: Record<string, Handler> = {};
   const stored = new Map<string, Response>();
@@ -623,7 +611,7 @@ const loadRowWorker = () => {
     },
   });
 
-  /** The page asking for a row: what it is handed, once all is stored. */
+  /** Fetches a row as the page would; resolves once stored. */
   const row = async (path: string) => {
     let response: Promise<Response> | undefined;
     const waits: Promise<unknown>[] = [];
@@ -647,17 +635,17 @@ describe('Discover rows kept on the device', () => {
     const worker = loadRowWorker();
     const yours = '/api/v1/discover/music/your-requests?page=1';
     assert.equal(await worker.row(yours), 1);
-    // A playlist import requested more on the server; nothing on the page.
+    // A playlist import added more server-side, with no page call.
     worker.server.rows = 2;
     assert.equal(await worker.row(yours), 2);
-    // Offline, the last copy.
+    // Offline: the last copy.
     worker.server.offline = true;
     assert.equal(await worker.row(yours), 2);
   });
 
   it('show other rows from the device first, fetched again for next time', async () => {
     const worker = loadRowWorker();
-    // Rows made from someone's music are slower to make: kept as the rest.
+    // Rows derived from music requests are cached like the rest.
     const like = '/api/v1/discover/music/artists-like-yours?page=1';
     assert.equal(await worker.row(like), 1);
     worker.server.rows = 2;

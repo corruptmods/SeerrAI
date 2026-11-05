@@ -64,11 +64,9 @@ const messages = defineMessages('components.Music.AlbumDetails', {
 });
 
 /**
- * The album's tracks, disc by disc, shown at first (on a phone they can be
- * folded away). Once
- * songs can be asked for one at a time, each track that can be has its
- * own Request (`songsOf`: the artist they are asked for under), and each
- * asked for says where it stands.
+ * The album's tracks by disc, open by default (foldable on a phone). With
+ * song requests on, each requestable track has its own Request (`songsOf`:
+ * the artist to request under) and requested ones show their status.
  */
 const TrackList = ({
   albumId,
@@ -77,19 +75,18 @@ const TrackList = ({
   follow = 0,
 }: {
   albumId: string;
-  /** How often to ask again while the album is on its way; 0 not to. */
+  /** Refresh interval while the album is in progress; 0 for none. */
   follow?: number;
   songsOf?: string;
-  /** The artist's downloads: each song's own shows on its row. */
+  /** The artist's downloads; each song's show on its row. */
   downloads?: DownloadingItem[];
 }) => {
   const intl = useIntl();
   const { requestSong, isBusy } = useRequestSong();
   const { mutate: mutateAlbum } = useSWRConfig();
-  // Open to start, on a phone too; there it can be folded away.
   const [open, setChosen] = useState(true);
-  // Songs asked for by themselves are followed too, while on their way;
-  // their downloads are the album's, so it is asked again with them.
+  // Individually requested songs are followed while in progress; their
+  // downloads are the album's, so it refreshes with them.
   const ownFollow = refreshIntervalHelper<{ tracks: MusicTrack[] }>(
     ({ tracks }) =>
       watchMusic({
@@ -107,8 +104,8 @@ const TrackList = ({
   const { data, error, mutate } = useSWR<{ tracks: MusicTrack[] }>(
     `/api/v1/music/album/${albumId}/tracks`,
     {
-      // Asked again while some are still being looked up, and while the
-      // album or a song of it is on its way.
+      // Refreshes while tracks are being checked, or the album or a song is
+      // in progress.
       refreshInterval: (latest) => {
         if (latest?.tracks.some((track) => track.checking)) return 5000;
         const own = ownFollow(latest);
@@ -188,8 +185,7 @@ const TrackList = ({
                         <span className="shrink-0 tabular-nums text-muted">
                           {trackLength(track.length)}
                         </span>
-                        {/* One width for every row, so the lengths line
-                            up whatever each track's state. */}
+                        {/* Fixed width, so lengths line up in every row. */}
                         {!requestable(track.status) ? (
                           <span className="flex w-28 shrink-0 justify-center">
                             <MusicStatusBadge
@@ -205,8 +201,7 @@ const TrackList = ({
                             />
                           </span>
                         ) : songsOf && track.checking ? (
-                          // Its Request shows once it is known to be on a
-                          // single.
+                          // Request shows once it is known to be on a single.
                           <span className="w-28 shrink-0" />
                         ) : songsOf && track.onlyOnAlbums ? (
                           <span
@@ -229,7 +224,7 @@ const TrackList = ({
                                 artistMbid: songsOf,
                                 recordingMbid: track.recordingId as string,
                                 name: track.title,
-                                // The tracks, and the album's own status and
+                                // The tracks, and the album's status and
                                 // downloads.
                                 then: () =>
                                   Promise.all([
@@ -265,7 +260,7 @@ interface AlbumDetailsProps {
   albumId: string;
 }
 
-/** An album's page: its cover, who made it, and its tracks. */
+/** An album's page: cover, artist and tracks. */
 const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
@@ -273,8 +268,8 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const { hasPermission } = useUser();
   const [requesting, setRequesting] = useState(false);
   const { mutate: globalMutate } = useSWRConfig();
-  // Followed while it is on its way, as a film's or a series' page is: its
-  // pill and its songs' move on their own.
+  // Refreshes while in progress, as a film's page does, so its pill and
+  // songs update.
   const watch = (album: MusicAlbumDetails) =>
     watchMusic({
       status: album.status,
@@ -285,14 +280,14 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
     musicOn ? `/api/v1/music/album/${albumId}` : null,
     { refreshInterval: refreshIntervalHelper<MusicAlbumDetails>(watch) }
   );
-  // Played the way a movie or series is: on an iPhone or iPad, Plex's app
-  // opens; the viewer's own servers come first.
+  // As for films: Plex's app opens on iPhone or iPad; the viewer's own
+  // servers come first.
   const albumLinks = useMemo(
     () => (data ? { playLinks: data.playLinks ?? [] } : undefined),
     [data]
   );
   const { links: playLinks } = usePlayLinks(albumLinks);
-  // For admins, Backfill: the album as Lidarr has it, when it does.
+  // For admins' Backfill: the album in Lidarr, if there.
   const lidarrServer = data?.mediaInfo?.serviceId;
   const { data: inLidarr } = useSWR<LibraryTitle>(
     musicOn &&
@@ -407,7 +402,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
               <ArrowDownTrayIcon />
               <span>
                 {intl.formatMessage(
-                  // Part of it is here: the rest is what's asked for.
+                  // Partly here: request the rest.
                   data.status === MediaStatus.PARTIALLY_AVAILABLE
                     ? messages.requestMore
                     : messages.requestAlbum
@@ -432,7 +427,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
           onComplete={() => {
             setRequesting(false);
             mutate();
-            // Its tracks show the album's status too.
+            // The tracks show the album's status too.
             globalMutate(`/api/v1/music/album/${albumId}/tracks`);
           }}
         />

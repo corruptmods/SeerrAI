@@ -13,11 +13,11 @@ import { Router } from 'express';
 const searchRoutes = Router();
 
 /*
- * TMDB's search across everything never returns collections, so they are
- * searched for on their own. Page N of search holds page N of each. The
- * first page of collections (cached, like every page) says how many there
- * are, so pages past the last one are not asked for at all. A collection
- * search that fails leaves the rest of the search as it was.
+ * TMDB's multi search never returns collections, so they're searched
+ * separately; page N of results holds page N of each. The first collections
+ * page (cached, like every page) gives the page count, so pages past the last
+ * aren't fetched. A failed collection search leaves the rest of the results
+ * intact.
  */
 const searchCollections = async (
   tmdb: TheMovieDb,
@@ -61,17 +61,17 @@ const toCollectionResult = (
   backdrop_path: collection.backdrop_path ?? undefined,
 });
 
-/** What a search can be narrowed to: films (with their collections) or series. */
+/** Search filter: films (with their collections) or series. */
 type SearchType = 'movie' | 'tv';
 
-/** Search for one kind of title, or everything when no kind is asked for. */
+/** Search one kind of title, or everything when none is given. */
 const searchTitles = async (
   tmdb: TheMovieDb,
   type: SearchType | undefined,
   options: { query: string; page: number; language: string }
 ): Promise<TmdbSearchMultiResponse> => {
-  // TMDB's film and series searches leave out the kind of each result:
-  // every one is the kind asked for.
+  // TMDB's film and series searches omit each result's media type: it's the one
+  // asked for.
   if (type === 'movie') {
     const found = await tmdb.searchMovies(options);
     return {
@@ -129,7 +129,7 @@ searchRoutes.get('/', async (req, res, next) => {
       const page = Number(req.query.page) || 1;
       const language = (req.query.language as string) ?? req.locale;
 
-      // Collections are films', so a search for series leaves them out.
+      // Collections are films, so a series search leaves them out.
       const [multi, collections] = await Promise.all([
         searchTitles(tmdb, type, { query: queryString, page, language }),
         type === 'tv'
@@ -137,8 +137,8 @@ searchRoutes.get('/', async (req, res, next) => {
           : searchCollections(tmdb, queryString, page, language),
       ]);
 
-      // Collections lead the page: a franchise's name is usually what was
-      // typed. Search goes on for as long as either has more pages.
+      // Collections lead the page: a franchise name is usually what was typed.
+      // Paging continues while either has more pages.
       results = {
         page,
         total_pages: Math.max(multi.total_pages, collections.total_pages),

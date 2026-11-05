@@ -34,10 +34,9 @@ const stubTmdb = () => {
 };
 
 /**
- * Upstream logs and returns when no Radarr or Sonarr server can be resolved,
- * leaving the request APPROVED forever. `POST /request/:id/retry` refuses
- * anything that is not FAILED, so the request could only be deleted and
- * remade (seerr-team/seerr#3460).
+ * Upstream logs and returns when no Radarr or Sonarr server resolves, leaving
+ * the request APPROVED forever; `POST /request/:id/retry` only accepts FAILED,
+ * so it could only be deleted and remade (seerr-team/seerr#3460).
  */
 describe('markUndispatchable', () => {
   setupTestDb();

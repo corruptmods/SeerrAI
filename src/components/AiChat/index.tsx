@@ -12,13 +12,11 @@ const messages = defineMessages('components.AiChat', {
     'The AI panel could not be opened. Check your connection and try again.',
 });
 
-// The panel and what it shows (title cards, the picker) are only needed once
-// someone opens it: loaded then, or while the browser is idle, not with
-// every page (FORK.md, rule 9).
+// Load the panel on open or when idle, not with every page (FORK.md, rule 9).
 const loadPanel = () =>
   import('@app/components/AiChat/AiChatPanel').then((m) => m.default);
 
-/** The round AI button beside the search box. */
+/** AI button beside the search box. */
 const AiChat = () => {
   const intl = useIntl();
   const { addToast } = useToasts();

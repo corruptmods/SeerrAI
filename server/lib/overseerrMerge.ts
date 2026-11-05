@@ -28,14 +28,14 @@ const checkOverseerrMerge = async (): Promise<boolean> => {
     [1745492372230, 'UpdateWebPush1745492372230'],
   ];
 
-  // Open the database connection to get the migrations and close it afterwards
+  // Open the connection only to read the migrations, then close it.
   const dbConnection = await dataSource.initialize();
   const migrations = dbConnection.migrations;
   await dbConnection.destroy();
 
-  // We have to replace Jellyseerr migrations not working with Overseerr with a custom one
+  // Jellyseerr migrations don't work on an Overseerr database; swap in a custom
+  // one.
   try {
-    // Filter out the Jellyseerr migrations and replace them with the Seerr migration
     // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     const newMigrations: MixedList<string | Function> = migrations
       ?.filter(
@@ -62,10 +62,11 @@ const checkOverseerrMerge = async (): Promise<boolean> => {
     process.exit(1);
   }
 
-  // Reopen the database connection with the updated migrations
+  // Reopen with the replaced migrations.
   await dataSource.initialize();
 
-  // Add fake migration record to prevent running the already existing Overseerr migration again
+  // Fake migration record so the existing Overseerr migration doesn't run
+  // again.
   try {
     await dbConnection.query(
       `INSERT INTO migrations (timestamp,name) VALUES
@@ -82,7 +83,7 @@ const checkOverseerrMerge = async (): Promise<boolean> => {
     process.exit(1);
   }
 
-  // Manually run the migration to update the database schema
+  // Run the migration manually to update the schema.
   if (process.env.NODE_ENV === 'production') {
     await dbConnection.query('PRAGMA foreign_keys=OFF');
     await dbConnection.runMigrations();
@@ -133,10 +134,10 @@ const checkOverseerrMerge = async (): Promise<boolean> => {
     process.exit(1);
   }
 
-  // Set media server type to Plex (default for Overseerr)
+  // Overseerr is Plex-only.
   settings.main.mediaServerType = MediaServerType.PLEX;
 
-  // Replace default Overseerr values with Seerr values
+  // Replace Overseerr defaults with Seerr's.
   if (settings.main.applicationTitle === 'Overseerr') {
     settings.main.applicationTitle = 'Seerr';
   }
@@ -144,7 +145,6 @@ const checkOverseerrMerge = async (): Promise<boolean> => {
     settings.notifications.agents.email.options.senderName = 'Seerr';
   }
 
-  // Save the updated settings
   try {
     await settings.save();
   } catch (error) {

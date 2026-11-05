@@ -8,8 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Settings → Music's pace: each limit songs are held to, and how much of
- * it is in use.
+ * Settings → Music pace: each song limit and its current usage.
  */
 
 setupTestDb();

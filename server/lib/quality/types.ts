@@ -1,12 +1,12 @@
 /*
- * Quality profiles Seerr AI sets up in Radarr and Sonarr (Settings →
- * Quality): what is saved, per server, and the words both the server and
- * the page use for them. Nothing here talks to a server.
+ * Quality profiles Seerr AI manages in Radarr and Sonarr (Settings →
+ * Quality): per-server saved settings and the vocabulary shared by server
+ * and page. Nothing here calls a server.
  */
 
 export type ArrKind = 'radarr' | 'sonarr';
 
-/** The presets, one per resolution, and Anime. */
+/** One preset per resolution, plus Anime. */
 export const PRESET_KEYS = [
   'sd',
   '720p',
@@ -18,7 +18,7 @@ export const PRESET_KEYS = [
 ] as const;
 export type PresetKey = (typeof PRESET_KEYS)[number];
 
-/** Where a preset comes from on one server. */
+/** A preset's source on one server. */
 export type PresetSource = 'seerr' | 'trash' | 'off';
 
 /** How strongly usenet is preferred over torrents. */
@@ -27,18 +27,18 @@ export type PreferUsenet = 'equal' | 'always' | 'none';
 export type FileSize = 'small' | 'balanced' | 'best';
 
 /**
- * One preset's file size: one of the three above, or an admin's own limit,
- * in MB a minute in Sonarr and GB a film in Radarr.
+ * One preset's file size: one of the three above, or a custom limit in MB
+ * per minute (Sonarr) or GB per movie (Radarr).
  */
 export type PresetSize = FileSize | number;
 
-/** The largest own limit: Sonarr's own most (MB a minute), or a GB a film. */
+/** Max custom limit: Sonarr's own max (MB per minute), or GB per movie. */
 export const MAX_OWN_SIZE = 1000;
 
-/** The audio a release must have. */
+/** Required audio language. */
 export type Languages = 'english-or-original' | 'original' | 'any';
 
-/** A single format moved between bands, or never taken. */
+/** Moves one format up or down a band, or never takes it. */
 export type Nudge = 'up' | 'down' | 'never';
 
 export const BAND_STEPS = [50, 100, 250, 500] as const;
@@ -46,23 +46,23 @@ export type BandStep = (typeof BAND_STEPS)[number];
 
 export interface QualityAdjustments {
   preferUsenet: PreferUsenet;
-  /** With `always`: how long torrents wait so usenet gets the first chance. */
+  /** With `always`: torrent delay so usenet gets the first chance. */
   torrentWaitHours: number;
   fileSize: FileSize;
   languages: Languages;
-  /** HDR and Dolby Vision preferred, on the 2160p presets. */
+  /** Prefer HDR and Dolby Vision on the 2160p presets. */
   hdr: boolean;
-  /** x265 allowed at 1080p and below; never taken when off. */
+  /** Allow x265 at 1080p and below; never taken when off. */
   x265At1080p: boolean;
-  /** Anime: the English dub with the original audio comes first. */
+  /** Anime: prefer English dub plus original audio. */
   dualAudioAnime: boolean;
-  /** Sonarr: files with more than one episode only as a last resort. */
+  /** Sonarr: multi-episode files only as a last resort. */
   singleEpisodes: boolean;
-  /** Burned-in subtitles taken only when nothing else is out. */
+  /** Burned-in subtitles only when nothing else is available. */
   burnedInLastResort: boolean;
   /**
-   * AV1 taken only when nothing else is out, since many TVs and boxes
-   * can't play it; taken like any other when off.
+   * AV1 only when nothing else is available, since many TVs and boxes
+   * can't play it. When off, AV1 is treated like any other codec.
    */
   av1LastResort: boolean;
 }
@@ -72,53 +72,44 @@ export interface QualityServerSettings {
   kind: ArrKind;
   /** The server's id in settings.radarr or settings.sonarr. */
   serverId: number;
-  /**
-   * Off for every server until an admin chooses to manage it: nothing is
-   * sent to a server that isn't managed.
-   */
+  /** Off until an admin opts in; nothing is sent to an unmanaged server. */
   managed: boolean;
   presets: Partial<Record<PresetKey, PresetSource>>;
   adjustments: QualityAdjustments;
-  /**
-   * Each preset's own file size. A preset without one takes the server's
-   * (adjustments.fileSize), as every preset did before they had their own.
-   */
+  /** Per-preset file size; a preset without one uses adjustments.fileSize. */
   sizes?: Partial<Record<PresetKey, PresetSize>>;
   /** By format key (see lib/quality/build). */
   nudges: Record<string, Nudge>;
   bandStep: BandStep;
-  /** The TRaSH Guides copy (its commit) last applied to this server. */
+  /** The TRaSH Guides commit last applied to this server. */
   trashCommit?: string;
   /**
-   * TRaSH Guides' own score, when last applied, of each TRaSH format an
-   * admin moved: a later update that changes one is pointed out once.
+   * TRaSH Guides' score at last apply for each TRaSH format an admin moved,
+   * so a later update that changes one is flagged once.
    */
   trashRaw?: Record<string, number>;
   /**
-   * The choices last applied (see lib/quality/engine), so a TRaSH Guides
-   * update can be told from choices nobody has applied yet. Cleared by Undo.
+   * The choices last applied (see lib/quality/engine), to tell a TRaSH
+   * Guides update apart from unapplied choices. Cleared by Undo.
    */
   appliedChoices?: string;
   /**
-   * Which preset's profile new requests to this server go to (its quality
-   * profile in Settings → Services), set on Apply: a preset, or 'keep' to
-   * leave it as it is. Unset: the usual one (requestPresetsOf).
+   * Preset whose profile new requests to this server use (its quality
+   * profile in Settings → Services), set on Apply; 'keep' leaves it as is.
+   * Unset uses the default (requestPresetsOf).
    */
   requestPreset?: PresetKey | 'keep';
-  /** The same for anime requests: the Anime preset, or 'keep'. */
+  /** Same, for anime requests: the Anime preset, or 'keep'. */
   animeRequestPreset?: 'anime' | 'keep';
 }
 
-/** The presets new requests use first, on a 4K server and on others. */
+/** Preset preference order for new requests, on 4K and other servers. */
 const REQUEST_ORDER: Record<'4k' | 'hd', PresetKey[]> = {
   '4k': ['2160p', '2160p-remux', '1080p-remux', '1080p', '720p', 'sd'],
   hd: ['1080p', '1080p-remux', '720p', '2160p', '2160p-remux', 'sd'],
 };
 
-/**
- * Which presets' profiles a server's new requests go to, as its choices
- * say: undefined where they are left as they are.
- */
+/** Preset profiles a server's new requests use; undefined where left as is. */
 export const requestPresetsOf = (
   config: QualityServerSettings,
   is4k: boolean
@@ -138,7 +129,7 @@ export const requestPresetsOf = (
 
 export interface QualitySettings {
   trash: {
-    /** TRaSH Guides updates applied without a preview. Off by default. */
+    /** Apply TRaSH Guides updates without a preview. Off by default. */
     autoApply: boolean;
     /** Seerr AI builds what TRaSH Guides lacks. On by default. */
     fillGaps: boolean;
@@ -164,7 +155,7 @@ export const QUALITY_DEFAULTS: QualitySettings = {
   servers: [],
 };
 
-/** A server's choices before an admin has made any. */
+/** A server's default choices. */
 export const serverDefaults = (
   kind: ArrKind,
   serverId: number,

@@ -2,16 +2,15 @@ import { getRepository } from '@server/datasource';
 import SongFetch from '@server/entity/SongFetch';
 import { MoreThan } from 'typeorm';
 
-/** What a fetch waiting for an answer, not for its next search, shows. */
+/** Stage shown by a fetch waiting on an answer rather than its next search. */
 export const SEARCHING_SOON = 'Searching again soon';
 
 /*
- * Songs taken from albums whose search found nothing wait hours to look
- * again (lib/music/songFetch). A playlist's page says how many albums of
- * its songs are waiting, and can have them looked for now.
+ * Album searches that find nothing wait hours before retrying
+ * (lib/music/songFetch); a playlist page can count and retry them now.
  */
 
-/** Albums of these songs waiting to be searched again, at `now`. */
+/** Fetches for these songs waiting to search again at `now`. */
 const waitingFor = async (recordings: string[], now: Date) => {
   if (!recordings.length) return [];
   const wanted = new Set(recordings);
@@ -24,16 +23,15 @@ const waitingFor = async (recordings: string[], now: Date) => {
   );
 };
 
-/** How many albums of these songs are waiting to be searched again. */
+/** Counts fetches for these songs waiting to search again. */
 export const albumsWaitingToSearch = async (
   recordings: string[],
   now = new Date()
 ): Promise<number> => (await waitingFor(recordings, now)).length;
 
 /**
- * Has the albums of these songs waiting to be searched again looked for at
- * the next turn. The wait it ends isn't counted against them: a search
- * that finds nothing waits as long as the last did.
+ * Queues waiting fetches for these songs for the next pass. The skipped
+ * wait isn't counted, so an empty search waits as long as the last did.
  */
 export const searchAgainNow = async (
   recordings: string[],
@@ -43,7 +41,7 @@ export const searchAgainNow = async (
   for (const fetch of waiting) {
     await getRepository(SongFetch).update(fetch.id, {
       searchAgainAt: null,
-      // A wait for an answer (Prowlarr, a resting indexer) was no search.
+      // Waiting on Prowlarr or a resting indexer wasn't a search.
       searches: fetch.stage?.startsWith(SEARCHING_SOON)
         ? (fetch.searches ?? 0)
         : Math.max(0, (fetch.searches ?? 0) - 1),

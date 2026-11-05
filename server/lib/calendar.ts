@@ -8,9 +8,8 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * What is coming, by date: film releases and episode air dates for
- * everything Radarr and Sonarr are watching for — requested through Seerr or
- * added there directly. One calendar call per server, not one per title.
+ * Upcoming film releases and episode air dates for everything Radarr and
+ * Sonarr watch, requested through Seerr or not. One calendar call per server.
  */
 
 export interface CalendarItem {
@@ -20,9 +19,8 @@ export interface CalendarItem {
   /** Poster, from TMDB for films and TheTVDB for series. */
   poster?: string;
   /**
-   * Film releases are calendar dates, stored as midnight UTC: `allDay`, to be
-   * shown as the date they are. An episode's air time is a real moment, shown
-   * in local time.
+   * Film releases are dates stored as midnight UTC (`allDay`); episode air
+   * times are real moments, shown in local time.
    */
   at: string;
   allDay: boolean;
@@ -48,7 +46,7 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
   const settings = getSettings();
   const items: CalendarItem[] = [];
 
-  // A 4K server usually mirrors the regular one; each title once.
+  // A 4K server usually mirrors the regular one; list each title once.
   const seenFilms = new Set<string>();
   for (const server of [...settings.radarr].sort(
     (a, b) => Number(a.is4k) - Number(b.is4k)
@@ -125,8 +123,7 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
         }
         seenEpisodes.add(key);
 
-        // Episodes of one show airing together, as a streaming service drops
-        // a season, read as one line.
+        // Episodes of a show airing at once (a season drop) form one entry.
         const groupKey = `${showKey}:${episode.seasonNumber}:${at}`;
         const group = episodesByShowAndTime.get(groupKey);
         if (group) {
@@ -163,8 +160,7 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
     }
   }
 
-  // Older Sonarr leaves out the series' TMDB id; Seerr knows it from the
-  // TVDB id, so the entry still opens the right page.
+  // Older Sonarr omits the TMDB id; find it by TVDB id so the entry links.
   const missing = items.filter(
     (item) => item.mediaType === MediaType.TV && !item.tmdbId
   );

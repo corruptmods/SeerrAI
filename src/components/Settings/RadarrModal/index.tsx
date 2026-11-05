@@ -97,7 +97,7 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
   const intl = useIntl();
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
-  const [isValidated, setIsValidated] = useState(radarr ? true : false);
+  const [isValidated, setIsValidated] = useState(!!radarr);
   const [isTesting, setIsTesting] = useState(false);
   const [testResponse, setTestResponse] = useState<RadarrTestResponse>({
     profiles: [],

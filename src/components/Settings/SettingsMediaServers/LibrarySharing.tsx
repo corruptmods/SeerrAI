@@ -128,9 +128,9 @@ const Fade = ({
 );
 
 /**
- * Settings → Media Servers: each connected server's libraries, how many
- * people have each, and one library taken from (or given to) everyone at
- * once, with a preview first and Undo after.
+ * Settings → Media Servers: each server's libraries, how many people have each,
+ * and taking one from (or giving it to) everyone at once, with a preview first
+ * and Undo after.
  */
 const LibrarySharing = ({ servers }: LibrarySharingProps) => {
   const intl = useIntl();

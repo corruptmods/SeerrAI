@@ -6,9 +6,9 @@ import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Searching Soulseek through a stand-in slskd. slskd's timeout counts from
- * the last answer, so a popular search can run on; one cleared while it
- * runs fails in slskd, so it is stopped, and finished, first.
+ * Searching through a stand-in slskd. Its timeout counts from the last
+ * response, so a popular search runs on; clearing a running search fails, so
+ * it is stopped and finished first.
  */
 
 const ANSWER = {
@@ -23,9 +23,9 @@ const ANSWER = {
 
 let server: Server;
 let slskd: SlskdAPI;
-/** Each request, as "METHOD /path". */
+/** Requests as "METHOD /path". */
 let seen: string[];
-/** Whether the search finishes on its own after a look or two. */
+/** Whether the search finishes itself after a poll or two. */
 let finishes: boolean;
 let state: string;
 let looks: number;
@@ -47,7 +47,7 @@ before(async () => {
       return json(200, { id: 'x', state, responseCount: 1 });
     }
     if (req.method === 'PUT' && /^\/searches\/[^/]+$/.test(path)) {
-      // Stopping finishes it: slskd saves it as cancelled.
+      // Stopping finishes it as cancelled.
       state = 'Completed, Cancelled';
       return json(200);
     }
@@ -101,7 +101,7 @@ describe('a Soulseek search', () => {
     ]);
     const stop = seen.indexOf('PUT /searches/:id');
     assert.ok(stop > 0, 'stopped');
-    // Looked at once more, finished, before its answers are read.
+    // Polled once more, finished, before responses are read.
     assert.equal(seen[stop + 1], 'GET /searches/:id');
     assert.deepEqual(seen.slice(-2), [
       'GET /searches/:id/responses',

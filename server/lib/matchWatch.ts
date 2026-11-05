@@ -52,22 +52,19 @@ import type { MatchKind } from '@server/utils/plexMatch';
 import { In, IsNull, LessThanOrEqual, MoreThanOrEqual, Not } from 'typeorm';
 
 /*
- * Wrong matches caught as they happen. When Radarr, Sonarr or Lidarr
- * imports something for a title someone requested, each connected media
- * server whose libraries should hold it is looked at a couple of minutes
- * later: the item whose folder is the one imported into, its ids against
- * the ones Radarr, Sonarr or Lidarr has (as the nightly Match Check
- * compares them). A request stuck at "Adding to Plex" is usually this: the
- * server filed the file under another title.
+ * Catches wrong matches as they happen. After Radarr, Sonarr or Lidarr
+ * imports a requested title, each media server that should hold it is
+ * checked: the item in the imported folder, its ids against the *arr's (as
+ * the nightly Match Check does). A request stuck at "Adding to Plex" is
+ * usually the server filing it under another title.
  *
- * Servers take a few minutes to scan and match, so the looks back off over
- * about two hours. A match to another title is told as soon as it is seen;
- * "not matched" only if it still is at the end. Admins are told once per
- * problem, ever: several found close together go out as one message, and
- * no more than DAILY_MESSAGES a day; past that they are only on the Health
- * page, and the next message says how many. A problem put right is cleared
- * without a word. Requesters are never told: their request keeps waiting
- * for the server, with a line saying so.
+ * Servers take minutes to scan and match, so checks back off over about two
+ * hours. A match to another title is reported at once; "not matched" only if
+ * it persists to the last check. Admins hear of each problem once ever:
+ * problems found close together share one message, capped at DAILY_MESSAGES
+ * a day; the rest show only on the Health page and the next message counts
+ * them. A problem put right clears silently. Requesters are never told;
+ * their request shows a waiting line instead.
  */
 
 const MINUTE_MS = 60_000;
@@ -75,52 +72,51 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 /**
- * When each look is taken, after the import: a server usually has it
- * matched within minutes, and is given about two hours before "not
- * matched" is said.
+ * Check times after the import; "not matched" is reported only after about two
+ * hours.
  */
 export const LOOKS_AT_MS = [2, 7, 22, 52, 112].map((m) => m * MINUTE_MS);
 
-/** Problems found within this long of the first go out as one message. */
+/** Problems found within this long of the first share one message. */
 export const GATHER_MS = 10 * MINUTE_MS;
 
-/** Messages a day at most (any 24 hours). */
+/** Max messages in any 24 hours. */
 export const DAILY_MESSAGES = 5;
 
-/** How often a problem not yet put right is looked at again. */
+/** How often an open problem is rechecked. */
 export const RECHECK_MS = 6 * HOUR_MS;
 
-/** Titles looked at in one run, so a burst of imports is spread out. */
+/** Titles checked per run, so a burst of imports is spread out. */
 const PER_RUN = 25;
 
-/** Nightly problems fixed in Plex by themselves, at most, a night. */
+/** Max nightly problems auto-fixed in Plex per night. */
 const AUTO_PER_NIGHT = 20;
 
-/** The newest items of each library looked through for the one imported. */
+/** Newest items per library searched for the imported one. */
 const NEWEST = 100;
 
-/** Albums on Plex whose tracks are read to find their folder, a run. */
+/** Max Plex albums per run whose tracks are read to find their folder. */
 const PLEX_ALBUM_LOOKUPS = 40;
 
 /** Problems named in one message before "and N more". */
 const NAMED = 8;
 
-/** Longest to wait on a media server or Lidarr for one answer. */
+/** Timeout for one media server or Lidarr call. */
 const TIMEOUT_MS = 20_000;
 
 type Verdict =
-  /** The server has it, matched to the right title. */
+  /** On the server, matched to the right title. */
   | { state: 'right' }
-  /** Matched to another title: certain. */
+  /** Certainly matched to another title. */
   | { state: 'wrong'; problem: PlexMatchProblem }
-  /** On the server, not matched to anything (yet). */
+  /** On the server, not matched yet. */
   | { state: 'unmatched'; problem: PlexMatchProblem }
-  /** Not on the server (yet), or nothing to compare by. */
+  /** Not on the server yet, or no ids to compare. */
   | { state: 'unknown' }
-  /** Radarr, Sonarr or Lidarr no longer has it. */
+  /** The *arr no longer has it. */
   | { state: 'gone' };
 
-/** What Lidarr has for an album: as a film's Expected, with its ids. */
+/** Lidarr's album, shaped like a film's Expected plus its ids. */
 interface ExpectedAlbum {
   title: string;
   year?: number;
@@ -153,7 +149,7 @@ const yearOf = (date?: string | null): number | undefined => {
 const titled = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
 
-/** Neither title is the other: one may be a longer edition's. */
+/** True when either title contains the other, e.g. a longer edition's. */
 const titlesClose = (a?: string, b?: string): boolean => {
   const x = normalizeName(a);
   const y = normalizeName(b);
@@ -161,9 +157,8 @@ const titlesClose = (a?: string, b?: string): boolean => {
 };
 
 /**
- * An album whose server gives no MusicBrainz id we can trust: told apart
- * by name only when clearly another (another title, and another artist or
- * a year more than one apart).
+ * For albums without a trustworthy MusicBrainz id: different only when the
+ * title differs and the artist differs or the year is more than one apart.
  */
 const clearlyAnotherAlbum = (
   expected: ExpectedAlbum,
@@ -176,7 +171,7 @@ const clearlyAnotherAlbum = (
   return artistDiffers || yearDiffers;
 };
 
-/** Whether a server's album is the one Lidarr has, by its ids, or names. */
+/** Whether a server's album is Lidarr's, by ids or names. */
 export const compareAlbum = (
   expected: ExpectedAlbum,
   album: ServerAlbum,
@@ -207,15 +202,15 @@ export const compareAlbum = (
       reason: 'other',
     },
   });
-  // Jellyfin and Emby say which album (release group) it is.
+  // Jellyfin and Emby give the release group.
   if (album.releaseGroupId) {
     return album.releaseGroupId === expected.mbid
       ? { state: 'right' }
       : problem();
   }
-  // A release's id (or Plex's, which may be either): another release of
-  // the same album is not a wrong match, and Lidarr may not list them all,
-  // so the names must say so too.
+  // A release id (Plex's may be either): another release of the same album is
+  // not a wrong match, and Lidarr may not list them all, so names must agree
+  // too.
   const ids = [album.releaseId, album.releaseOrGroupId].filter(
     (id): id is string => !!id
   );
@@ -227,7 +222,7 @@ export const compareAlbum = (
   return clearlyAnotherAlbum(expected, album) ? problem() : { state: 'right' };
 };
 
-/** The servers whose libraries should have this kind of title. */
+/** Servers whose libraries should hold this kind of title. */
 const serversFor = (kind: MatchKind): MediaServerKind[] =>
   connectedServers().filter((server) => {
     const settings =
@@ -248,8 +243,8 @@ const kindOfServer = (name: MediaServerName): MediaServerKind =>
   name === 'Plex' ? 'plex' : name === 'Emby' ? 'emby' : 'jellyfin';
 
 /**
- * A reading of what was added since a time, shared by the titles that ask:
- * read again for a title imported before it, which it may have missed.
+ * Shares a "recently added since" read between titles; re-reads for a title
+ * imported before the read's start, which it may have missed.
  */
 const sinceShared = <T>(
   cache: Map<string, { since: number; read: Promise<T> }>,
@@ -265,8 +260,8 @@ const sinceShared = <T>(
 };
 
 /**
- * What one run has read, so several titles on one server share a reading
- * of its newest items.
+ * One run's cache, so titles on the same server share a read of its newest
+ * items.
  */
 class Reading {
   private lists = new Map<
@@ -290,7 +285,7 @@ class Reading {
     return this.plex;
   }
 
-  /** A server's newest films or series, with their folders and ids. */
+  /** A server's newest films or series, with folders and ids. */
   public newest(
     server: MediaServerKind,
     kind: 'movie' | 'series',
@@ -312,8 +307,8 @@ class Reading {
       const items: MatchItem[] = [];
       for (const library of getSettings().plex.libraries) {
         if (!library.enabled || library.type !== type) continue;
-        // A little before the import: the server adds it after Radarr or
-        // Sonarr has, and clocks differ.
+        // Start a little before the import: the server adds it after the *arr
+        // does, and clocks differ.
         const added = await plex.getRecentlyAdded(
           library.id,
           { addedAt: since.getTime() - HOUR_MS },
@@ -325,8 +320,7 @@ class Reading {
           );
           continue;
         }
-        // Series are listed as their new episodes; their shows carry the
-        // folders and ids.
+        // Series come back as new episodes; their shows carry folders and ids.
         const shows = [
           ...new Set(
             added.flatMap((episode) =>
@@ -367,7 +361,7 @@ class Reading {
     return items;
   }
 
-  /** One film or series by the server's id; undefined once it is gone. */
+  /** One film or series by server id; undefined once gone. */
   public async item(
     server: MediaServerKind,
     kind: 'movie' | 'series',
@@ -382,7 +376,7 @@ class Reading {
     return item ? jellyfinMatchItem(kind, item) : undefined;
   }
 
-  /** A server's newest albums, with their folders and MusicBrainz ids. */
+  /** A server's newest albums, with folders and MusicBrainz ids. */
   public newestAlbums(
     server: MediaServerKind,
     since: Date
@@ -407,7 +401,7 @@ class Reading {
         );
         for (const album of albums.slice(0, NEWEST)) {
           const entry = plexAlbum(album);
-          // Plex lists no folders for albums: one track's file gives it.
+          // Plex lists no album folders: read one track's file instead.
           if (this.plexAlbumLookups < PLEX_ALBUM_LOOKUPS) {
             this.plexAlbumLookups++;
             const tracks = await plex.getAlbumTracks(album.ratingKey);
@@ -434,7 +428,7 @@ class Reading {
     return found;
   }
 
-  /** One album by the server's id; undefined once it is gone. */
+  /** One album by server id; undefined once gone. */
   public async album(
     server: MediaServerKind,
     key: string
@@ -480,7 +474,7 @@ const jellyfinAlbum = (
   };
 };
 
-/** The verdict on a film or series item against what Radarr or Sonarr has. */
+/** Verdict on a film or series item against the *arr's. */
 const compareTitle = (
   kind: 'movie' | 'series',
   item: MatchItem,
@@ -488,8 +482,8 @@ const compareTitle = (
   expected: Expected,
   mediaServer: MediaServerName
 ): Verdict => {
-  // Compared as if the item were in Radarr's or Sonarr's folder: found by
-  // that folder, or (looked at again) known to be the one.
+  // Compare as if the item were in the *arr's folder: found by that folder, or
+  // (on a recheck) already known to be it.
   const byFolder = new Map([[folder.toLowerCase(), [expected]]]);
   const { checked, problem } = compareMatch(
     kind,
@@ -508,16 +502,15 @@ const compareTitle = (
 class MatchWatchJob {
   private running = false;
 
-  /** Whether it is turned on (Settings → Health → Match Check). */
+  /** Whether Match Check is on (Settings → Health). */
   private get enabled(): boolean {
     return getSettings().main.matchCheckOnImport !== false;
   }
 
   /**
-   * Notes what Radarr, Sonarr or Lidarr just imported: each title someone
-   * requested is looked for on every server that should have it. A title
-   * already waiting to be looked at is left as it is, so a series' episodes
-   * arriving one by one make one check.
+   * Queues a check of each requested title the *arr just imported, on every
+   * server that should hold it. A title already queued is left alone, so a
+   * series' episodes arriving one by one make one check.
    */
   public async noteImports(
     imported: Pick<ImportedDownload, 'kind' | 'serverId' | 'item'>[],
@@ -551,13 +544,13 @@ class MatchWatchJob {
             attempts: 0,
           });
         } catch {
-          // Noted at the same moment by another import of it.
+          // Another import of it queued it at the same moment.
         }
       }
     }
   }
 
-  /** The title an import is for, if someone requested it. */
+  /** The requested title an import is for, if any. */
   private async requested(
     kind: ImportedDownload['kind'],
     serverId: number,
@@ -591,7 +584,9 @@ class MatchWatchJob {
       .getOne();
   }
 
-  /** One run: looks due, problems looked at again, messages, waiting lines. */
+  /**
+   * One run: due checks, rechecks of open problems, messages, waiting lines.
+   */
   public async run(now = new Date()): Promise<void> {
     if (this.running) return;
     this.running = true;
@@ -643,7 +638,7 @@ class MatchWatchJob {
     }
   }
 
-  /** What Radarr, Sonarr or Lidarr has: the folder, and the title's ids. */
+  /** The *arr's folder and ids for the title. */
   private async arrSide(watch: MatchWatch): Promise<ArrSide> {
     const settings = getSettings();
     try {
@@ -716,7 +711,7 @@ class MatchWatchJob {
     }
   }
 
-  /** Finds the imported title on the server by its folder, and compares. */
+  /** Finds the imported title on the server by folder and compares. */
   private async look(
     watch: MatchWatch,
     arr: ArrSide,
@@ -750,7 +745,7 @@ class MatchWatchJob {
       : { state: 'unknown' };
   }
 
-  /** What a look means for the title: done, told, or looked at later. */
+  /** Acts on a verdict: done, reported, or checked again later. */
   private async decide(
     watch: MatchWatch,
     verdict: Verdict,
@@ -803,9 +798,9 @@ class MatchWatchJob {
   }
 
   /**
-   * Keeps a problem found. One already known (by its key) is never told
-   * again, even if it was put right and came back; one the nightly check
-   * listed already is not told either, as it is on the Health page.
+   * Stores a problem. One already known by key is never reported again, even
+   * if it was fixed and came back; one the nightly check already listed is not
+   * reported either, since it is on the Health page.
    */
   private async record(
     problem: PlexMatchProblem,
@@ -821,7 +816,7 @@ class MatchWatchJob {
   ): Promise<void> {
     const repo = getRepository(MatchProblem);
     const key = problemKey(problem);
-    // The server matched it to something else since: that one is over.
+    // The server has since matched it elsewhere: that earlier problem is over.
     await this.resolve(
       {
         mediaId: from.mediaId,
@@ -866,15 +861,15 @@ class MatchWatchJob {
         { label: 'Match Check', mediaId: from.mediaId }
       );
     } catch {
-      // Recorded at the same moment by another look.
+      // Another check recorded it at the same moment.
       return;
     }
     await this.fixOnItsOwn(problem, key, now);
   }
 
   /**
-   * With "Fix automatically" on, a new problem is fixed in Plex there and
-   * then, and admins are told it was fixed rather than asked to.
+   * With "Fix automatically" on, fixes a new problem in Plex immediately and
+   * tells admins it was fixed instead of asking them to.
    */
   private async fixOnItsOwn(
     problem: PlexMatchProblem,
@@ -886,7 +881,8 @@ class MatchWatchJob {
       await this.resolveKeys([key], now);
     } else if (outcome?.state === 'fixed') {
       const { title, year } = outcome.fix.to;
-      // Left 'waiting', unlike other problems put right: still told.
+      // Stays 'waiting', unlike other resolved problems: still reported as
+      // fixed.
       await getRepository(MatchProblem).update(
         { key },
         {
@@ -898,7 +894,7 @@ class MatchWatchJob {
     }
   }
 
-  /** Problems put right, by their keys: over, and not told. */
+  /** Resolves problems by key, silently. */
   private async resolveKeys(keys: string[], now: Date): Promise<void> {
     if (!keys.length) return;
     const repo = getRepository(MatchProblem);
@@ -916,7 +912,7 @@ class MatchWatchJob {
     );
   }
 
-  /** An open problem by its key: a new request's, or the nightly check's. */
+  /** An open problem by key, from a new request or the nightly check. */
   public async findProblem(key: string): Promise<PlexMatchProblem | undefined> {
     const row = await getRepository(MatchProblem).findOne({
       where: { key, resolvedAt: IsNull() },
@@ -926,7 +922,7 @@ class MatchWatchJob {
     return report.problems.find((p) => problemKey(p) === key);
   }
 
-  /** A problem an admin fixed: off the Health page, and not told. */
+  /** Marks a problem fixed by an admin: off the Health page, not reported. */
   public async markFixed(
     problem: PlexMatchProblem,
     now = new Date()
@@ -938,16 +934,16 @@ class MatchWatchJob {
   }
 
   /**
-   * A title is right on a server now: what was found wrong with it there is
-   * over, without a word. Not yet told, it never will be.
+   * The title is right on a server now: its problems there resolve silently.
+   * Unreported ones never will be.
    */
   private async resolve(
     which: {
       mediaServer: MediaServerName;
       mediaId?: number;
-      /** Music: one album of the artist, not the others. */
+      /** Music: just this album of the artist. */
       albumId?: number | null;
-      /** All but this problem. */
+      /** Every problem except this one. */
       exceptKey?: string;
     },
     now: Date
@@ -968,8 +964,7 @@ class MatchWatchJob {
   }
 
   /**
-   * Problems not yet put right, looked at again now and then by the
-   * server's own id for the item, which a fix keeps.
+   * Rechecks open problems by the server's item id, which a fix keeps.
    */
   private async lookAgainAtOpen(reading: Reading, now: Date): Promise<void> {
     const repo = getRepository(MatchProblem);
@@ -1020,10 +1015,10 @@ class MatchWatchJob {
             : 'gone';
         }
       } catch {
-        // Not answering: looked at again later.
+        // No answer: retry later.
       }
       if (verdict === 'gone' || verdict.state === 'right') {
-        // Put right, or the item is gone (rescanned, removed): over.
+        // Fixed, or the item is gone (rescanned, removed): resolve.
         await getRepository(MatchProblem).update(row.id, {
           resolvedAt: now,
           nextCheckAt: null,
@@ -1059,8 +1054,8 @@ class MatchWatchJob {
   }
 
   /**
-   * After the nightly check: what it now finds right (on a server it could
-   * read) is over. Music is not part of it, so is left alone.
+   * After the nightly check, resolves what it now finds right on servers it
+   * could read. It skips music, so music problems are left alone.
    */
   public async afterNightly(
     report: PlexMatchReport,
@@ -1089,8 +1084,8 @@ class MatchWatchJob {
   }
 
   /**
-   * With "Fix automatically" on, what the nightly check found is fixed in
-   * Plex too, up to AUTO_PER_NIGHT a night, and taken off its list.
+   * With "Fix automatically" on, also fixes nightly findings in Plex, up to
+   * AUTO_PER_NIGHT a night, and removes them from its list.
    */
   private async fixNightlyOnItsOwn(
     report: PlexMatchReport,
@@ -1116,13 +1111,13 @@ class MatchWatchJob {
   }
 
   /**
-   * Sends what is waiting, once the first of it has waited GATHER_MS for
-   * others to join it, within DAILY_MESSAGES a day.
+   * Sends waiting problems once the oldest has waited GATHER_MS for others,
+   * within DAILY_MESSAGES a day.
    */
   private async tell(now: Date): Promise<void> {
     const repo = getRepository(MatchProblem);
-    // Problems put right are no longer 'waiting', but those fixed on
-    // their own still are: they are told as fixed.
+    // Resolved problems leave 'waiting', except auto-fixed ones, which are
+    // reported as fixed.
     const waiting = await repo.find({
       where: { notice: 'waiting' },
       order: { foundAt: 'ASC' },
@@ -1184,7 +1179,7 @@ class MatchWatchJob {
     }
   }
 
-  /** Requests waiting on a server's match say so (downloadTracker). */
+  /** Marks requests waiting on a server's match (downloadTracker). */
   public async showWaiting(): Promise<void> {
     const open = await getRepository(MatchProblem).find({
       where: { resolvedAt: IsNull() },
@@ -1207,7 +1202,7 @@ class MatchWatchJob {
     );
   }
 
-  /** What was found wrong with one title and is not put right yet. */
+  /** A title's unresolved problems. */
   public async openProblems(mediaId: number): Promise<PlexMatchProblem[]> {
     const rows = await getRepository(MatchProblem).find({
       where: { mediaId, resolvedAt: IsNull() },
@@ -1216,7 +1211,7 @@ class MatchWatchJob {
     return rows.map((row) => JSON.parse(row.problem) as PlexMatchProblem);
   }
 
-  /** Forgets what is pending or found on a server no longer connected. */
+  /** Drops pending checks and problems for a disconnected server. */
   public async dropServer(mediaServer: MediaServerName): Promise<void> {
     await getRepository(MatchWatch).delete({ mediaServer });
     await this.resolve({ mediaServer }, new Date());
@@ -1225,9 +1220,9 @@ class MatchWatchJob {
 }
 
 /**
- * The message for problems found together: one says it all with a link to
- * its title; several are listed, each with its link, and open Health.
- * `more` is how many were held back by the day's limit since the last.
+ * Message for problems found together: one gets a link to its title; several
+ * are listed with links plus a Health link. `more` counts those held back by
+ * the daily cap since the last message.
  */
 export const wrongMatchMessage = (
   told: { problem: PlexMatchProblem; path?: string }[],
@@ -1287,7 +1282,7 @@ export const wrongMatchMessage = (
   };
 };
 
-/** The title's page in Seerr: a film's or series', or the album's. */
+/** Seerr page for a film, series or album. */
 const pagePath = (
   problem: PlexMatchProblem,
   media?: Media
@@ -1304,7 +1299,7 @@ const pagePath = (
 
 const matchWatch = new MatchWatchJob();
 
-// The nightly check shares what it finds: what it finds right is over.
+// Nightly check results: what it finds right is resolved.
 plexMatchCheck.whenFinished((report, unread) =>
   matchWatch.afterNightly(report, unread)
 );

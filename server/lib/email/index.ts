@@ -8,17 +8,15 @@ import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { URL } from 'url';
 import { openpgpEncrypt } from './openpgpEncrypt';
 
-// Seerr AI's logo, light on the emails' dark background. A PNG: Gmail and
-// Outlook don't show SVG pictures at all.
+// Light logo for the dark email background. PNG: Gmail and Outlook don't render
+// SVG.
 const LOGO_FILE = 'logo_ai_dark.png';
 const PUBLIC_LOGO_URL = `https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_BRANCH}/public/${LOGO_FILE}`;
 
 /**
- * The logo at the top of every email: the copy in the repository when the
- * email settings say to use the public logo, else this server's own (which
- * needs the Application URL). Without either, emails show the application's
- * name instead. A test email passes the settings being tested, which may
- * not be saved yet.
+ * Email logo URL: the repository copy if `usePublicLogo`, else this server's
+ * (needs Application URL); undefined shows the app name. Test emails pass
+ * their unsaved settings.
  */
 export const emailLogoUrl = (
   options: Pick<
@@ -114,9 +112,8 @@ class PreparedEmail extends Email {
         },
       },
       send: true,
-      // nodemailer 10 ships its own types; email-templates' still describe
-      // the same transporter through @types/nodemailer 8. It is the same
-      // object at run time: email-templates only calls its sendMail.
+      // email-templates types target @types/nodemailer 8; nodemailer 10's
+      // transporter is the same at run time (only sendMail is called).
       transport: transport as unknown as Email.NodeMailerTransportOptions,
       preview: false,
     });

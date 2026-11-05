@@ -30,11 +30,11 @@ const messages = defineMessages('components.Settings.BazarrModal', {
   validationApiKeyRequired: 'You must provide the API key',
 });
 
-/** As the settings page is sent it: no key, only that one is set. */
+/** Bazarr as the settings API returns it: no key, only `hasApiKey`. */
 export type ShownBazarr = BazarrSettings & { hasApiKey?: boolean };
 
 interface BazarrModalProps {
-  /** The saved Bazarr, or null to add it. */
+  /** Saved Bazarr, or null to add one. */
   bazarr: ShownBazarr | null;
   onClose: () => void;
   onSave: () => void;
@@ -44,8 +44,7 @@ const BazarrModal = ({ bazarr, onClose, onSave }: BazarrModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from a Bazarr that already worked; a new one must pass a
-  // test before it can be added.
+  // A saved Bazarr already passed a test; a new one must pass before adding.
   const [isValidated, setIsValidated] = useState(!!bazarr);
 
   const schema = Yup.object().shape({
@@ -108,8 +107,7 @@ const BazarrModal = ({ bazarr, onClose, onSave }: BazarrModalProps) => {
     }
   };
 
-  // Changing where Bazarr is, or its key, means the earlier test no longer
-  // counts.
+  // Changing a connection field invalidates the last test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,
@@ -145,7 +143,7 @@ const BazarrModal = ({ bazarr, onClose, onSave }: BazarrModalProps) => {
             await axios.put('/api/v1/settings/bazarr', toBody(values));
             onSave();
           } catch (e) {
-            // The server tests the connection again before saving.
+            // The server re-tests before saving.
             setIsValidated(false);
             addToast(
               intl.formatMessage(messages.toastTestFailure, {

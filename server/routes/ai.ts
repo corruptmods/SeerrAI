@@ -23,14 +23,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * The AI features. Every route checks its own switch (off for everyone, or
- * by this person, or AI not set up) and the daily limit, through lib/ai.
+ * AI features. Every route checks its own switch (off globally, for this
+ * person, or AI not set up) and the daily limit, through lib/ai.
  */
 const aiRoutes = Router();
 
 /**
- * Why there is no answer: the English, and a code the page shows in the
- * person's language instead when it knows it (with any numbers it needs).
+ * Send a refusal: English message plus a code (and any values) the client
+ * translates when it knows it.
  */
 const refuse = (
   res: Response,
@@ -45,7 +45,7 @@ const refuse = (
     ...(values && { values }),
   });
 
-/** An answer, or the reason there is none, as a message the page can show. */
+/** Wrap a handler so errors become refusals the client can show. */
 const handle =
   (run: (req: Request) => Promise<unknown>) =>
   async (req: Request, res: Response) => {
@@ -60,8 +60,8 @@ const handle =
       }
       if (e instanceof z.ZodError) {
         const issue = e.issues[0];
-        // The only checks the app's own requests can trip are on the
-        // picture someone sent.
+        // The app's own requests can only fail validation on the attached
+        // picture.
         return refuse(
           res,
           400,
@@ -83,8 +83,8 @@ const handle =
   };
 
 /**
- * Checked before any work: someone with the feature off, or a server with
- * no model, gets a plain refusal rather than lookups made for nothing.
+ * Checked before any work, so someone with the feature off, or a server with no
+ * model, gets a plain refusal without wasted lookups.
  */
 const need =
   (feature: AiFeature) => (req: Request, res: Response, next: NextFunction) =>
@@ -92,7 +92,7 @@ const need =
       ? next()
       : refuse(res, 403, 'This AI feature is turned off.', 'off');
 
-/** Which AI features this person has, and how many answers are left today. */
+/** This person's AI features and answers left today. */
 aiRoutes.get(
   '/status',
   handle(async (req) => ({
@@ -106,7 +106,7 @@ aiRoutes.get(
 /** Larger than any phone photo the app sends, which it shrinks first. */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-/** How each picture type starts, so a file is what it says it is. */
+/** Magic bytes per image type, so a file is what it claims. */
 const SIGNATURES: Record<CompletionImage['type'], (b: Buffer) => boolean> = {
   'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
   'image/png': (b) =>
@@ -131,9 +131,9 @@ const chatImage = z
     'That picture could not be read.'
   );
 
-// Earlier turns are only context, so anything long is cut to size rather
-// than the whole message refused: a refusal here would stop the
-// conversation for good, as every later message sends the same turns.
+// Earlier turns are only context, so long ones are truncated, not refused: a
+// refusal would end the conversation for good, as every later message resends
+// the same turns.
 const chatBody = z.object({
   message: z.string().trim().max(500).default(''),
   image: chatImage.optional(),
@@ -177,8 +177,8 @@ const fixBody = z.object({
 });
 
 /**
- * A fix offered in the chat that replaces files, once the person has seen
- * which title it is for and confirmed it. No model is asked.
+ * Apply a file-replacing fix offered in chat, once the person has seen the
+ * title and confirmed. No model call.
  */
 aiRoutes.post(
   '/fix',
@@ -219,7 +219,7 @@ aiRoutes.post(
   handle(async (req) => pickForRoom(req.user!, pickBody.parse(req.body)))
 );
 
-/** An id in the path: anything else is refused, not looked up. */
+/** Path id: anything else is refused, not looked up. */
 const pathId = z.coerce.number().int().positive();
 
 aiRoutes.get<{ tvId: string }>(
@@ -266,7 +266,7 @@ aiRoutes.get<{ issueId: string }>(
 const logBody = z.object({
   label: z.string().max(100).optional(),
   level: z.string().max(20).optional(),
-  // Long entries are trimmed, not refused; only the start is sent anyway.
+  // Long entries are truncated, not refused; only the start is sent anyway.
   message: z
     .string()
     .min(1)

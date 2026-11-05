@@ -43,8 +43,8 @@ const addressOf = (url: string) => {
 };
 
 /*
- * Soulseek, through slskd, laid out like the other services: its tile with
- * Edit and Delete once it is set up, a dashed tile to add it before.
+ * Soulseek (through slskd), laid out like the other services: its tile with
+ * Edit and Delete once set up, else a dashed tile to add it.
  */
 const SettingsSoulseek = () => {
   const intl = useIntl();
@@ -56,7 +56,7 @@ const SettingsSoulseek = () => {
   const [deleting, setDeleting] = useState(false);
   const configured = !!data?.url && !!data.hasApiKey;
 
-  // A blank address takes Soulseek out.
+  // A blank address removes Soulseek.
   const disconnect = async () => {
     try {
       await axios.put('/api/v1/settings/music/soulseek', { url: '' });

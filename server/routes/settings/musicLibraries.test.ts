@@ -13,8 +13,8 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
  * Music libraries in Settings → Plex, Jellyfin and Emby: found by the same
- * library sync as the others but kept apart from them, and switched on and
- * off on their own, behind the real OpenAPI validator.
+ * library sync but kept separate and toggled separately, behind the real
+ * OpenAPI validator.
  */
 
 setupTestDb();
@@ -41,7 +41,7 @@ const plexStandIn = (req: IncomingMessage, res: ServerResponse) => {
             type: 'show',
             agent: 'tv.plex.agents.series',
           },
-          // Music libraries count whatever their agent, none included.
+          // Music libraries count with any agent, or none.
           {
             key: '3',
             title: 'Music',
@@ -165,7 +165,7 @@ describe('music libraries', () => {
   it('are synced with Plex’s libraries and kept apart from them', async () => {
     const synced = await api('/plex/library/sync', { method: 'POST' });
     assert.equal(synced.status, 200);
-    // The answer is the film and series libraries, as before.
+    // The response lists only film and series libraries.
     assert.deepEqual(
       ((await synced.json()) as { id: string }[]).map((library) => library.id),
       ['1', '2']
@@ -186,7 +186,7 @@ describe('music libraries', () => {
     });
     assert.equal(toggled.status, 200);
     assert.equal(getSettings().plex.musicLibraries[0].enabled, true);
-    // Switched on stays on through the next sync.
+    // Enabled survives the next sync.
     await api('/plex/library/sync', { method: 'POST' });
     assert.equal(getSettings().plex.musicLibraries[0].enabled, true);
     assert.equal(getSettings().plex.libraries.length, 2);
@@ -231,7 +231,7 @@ describe('music libraries', () => {
       });
       assert.equal(toggled.status, 200);
       assert.equal(settings[kind].musicLibraries[0].enabled, true);
-      // The other server's are its own.
+      // The other server's list is untouched.
       const other = kind === 'jellyfin' ? 'emby' : 'jellyfin';
       assert.deepEqual(settings[other].musicLibraries, []);
     });

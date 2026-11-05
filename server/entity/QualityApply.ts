@@ -9,8 +9,8 @@ import {
 } from 'typeorm';
 
 /**
- * What one item was in Radarr or Sonarr before an apply changed it: null
- * when the apply created it. Undo puts these back.
+ * An item's state in Radarr or Sonarr before an apply changed it; null when the
+ * apply created it. Undo restores these.
  */
 export interface QualityBefore {
   itemKind: 'profile' | 'format' | 'delay' | 'requests';
@@ -26,8 +26,8 @@ export interface QualityMovedTitle {
 }
 
 /**
- * One apply of Seerr AI's quality profiles to a server, for History and
- * Undo: what it did in a line, and the copies to put back.
+ * One apply of Seerr AI's quality profiles to a server, for History and Undo: a
+ * one-line summary, and the copies to restore.
  */
 @Entity()
 export class QualityApply {
@@ -42,7 +42,7 @@ export class QualityApply {
   @Column({ type: 'integer' })
   public serverId: number;
 
-  /** The admin who applied it; null for a TRaSH Guides update on its own. */
+  /** The admin who applied it; null for an automatic TRaSH Guides update. */
   @Column({ type: 'integer', nullable: true })
   public userId: number | null;
 

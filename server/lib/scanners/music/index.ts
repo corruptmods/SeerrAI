@@ -44,22 +44,22 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * The music jobs. Music Sync (every few minutes) follows Lidarr's work on
- * requests and reads what each connected server's music libraries have
- * newly added. The Music Full Scan (daily) reads every music library and
- * all of Lidarr, brings in the libraries of Lidarrs with Scan on, and takes
- * away what is gone. Both do nothing until music is set up.
+ * Music jobs. Music Sync (every few minutes) tracks Lidarr's progress on
+ * requests and reads newly added albums from each connected server's music
+ * libraries. Music Full Scan (daily) reads every music library and all of
+ * Lidarr, imports the libraries of Lidarrs with Scan on, and removes what is
+ * gone. Both do nothing until music is set up.
  */
 
 const LABEL = 'Music Scan';
 
-/** Albums Seerr has under these item ids of one server. */
+/** Album rows Seerr has for these item ids on one server. */
 const rowsWithItemIds = async (
   kind: MediaServerKind,
   itemIds: string[]
 ): Promise<Pick<MusicAlbum, 'id' | 'mediaId'>[]> => {
   const rows: Pick<MusicAlbum, 'id' | 'mediaId'>[] = [];
-  // In slices, to stay under the databases' limit on query parameters.
+  // Chunked to stay under the databases' query parameter limit.
   for (let i = 0; i < itemIds.length; i += 500) {
     rows.push(
       ...(await getRepository(MusicAlbum).find({
@@ -71,9 +71,9 @@ const rowsWithItemIds = async (
   return rows;
 };
 
-/** A recent scan's window reaches this far behind the last one. */
+/** How far a recent scan's window overlaps the previous one. */
 const RECENT_OVERLAP_MS = 10 * 60 * 1000;
-/** A library never scanned: what was added in the last hour. */
+/** First scan of a library: items added in the last hour. */
 const FIRST_WINDOW_MS = 60 * 60 * 1000;
 
 export interface MusicScanStatus {
@@ -87,7 +87,7 @@ const openSource = (kind: MediaServerKind): Promise<MusicSource> =>
     ? JellyfinMusicSource.open(kind)
     : PlexMusicSource.open();
 
-/** The albums Seerr keeps of an artist, to match folders and titles. */
+/** Seerr's albums per artist, cached, for matching folders and titles. */
 const knownAlbums = () => {
   const found = new Map<string, KnownAlbum[]>();
   return async (artistMbid: string): Promise<KnownAlbum[]> => {
@@ -125,9 +125,8 @@ const knownAlbums = () => {
 };
 
 /**
- * Albums now here that Lidarr imported: their downloads stop being shown
- * as being added to the library. Those imported after the scan began wait
- * for the next one.
+ * Stops showing downloads as being added for Lidarr imports a server now
+ * lists. Imports after the scan began wait for the next scan.
  */
 const forgetListedImports = async (before: number): Promise<void> => {
   const held = downloadTracker.heldMusicImports();
@@ -153,7 +152,7 @@ const forgetListedImports = async (before: number): Promise<void> => {
   }
 };
 
-/** The music scan under way, if any. */
+/** The running music scan, if any. */
 let underWay: Promise<void> | undefined;
 
 class MusicScanner {
@@ -188,9 +187,9 @@ class MusicScanner {
     this.progress = 0;
     this.total = 0;
     try {
-      // One music scan at a time: two would make the same rows. A sync
-      // while another scan runs is left out, as that scan covers it; a
-      // full scan waits its turn.
+      // One music scan at a time, since two would create duplicate rows. A
+      // sync during another scan is skipped (that scan covers it); a full
+      // scan waits.
       while (underWay) {
         if (!this.full) return;
         await underWay.catch(() => undefined);
@@ -234,7 +233,7 @@ class MusicScanner {
       try {
         const source = await openSource(kind);
         const matches: AlbumMatch[] = [];
-        // Items the server lists that could not be placed this time.
+        // Items the server lists that couldn't be placed this run.
         const notPlaced: string[] = [];
         const scanned: [MusicLibrary, number][] = [];
         for (const library of libraries) {
@@ -265,14 +264,14 @@ class MusicScanner {
           if (!this.cancelled) scanned.push([library, askedAt]);
         }
         const recorded = await recordServerAlbums(kind, matches, index);
-        // The next sync reads from here, once what was read is kept.
+        // Advance each library's window only after the results are saved.
         for (const [library, askedAt] of scanned) library.lastScan = askedAt;
         matched += matches.filter((m) => m.albumMbid).length;
         unplaced += matches.filter((m) => !m.albumMbid).length;
         seen.albums.set(kind, recorded.albumIds);
         seen.artists.set(kind, recorded.listedArtistIds);
-        // An album placed on an earlier run that could not be placed this
-        // time (MusicBrainz busy, the artist not told) is still listed.
+        // Albums placed earlier but not this run (MusicBrainz busy, artist
+        // unknown) stay listed.
         for (const row of await rowsWithItemIds(kind, notPlaced)) {
           recorded.albumIds.add(row.id);
           recorded.listedArtistIds.add(row.mediaId);
@@ -297,8 +296,8 @@ class MusicScanner {
           { label: LABEL }
         );
       } else if (matcher.later > 0) {
-        // An album left for MusicBrainz may be one Seerr has under another
-        // server id; it is not taken down for want of an answer.
+        // An album waiting on MusicBrainz may be one Seerr has under another
+        // server id, so nothing is removed without an answer.
         logger.info(
           'Some albums wait for MusicBrainz; nothing is marked as gone this time',
           { label: LABEL, leftForNextRun: matcher.later }
@@ -316,11 +315,10 @@ class MusicScanner {
 
     await refreshArtists(artists, index);
 
-    // Requests whose albums are all here now are done, and say so.
+    // Complete requests whose albums are all present.
     const completed = await completeMusicRequests(artists);
 
-    // Downloads shown as being added to the library, for albums a server
-    // now lists, are no longer shown.
+    // Stop showing import downloads for albums a server now lists.
     await forgetListedImports(startedAt);
 
     logger.info(`${this.name} finished`, {
@@ -337,8 +335,8 @@ class MusicScanner {
   }
 
   /**
-   * Places an album; one the ids could not place gets its folders looked
-   * up (Plex lists none) and another try.
+   * Places an album. If its ids can't, looks up its folders (Plex lists
+   * none) and tries again.
    */
   private async place(
     matcher: AlbumMatcher,
@@ -356,7 +354,7 @@ class MusicScanner {
     ) {
       return match;
     }
-    // The first try's count is taken back: only the second counts.
+    // Undo the first try's unknown-artist count; only the retry counts.
     matcher.unknownArtist = unknown;
     return (await matcher.match(album)) ?? match;
   }

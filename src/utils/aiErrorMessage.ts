@@ -1,10 +1,9 @@
-// Kept apart from the hook, with nothing that needs the page around it, so
-// it can be tested on its own.
+// Kept free of page dependencies so it can be tested alone.
 import { isAxiosError } from 'axios';
 import type { IntlShape } from 'react-intl';
 import defineMessages from './defineMessages';
 
-/** The AI features' refusals, by the code the server sends with them. */
+/** AI refusal messages, keyed by the server's code. */
 const messages = defineMessages('utils.aiErrorMessage', {
   off: 'This AI feature is turned off.',
   limit:
@@ -36,9 +35,8 @@ const isCode = (code: unknown): code is keyof typeof messages =>
   typeof code === 'string' && Object.hasOwn(messages, code);
 
 /**
- * The server's reason, which is always written to be shown: in the
- * person's language when it comes with a code this page knows (and `intl`
- * is given), otherwise the server's English. `failed` is the fallback's.
+ * The server's user-facing reason: localised for known codes (when `intl` is
+ * given), else the server's English. `failed` is the fallback.
  */
 export const aiErrorMessage = (
   e: unknown,

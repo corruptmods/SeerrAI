@@ -24,8 +24,8 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * What the person who asked for a title is told about Backfill: that it is
- * looking, or downloading, for their own requests only.
+ * What a requester is told about Backfill (looking, or downloading), for their
+ * own requests only.
  */
 
 let server: Server;
@@ -120,7 +120,7 @@ describe('Backfill on someone’s own requests', () => {
     await tracked(10, 'series', 1);
     const movie = await tracked(20, 'movie', 2);
     await tracked(30, 'movie', 3);
-    // A series with the movie's TMDB id is another title.
+    // A series with the movie's TMDB id is a different title.
     await tracked(20, 'series', 4);
     await getRepository(BackfillJob).save(
       new BackfillJob({
@@ -180,7 +180,7 @@ describe('Backfill on someone’s own requests', () => {
         steps: [],
         actions: [],
       }),
-      // Finished, or waiting for an answer: not looking.
+      // Finished, or awaiting an answer: not looking.
       new AgentRun({
         trigger: 'auto',
         status: 'done',

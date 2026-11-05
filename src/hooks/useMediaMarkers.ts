@@ -15,10 +15,8 @@ const key = (marker: Marker) => `${marker.mediaType}:${marker.tmdbId}`;
 export const MARKERS_KEY = '/api/v1/list/markers';
 
 /**
- * Which titles the current user has on a list, and which they will hear about.
- *
- * One shared SWR key, so a grid of cards costs a single request rather than
- * one per poster.
+ * Titles the user has on a list or will be notified about. One shared SWR
+ * key, so a grid costs one request.
  */
 export const useMediaMarkers = () => {
   const { data } = useSWR<MarkersResponse>(MARKERS_KEY, {

@@ -10,8 +10,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import * as Yup from 'yup';
 
-// The form's words keep the ids they had in Settings → Services' own
-// Soulseek form, so their translations still apply.
+// Message ids predate this modal, so existing translations still apply.
 const messages = defineMessages('components.Settings.SettingsSoulseek', {
   addSoulseek: 'Add Soulseek',
   editSoulseek: 'Edit Soulseek',
@@ -34,7 +33,7 @@ const messages = defineMessages('components.Settings.SettingsSoulseek', {
     'You must provide the downloads folder, as a full path',
 });
 
-/** Soulseek as Settings sends it: no key, only that one is set. */
+/** As Settings sends it: no key, only whether one is set. */
 export interface ShownSoulseek {
   url: string;
   downloadsPath: string;
@@ -55,16 +54,14 @@ interface FormValues {
 }
 
 /**
- * Adding or editing Soulseek, through slskd, as the other services are:
- * tested before it can be added, and saved only once Lidarr sees its
- * downloads folder.
+ * Adds or edits Soulseek (through slskd): tested before adding, and saved only
+ * once Lidarr can see its downloads folder.
  */
 const SoulseekModal = ({ soulseek, onClose, onSave }: SoulseekModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from an slskd that already worked; a new one must pass a
-  // test before it can be added.
+  // Editing starts from a working slskd; a new one must pass a test first.
   const [isValidated, setIsValidated] = useState(!!soulseek);
 
   const schema = Yup.object().shape({
@@ -126,8 +123,7 @@ const SoulseekModal = ({ soulseek, onClose, onSave }: SoulseekModalProps) => {
     }
   };
 
-  // Changing where slskd is, its key or its folder means the earlier test no
-  // longer counts.
+  // A new address, key or folder voids the earlier test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,

@@ -3,11 +3,7 @@ import migrateMusicInAllSearch from '@server/lib/settings/migrations/0015_music_
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * Settings migration 0015: music in All search results started off, and
- * that was saved. A saved "off" goes back to the new default (on once
- * Lidarr is set up), once; "on" is kept.
- */
+// Migration 0015: a saved "off" for music in All is cleared once; "on" is kept.
 
 const run = (settings: unknown) =>
   migrateMusicInAllSearch(

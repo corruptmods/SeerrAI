@@ -35,7 +35,7 @@ interface LanguageSelectorProps {
   isUserSettings?: boolean;
   isDisabled?: boolean;
   fieldName?: string;
-  /** The id its label points at; the field name unless given. */
+  /** The id for its label; defaults to the field name. */
   inputId?: string;
 }
 

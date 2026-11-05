@@ -14,8 +14,8 @@ import request from 'supertest';
 import userRoutes from '.';
 
 /*
- * The answer to a seasonal theme's note (Keep or Turn off), kept with the
- * account so it holds on every device and the note is not asked again.
+ * The answer to a seasonal theme's note (Keep or Turn off), stored on the
+ * account so it applies on every device and isn't asked again.
  */
 
 let app: Express;
@@ -73,7 +73,7 @@ describe('the answer to a season’s note', () => {
       'halloween-2026:off'
     );
 
-    // A later answer replaces it, and nothing else of theirs changes.
+    // A later answer replaces it; nothing else changes.
     await agent.post(`/user/${userId}/settings/appearance`).send({
       appearance: { mode: 'light', accent: 'teal', background: 'classic' },
     });
@@ -107,7 +107,7 @@ describe('the answer to a season’s note', () => {
       { season: 'halloween-2026' },
       { season: 'halloween-2026', choice: 'maybe' },
       { season: 'easter-2026', choice: 'off' },
-      // Seasons there are no longer.
+      // Removed seasons.
       { season: 'diwali-2026', choice: 'off' },
       { season: 'pride-2026', choice: 'keep' },
       { season: 'halloween', choice: 'off' },

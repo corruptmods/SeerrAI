@@ -3,12 +3,10 @@ import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 
 /**
- * A title's own records (its requests and issues), shaped for whoever is
- * looking at the title page. Everyone may see that a title was requested and
- * by whom, but not other people's email addresses or Plex ids; and the issues
- * reported on it, with their text, only reach those allowed to see issues.
- * Why a request was declined reaches its requester and those who may see
- * all requests.
+ * A title's requests and issues, shaped for the title page viewer. Everyone
+ * may see that it was requested and by whom, but not others' emails or Plex
+ * ids; issues and their text reach only those allowed to see issues. Decline
+ * reasons reach the requester and those who may see all requests.
  */
 const mediaForViewer = (
   media: Media | undefined,
@@ -19,8 +17,8 @@ const mediaForViewer = (
   }
 
   const seesPersonalDetails = !!viewer?.hasPermission(Permission.MANAGE_USERS);
-  // Why a request was declined is said to its requester; others see it
-  // only if they may see everyone's requests anyway.
+  // Decline reasons go to the requester, and to others only if they may see
+  // all requests anyway.
   const seesAllRequests = !!viewer?.hasPermission(
     [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
     { type: 'or' }

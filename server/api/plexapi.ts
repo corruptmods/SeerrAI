@@ -45,7 +45,7 @@ interface PlexLibraryResponse {
 }
 
 export interface PlexLibrary {
-  /** 'artist' is a music library. */
+  /** 'artist' means a music library. */
   type: 'show' | 'movie' | 'artist';
   key: string;
   title: string;
@@ -53,7 +53,7 @@ export interface PlexLibrary {
   language?: string;
 }
 
-/** A title Plex's Fix Match offers for an item. */
+/** A Fix Match candidate for an item. */
 export interface PlexMatchResult {
   guid: string;
   name: string;
@@ -103,7 +103,7 @@ interface Media {
   container: string;
   videoFrameRate: string;
   videoProfile: string;
-  /** The files it is, for a movie: where it sits on disk. */
+  /** A movie's files on disk. */
   Part?: { file?: string }[];
 }
 
@@ -127,12 +127,11 @@ export interface PlexMusicItem {
   /** An album's tracks in the library. */
   leafCount?: number;
   /**
-   * The ids its agent matched it to. With Plex's music agent an artist has
-   * `mbid://<artist>` and an album `mbid://<id>`, which may be the album's
-   * (release group) or one release's.
+   * Agent-matched ids. Plex's music agent gives an artist `mbid://<artist>`
+   * and an album `mbid://<id>`, either the release group or one release.
    */
   Guid?: { id: string }[];
-  /** An artist's folders on disk, when Plex gives them. */
+  /** An artist's folders on disk, when Plex sends them. */
   Location?: { path: string }[];
   /** A track's files. */
   Media?: { Part?: { file?: string }[] }[];
@@ -145,19 +144,19 @@ interface PlexMusicResponse {
   };
 }
 
-/** One thing playing on the server, as /status/sessions lists it. */
+/** One playback session from /status/sessions. */
 export interface PlexSession {
   type: string;
-  /** The film's, or the episode's. */
+  /** Movie or episode key. */
   ratingKey: string;
   /** An episode's series. */
   grandparentRatingKey?: string;
   title?: string;
   grandparentTitle?: string;
-  /** An episode's season and number. */
+  /** Episode season and number. */
   parentIndex?: number;
   index?: number;
-  /** Who is watching: their plex.tv id, or "1" for the server's owner. */
+  /** The viewer: plex.tv id, or "1" for the server owner. */
   User?: { id?: string; title?: string };
   Player?: { state?: string; title?: string };
 }
@@ -166,11 +165,11 @@ interface PlexSessionsResponse {
   MediaContainer: { size?: number; Metadata?: PlexSession[] };
 }
 
-/** Plex's numbers for the kinds of music item, in its listings. */
+/** Plex's type numbers for music items. */
 const PLEX_MUSIC_TYPE = { artist: 8, album: 9 } as const;
 
 const RECENT_PAGE_SIZE = 500;
-/** A bound on one recently added read, should a window be very wide. */
+/** Caps one recently-added read in case the window is very wide. */
 const RECENT_MAX_ITEMS = 5000;
 
 class PlexAPI extends ExternalAPI {
@@ -222,11 +221,10 @@ class PlexAPI extends ExternalAPI {
       const libraries = await this.getLibraries();
 
       const newLibraries = libraries
-        // Remove libraries that are not movie or show
         .filter(
           (library) => library.type === 'movie' || library.type === 'show'
         )
-        // Remove libraries that do not have a metadata agent set (usually personal video libraries)
+        // No metadata agent: usually personal video libraries.
         .filter((library) => library.agent !== 'com.plexapp.agents.none')
         .map((library): Library => {
           const existing = settings.plex.libraries.find(
@@ -243,8 +241,8 @@ class PlexAPI extends ExternalAPI {
         });
 
       settings.plex.libraries = newLibraries;
-      // Music libraries are kept apart. Any agent counts, none included:
-      // albums are found by folder and title too.
+      // Music libraries are stored separately. Any agent counts, none
+      // included: albums are also matched by folder and title.
       settings.plex.musicLibraries = libraries
         .filter((library) => library.type === 'artist')
         .map((library): MusicLibrary => {
@@ -309,8 +307,8 @@ class PlexAPI extends ExternalAPI {
   }
 
   /**
-   * One movie or show as a library listing gives it: the ids it is matched
-   * to, a movie's files and a show's folders. Undefined once it is gone.
+   * One movie or show with its matched ids, a movie's files and a show's
+   * folders. Undefined once it is gone.
    */
   public async getMatchItem(
     ratingKey: string
@@ -327,9 +325,9 @@ class PlexAPI extends ExternalAPI {
   }
 
   /**
-   * What Plex's Fix Match offers for an item when searched for `title`,
-   * which may be an id ("tmdb-123", "tvdb-456", "imdb-tt789"), as in Plex
-   * Web. The agent and language are its library's.
+   * Fix Match candidates for `title`, which may be an id ("tmdb-123",
+   * "tvdb-456", "imdb-tt789") as in Plex Web. Uses the library's agent and
+   * language.
    */
   public async findMatches(
     ratingKey: string,
@@ -345,7 +343,7 @@ class PlexAPI extends ExternalAPI {
     return response.MediaContainer.SearchResult ?? [];
   }
 
-  /** Matches an item to a title Fix Match offered, as Plex Web does. */
+  /** Matches an item to a Fix Match candidate, as Plex Web does. */
   public async setMatch(
     ratingKey: string,
     to: { guid: string; name: string; year?: number }
@@ -357,7 +355,7 @@ class PlexAPI extends ExternalAPI {
     );
   }
 
-  /** Leaves an item matched to nothing, as Plex Web's Unmatch does. */
+  /** Unmatches an item, as Plex Web does. */
   public async unmatch(ratingKey: string): Promise<void> {
     await this.axios.put(
       `/library/metadata/${encodeURIComponent(ratingKey)}/unmatch`
@@ -373,9 +371,8 @@ class PlexAPI extends ExternalAPI {
   }
 
   /**
-   * Everything added to a library since a time, newest first. Read a page
-   * at a time, so a busy day (a whole series imported at once) is not cut
-   * off at the first page.
+   * Everything added to a library since a time, newest first. Paged so a
+   * busy day (a whole series imported) is not cut off at the first page.
    */
   public async getRecentlyAdded(
     id: string,
@@ -405,10 +402,7 @@ class PlexAPI extends ExternalAPI {
     return items;
   }
 
-  /**
-   * One page of a music library's artists or albums, with the ids Plex
-   * matched them to.
-   */
+  /** One page of a music library's artists or albums, with matched ids. */
   public async getMusicItems(
     sectionId: string,
     type: 'artist' | 'album',
@@ -431,8 +425,8 @@ class PlexAPI extends ExternalAPI {
   }
 
   /**
-   * What is playing on the server now, for everyone. Needs the owner's
-   * token; never cached, as it changes by the second.
+   * Everything playing on the server now. Needs the owner's token; never
+   * cached, as it changes by the second.
    */
   public async getSessions(): Promise<PlexSession[]> {
     const response = await this.get<PlexSessionsResponse>(
@@ -466,7 +460,7 @@ class PlexAPI extends ExternalAPI {
     return items;
   }
 
-  /** One artist, album or track, with the ids Plex matched it to. */
+  /** One artist, album or track, with matched ids. */
   public async getMusicItem(
     ratingKey: string
   ): Promise<PlexMusicItem | undefined> {

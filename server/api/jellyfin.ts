@@ -58,7 +58,7 @@ interface JellyfinMediaFolder {
 }
 
 export interface JellyfinLibrary {
-  /** 'music' only from getAllLibraries, apart from the others. */
+  /** 'music' comes only from getAllLibraries' musicLibraries. */
   type: 'show' | 'movie' | 'music';
   key: string;
   title: string;
@@ -71,7 +71,7 @@ export interface JellyfinLibraryItem {
   HasSubtitles: boolean;
   Type: 'Movie' | 'Episode' | 'Season' | 'Series';
   LocationType: 'FileSystem' | 'Offline' | 'Remote' | 'Virtual';
-  /** The year, as the server has it; it names the title in the log. */
+  /** Names the title in logs. */
   ProductionYear?: number;
   SeriesName?: string;
   SeriesId?: string;
@@ -123,22 +123,22 @@ type EpisodeReturn<T> = T extends { includeMediaInfo: true }
   : JellyfinLibraryItem[];
 
 /**
- * An album or artist in a music library. Its MusicBrainz ids come from the
- * files' tags: MusicBrainzReleaseGroup is the album's, MusicBrainzAlbum one
- * release's, MusicBrainzAlbumArtist and MusicBrainzArtist the artist's.
+ * An album or artist in a music library. MusicBrainz ids come from file tags:
+ * MusicBrainzReleaseGroup is the album, MusicBrainzAlbum one release,
+ * MusicBrainzAlbumArtist and MusicBrainzArtist the artist.
  */
 export interface JellyfinMusicItem {
   Id: string;
   Name: string;
   Type: 'MusicAlbum' | 'MusicArtist';
   ProviderIds?: Record<string, string | undefined>;
-  /** The album's or artist's folder. */
+  /** Album or artist folder. */
   Path?: string;
   DateCreated?: string;
   ProductionYear?: number;
   AlbumArtist?: string;
   AlbumArtists?: { Name: string; Id: string }[];
-  /** An album's tracks, when the server gives them. */
+  /** Album track count, when the server sends it. */
   ChildCount?: number;
 }
 
@@ -148,13 +148,10 @@ export interface JellyfinItemsReponse {
   StartIndex: number;
 }
 
-/**
- * Longest to wait on the server for watch history: asked while someone
- * waits on a page, so a server that is down must fail rather than hang.
- */
+/** Watch history loads while a page waits, so a down server must fail fast. */
 const WATCH_TIMEOUT_MS = 15_000;
 
-/** What a person has done with an item: played, how far, and when last. */
+/** One user's play state for an item. */
 export interface JellyfinUserData {
   Played?: boolean;
   PlayCount?: number;
@@ -163,17 +160,17 @@ export interface JellyfinUserData {
   LastPlayedDate?: string | null;
 }
 
-/** An item as one person sees it, with their own play state. */
+/** An item with one user's play state. */
 export interface JellyfinUserItem extends JellyfinLibraryItem {
   ProductionYear?: number;
   UserData?: JellyfinUserData;
   ProviderIds?: JellyfinLibraryItemExtended['ProviderIds'];
   Path?: string;
-  /** How long it runs, in ticks of a ten-millionth of a second. */
+  /** In 100 ns ticks. */
   RunTimeTicks?: number;
 }
 
-/** A movie, series, episode or album, as the check of a match reads it. */
+/** A movie, series, episode or album as the match check reads it. */
 export type JellyfinMatchItem = JellyfinUserItem &
   Pick<JellyfinMusicItem, 'AlbumArtist' | 'AlbumArtists'> & {
     Type: string;
@@ -184,43 +181,43 @@ export interface JellyfinUserItemsResponse {
   TotalRecordCount: number;
 }
 
-/** One device's session, as /Sessions lists it. */
+/** One device session from /Sessions. */
 export interface JellyfinSession {
   UserId?: string;
   UserName?: string;
   DeviceName?: string;
   NowPlayingItem?: {
     Type?: string;
-    /** The film's, or the episode's. */
+    /** Movie or episode id. */
     Id: string;
     Name?: string;
     SeriesId?: string;
     SeriesName?: string;
-    /** An episode's season and number. */
+    /** Episode season and number. */
     ParentIndexNumber?: number;
     IndexNumber?: number;
   };
   PlayState?: { IsPaused?: boolean };
 }
 
-/** One account on the server, with whether it is switched off. */
+/** A server account. */
 export interface JellyfinAccount {
   Name: string;
   Id: string;
   Policy?: { IsAdministrator?: boolean; IsDisabled?: boolean };
 }
 
-/** A library, as the libraries a user may see are kept. */
+/** A library as user library access stores it. */
 export interface JellyfinAccessFolder {
   Name: string;
   Id: string;
-  /** Emby's: what its user policies list. */
+  /** Emby only; what its user policies list. */
   Guid?: string;
   Type: string;
   CollectionType?: string;
 }
 
-/** An account with the parts of its policy that say which libraries. */
+/** An account with the policy fields that grant library access. */
 export interface JellyfinPolicyAccount {
   Name: string;
   Id: string;
@@ -229,20 +226,17 @@ export interface JellyfinPolicyAccount {
     IsDisabled?: boolean;
     EnableAllFolders?: boolean;
     EnabledFolders?: string[];
-    /** The rest is sent back as it came. */
+    /** Other fields, sent back unchanged. */
     [key: string]: unknown;
   };
 }
 
 class JellyfinAPI extends ExternalAPI {
   private userId?: string;
-  /** Jellyfin and Emby differ in a few places; this says which it is. */
+  /** Jellyfin and Emby differ in places. */
   public readonly kind: JellyfinFamilyKind;
 
-  /**
-   * `kind` is the server being spoken to. Left out, it is the primary
-   * server's when that is Emby, else Jellyfin.
-   */
+  /** `kind` defaults to 'emby' for an Emby primary server, else 'jellyfin'. */
   constructor(
     jellyfinHost: string,
     authToken?: string | null,
@@ -282,7 +276,7 @@ class JellyfinAPI extends ExternalAPI {
     this.kind = serverKind;
   }
 
-  /** Jellyfin or Emby, as the log names the server spoken to. */
+  /** Server name for log text. */
   private get serverName(): string {
     return this.kind === 'emby' ? 'Emby' : 'Jellyfin';
   }
@@ -418,7 +412,6 @@ class JellyfinAPI extends ExternalAPI {
 
   public setUserId(userId: string): void {
     this.userId = userId;
-    return;
   }
 
   public async getSystemInfo(): Promise<any> {
@@ -476,8 +469,8 @@ class JellyfinAPI extends ExternalAPI {
   }
 
   /**
-   * Every device's session, with what each is playing. Needs the server's
-   * API key; never cached.
+   * Every device session with what it plays. Needs the server API key; never
+   * cached.
    */
   public async getSessions(): Promise<JellyfinSession[]> {
     const sessions = await this.get<JellyfinSession[]>(
@@ -508,15 +501,13 @@ class JellyfinAPI extends ExternalAPI {
     }
   }
 
-  /** The server's libraries, as folders with their kind. */
   private async getMediaFolders(): Promise<JellyfinMediaFolder[]> {
     try {
       const mediaFolderResponse = await this.get<any>(`/Library/MediaFolders`);
 
       return mediaFolderResponse.Items;
     } catch {
-      // fallback to user views to get libraries
-      // this only and maybe/depending on factors affects LDAP users
+      // Fall back to user views, which some LDAP users need.
       try {
         const mediaFolderResponse = await this.get<any>(
           `/Users/${this.userId ?? 'Me'}/Views`
@@ -545,10 +536,7 @@ class JellyfinAPI extends ExternalAPI {
     return this.mapLibraries(await this.getMediaFolders());
   }
 
-  /**
-   * The film and series libraries, and apart from them the music ones,
-   * from one look at the server.
-   */
+  /** Movie and series libraries, and music libraries apart, in one request. */
   public async getAllLibraries(): Promise<{
     libraries: JellyfinLibrary[];
     musicLibraries: JellyfinLibrary[];
@@ -733,10 +721,9 @@ class JellyfinAPI extends ExternalAPI {
   }
 
   /**
-   * Items as one person sees them, with their own play state. Both
-   * Jellyfin and Emby answer /Items with a UserId, so one call serves both;
-   * errors are left to the caller, which knows whether "no answer" may be
-   * read as "nothing".
+   * Items with one user's play state; Jellyfin and Emby both accept /Items
+   * with UserId. Errors go to the caller, which decides whether a failure
+   * means "nothing".
    */
   public async getUserItems(
     userId: string,
@@ -752,10 +739,7 @@ class JellyfinAPI extends ExternalAPI {
     };
   }
 
-  /**
-   * One page of a library's movies or series, with their paths and the ids
-   * the server matched them to.
-   */
+  /** One page of a library's movies or series, with paths and provider ids. */
   public async getLibraryPage(
     libraryId: string,
     type: 'Movie' | 'Series',
@@ -780,9 +764,8 @@ class JellyfinAPI extends ExternalAPI {
   }
 
   /**
-   * Items to compare with Sonarr, Radarr or Lidarr: the newest of a
-   * library's (by when the server added them), or those with these ids,
-   * with their paths and the ids the server matched them to.
+   * Items to compare with Sonarr, Radarr or Lidarr: a library's newest by
+   * DateCreated, or those with the given ids, with paths and provider ids.
    */
   public async getMatchItems(
     query:
@@ -816,8 +799,8 @@ class JellyfinAPI extends ExternalAPI {
   }
 
   /**
-   * One page of a music library's albums and artists, with their folders
-   * and MusicBrainz ids. Newest first when asked, for what was just added.
+   * One page of a music library's albums and artists, with folders and
+   * MusicBrainz ids. `newestFirst` finds recent additions.
    */
   public async getMusicItems(
     libraryId: string,
@@ -848,7 +831,7 @@ class JellyfinAPI extends ExternalAPI {
     };
   }
 
-  /** Every account on the server, the switched-off ones included. */
+  /** Every server account, disabled ones included. */
   public async getAccounts(): Promise<JellyfinAccount[]> {
     const accounts = await this.get<JellyfinAccount[]>('/Users', {
       timeout: WATCH_TIMEOUT_MS,
@@ -872,8 +855,8 @@ class JellyfinAPI extends ExternalAPI {
   }
 
   /**
-   * Every library on the server, of any kind, as a user's access lists
-   * them. Emby lists them by Guid, Jellyfin by Id.
+   * Every library of any kind. User access lists them by Guid on Emby, by Id
+   * on Jellyfin.
    */
   public async getAccessFolders(): Promise<JellyfinAccessFolder[]> {
     const response = await this.get<{ Items?: JellyfinAccessFolder[] }>(
@@ -886,7 +869,7 @@ class JellyfinAPI extends ExternalAPI {
     );
   }
 
-  /** Every account with its policy, read afresh. */
+  /** Every account with its policy, uncached. */
   public async getPolicyAccounts(): Promise<JellyfinPolicyAccount[]> {
     const accounts = await this.get<JellyfinPolicyAccount[]>(
       '/Users',
@@ -896,7 +879,7 @@ class JellyfinAPI extends ExternalAPI {
     return Array.isArray(accounts) ? accounts : [];
   }
 
-  /** One account with its policy, read afresh. */
+  /** One account with its policy, uncached. */
   public async getPolicyAccount(id: string): Promise<JellyfinPolicyAccount> {
     return this.get<JellyfinPolicyAccount>(
       `/Users/${encodeURIComponent(id)}`,
@@ -905,7 +888,7 @@ class JellyfinAPI extends ExternalAPI {
     );
   }
 
-  /** Replaces an account's policy: the whole of it is sent. */
+  /** Replaces an account's whole policy. */
   public async setPolicy(
     id: string,
     policy: JellyfinPolicyAccount['Policy']

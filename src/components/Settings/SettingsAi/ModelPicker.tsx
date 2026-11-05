@@ -16,8 +16,8 @@ export interface ModelInfo {
 const OTHER = '__other__';
 
 /**
- * A model from the list the key can use, or any other by name. Before the
- * list has loaded, or when there is none, a name can still be typed.
+ * A model from the key's list, or any other by name. A name can be typed
+ * before the list loads or when there is none.
  */
 const ModelPicker = ({
   id,

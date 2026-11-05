@@ -3,9 +3,9 @@ import { readNumbers } from '@server/lib/backfill/naming';
 import type { SonarrQuality } from '@server/lib/backfill/sonarr';
 
 /*
- * The limits the admin agent works within, kept apart from the model: it
- * can ask for anything, and these decide what actually happens. Each says
- * why in words the model can act on, so it can try something else.
+ * The admin agent's limits, enforced outside the model: it can ask for
+ * anything, and these decide what happens. Each refusal says why in terms
+ * the model can act on.
  */
 
 /** Below this a video is a sample or an extra, not an episode or a film. */
@@ -14,16 +14,15 @@ export const MIN_VIDEO_BYTES = 20 * 1024 * 1024;
 /** A sample's name: "x-sample.mkv", "sample-x.mkv", "x.sample.mkv". */
 const SAMPLE = /(^|[\s._\-[(])sample([\s._\-\])]|$)/i;
 
-/** What a file's quality is when Sonarr or Radarr cannot read one. */
+/** The quality used when Sonarr or Radarr cannot read one. */
 export const UNKNOWN_QUALITY: SonarrQuality = {
   quality: { id: 0, name: 'Unknown' },
   revision: { version: 1, real: 0 },
 };
 
 /**
- * Whether a release or file is in a language worth having: English, or the
- * title's own language. A name that says nothing about language passes.
- * Returns why not, or null.
+ * Why a release or file is in neither English nor the title's original
+ * language, or null. No language named passes.
  */
 export const languageProblem = (
   languages: { name?: string }[] | undefined,
@@ -79,7 +78,7 @@ export const rangeLabel = (season: number, episodes: number[]) =>
     ? `${episodeLabel(season, episodes[0])}-E${pad(episodes[episodes.length - 1])}`
     : episodeLabel(season, episodes[0] ?? 0);
 
-/** The episodes a mapped file is given, in order. */
+/** A mapped file's episodes, deduplicated and sorted. */
 export const mappedEpisodes = (entry: MappedFile): number[] =>
   [
     ...new Set(
@@ -93,11 +92,10 @@ export const mappedEpisodes = (entry: MappedFile): number[] =>
 
 /**
  * Checks a mapping of a release's files to episodes: each file is in the
- * release and is a video, each episode is one the series has, monitored,
- * aired, with no file yet and not already downloading, and nothing is used
- * twice. A file holding several episodes is given all of them, in a row.
- * Returns the episodes each file fills (the first as `episode`), or every
- * reason it cannot.
+ * release and is a video; each episode exists, is monitored and aired, has
+ * no file and isn't downloading; nothing is used twice. A multi-episode
+ * file gets consecutive episodes. Returns each file's episodes (the first
+ * as `episode`) and every problem.
  */
 export const checkMapping = (
   mapped: MappedFile[],
@@ -105,15 +103,15 @@ export const checkMapping = (
   episodes: EpisodeOnDisk[],
   options: {
     queued: Set<number>;
-    /** Episodes a Backfill download under way is fetching, by its job. */
+    /** Episodes a running Backfill download is fetching, to its job. */
     backfilling?: Map<number, number>;
-    /** Episodes this release was downloaded for before but not imported. */
+    /** Episodes this release was fetched for before but didn't import. */
     importFailed?: Map<number, number>;
     isVideo: (path: string) => boolean;
     now?: number;
     /**
-     * Episodes with a file may be mapped too, their files to be replaced
-     * once the new ones import: only with an admin's approval.
+     * Allow episodes that have a file; it is replaced once the new one
+     * imports. Only with an admin's approval.
      */
     replace?: boolean;
     /** An admin is in the conversation, so replacing can be proposed. */
@@ -151,7 +149,7 @@ export const checkMapping = (
       problems.push(`File #${entry.index} is not a video of any length.`);
       continue;
     }
-    // A sample can be long enough to pass for an episode (DHD's are 40 MB).
+    // A sample can be big enough to pass for an episode (DHD's are 40 MB).
     // Only the file's own name is read: a show called Caravan Lot Lads,
     // or an episode called The Menu, is not an extra.
     if (SAMPLE.test(file.path.split(/[\\/]/).pop() ?? '')) {
@@ -241,11 +239,10 @@ const REPLACE_WORDS =
 const DELETE_WORDS = /\b(delet\w*|remov\w*|get rid of|trash|wipe)\b/i;
 
 /**
- * Whether files may be deleted outright: only when deleting is what the
- * admin asked for. Asked to replace or fix something, without a word about
- * deleting, the old files go only through a replacement (replace_season,
- * or grab with replace), never by deleting them first and leaving nothing
- * to play until something is found. Returns why not, or null.
+ * Files may be deleted outright only when the admin asked for deletion. A
+ * request to replace or fix, with no word about deleting, goes through a
+ * replacement (replace_season, or grab with replace), never deleting first
+ * and leaving nothing to play. Returns why not, or null.
  */
 export const deleteProblem = (said: string[]): string | null =>
   said.some((text) => DELETE_WORDS.test(text)) ||
@@ -253,7 +250,7 @@ export const deleteProblem = (said: string[]): string | null =>
     ? null
     : 'The admin asked for a replacement, not for files to be deleted. Use replace_season for a whole season, or grab with replace: true for some episodes: the new release is downloaded first, and the old files go only after. Propose deleteFiles only when deleting is what was asked.';
 
-/** Megabytes or gigabytes, as people read sizes. */
+/** A size in MB or GB, for reading. */
 export const sizeOf = (bytes: number | undefined): string => {
   if (!bytes) return '?';
   return bytes >= 1024 ** 3
@@ -261,7 +258,7 @@ export const sizeOf = (bytes: number | undefined): string => {
     : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
 };
 
-/** A tool's answer, cut to what the model can usefully read. */
+/** Longest tool result the model is given. */
 export const MAX_RESULT_CHARS = 8000;
 
 export const clip = (text: string, max = MAX_RESULT_CHARS): string =>
@@ -347,9 +344,7 @@ export const numberedAs = (
     absoluteEpisodeNumber?: number;
   }
 ) =>
-  (numbers.season !== undefined &&
-    numbers.episode !== undefined &&
-    numbers.season === episode.seasonNumber &&
+  (numbers.season === episode.seasonNumber &&
     numbers.episode === episode.episodeNumber) ||
   (numbers.absolute !== undefined &&
     numbers.absolute === episode.absoluteEpisodeNumber);

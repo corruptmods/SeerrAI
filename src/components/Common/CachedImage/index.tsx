@@ -13,10 +13,9 @@ const PLEX_AVATAR =
   /^https:\/\/plex\.tv\/users\/([0-9a-f]{8,64})\/avatar(?:\?c=([0-9]+))?/;
 
 /**
- * A Plex account's picture comes through Seerr AI, which keeps it, rather
- * than from plex.tv each time, which doesn't always answer; Plex's version
- * number stays on, so a new picture is fetched when it changes. Jellyfin and
- * Emby pictures already come through it.
+ * A Plex avatar served through Seerr AI's cache, as plex.tv doesn't always
+ * answer. The version number is kept, so a changed picture is refetched.
+ * Jellyfin and Emby avatars already go through it.
  */
 export const avatarSrc = (src: string): string => {
   const plex = PLEX_AVATAR.exec(src);
@@ -28,17 +27,13 @@ export const avatarSrc = (src: string): string => {
 export type CachedImageProps = ImageProps & {
   src: string;
   /**
-   * Where the picture comes from. 'music' is an album cover (Cover Art
-   * Archive), a picture from fanart.tv or TheAudioDB, or the server's
-   * address for a picture of an artist.
+   * 'music': a Cover Art Archive cover, a fanart.tv or TheAudioDB picture,
+   * or the server's artist-picture address.
    */
   type: 'tmdb' | 'avatar' | 'tvdb' | 'music';
 };
 
-/**
- * The CachedImage component should be used wherever
- * we want to offer the option to locally cache images.
- **/
+/** An image served through the local image cache when caching is on. */
 const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
   const { currentSettings } = useSettings();
   const nearness = useContext(NearScreen);
@@ -63,11 +58,10 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
     return null;
   }
 
-  // Inside a card or row near the screen, the picture loads before it is
-  // scrolled to (see nearScreen).
+  // Loads early inside a card or row near the screen (see nearScreen).
   const loading = pictureLoading(nearness, { loading: props.loading });
 
-  // Only what the proxy can convert.
+  // The proxy can't convert it: no <picture> sources.
   if (!convertible(imageUrl)) {
     return (
       <Image
@@ -80,9 +74,9 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
     );
   }
 
-  // Next would preload the <img>'s own address for a priority image, which
-  // a browser using a <source> never shows: it would be downloaded twice.
-  // Fetching it eagerly and first does the same job without that.
+  // Next would preload a priority image's <img> address, which a browser
+  // using a <source> never shows, so it would download twice. Eager, high
+  // priority loading does the same job.
   const { priority, preload, sizes, ...imageProps } = props;
   const urgent = !!(priority || preload);
 

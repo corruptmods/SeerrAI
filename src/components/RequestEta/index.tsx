@@ -35,12 +35,11 @@ const messages = defineMessages('components.RequestEta', {
 });
 
 /**
- * A date near enough reads as a weekday; further out, as a date.
+ * A weekday when near, else a date.
  *
- * Film release dates are calendar dates, stored as midnight UTC: shown in
- * local time west of UTC they would fall a day early (Oct 30 as Oct 29), so
- * they are shown in UTC. An episode's air time is a real moment, so it is
- * shown in local time.
+ * Film release dates are midnight-UTC calendar dates, shown in UTC so they
+ * don't fall a day early west of UTC. Episode air times are instants, shown
+ * in local time.
  */
 const when = (intl: IntlShape, iso: string, calendarDate: boolean) => {
   const at = new Date(iso);
@@ -63,9 +62,8 @@ const when = (intl: IntlShape, iso: string, calendarDate: boolean) => {
 };
 
 /**
- * What to tell someone about when their request arrives, or null when there
- * is nothing useful to add: waiting for approval and available already show
- * in the status, and with no estimate it says nothing rather than guess.
+ * The arrival estimate to show, or null when the status already says it
+ * (pending, available) or there is no estimate.
  */
 export const describeEta = (
   intl: IntlShape,
@@ -77,7 +75,7 @@ export const describeEta = (
         date: when(intl, eta.date, eta.kind !== 'airs'),
       });
     case 'searching': {
-      // With no release date known it cannot be said to be out.
+      // Without a known release date it can't be called out.
       if (eta.released === false) {
         return intl.formatMessage(messages.searchingUnknown);
       }
@@ -118,7 +116,7 @@ export const describeEta = (
 
 export const expectedLabel = messages.expected;
 
-/** The estimate as a line of text, or nothing. */
+/** The estimate as a text line, or nothing. */
 const RequestEta = ({
   eta,
   className,

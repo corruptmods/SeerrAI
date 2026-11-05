@@ -11,21 +11,19 @@ export interface BlocklistRemovalResult {
   removedFrom: string[];
   /** Servers it could not be removed from, and why. */
   failed: { service: string; message: string }[];
-  /** Requests that were still pending or approved, now declined. */
+  /** Pending or approved requests now declined. */
   declinedRequests: number;
 }
 
 /**
- * Finishes blocklisting a title that was already requested or downloaded.
+ * Finishes blocklisting a title already requested or downloaded.
  *
- * Removes it from every Radarr or Sonarr that holds it, deleting its files and
- * adding an import exclusion so the *arr's own lists cannot bring it back.
- * Any request still pending or approved is declined, since it can no longer
- * be fulfilled. The title stays BLOCKLISTED throughout.
+ * Removes it from every Radarr or Sonarr holding it, deleting its files and
+ * adding an import exclusion so the *arr's own lists can't re-add it, and
+ * declines pending or approved requests. The title stays BLOCKLISTED.
  *
- * A removal that fails does not undo the blocklist: the title is still
- * blocked from being requested, and the failure is reported so it can be
- * cleaned up by hand.
+ * A failed removal doesn't undo the blocklist; it is reported for manual
+ * cleanup.
  */
 export const removeBlocklistedFromLibrary = async (
   tmdbId: number,
@@ -89,8 +87,7 @@ export const removeBlocklistedFromLibrary = async (
     await recordMediaDeletion(tmdbId, mediaType);
   }
 
-  // Blocklisting the title has declined these already; this is in case one
-  // was approved again in between.
+  // Blocklisting already declined these; this catches any approved since.
   result.declinedRequests = await Blocklist.declineOpenRequests(media.id);
 
   return result;

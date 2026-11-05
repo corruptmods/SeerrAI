@@ -7,10 +7,9 @@ import logger from '@server/logger';
 import { isUniqueViolation } from '@server/utils/isUniqueViolation';
 
 /**
- * Whether a notification has already been sent, without claiming it.
- *
- * Lets a caller skip expensive work — a TMDB lookup per season, say — for
- * something it has already told the user about.
+ * Whether a notification was already sent, without claiming it. Lets callers
+ * skip expensive work (e.g. a TMDB lookup per season) for something already
+ * announced.
  */
 export const hasDelivery = async (
   requestId: number,
@@ -26,15 +25,15 @@ export const hasDelivery = async (
   })) > 0;
 
 /**
- * Claims a notification for a request so it is only ever sent once.
+ * Claims a notification for a request so it is sent only once.
  *
- * The unique constraint on (requestId, type) is the arbiter: whichever caller
- * inserts first wins, and every later attempt fails with a unique violation.
- * This is race-safe across the subscriber and the reconciler without a lock.
+ * The unique constraint on (requestId, type) arbitrates: the first insert
+ * wins and later ones fail with a unique violation, race-safe across the
+ * subscriber and the reconciler without a lock.
  *
- * Returns true when this call won the claim and the caller should send. Returns
- * false when the notification was already claimed, or when the claim could not
- * be recorded — never sending is preferred over sending twice.
+ * Returns true when this call won and the caller should send; false when
+ * already claimed or the claim couldn't be recorded (never sending beats
+ * sending twice).
  */
 export const claimDelivery = async (
   requestId: number,
@@ -69,10 +68,7 @@ export const claimDelivery = async (
   }
 };
 
-/**
- * Releases a claim so the notification can be attempted again. Used when the
- * send itself fails after the claim was taken.
- */
+/** Releases a claim so a failed send can be retried. */
 export const releaseDelivery = async (
   requestId: number,
   type: Notification,
@@ -98,13 +94,12 @@ export const releaseDelivery = async (
 };
 
 /**
- * Tells each person watching a request that it is ready to watch. The
- * requester, the channels and admins are told separately by the caller; this
- * is only the watchers' own copies. Each watcher has a claim of their own, so
- * one failed send cannot stop the others, and a failed one is released to be
- * tried again later.
+ * Tells each watcher of a request that it is ready to watch. The caller
+ * notifies the requester, channels and admins separately; these are only the
+ * watchers' copies. Each watcher has their own claim, so one failed send
+ * can't block the others, and a failed one is released for a later retry.
  *
- * `send` sends one watcher's copy and says whether it went out.
+ * `send` sends one watcher's copy and returns whether it went out.
  */
 export const notifyRequestWatchers = async (
   requestId: number,

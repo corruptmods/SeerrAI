@@ -70,7 +70,7 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
   configurable: true,
 });
 
-/** Genres and language for particular movies; others are English, no genre. */
+/** Genres and language for specific movies; others are English, no genre. */
 const movieDetails = new Map<
   number,
   {
@@ -91,7 +91,7 @@ function fakeTmdbMovie(tmdbId: number): TmdbMovieDetails {
   } as unknown as TmdbMovieDetails;
 }
 
-/** Genres and language for particular shows; others are English, no genre. */
+/** Genres and language for specific shows; others are English, no genre. */
 const showDetails = new Map<
   number,
   { genres: { id: number; name: string }[]; original_language: string }
@@ -197,7 +197,7 @@ beforeEach(() => {
 
 setupTestDb();
 
-/** A seeded user's id, by email. */
+/** A seeded user's id by email. */
 const userIdOf = async (email: string) =>
   (await getRepository(User).findOneByOrFail({ email })).id;
 
@@ -275,7 +275,7 @@ describe('DELETE /request/:requestId', () => {
     const mediaRepo = getRepository(Media);
     const requestRepo = getRepository(MediaRequest);
 
-    // Create a request owned by admin, then try to delete as friend
+    // A request owned by admin; friend tries to delete it.
     const owner = await userRepo.findOneOrFail({
       where: { email: 'admin@seerr.dev' },
     });
@@ -640,7 +640,7 @@ describe('PUT /request/:requestId (season availability)', () => {
       saved.seasons.map((s) => s.seasonNumber).sort((a, b) => a - b),
       [1, 2]
     );
-    // Without advanced options the server stays whatever it was.
+    // Without advanced options the server stays unchanged.
     assert.strictEqual(saved.serverId, mediaRequest.serverId ?? null);
   });
 
@@ -770,7 +770,7 @@ describe('PUT /request/:requestId (quota)', () => {
     const owner = await seedUser('admin@seerr.dev');
     const target = await seedUser('friend@seerr.dev', { movieQuotaLimit: 1 });
 
-    // Uses up the target's single movie request
+    // Uses up the target's single movie request.
     await seedRequest();
 
     const media = await mediaRepo.save(
@@ -1420,8 +1420,8 @@ describe('POST /request (movie), override rules', () => {
 });
 
 /**
- * Lets the seeded friend choose the server, as the advanced request options
- * do, and adds a rule of theirs for one server.
+ * Let the seeded friend choose the server (as advanced request options do) and
+ * add a rule of theirs for one server.
  */
 async function friendWithRuleFor(rule: Partial<OverrideRule>): Promise<void> {
   const userRepo = getRepository(User);
@@ -1797,7 +1797,7 @@ describe('POST /request, override rules and requester choices', () => {
   });
 
   it('keeps what a request manager sets and fills the rest from the rule', async (t) => {
-    // Manage Requests auto-approves; keep it from calling Radarr
+    // Manage Requests auto-approves; keep it from calling Radarr.
     t.mock.method(
       MediaRequestSubscriber.prototype,
       'sendToRadarr',
@@ -2007,8 +2007,8 @@ describe("GET /request/:requestId, the requester's own settings", () => {
 
   it("never carries anyone's email, Plex id or Plex sign-in state", async () => {
     const seeded = await seedRequest();
-    // Signed in first: with the owner's Plex id changed, the friend's would
-    // no longer be the owner's, and plex.tv is not there to vouch for them.
+    // Sign in first: once the owner's Plex id changes, the friend's no longer
+    // matches, and plex.tv isn't available to vouch.
     const agent = await loginAs('friend@seerr.dev', 'test1234');
     const userRepo = getRepository(User);
     const admin = await userRepo.findOneByOrFail({
@@ -2068,7 +2068,7 @@ describe('POST /request/missing', () => {
         [91002, 'requested', undefined],
         [91001, 'here', undefined],
         [pending.media.tmdbId, 'asked', undefined],
-        // A series TMDB lists no seasons for has nothing to request.
+        // A series with no TMDB seasons has nothing to request.
         [91003, 'failed', 'There are no seasons to request.'],
       ]
     );
@@ -2123,7 +2123,7 @@ describe('POST /request/missing', () => {
 
 describe('series type and anime', () => {
   const ANIMATION = { id: 16, name: 'Animation' };
-  // Japanese animation without TMDB's anime keyword, like Yume no Tane.
+  // Japanese animation without TMDB's anime keyword.
   const JAPANESE_ANIMATION = 88100;
   const KOREAN_ANIMATION = 88101;
   showDetails.set(JAPANESE_ANIMATION, {
@@ -2225,7 +2225,7 @@ describe('series type and anime', () => {
     assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.seriesType, 'standard');
 
-    // Their own edit can change it, and null hands it back.
+    // Their own edit can change it, and null reverts it.
     let edited = await agent
       .put(`/request/${res.body.id}`)
       .send({ seasons: [1], seriesType: 'anime' });
@@ -2235,7 +2235,7 @@ describe('series type and anime', () => {
       .put(`/request/${res.body.id}`)
       .send({ seasons: [1], seriesType: null });
     assert.strictEqual(edited.body.seriesType, null);
-    // Left out, it stays as it was.
+    // Omitted, it stays unchanged.
     edited = await agent
       .put(`/request/${res.body.id}`)
       .send({ seasons: [1], seriesType: 'anime' });
@@ -2290,7 +2290,7 @@ describe('series type and anime', () => {
       }),
     ]);
     const agent = await friendWith(Permission.REQUEST);
-    // Set as anime: left to the anime settings, not the ordinary rule.
+    // Marked anime: anime settings apply, not the ordinary rule.
     let res = await agent.post('/request').send({
       mediaType: MediaType.TV,
       mediaId: KOREAN_ANIMATION,
@@ -2298,7 +2298,7 @@ describe('series type and anime', () => {
     });
     assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.rootFolder, null);
-    // Set as not anime: the ordinary rule applies.
+    // Marked not anime: the ordinary rule applies.
     res = await agent.post('/request').send({
       mediaType: MediaType.TV,
       mediaId: JAPANESE_ANIMATION,
@@ -2383,7 +2383,7 @@ describe('anime movies', () => {
     assert.strictEqual(res.body.rootFolder, null);
     await getRepository(MediaRequest).delete({ id: res.body.id });
 
-    // A server with no anime settings goes by its rules, as it always has.
+    // A server without anime settings follows its rules.
     configureRadarr([{ id: 0, isDefault: true, is4k: false }]);
     agent = await friendWith(Permission.REQUEST);
     res = await agent.post('/request').send({
@@ -2408,7 +2408,7 @@ describe('anime movies', () => {
     });
     assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.seriesType, 'anime');
-    // A movie has no daily type.
+    // Movies have no daily type.
     res = await agent.post('/request').send({
       mediaType: MediaType.MOVIE,
       mediaId: JAPANESE_ANIMATION,
@@ -2508,7 +2508,7 @@ describe('anime movies', () => {
 });
 
 describe('requests for a blocklisted title', () => {
-  // A request left over from before its title was blocklisted.
+  // A request created before its title was blocklisted.
   async function seedBlocklisted(status: MediaRequestStatus) {
     const seeded = await seedRequest(status);
     await getRepository(Media).update(seeded.media.id, {
@@ -2528,7 +2528,7 @@ describe('requests for a blocklisted title', () => {
       async () => undefined
     );
     const pending = await seedBlocklisted(MediaRequestStatus.PENDING);
-    // Creating the request looked at it once, and found it pending.
+    // Creating the request checked it once and found it pending.
     sendToRadarr.mock.resetCalls();
     const admin = await loginAs('admin@seerr.dev', 'test1234');
 

@@ -23,11 +23,8 @@ interface RequestListPickerProps {
 }
 
 /**
- * Lets someone drop a title onto their watch lists as part of requesting it,
- * rather than requesting and then going back to add it.
- *
- * Renders nothing when the user has no lists, so the request modal is
- * unchanged for anyone not using the feature.
+ * Adds the title to the user's watch lists with the request. Renders nothing
+ * without lists.
  */
 const RequestListPicker = ({
   tmdbId,
@@ -37,11 +34,10 @@ const RequestListPicker = ({
 }: RequestListPickerProps) => {
   const intl = useIntl();
   const { data: allLists } = useSWR<ListSummary[]>('/api/v1/list');
-  // Films and series go on watch lists, not playlists.
+  // Music lists are playlists, not watch lists.
   const lists = allLists?.filter((list) => list.kind !== 'music');
 
-  // Lists the title is already on, so those come up ticked rather than
-  // looking as though it is on none of them.
+  // Lists already holding the title start ticked.
   const { data: membership } = useSWR<{ listId: number }[]>(
     `/api/v1/list/contains?tmdbId=${tmdbId}&mediaType=${mediaType}`
   );
@@ -50,7 +46,7 @@ const RequestListPicker = ({
   const applied = useRef(false);
 
   useEffect(() => {
-    // Apply once, so a tick the user removes does not spring back.
+    // Apply once so a removed tick does not spring back.
     if (applied.current || !membership) {
       return;
     }
@@ -68,8 +64,7 @@ const RequestListPicker = ({
   }
 
   const toggle = (id: number) => {
-    // Unticking a list it is already on would silently do nothing — removal
-    // belongs on the list itself, not in the request dialog.
+    // Removal belongs on the list itself, so existing ticks are locked.
     if (alreadyOn.includes(id)) {
       return;
     }

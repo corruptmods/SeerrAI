@@ -14,10 +14,9 @@ const ServiceWorkerSetup = () => {
   const { currentSettings } = useSettings();
 
   useEffect(() => {
-    // Cached assets are evicted at the browser's discretion unless storage is
-    // marked persistent. Installed web apps are hit hardest by this: the app
-    // goes cold and re-downloads the whole bundle. Safari only grants the
-    // request once notification permission exists, so ask after that is known.
+    // Without persistent storage the browser may evict cached assets and an
+    // installed app re-downloads the bundle. Safari grants it only after
+    // notification permission, so ask once that is known.
     const requestPersistentStorage = async () => {
       if (!navigator.storage?.persist || !navigator.storage?.persisted) {
         return;
@@ -30,16 +29,15 @@ const ServiceWorkerSetup = () => {
 
         await navigator.storage.persist();
       } catch {
-        // Persistence is an optimisation; carry on without it.
+        // Optional optimisation.
       }
     };
 
     if ('serviceWorker' in navigator && user?.id) {
       requestPersistentStorage();
 
-      // Installed web apps on iOS do not reliably run the update check on
-      // launch, so ask for one explicitly now and every time the app returns
-      // to the foreground.
+      // iOS installed apps don't reliably check for updates on launch, so
+      // check now and on every return to the foreground.
       let registrationRef: ServiceWorkerRegistration | undefined;
       const onVisible = () => {
         if (document.visibilityState === 'visible') {
@@ -56,10 +54,8 @@ const ServiceWorkerSetup = () => {
           registrationRef = registration;
           registration.update().catch(() => undefined);
 
-          // Ask the worker to warm its chunk cache, but only once the page has
-          // settled. Doing it on activation meant a megabyte of downloads
-          // competing with the data the page needs to render, which on a cold
-          // start left the app spinning.
+          // Warm the chunk cache only once the page has settled, so it
+          // doesn't compete with the page's own data on a cold start.
           const warmChunkCache = () => {
             const target =
               navigator.serviceWorker.controller ?? registration.active;
@@ -95,7 +91,7 @@ const ServiceWorkerSetup = () => {
 
           const pushNotificationsEnabled = getPushOptIn(user.id) === true;
 
-          // Reset the notifications flag if permissions were revoked
+          // Reset the opt-in if permission was revoked.
           if (
             Notification.permission !== 'granted' &&
             pushNotificationsEnabled
@@ -108,7 +104,7 @@ const ServiceWorkerSetup = () => {
             return;
           }
 
-          // Bypass resubscribing if we have manually disabled push notifications
+          // Don't resubscribe if push was turned off.
           if (!pushNotificationsEnabled) {
             return;
           }

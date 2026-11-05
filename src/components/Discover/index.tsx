@@ -55,10 +55,9 @@ import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
-// Only someone customizing the page needs these, and they bring drag-and-drop
-// and select libraries with them: load them when editing starts, not with
-// the page everyone opens first. The sidebar's editor comes with them, so a
-// failed download is said once, here.
+// Heavy editor modules (drag-and-drop, selects) load only when editing
+// starts. The sidebar editor loads with them, so a failed load is reported
+// once, here.
 const loadEditor = () =>
   Promise.all([
     import('@app/components/Discover/CreateSlider'),
@@ -95,9 +94,8 @@ const messages = defineMessages('components.Discover', {
 });
 
 /**
- * After a slider is created or deleted, the fresh list from the server
- * merged into the one being edited, so changes not saved yet (order, which
- * rows are on, the Networks list) are kept.
+ * Merges the server's list into the edited one, keeping unsaved order,
+ * toggles and Networks list.
  */
 const mergeRefreshedSliders = (
   current: Partial<DiscoverSlider>[],
@@ -105,12 +103,12 @@ const mergeRefreshedSliders = (
 ): Partial<DiscoverSlider>[] => {
   const refreshedById = new Map(refreshed.map((s) => [s.id, s]));
   const currentIds = new Set(current.map((s) => s.id));
-  // A new slider is created at order -1, so the server lists it first.
+  // New sliders are created at order -1, so they go first.
   const added = refreshed.filter((s) => !currentIds.has(s.id));
   const kept = current.flatMap((slider) => {
     const fresh = refreshedById.get(slider.id as number);
     if (!fresh) return [];
-    // A built-in slider is only changed here, so the local copy is newer.
+    // Built-in sliders only change here, so the local copy is newer.
     return [
       fresh.isBuiltIn
         ? slider
@@ -125,11 +123,10 @@ const Discover = () => {
   const featureIsOn = useFeatureCheck();
   const { user, hasPermission, revalidate: revalidateUser } = useUser();
   const isAdmin = hasPermission(Permission.ADMIN);
-  // Rows this person hid for themselves, saved, and as being edited.
+  // The user's own hidden rows: saved and draft.
   const savedHidden = user?.settings?.hiddenSliders ?? [];
   const [myHidden, setMyHidden] = useState<number[]>(savedHidden);
-  // Their own list for the Networks row (null: the usual one), saved and as
-  // being edited.
+  // The user's own Networks list (null: the default): saved and draft.
   const savedNetworks = user?.settings?.discoverNetworks ?? null;
   const [myNetworks, setMyNetworks] = useState<string | null>(savedNetworks);
   const { addToast } = useToasts();
@@ -140,8 +137,7 @@ const Discover = () => {
   } = useSWR<DiscoverSlider[]>('/api/v1/settings/discover');
   const [sliders, setSliders] = useState<Partial<DiscoverSlider>[]>([]);
   const [isEditing, setIsEditing] = useState(false);
-  // Their sidebar and phone menu, arranged while customizing: shown in the
-  // menus themselves, saved (or dropped) with the rest of the page.
+  // Menu layout is edited in the menus themselves and saved with the page.
   const nav = useNavLayout();
   const { setDraft: setNavDraft } = nav;
   const editor = useLazyModule(loadEditor, isEditing, () => {
@@ -154,8 +150,7 @@ const Discover = () => {
   const CreateSlider = editor?.CreateSlider;
   const DiscoverSliderEdit = editor?.DiscoverSliderEdit;
 
-  // We need to sync the state here so that we can modify the changes locally without commiting
-  // anything to the server until the user decides to save the changes
+  // Local copy so edits stay unsaved until the user saves.
   useEffect(() => {
     if (discoverData && !isEditing) {
       setSliders(discoverData);
@@ -172,13 +167,11 @@ const Discover = () => {
       setMyNetworks(savedNetworks);
     }
   }, [savedNetworks, isEditing]);
-  // The menus show their editors from the moment customizing starts, until
-  // it ends or this page is left.
+  // Menu editors show while customizing, until it ends or the page unmounts.
   const savedNav = nav.saved;
   useEffect(() => {
     setNavDraft(isEditing ? editableNavLayout(savedNav) : undefined);
-    // Only as customizing starts or ends: what was saved meanwhile is the
-    // draft itself.
+    // Only on start/end: anything saved meanwhile is the draft itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, setNavDraft]);
   useEffect(() => () => setNavDraft(undefined), [setNavDraft]);
@@ -214,8 +207,8 @@ const Discover = () => {
       }
       if (navChanged() && nav.draft && user) {
         await axios.post(`/api/v1/user/${user.id}/settings/sidebar`, {
-          // The usual order is kept as none, so items added later take
-          // their usual place.
+          // Store the default order as [] so later-added items take their
+          // default place.
           order: isDefaultNavOrder(nav.draft.order) ? [] : nav.draft.order,
           hidden: nav.draft.hidden,
         });
@@ -236,7 +229,7 @@ const Discover = () => {
       setIsEditing(false);
       mutate();
     } catch (e) {
-      // A refused Networks list comes back as a 400 with its reason.
+      // A rejected Networks list returns 400 with a reason code.
       const code =
         axios.isAxiosError(e) && e.response?.status === 400
           ? e.response.data?.message
@@ -387,8 +380,7 @@ const Discover = () => {
         </>
       )}
       {(isEditing
-        ? // Someone who is not an admin only chooses among the rows an
-          // admin left on.
+        ? // Non-admins only choose among rows an admin enabled.
           isAdmin
           ? sliders
           : sliders.filter((slider) => slider.enabled)
@@ -396,8 +388,7 @@ const Discover = () => {
       )?.map((slider, index) => {
         let sliderComponent: React.ReactNode;
 
-        // Music's rows exist once Lidarr is set up, for people with music
-        // on; for anyone else they are not there at all, even to arrange.
+        // Music rows are absent, even when editing, without the music feature.
         const musicRow = musicRowFor(slider.type);
         if (musicRow && !featureIsOn('music')) {
           return null;
@@ -415,8 +406,7 @@ const Discover = () => {
 
         switch (slider.type) {
           case DiscoverSliderType.DELETING_SOON:
-            // Shown only while Maintainerr has something due, and only with
-            // Deleting Soon on (Settings → Features, or one's own).
+            // Renders only while Maintainerr has items due and it is on.
             sliderComponent = <DeletingSoonSlider />;
             break;
           case DiscoverSliderType.RECENTLY_ADDED:
@@ -426,7 +416,6 @@ const Discover = () => {
             sliderComponent = <RecentRequestsSlider />;
             break;
           case DiscoverSliderType.MUSIC_RECENT_REQUESTS:
-            // Music's, for people with music on; not there for anyone else.
             if (!featureIsOn('music')) {
               return null;
             }
@@ -436,9 +425,8 @@ const Discover = () => {
             sliderComponent = <PlexWatchlistSlider />;
             break;
           case DiscoverSliderType.SUGGESTED:
-            // Built from each person's own watching, so it is theirs alone;
-            // hidden for anyone with nothing to go on, or who turned it off.
-            // Still listed while rearranging rows, so it can be moved.
+            // Per-user; hidden when off or empty, but kept while editing so
+            // it can be moved.
             if (!isEditing && !featureIsOn('suggestedForYou')) {
               break;
             }
@@ -527,7 +515,7 @@ const Discover = () => {
           case DiscoverSliderType.NETWORKS:
             sliderComponent = (
               <NetworkSlider
-                // Each person's own list, or the usual one.
+                // The user's own list, or the default.
                 data={isEditing ? myNetworks : savedNetworks}
                 isEditing={isEditing}
                 onChange={setMyNetworks}
@@ -670,8 +658,7 @@ const Discover = () => {
               }}
               onDelete={refreshSliders}
               onEnable={() => {
-                // A copy: the slider objects are shared with SWR's cache, and
-                // changing one in place would change the saved copy too.
+                // Copy: the objects are shared with SWR's cache.
                 setSliders(
                   sliders.map((s, i) =>
                     i === index ? { ...s, enabled: !s.enabled } : s

@@ -8,7 +8,7 @@ import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import { useIntl } from 'react-intl';
 
-/** What the request dialogs say when changing a failed request. */
+/** Request dialog messages for editing a failed request. */
 export const failedMessages = defineMessages(
   'components.RequestModal.FailedRequest',
   {
@@ -22,8 +22,8 @@ export const failedMessages = defineMessages(
 );
 
 /**
- * At the top of a failed request's dialog: why it could not be sent, where
- * that is for want of a server, and what to do.
+ * Explains why a failed request could not be sent (when a server is missing)
+ * and what to do.
  */
 const FailedRequestAlert = ({
   request,

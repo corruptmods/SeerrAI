@@ -24,17 +24,16 @@ const messages = defineMessages('components.Music.SongCard', {
 
 interface SongCardProps {
   song: MusicSongResult;
-  /** Fills a grid cell rather than taking a row's width. */
+  /** Fills a grid cell instead of a row's fixed width. */
   canExpand?: boolean;
-  /** Reads again what shows the song, once it is asked for. */
+  /** Refetches whatever shows the song, after a request. */
   onRequested?: () => Promise<unknown>;
 }
 
 /**
- * A song from a chart, as an album's card: the cover of the album or
- * single it is best known from, whether it is here, and Request for the
- * song itself. Opens that album or single, where its tracks are; a song on
- * no single of its own is asked for there, with its album.
+ * A chart song card: its best-known album or single's cover, status, and
+ * Request. Links to that release; a song with no single of its own is
+ * requested there, with its album.
  */
 const SongCard = ({ song, canExpand, onRequested }: SongCardProps) => {
   const intl = useIntl();
@@ -43,7 +42,7 @@ const SongCard = ({ song, canExpand, onRequested }: SongCardProps) => {
   const detail = useCardDetail();
   const { requestSong, isBusy } = useRequestSong();
   const [missing, setMissing] = useState(false);
-  // Shown at once after a request from the card, before the row reloads.
+  // Shown right after a request from the card, before the row reloads.
   const [requested, setRequested] = useState(false);
   const version = song.versions[0];
   const from = version?.from;
@@ -53,7 +52,7 @@ const SongCard = ({ song, canExpand, onRequested }: SongCardProps) => {
     setMissing(false);
   }, [from?.coverUrl]);
 
-  // The row read again says where it stands now.
+  // The refetched row now has the real status.
   useEffect(() => {
     setRequested(false);
   }, [version?.status]);
@@ -118,7 +117,7 @@ const SongCard = ({ song, canExpand, onRequested }: SongCardProps) => {
   );
 };
 
-/** Where a card will be while its row loads: a film's placeholder. */
+/** Loading placeholder, as for films. */
 SongCard.Placeholder = Placeholder;
 
 export default SongCard;

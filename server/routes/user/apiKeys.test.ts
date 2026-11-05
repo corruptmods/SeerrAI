@@ -30,8 +30,8 @@ import request from 'supertest';
 import userRoutes from '.';
 
 /*
- * Personal API keys from end to end: made and listed on a person's
- * settings, used in X-Api-Key, refused when they should be.
+ * Personal API keys end to end: created and listed in user settings, used
+ * via X-Api-Key, refused when they must be.
  */
 
 const jellyfinAccount = mock.method(
@@ -44,7 +44,7 @@ let app: Express;
 
 function createApp(withSpec = false) {
   const app = express();
-  // Each test's sign-in limit counts from its own address.
+  // Each test gets its own address, so sign-in limits don't carry over.
   app.set('trust proxy', true);
   app.use(express.json());
   app.use(
@@ -57,7 +57,7 @@ function createApp(withSpec = false) {
   api.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
   api.use('/now-playing', isAuthenticated(), nowPlayingRoutes);
   if (withSpec) {
-    // As the app runs: the spec checked before any route.
+    // As in the app: the spec is checked before any route.
     app.use(
       OpenApiValidator.middleware({
         apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
@@ -107,7 +107,7 @@ beforeEach(() => {
   resetApiKeyMemoryForTests();
   getSettings().main.personalApiKeys = 'everyone';
   getSettings().main.localLogin = true;
-  // As on a real server, which always has one.
+  // A real server always has one.
   getSettings().main.apiKey = 'the-servers-own-key';
   address += 1;
   ip = `198.51.100.${address}`;
@@ -137,7 +137,7 @@ async function signIn(email: string) {
 const friend = () =>
   getRepository(User).findOneOrFail({ where: { email: 'friend@seerr.dev' } });
 
-/** A third person, who manages users but isn't an admin. */
+/** A third user who manages users but isn't an admin. */
 async function manager() {
   const admin = await getRepository(User).findOneOrFail({
     select: { id: true, password: true },
@@ -341,7 +341,7 @@ describe('making a personal API key', () => {
       .send({ name: 'Theirs' });
     assert.equal(forOther.status, 403);
 
-    // A key can't make more keys: one that leaked can't be made permanent.
+    // A key can't create keys, so a leaked one can't be made permanent.
     const { secret } = await makeKey(agent, id);
     const withKey = await request(app)
       .post(`/user/${id}/settings/api-keys`)
@@ -350,7 +350,7 @@ describe('making a personal API key', () => {
       .send({ name: 'Forever', expiresInDays: null });
     assert.equal(withKey.status, 403);
 
-    // Nor can the server's own key, acting for someone.
+    // Nor can the server's key acting for a user.
     const withGlobal = await request(app)
       .post(`/user/${other.id}/settings/api-keys`)
       .set('X-Api-Key', getSettings().main.apiKey)
@@ -420,7 +420,7 @@ describe('using a personal API key', () => {
     const res = await asKey(secret).set('X-API-User', '1');
     assert.equal(res.status, 403);
     assert.notEqual(res.body.id, 1);
-    // Naming its own owner is harmless.
+    // Naming the key's own owner is allowed.
     assert.equal(
       (await asKey(secret).set('X-API-User', String(id))).status,
       200
@@ -539,7 +539,7 @@ describe('using a personal API key', () => {
   it('makes whoever guesses keys wait, like wrong passwords', async () => {
     const { agent, id } = await signIn('friend@seerr.dev');
     const { secret, key } = await makeKey(agent, id);
-    // An expired key a forgotten app keeps sending isn't a guess.
+    // An expired key a forgotten app keeps sending doesn't count as a guess.
     await getRepository(UserApiKey).update(key.id, {
       expiresAt: new Date(Date.now() - 1000),
     });
@@ -548,7 +548,7 @@ describe('using a personal API key', () => {
     }
     await getRepository(UserApiKey).update(key.id, { expiresAt: null });
 
-    // Keys that don't exist: after ten, a wait.
+    // Ten unknown keys trigger a wait.
     for (let i = 0; i < 10; i++) {
       assert.equal(
         (await asKey(`sai_0000000${i}_${'b'.repeat(43)}`)).status,
@@ -560,10 +560,10 @@ describe('using a personal API key', () => {
     assert.ok(Number(waited.headers['retry-after']) > 0);
     assert.equal((await asKey('sai_garbage')).status, 429);
 
-    // A real key from the same address isn't held up by the guessing.
+    // A real key from the same address isn't blocked by the guessing.
     assert.equal((await asKey(secret)).status, 200);
 
-    // Guessing one real key's secret holds up that key alone.
+    // Guessing a real key's secret blocks only that key.
     const forged = `${secret.slice(0, 13)}${'A'.repeat(43)}`;
     for (let i = 0; i < 10; i++) {
       assert.equal((await asKey(forged)).status, 401);
@@ -665,7 +665,7 @@ describe("someone else's keys", () => {
 describe('a Siri key', () => {
   const specApp = () => createApp(true);
 
-  /** Friend, who may report problems, signed in through the API spec. */
+  /** Friend (may report problems), signed in through the API spec. */
   async function siriUser(app: Express) {
     const id = (await friend()).id;
     await getRepository(User).update(id, {
@@ -709,7 +709,7 @@ describe('a Siri key', () => {
     assert.equal(me.status, 403);
     assert.match(me.body.message, /only works for reporting with Siri/);
 
-    // Listed on the Siri page, not with the API keys.
+    // Listed on the Siri page, not with API keys.
     const page = await agent.get(`/api/v1/user/${id}/settings/siri`);
     assert.equal(page.status, 200);
     assert.ok(page.body.key);
@@ -756,7 +756,7 @@ describe('a Siri key', () => {
     const app = specApp();
     const { agent, id } = await siriUser(app);
     const { secret } = await makeSiriKey(agent, id);
-    // Not by a key, not even itself.
+    // No key may do this, not even the Siri key itself.
     const byKey = await request(app)
       .post(`/api/v1/user/${id}/settings/siri`)
       .set('X-Forwarded-For', ip)

@@ -3,20 +3,18 @@ import { getAppVersion } from '@server/utils/appVersion';
 import { isAxiosError } from 'axios';
 
 /*
- * Trakt, read with only an app's Client ID: public lists and public
- * watchlists, nobody signing in. Each admin makes their own Trakt app
- * (developer.trakt.tv/apps) and pastes its Client ID into Settings; Trakt
- * deletes apps unused for 30 days, which the watchlist sync's regular use
- * prevents.
+ * Reads public Trakt lists and watchlists with only an app Client ID, no
+ * sign-in. Each admin creates a Trakt app (developer.trakt.tv/apps) and
+ * pastes its Client ID into Settings; Trakt deletes apps unused for 30 days,
+ * which regular watchlist sync prevents.
  *
- * Shapes and paths are Trakt's API v2 as its own contract describes them
- * (github.com/trakt/trakt-api). Since 2026 lists and watchlists are paged
- * even when no page is asked for, up to 250 items a page.
+ * Shapes and paths follow Trakt API v2 (github.com/trakt/trakt-api). Since
+ * 2026 lists and watchlists are always paged, up to 250 items a page.
  */
 
 const BASE_URL = 'https://api.trakt.tv';
 const PAGE_LIMIT = 250;
-/** Enough for any real list or watchlist; a runaway one stops here. */
+/** Enough for any real list; stops a runaway one. */
 const MAX_PAGES = 20;
 
 export interface TraktIds {
@@ -42,15 +40,15 @@ export interface TraktListItem {
   show?: TraktMedia | null;
 }
 
-/** A film or series from Trakt, with what Seerr AI needs of it. */
+/** A movie or series from Trakt, with the fields Seerr AI uses. */
 export interface TraktTitle {
   type: 'movie' | 'show';
   title: string;
   year?: number;
-  /** Missing for the odd entry Trakt could not match to TMDB. */
+  /** Missing when Trakt could not match the entry to TMDB. */
   tmdbId?: number;
   tvdbId?: number;
-  /** When it went on the list, in seconds since 1970. */
+  /** When listed, in Unix seconds. */
   listedAt?: number;
 }
 
@@ -68,7 +66,7 @@ export type TraktProblem =
   /** No such user or list. */
   | 'notFound'
   | 'rateLimited'
-  /** Trakt did not answer, or answered with an error of its own. */
+  /** Trakt did not answer, or returned an error. */
   | 'unreachable';
 
 export class TraktError extends Error {
@@ -82,12 +80,12 @@ export class TraktError extends Error {
 }
 
 /**
- * A Trakt username or list slug. Not dots alone: "." and ".." are steps in
- * a path, not names, and would change which address is asked for.
+ * A Trakt username or list slug. Not dots alone: "." and ".." are path
+ * steps and would change the requested address.
  */
 const SLUG = /^(?!\.+$)[\w.-]+$/;
 
-/** A username or slug for an API path, refused unless it could be one. */
+/** Validates a username or slug for use in an API path. */
 const pathPart = (name: string): string => {
   if (!SLUG.test(name)) {
     throw new TraktError('notFound', `"${name}" is not a Trakt name.`);
@@ -96,10 +94,9 @@ const pathPart = (name: string): string => {
 };
 
 /**
- * Reads a link from trakt.tv or app.trakt.tv (or the same without the
- * scheme): a user's list, a user's watchlist, or a list by its number.
- * Undefined for anything else, including a list's private share link, which
- * the API cannot read.
+ * Parses a trakt.tv or app.trakt.tv link (scheme optional): a user's list,
+ * a user's watchlist, or a list by number. Undefined otherwise, including a
+ * private share link, which the API cannot read.
  */
 export const parseTraktUrl = (text: string): TraktSource | undefined => {
   const trimmed = text.trim();
@@ -121,7 +118,7 @@ export const parseTraktUrl = (text: string): TraktSource | undefined => {
       .filter(Boolean)
       .map((part) => decodeURIComponent(part));
   } catch {
-    // A stray % that starts no character.
+    // A stray % that decodes to nothing.
     return undefined;
   }
 
@@ -172,20 +169,20 @@ class TraktAPI extends ExternalAPI {
         headers: {
           'trakt-api-version': '2',
           'trakt-api-key': clientId,
-          // Trakt's Cloudflare turns away requests with no User-Agent, and
-          // its policy asks apps to name themselves.
+          // Trakt's Cloudflare rejects requests without a User-Agent, and its
+          // policy asks apps to name themselves.
           'User-Agent': `SeerrAI/${getAppVersion()}`,
         },
       }
     );
   }
 
-  /** Whether the Client ID is accepted, with the cheapest call Trakt has. */
+  /** Checks the Client ID with Trakt's cheapest call. */
   public async check(): Promise<void> {
     await this.call(() => this.axios.get('/genres/movies'));
   }
 
-  /** The films and series on a public list or watchlist, in list order. */
+  /** Movies and series on a public list or watchlist, in list order. */
   public async titles(source: TraktSource): Promise<TraktTitle[]> {
     const path =
       source.kind === 'watchlist'
@@ -210,9 +207,8 @@ class TraktAPI extends ExternalAPI {
   }
 
   /**
-   * The titles most recently put on someone's public watchlist, newest
-   * first: as for Plex, sync acts on recent additions, so a long-kept
-   * watchlist is not requested all at once.
+   * The newest titles on a public watchlist, newest first. As with Plex, sync
+   * acts on recent additions so a long watchlist isn't requested all at once.
    */
   public async recentWatchlist(
     user: string,

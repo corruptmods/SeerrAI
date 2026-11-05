@@ -9,8 +9,8 @@ import {
 } from 'typeorm';
 
 /**
- * A passkey someone can sign in with instead of their Plex account. Anyone can
- * have several: one per phone, computer or security key.
+ * A passkey a user can sign in with instead of their Plex account; one per
+ * phone, computer or security key.
  */
 @Entity()
 export class UserPasskey {
@@ -21,7 +21,7 @@ export class UserPasskey {
   @Index()
   public user: User;
 
-  /** The credential id, base64url. What a sign-in names. */
+  /** The credential id, base64url; sign-ins look it up. */
   @Column({ type: 'varchar', unique: true })
   public credentialId: string;
 
@@ -29,7 +29,7 @@ export class UserPasskey {
   @Column({ type: 'text' })
   public publicKey: string;
 
-  /** Signature counter; a counter that goes backwards means a cloned key. */
+  /** Signature counter; one going backwards means a cloned key. */
   @Column({ type: 'bigint', default: 0 })
   public counter: string;
 
@@ -41,7 +41,7 @@ export class UserPasskey {
   @Column({ default: false })
   public backedUp: boolean;
 
-  /** What it's called in settings: the device it was made on, until renamed. */
+  /** Its name in settings: the creating device, until renamed. */
   @Column({ type: 'varchar' })
   public name: string;
 

@@ -115,7 +115,6 @@ interface TautulliInfoResponse {
   };
 }
 
-/** Longest to wait on Tautulli before giving up. */
 const TAUTULLI_TIMEOUT_MS = 15000;
 
 class TautulliAPI {
@@ -127,11 +126,7 @@ class TautulliAPI {
         settings.port
       }${settings.urlBase ?? ''}`,
       params: { apikey: settings.apiKey },
-      /*
-       * Watch-list suggestions are checked while the user waits, so a
-       * Tautulli that is down or unreachable must fail rather than leave the
-       * request hanging indefinitely.
-       */
+      // Checked while the user waits, so a down Tautulli must fail fast.
       timeout: TAUTULLI_TIMEOUT_MS,
     });
     this.axios.interceptors.request.use(proxyRequestInterceptor);
@@ -187,8 +182,8 @@ class TautulliAPI {
   }
 
   /**
-   * Every play of one title, newest first: a film by its own rating key, a
-   * series by the show's, which covers all of its episodes.
+   * Every play of one title, newest first: a movie by its rating key, a
+   * series by the show's, covering all episodes.
    */
   public async getTitleHistory(
     ratingKey: string,
@@ -207,9 +202,8 @@ class TautulliAPI {
   }
 
   /**
-   * A user's plays, newest first: films and episodes, up to `length` of
-   * them. One call, for the few features that need the whole picture of what
-   * someone has watched rather than a handful of recent titles.
+   * Up to `length` of a user's movie and episode plays, newest first, in one
+   * call. For features that need their full history, not a few recent titles.
    */
   public async getUserHistory(
     user: User,
@@ -261,12 +255,9 @@ class TautulliAPI {
   }
 
   /**
-   * Every play this user completed for one library item since a given time.
-   *
-   * getUserWatchHistory is capped and de-duplicated for the "recently
-   * watched" display; this asks a narrow question instead — did this person
-   * finish this title after a given moment — so it can be answered per item
-   * without pulling their whole history.
+   * Every play this user completed of one item since a given time.
+   * getUserWatchHistory is capped and de-duplicated for display; this answers
+   * per item without pulling the whole history.
    */
   public async getUserPlaysSince(
     user: User,
@@ -280,9 +271,8 @@ class TautulliAPI {
       grandparentRatingKey?: string;
       after: Date;
       /**
-       * Throw instead of returning an empty list when Tautulli fails. An
-       * empty list reads as "never watched", which is wrong when the truth is
-       * "could not ask".
+       * Throw instead of returning [] on failure: [] reads as "never
+       * watched", not "could not ask".
        */
       strict?: boolean;
     }
@@ -300,11 +290,9 @@ class TautulliAPI {
     let start = 0;
 
     try {
-      // Tautulli's `after` is a date, not a timestamp, so the exact cutoff is
-      // applied below against each record's own date. Tautulli reads the
-      // date as midnight in its own time zone, which need not be this
-      // server's: asking from the day before means plays in the hours after
-      // `after` are never left out when the two differ.
+      // Tautulli's `after` is a date read as midnight in Tautulli's time
+      // zone, which may differ from ours. Ask from the day before so no plays
+      // are missed; the exact cutoff is applied below per record.
       const afterDate = new Date(after);
       afterDate.setDate(afterDate.getDate() - 1);
       const afterParam = `${afterDate.getFullYear()}-${String(

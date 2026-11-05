@@ -1,12 +1,12 @@
 import rateLimit from 'express-rate-limit';
 
 /**
- * A rate limit counted per signed-in person rather than per IP address.
+ * A rate limit counted per signed-in user rather than per IP.
  *
- * For routes only signed-in people reach. Counting by address behind a
- * reverse proxy means trusting the forwarded address, which anyone can set
- * (express-rate-limit refuses to count that way with "trust proxy" on, and
- * logs an error each time); the person's account cannot be faked.
+ * For signed-in-only routes. Counting by address behind a reverse proxy means
+ * trusting the forwarded address, which anyone can set (express-rate-limit
+ * refuses that with "trust proxy" on, logging an error each time); the user's
+ * account can't be faked.
  */
 export const perUserRateLimit = (options: {
   windowMs: number;
@@ -15,6 +15,6 @@ export const perUserRateLimit = (options: {
   rateLimit({
     ...options,
     keyGenerator: (req) => `user:${req.user?.id ?? 'none'}`,
-    // As every other error is answered, so the app can show it.
+    // Shaped like every other error response, so the app can show it.
     message: { message: 'Too many requests. Try again in a few minutes.' },
   });

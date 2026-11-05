@@ -7,21 +7,20 @@ import type {
 } from '@server/lib/backfill/sonarr';
 
 /*
- * What a pack would do to a series, file by file, judged the way Sonarr
- * judges: the quality profile's order of qualities first, then the release
- * revision (v2, v3), then the custom format score — and nothing that would
- * replace a file Sonarr itself would keep.
+ * A pack's effect on a series, file by file, judged as Sonarr does: profile
+ * quality order, then revision (v2, v3), then custom format score. Never
+ * replaces a file Sonarr would keep.
  */
 
 export type PlanAction = 'fill' | 'upgrade' | 'skip' | 'reject';
 
 export interface PlanEntry {
-  /** The file's index in the torrent or NZB. */
+  /** Index in the torrent or NZB. */
   index: number;
-  /** Its path inside the pack. */
+  /** Path inside the pack. */
   path: string;
   size: number;
-  /** The name Sonarr was asked to judge. */
+  /** The name Sonarr judged. */
   judgedAs: string;
   episodeIds: number[];
   absolute?: number;
@@ -37,20 +36,17 @@ export interface PlanEntry {
   replaces: number;
   /**
    * Placed by the AI second opinion, or by the episode title in its name
-   * where its number is another episode's, rather than by its number.
+   * where its number points to another episode.
    */
   matchedBy?: 'ai' | 'title';
   /** What the model read in the name, for an AI match. */
   why?: string;
-  /**
-   * An album's edition (Lidarr's release) the file is imported into: the
-   * track ids are that edition's.
-   */
+  /** The album edition (Lidarr release) imported into; track ids are its. */
   releaseId?: number;
   /**
-   * The whole release, a Usenet post packed in archives or with scrambled
-   * names whose name is this one episode (or the movie): its files are
-   * unknown until it is downloaded, and its one video is imported.
+   * The whole release: a Usenet post in archives or with scrambled names,
+   * named as this one episode (or movie). Its files are unknown until
+   * downloaded; its one video is imported.
    */
   whole?: true;
 }
@@ -62,38 +58,38 @@ export interface PlanSummary {
   reject: number;
   /** Distinct episodes the pack has a usable file for. */
   covered: number;
-  /** Bytes of the files the full plan (fill + upgrade) would download. */
+  /** Bytes the full plan (fill + upgrade) downloads. */
   bytes: number;
-  /** Bytes for filling the missing episodes alone. */
+  /** Bytes for filling missing episodes only. */
   fillBytes: number;
   replaces: number;
   quality?: string;
   score: number;
   /**
-   * Whether Sonarr can match the pack's own title to the series. When it
-   * can't, Sonarr's own searches never see the pack.
+   * Whether Sonarr matches the pack title to the series; if not, Sonarr's
+   * own searches never see the pack.
    */
   sonarrSeesTitle?: boolean;
   /** Files the plan uses that only the AI second opinion placed. */
   aiMatched?: number;
   /**
-   * Files the plan uses that hold several episodes each (S01E01-E02).
-   * Such packs come last: one file per episode is preferred.
+   * Used files holding several episodes (S01E01-E02). Such packs rank last:
+   * one file per episode is preferred.
    */
   multi?: number;
-  /** Why the second opinion could not be asked, when it could not. */
+  /** Why the second opinion wasn't asked, if it wasn't. */
   aiNote?: string;
   /**
-   * Files to be taken that are outside Sonarr's or Radarr's size limits:
-   * such a pack is offered only when nothing within them is, and never
-   * taken without an admin.
+   * Files to take that are outside Sonarr's or Radarr's size limits: such a
+   * pack is offered only when nothing within them is, and never taken
+   * without an admin.
    */
   outsideSize?: number;
-  /** What is outside the limits, in words. */
+  /** The size-limit problem in words. */
   sizeNote?: string;
 }
 
-/** A profile's qualities in order, lowest first, a group counting once. */
+/** Index of the matching top-level quality, lowest first; groups count once. */
 const topLevelIndex = (
   items: SonarrProfileItem[],
   match: (item: SonarrProfileItem) => boolean
@@ -142,8 +138,7 @@ export const upgradeVerdict = (
   }
   const have = qualityRank(profile, current.qualityId);
   const want = qualityRank(profile, next.qualityId);
-  // A newer revision (v2, a proper) of the same quality is taken even at
-  // the cutoff, as Sonarr does.
+  // As in Sonarr, a newer revision (v2, proper) upgrades even at the cutoff.
   if (want === have && next.revision > current.revision) {
     return { upgrade: true };
   }
@@ -175,9 +170,9 @@ const judged = (
 });
 
 /**
- * Decides one file's action from the episodes it maps to. A file for a
- * missing episode fills it; one for an episode on disk is an upgrade only if
- * Sonarr would take it over every file it would replace.
+ * Decides one file's action. A file for a missing episode fills it; one for
+ * an episode on disk upgrades only if Sonarr would take it over every file
+ * it replaces.
  */
 export const decide = (
   entry: Omit<PlanEntry, 'action' | 'reason' | 'replaces'>,
@@ -255,8 +250,8 @@ const better = (
 };
 
 /**
- * Where a pack holds two files for one episode (a v1 and a v2), only the
- * better one is used; the other is skipped.
+ * When a pack has two files for one episode (v1 and v2), keeps the better
+ * and skips the other.
  */
 export const dedupe = (
   entries: PlanEntry[],
@@ -314,10 +309,7 @@ export const summarize = (entries: PlanEntry[]): PlanSummary => {
   };
 };
 
-/**
- * The entries an approval imports, by mode, with or without the files only
- * the AI second opinion placed.
- */
+/** The entries an approval imports, by mode, optionally without AI matches. */
 export const selectEntries = (
   entries: PlanEntry[],
   mode: 'missing' | 'all',
@@ -330,14 +322,9 @@ export const selectEntries = (
   );
 
 /**
- * Ranks candidates: those that fill something missing, one file per
- * episode before files holding several episodes, then most missing
- * episodes filled, most upgrades, the better score, the healthier swarm.
- */
-/**
- * Whether a pack of multi-episode files must wait: another pack would fill
- * something with one file per episode. Multi-episode files are the last
- * resort, so Backfill takes them by itself only when nothing else will do.
+ * Whether a multi-episode pack must wait because another pack fills
+ * something with one file per episode. Multi-episode files are a last
+ * resort, taken automatically only when nothing else will do.
  */
 export const multiMustWait = (
   pack: { summary: PlanSummary },
@@ -347,14 +334,19 @@ export const multiMustWait = (
   others.some((o) => o !== pack && o.summary.fill > 0 && !o.summary.multi);
 
 /**
- * A torrent its indexer says nobody seeds. Such counts are often old, but
- * one at 0 is the likeliest to never finish.
+ * A torrent its indexer reports 0 seeders for. Counts are often stale, but
+ * 0 is the likeliest never to finish.
  */
 export const unseeded = (pack: {
   protocol?: string;
   seeders?: number | null;
 }): boolean => pack.protocol === 'torrent' && pack.seeders === 0;
 
+/**
+ * Ranks candidates: fills first, seeded before unseeded, one file per
+ * episode before multi-episode, then most fills, most upgrades, better
+ * score, more seeders.
+ */
 export const rankCandidates = <
   T extends {
     summary: PlanSummary;
@@ -367,9 +359,7 @@ export const rankCandidates = <
   [...candidates].sort(
     (a, b) =>
       Number(b.summary.fill > 0) - Number(a.summary.fill > 0) ||
-      // One somebody seeds before one nobody does.
       Number(unseeded(a)) - Number(unseeded(b)) ||
-      // Files holding several episodes are the last resort.
       Number(!!a.summary.multi) - Number(!!b.summary.multi) ||
       b.summary.fill - a.summary.fill ||
       b.summary.upgrade - a.summary.upgrade ||

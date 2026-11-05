@@ -6,9 +6,8 @@ import type { MessageDescriptor } from 'react-intl';
 import { useIntl } from 'react-intl';
 
 /**
- * Runs something done to a request (approving, deleting) so that its
- * buttons never stay stuck: busy while it runs, never after, and a toast
- * saying why when it fails. Resolves to whether it worked.
+ * Runs a request action (approve, delete) with a busy state that always
+ * clears, and an error toast on failure. Resolves to success.
  */
 const useRequestAction = () => {
   const intl = useIntl();

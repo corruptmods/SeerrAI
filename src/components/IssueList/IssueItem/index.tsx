@@ -42,8 +42,7 @@ interface IssueItemProps {
 const IssueItem = ({ issue }: IssueItemProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
-  // The title, and with it the pictures, load once the row is near the
-  // screen, so they are there by the time it is scrolled to.
+  // Load the title and images once the row is near the screen.
   const { ref, near, nearness } = useNearScreen();
   const url =
     issue.media.mediaType === 'movie'

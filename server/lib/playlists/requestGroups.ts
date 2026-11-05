@@ -9,18 +9,17 @@ import type { SelectQueryBuilder } from 'typeorm';
 import { In } from 'typeorm';
 
 /*
- * A playlist import makes many song requests at once. Where requests are
- * shown in a row (Recent Requests), those are shown as one card for their
- * playlist instead of a card each.
+ * A playlist import makes many song requests at once, so request rows
+ * (Recent Requests) show one card per playlist instead.
  */
 
-/** The most playlist requests looked through for the playlists to show. */
+/** Max playlist requests scanned to find playlists to show. */
 const LOOK_BACK = 500;
 
-/** Covers on a playlist's card. */
+/** Covers per playlist card. */
 const COVERS = 4;
 
-/** The requests a playlist's songs went into. */
+/** Subquery of request ids made from playlists. */
 const playlistRequestIds = (query: SelectQueryBuilder<MediaRequest>) =>
   query
     .subQuery()
@@ -29,16 +28,15 @@ const playlistRequestIds = (query: SelectQueryBuilder<MediaRequest>) =>
     .where('song.requestId IS NOT NULL')
     .getQuery();
 
-/** Leaves out the requests made from playlists. */
+/** Excludes requests made from playlists. */
 export const withoutPlaylistRequests = (
   query: SelectQueryBuilder<MediaRequest>
 ): SelectQueryBuilder<MediaRequest> =>
   query.andWhere(`request.id NOT IN ${playlistRequestIds(query)}`);
 
 /**
- * The playlists behind the requests this query finds (with its filters and
- * whose requests this person may see), newest request first: one each,
- * with how its songs are getting on.
+ * One group per playlist behind this query's requests, newest first, with
+ * song progress counts.
  */
 export const playlistRequestGroups = async (
   query: SelectQueryBuilder<MediaRequest>,

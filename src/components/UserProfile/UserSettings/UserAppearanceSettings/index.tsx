@@ -142,7 +142,7 @@ const MODES: {
   { id: 'auto', name: 'modeAuto', icon: ComputerDesktopIcon },
 ];
 
-/** A colour as the form keeps it: a custom accent needs a valid colour. */
+/** Custom accent validation: requires a valid colour when accent is custom. */
 export const accentSchema = (message: string) =>
   Yup.string().when('accent', {
     is: 'custom',
@@ -151,9 +151,8 @@ export const accentSchema = (message: string) =>
   });
 
 /**
- * The picker for a custom accent: the browser's colour picker and the same
- * colour as a hex code, which can be typed or pasted. Used here and by the
- * server's default (Settings → Appearance).
+ * Custom accent picker: native colour input plus a hex field. Also used by
+ * Settings → Appearance.
  */
 export const CustomAccentField = ({
   value,
@@ -206,7 +205,7 @@ export const CustomAccentField = ({
   );
 };
 
-/** One of a row of buttons of which one is chosen. */
+/** Single-choice button group. */
 const Segmented = <T extends string>({
   label,
   options,
@@ -244,7 +243,6 @@ const Segmented = <T extends string>({
   </div>
 );
 
-/** A switch with a name and a line saying what it does. */
 const Switch = ({
   label,
   hint,
@@ -265,7 +263,7 @@ const Switch = ({
   </div>
 );
 
-/** How the chosen look comes out on a title, a few badges and a panel. */
+/** Live preview of the chosen look. */
 const Preview = ({ name }: { name: string }) => {
   const intl = useIntl();
   return (
@@ -337,7 +335,7 @@ const Preview = ({ name }: { name: string }) => {
   );
 };
 
-/** The form's sections; changes show at once while editing one's own. */
+/** Form sections; changes preview live when editing one's own. */
 const AppearanceFields = ({
   preview,
   isOwn,
@@ -354,7 +352,7 @@ const AppearanceFields = ({
     useFormikContext<Appearance>();
   const { user } = useUser();
 
-  // Shown on screen as it is chosen, and taken back on leaving unsaved.
+  // Preview live; reverted on unmount.
   const shown = JSON.stringify(values);
   useEffect(() => {
     if (!isOwn) {
@@ -370,7 +368,7 @@ const AppearanceFields = ({
   const set = <K extends keyof Appearance>(key: K, value: Appearance[K]) =>
     setFieldValue(key, value);
 
-  // What "Match my device" shows, kept up to date as the device changes.
+  // Track the device scheme for "Match my device".
   const [device, setDevice] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-color-scheme: light)');
@@ -635,10 +633,8 @@ const AppearanceFields = ({
 };
 
 /**
- * Profile → Settings → Appearance: light or dark, the accent, the dark
- * background and a few extras, kept with the account. Each change shows at
- * once on one's own screen and is kept on Save; leaving without saving puts
- * the saved look back.
+ * Profile → Settings → Appearance. Changes preview live; leaving unsaved
+ * restores the saved look.
  */
 const UserAppearanceSettings = () => {
   const intl = useIntl();
@@ -663,8 +659,7 @@ const UserAppearanceSettings = () => {
       serverDefault: ThemeDefaults;
     }>(key, { appearance });
     await mutate(response.data, { revalidate: false });
-    // Pages read the look from the signed-in person: take it from there
-    // before the preview stops, so nothing flickers back.
+    // Revalidate before the preview ends, so the look doesn't flicker back.
     await revalidate();
     if (isOwn) {
       await revalidateCurrentUser();

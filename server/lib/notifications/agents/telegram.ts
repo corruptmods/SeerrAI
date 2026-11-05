@@ -37,7 +37,7 @@ interface TelegramPhotoPayload {
   disable_notification: boolean;
 }
 
-/** The most characters Telegram takes in a photo's caption. */
+/** Telegram's photo caption length limit. */
 const CAPTION_LIMIT = 1024;
 
 class TelegramAgent
@@ -67,9 +67,9 @@ class TelegramAgent
   }
 
   /**
-   * Escapes text for Telegram's MarkdownV2, which refuses a whole message
-   * over any of these characters left bare. The backslash is escaped in the
-   * same single pass as the rest, so text is never escaped twice.
+   * Escapes for MarkdownV2, which rejects the whole message over any bare
+   * special character. Backslash is in the same pass, so nothing is
+   * double-escaped.
    */
   private escapeText(text: string | undefined): string {
     return text
@@ -77,7 +77,7 @@ class TelegramAgent
       : '';
   }
 
-  /** A link's address only needs its closing bracket and backslash escaped. */
+  /** Link URLs only need `)` and backslash escaped. */
   private escapeUrl(url: string): string {
     return url.replace(/[)\\]/g, (x) => '\\' + x);
   }
@@ -198,9 +198,8 @@ class TelegramAgent
     }
     /* eslint-enable */
 
-    // Telegram refuses a caption over 1,024 characters, where a text message
-    // may have 4,096. Escaped, the message is never shorter than Telegram
-    // counts it, so one that might be too long for a caption goes as text.
+    // Captions allow 1,024 characters, text 4,096. The escaped length is never
+    // below Telegram's count, so a possibly too-long caption goes as text.
     return embedPoster && payload.image && message.length <= CAPTION_LIMIT
       ? {
           photo: payload.image,
@@ -218,7 +217,6 @@ class TelegramAgent
     payload: NotificationPayload
   ): Promise<boolean> {
     const settings = this.getSettings();
-    // A poster goes with its caption, or the message is sent as text.
     const endpoint = (
       built: Partial<TelegramMessagePayload | TelegramPhotoPayload>
     ) =>
@@ -260,8 +258,7 @@ class TelegramAgent
       }
     }
 
-    // Held while a burst to this person is gathered into one (see the
-    // notification manager): only the admin and channel copies go now.
+    // holdUser: the user's copy goes out later in a digest.
     if (payload.notifyUser && !payload.holdUser) {
       if (
         payload.notifyUser.settings?.hasNotificationType(

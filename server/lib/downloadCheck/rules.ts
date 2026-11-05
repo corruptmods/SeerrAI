@@ -1,8 +1,7 @@
 /*
- * What Download Check looks for, as plain functions: a grab's files, its
- * timing against the episode's air date, whether it can be an upgrade on
- * the file there is, and what a blocked import's messages mean. Nothing
- * here asks a server anything.
+ * Download Check's rules as pure functions: a grab's files, its timing
+ * against air dates, whether it can upgrade the existing file, and what a
+ * blocked import's messages mean. Nothing here calls a server.
  */
 
 /** File types Sonarr and Radarr import as video. */
@@ -31,7 +30,7 @@ export const VIDEO_EXTENSIONS = new Set([
   'wtv',
 ]);
 
-/** Programs: never part of a film or an episode. */
+/** Executable types: never part of a movie or episode. */
 export const PROGRAM_EXTENSIONS = new Set([
   'exe',
   'scr',
@@ -54,7 +53,7 @@ export const PROGRAM_EXTENSIONS = new Set([
 
 const ARCHIVE = /\.(rar|r\d{2,3}|zip|7z|001|tar|tgz|gz|bz2|xz)$/i;
 
-/** A video this small is a sample or a stand-in, never a whole episode. */
+/** Videos this small are samples or stand-ins, never a whole episode. */
 export const SAMPLE_BYTES = 50 * 1024 * 1024;
 
 const extensionOf = (name: string): string =>
@@ -72,9 +71,8 @@ export type FileProblem =
   | { code: 'sample'; files: string[] };
 
 /**
- * What a torrent's files say about it, wanted files only (a file set to
- * skip doesn't come down). Programs first: whatever else it has, a release
- * with a program in it is not what it says it is.
+ * Checks a torrent's wanted files (skipped files don't download). Programs
+ * are checked first: a release containing one is never what it claims.
  */
 export const checkFiles = (
   files: { name: string; size: number }[]
@@ -107,14 +105,13 @@ export const checkFiles = (
   return undefined;
 };
 
-/** A grab this far ahead of its episode's air time is a fake. */
+/** A grab this far ahead of its episode's air time is fake. */
 export const PRE_AIR_MS = 24 * 3600_000;
 
 /**
- * Hours a grab came before its episodes aired, when every one of them airs
- * more than a day after it; undefined otherwise, or when an air date is
- * unknown. A real episode can turn up hours early; days early, it's a fake
- * named after it.
+ * Hours a grab came before its episodes aired, if every one airs more than
+ * a day after it; undefined otherwise or if an air date is unknown. Real
+ * episodes can appear hours early; days early means a fake named after it.
  */
 export const hoursBeforeAir = (
   grabbedAt: number,
@@ -134,9 +131,9 @@ export interface Quality {
   revision?: { version: number; real: number };
 }
 
-/** A quality profile's ranking: what Sonarr and Radarr compare with. */
+/** A quality profile's ranking, as Sonarr and Radarr compare qualities. */
 export interface ProfileRanks {
-  /** Quality id to its place in the profile, higher better. */
+  /** Quality id → position in the profile; higher is better. */
   rank: Map<number, number>;
 }
 
@@ -145,10 +142,7 @@ interface ProfileItem {
   items?: ProfileItem[];
 }
 
-/**
- * A profile's items run from worst to best; the qualities in one group
- * rank alike.
- */
+/** Profile items run worst to best; qualities in one group rank equally. */
 export const ranksOf = (profile: { items: ProfileItem[] }): ProfileRanks => {
   const rank = new Map<number, number>();
   profile.items.forEach((item, i) => {
@@ -182,11 +176,10 @@ const label = (held: Held, why: 'quality' | 'revision' | 'score') =>
       : held.quality.quality.name;
 
 /**
- * Whether Sonarr or Radarr will take `offered` over the file it has, the
- * way their import does: a lower quality is refused, the same quality in an
- * older revision is refused, and the same quality scoring lower on custom
- * formats is refused. A quality the profile doesn't rank is let through:
- * the import decides those.
+ * Whether Sonarr's or Radarr's import would take `offered` over the
+ * existing file. It refuses a lower quality, the same quality at an older
+ * revision, or the same quality with a lower custom format score. Qualities
+ * the profile doesn't rank pass; the import decides those.
  */
 export const isUpgrade = (
   ranks: ProfileRanks,
@@ -232,26 +225,26 @@ export const compareGrabs = (ranks: ProfileRanks, a: Held, b: Held): number => {
 };
 
 /**
- * What a blocked import's message means. Sonarr and Radarr word them the
- * same way in every version since v3; anything else is left for an admin.
+ * What a blocked import's message means. Sonarr and Radarr have worded these
+ * identically since v3; anything else is left to an admin.
  */
 export type ImportProblem =
-  /** Grabbed on the indexer's id; the name doesn't say this title. */
+  /** Grabbed by indexer id; the name doesn't match this title. */
   | 'byId'
   /** TheXEM hasn't confirmed the episode's numbering yet. */
   | 'xem'
-  /** Not better than the file there. */
+  /** Not better than the existing file. */
   | 'notUpgrade'
-  /** The file there holds more episodes than this one. */
+  /** The existing file holds more episodes than this one. */
   | 'moreEpisodes'
   | 'alreadyImported'
-  /** Some of a pack came in; the rest wasn't there. */
+  /** Part of a pack imported; the rest was missing. */
   | 'partial'
   /** The runtime isn't known, so a sample can't be ruled out. */
   | 'sampleUnsure'
-  /** The file's name says nothing Sonarr can read. */
+  /** Sonarr can't parse anything from the file name. */
   | 'unparsed'
-  /** Wrong, broken or packed files: nothing in it to import. */
+  /** Wrong, broken or archived files: nothing to import. */
   | 'badFiles'
   | 'unknown';
 
@@ -279,25 +272,24 @@ const PROBLEMS: [RegExp, ImportProblem][] = [
 export const importProblemOf = (message: string): ImportProblem =>
   PROBLEMS.find(([re]) => re.test(message))?.[1] ?? 'unknown';
 
-/** Problems that leave the download worth importing, once confirmed. */
+/** Problems that still allow importing once confirmed. */
 const IMPORTABLE: ImportProblem[] = ['xem', 'sampleUnsure', 'unparsed'];
 
 export type ImportPlan =
-  /** Import it, telling the server which episodes or movie it is. */
+  /** Import, telling the server which episodes or movie it is. */
   | 'import'
-  /** Throw it away: blocklisted, searched again where still missing. */
+  /** Discard: blocklist, and search again where still missing. */
   | 'reject'
-  /** Done with: out of the queue, left in the client, the rest searched. */
+  /** Finished: dequeue, leave in the client, search for the rest. */
   | 'clear'
-  /** The name decides: same title, another or can't tell. */
+  /** Let the name decide: same title, another, or unsure. */
   | 'byName'
   | 'review';
 
 /**
- * What to do about an import that's blocked, from all its messages. One
- * message we can't read and it waits for an admin; one bad file and the
- * rest of a pack is still imported by `clear` once Sonarr says only part
- * of it came in.
+ * What to do with a blocked import, from all its messages. Any unreadable
+ * message sends it to an admin; a partial pack import is `clear`ed even if
+ * a file was bad, so the rest still comes in.
  */
 export const planImport = (problems: ImportProblem[]): ImportPlan => {
   const all = new Set(problems);

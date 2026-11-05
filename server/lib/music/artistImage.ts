@@ -14,17 +14,15 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
 /*
- * Pictures of an artist, in this order: what Lidarr's lookup has (from
- * fanart.tv and TheAudioDB, no key needed), then TheAudioDB itself (with
- * an admin's supporter key, or its free one), then the cover of the
- * artist's newest album. Each is served through
- * the image proxy, from the hosts and paths in ./imageSources only.
+ * Artist images, in order: Lidarr's lookup (fanart.tv and TheAudioDB, no key
+ * needed), TheAudioDB (supporter key or the free one), then the newest
+ * album's cover. Served via the image proxy, limited to ./imageSources.
  */
 
-/** How long a decision is kept before Lidarr is asked again. */
+/** How long a result is cached before Lidarr is asked again. */
 const KEPT_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Where the browser is sent for a picture: through the proxy, or not. */
+/** Image URL for the browser, through the proxy when caching is on. */
 export const musicImageUrl = (image: MusicImage): string =>
   getSettings().main.cacheImages
     ? `/imageproxy/${image.source}${image.path}`
@@ -74,7 +72,7 @@ const keep = async (key: string, images: ArtistImages): Promise<void> => {
     );
 };
 
-/** The cover of the newest album MusicBrainz has already listed. */
+/** Cover of the newest album in the cached MusicBrainz list. */
 const newestAlbumCover = async (
   artistMbid: string
 ): Promise<MusicImage | null> => {
@@ -96,9 +94,8 @@ const newestAlbumCover = async (
 };
 
 /**
- * The artist's pictures. What Lidarr and TheAudioDB say is kept for a
- * week; when either cannot be asked, nothing is kept, so the next visit
- * asks again.
+ * The artist's images, cached for a week. Nothing is cached when Lidarr or
+ * TheAudioDB fails, so the next visit retries.
  */
 export const artistImages = async (
   artistMbid: string

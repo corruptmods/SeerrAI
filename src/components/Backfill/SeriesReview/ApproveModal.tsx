@@ -50,7 +50,7 @@ const ApproveModal = ({
   kind: TitleKind;
   seriesTitle: string;
   candidate: CandidateView;
-  /** The pack can no longer be approved, so OK is turned off. */
+  /** The pack can no longer be approved; disables OK. */
   unavailable?: boolean;
   onClose: () => void;
   onApproved: (jobId: number) => void;

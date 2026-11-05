@@ -1,8 +1,8 @@
 import type { PlanSummary } from '@server/lib/backfill/plan';
 
 /*
- * What Backfill's admin API answers (server/routes/backfill.ts). The plan's
- * import paths and Prowlarr's links stay on the server.
+ * Backfill admin API response types (server/routes/backfill.ts). Import paths
+ * and Prowlarr links stay server-side.
  */
 
 export type TitleKind = 'series' | 'movie' | 'album';
@@ -32,7 +32,7 @@ export interface Readiness {
   torrentClient?: string;
   usenetClient?: string;
   problem?: string;
-  /** Albums are looked for too. */
+  /** Backfill also handles albums. */
   music: boolean;
 }
 
@@ -43,7 +43,7 @@ export interface SeriesView {
   arrId: number;
   tvdbId: number | null;
   tmdbId: number | null;
-  /** An album's MusicBrainz id, for its page. */
+  /** Album MusicBrainz id, for its page link. */
   foreignId?: string | null;
   artistName?: string | null;
   title: string;
@@ -57,7 +57,7 @@ export interface SeriesView {
   lastArrSearchAt: string | null;
   lastSearchedAt: string | null;
   searchError: string | null;
-  /** When the agent looked on its own: it does that once per title. */
+  /** When the agent last ran unprompted; it does so once per title. */
   agentAutoRunAt?: string | null;
 }
 
@@ -75,7 +75,7 @@ export interface EntryView {
   action: 'fill' | 'upgrade' | 'skip' | 'reject';
   reason?: string;
   replaces: number;
-  /** Placed by the AI second opinion, with what it read in the name. */
+  /** `ai` when placed by the AI second opinion; `why` holds its reading. */
   matchedBy?: 'ai' | 'title';
   why?: string;
 }
@@ -100,16 +100,14 @@ export interface LogLine {
   at: string;
   kind: 'info' | 'ok' | 'warn' | 'error';
   message: string;
-  /** The same line again: how many times, and when last. */
+  /** Repeat count and last time for a repeated line. */
   count?: number;
   lastAt?: string;
 }
 
 /**
- * What became of a failed download: replaced by another, Backfill or the
- * admin agent looking for one, a pack offered to an admin, nothing else
- * found, or the agent stopping (three failed replacements in a day, or its
- * downloads for the day used up).
+ * A failed download's follow-up. The agent stops after three failed
+ * replacements in a day or when its daily downloads are used up.
  */
 export type JobFollowUp =
   | 'replaced'
@@ -140,13 +138,13 @@ export interface JobView {
   rejected: number;
   fileCount: number;
   error: string | null;
-  /** Waiting on its indexer's download limit: when it is tried again. */
+  /** Retry time while waiting on the indexer's download limit. */
   retryAt: string | null;
   approvedByName: string | null;
-  /** Once failed: what became of it, and the download that replaced it. */
+  /** After a failure: the follow-up and the replacing download. */
   followUp: JobFollowUp | null;
   replacedById: number | null;
-  /** The admin agent's conversation that started it. */
+  /** Agent run that started it. */
   agentRunId: number | null;
   createdAt: string;
   startedAt: string | null;
@@ -198,14 +196,14 @@ export interface Overview {
   awaiting: (CandidateView & { series?: SeriesView })[];
 }
 
-/** What Backfill has for one title, as its media page asks. */
+/** Backfill lookup for one title's media page. */
 export type TitleLookup = SeriesView & {
   readyCount: number;
-  /** The admin agent's run working on it right now, if one is. */
+  /** Agent run currently working on it. */
   workingRunId?: number | null;
-  /** The first of `jobs`. */
+  /** First of `jobs`. */
   job?: JobView;
-  /** Every download running for it, oldest first. */
+  /** Running downloads, oldest first. */
   jobs: JobView[];
 };
 

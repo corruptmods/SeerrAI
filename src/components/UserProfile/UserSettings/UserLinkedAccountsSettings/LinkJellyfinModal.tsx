@@ -37,7 +37,7 @@ const messages = defineMessages(
 
 interface LinkJellyfinModalProps {
   show: boolean;
-  /** The server the account is on. */
+  /** Media server kind the account is on. */
   kind: JellyfinFamilyKind;
   onClose: () => void;
   onSave: () => void;

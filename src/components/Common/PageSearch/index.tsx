@@ -4,17 +4,14 @@ interface PageSearchProps {
   name: string;
   value: string;
   onChange: (value: string) => void;
-  /** What the field is for, read out in full by screen readers. */
+  /** Full description for screen readers. */
   label: string;
-  /** A hint short enough to fit beside a button on a phone. */
+  /** Short enough to fit beside a button on a phone. */
   placeholder: string;
   clearLabel: string;
 }
 
-/**
- * A page's own search field: the filter over a list of films or series,
- * the Music page's search. They look and behave alike.
- */
+/** A page's own search field, such as the list filter or Music search. */
 const PageSearch = ({
   name,
   value,
@@ -37,8 +34,8 @@ const PageSearch = ({
       value={value}
       maxLength={100}
       onChange={(e) => onChange(e.target.value)}
-      // Room for the clear button only while there is something to clear,
-      // so the hint fits beside Select on a phone.
+      // Padding for the clear button only while shown, so the hint fits
+      // beside Select on a phone.
       className={`rounded-r-only text-ellipsis ${value ? 'pr-9' : ''}`}
     />
     {value && (

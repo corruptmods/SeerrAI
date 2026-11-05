@@ -17,7 +17,7 @@ const messages = defineMessages('components.MediaLists.PlaylistLinkModal', {
   failed: 'That didn’t work: {detail}',
 });
 
-/** Links a playlist to a Spotify or Apple Music playlist by its share link. */
+/** Links a playlist to a Spotify or Apple Music playlist by share link. */
 const PlaylistLinkModal = ({
   listId,
   onClose,

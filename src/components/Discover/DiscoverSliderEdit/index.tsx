@@ -59,9 +59,9 @@ type DiscoverSliderEditProps = {
   children: React.ReactNode;
   disableUpButton: boolean;
   disableDownButton: boolean;
-  /** Not an admin: only showing or hiding it for themselves. */
+  /** Non-admin: can only show or hide it for themselves. */
   personalOnly?: boolean;
-  /** This person hid it for themselves. */
+  /** Hidden by the current user for themselves. */
   hiddenForMe?: boolean;
   onToggleMine?: () => void;
 };

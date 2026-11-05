@@ -67,9 +67,8 @@ const UserPasskeySettings = () => {
     }
   }, [supported]);
   const isOwn = !!user && currentUser?.id === user.id;
-  // Someone who manages users can remove another person's passkeys (a lost
-  // phone, say); the server decides whose, and refuses the owner's or
-  // another admin's to anyone but the owner.
+  // Managers can remove others' passkeys (e.g. a lost phone); the server
+  // enforces whose and reserves the owner's and other admins' to the owner.
   const managing = !!user && !isOwn && hasPermission(Permission.MANAGE_USERS);
   const endpoint = isOwn
     ? '/api/v1/auth/passkey'

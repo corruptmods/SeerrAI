@@ -1,9 +1,8 @@
 import { EventEmitter } from 'events';
 
-// whenever you need to run async code on tv show or movie that does "get existing" / "check if need to create new" / "save"
-// then you need to put all of that code in "await asyncLock.dispatch" callback based on media id
-// this will guarantee that only one part of code will run at the same for this media id to avoid code
-// trying to create two or more entries for same movie/tvshow (which would result in sqlite unique constraint failrue)
+// Wrap any "get existing / create if missing / save" sequence for a movie or
+// show in asyncLock.dispatch keyed on media id, so only one runs at a time per
+// id and duplicate entries (unique constraint failures) can't be created.
 
 class AsyncLock {
   private locked: { [key: string]: boolean } = {};

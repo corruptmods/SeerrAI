@@ -22,9 +22,8 @@ import path from 'node:path';
 import { after, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Declining a request with a reason, through the real OpenAPI validator as
- * in production: a body field the spec does not declare would be refused
- * before it reached the route.
+ * Declining with a reason through the real OpenAPI validator, as in production:
+ * an undeclared body field would be refused before the route.
  */
 
 setupTestDb();
@@ -48,8 +47,8 @@ Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
 });
 
 /**
- * Posts to the API. `body` undefined sends nothing at all, without a
- * content type, as the Decline button on a push notification does.
+ * Call the API. `body` undefined sends no body and no content type, like a push
+ * notification's Decline button.
  */
 const call = <T>(method: string, route: string, body?: unknown) =>
   new Promise<{ status: number; body: T }>((resolve, reject) => {

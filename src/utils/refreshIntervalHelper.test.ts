@@ -117,10 +117,8 @@ describe('getRequestDownloadStatus', () => {
 
   it('keeps an item Sonarr could not place in a season', () => {
     /*
-     * Upstream excluded these. The queue is already narrowed to this series
-     * by externalId, so an entry with no episode data is a season pack for
-     * the series in question — dropping it meant a pack downloaded with no
-     * progress bar and the card stuck on its pre-download status.
+     * The queue is already narrowed to this series by externalId, so an entry
+     * with no episode data is a season pack for it and must be kept.
      */
     const seasonPack = createDownloadItem({
       downloadId: 'season-pack',
@@ -166,8 +164,7 @@ describe('refreshIntervalHelper', () => {
   };
 
   it('starts checking for a page that arrived mid-download', () => {
-    // SWR passes nothing until it has fetched for itself, and sets its first
-    // timer from that.
+    // SWR passes nothing before its own first fetch and sets its first timer then.
     const interval = refreshIntervalHelper<Page>((page) => page, downloading);
     assert.equal(interval(undefined), 5_000);
   });
@@ -187,7 +184,7 @@ describe('watching a title for a download to start', () => {
   const interval = refreshIntervalHelper(watchMedia);
 
   it('keeps checking while it is requested or here only in part', () => {
-    // A request card loaded before Backfill (or Radarr) started downloading.
+    // A card loaded before Backfill (or Radarr) started downloading.
     assert.equal(interval({ status: MediaStatus.PROCESSING }), 30_000);
     assert.equal(interval({ status: MediaStatus.PARTIALLY_AVAILABLE }), 30_000);
     assert.equal(
@@ -226,9 +223,8 @@ describe('watching a request', () => {
   });
 
   it('stops once the request is done, though the series is only part here', () => {
-    // Season 1 was asked for and arrived; nobody asked for season 2. The
-    // series stays partly available for good, and the card has nothing
-    // more to wait for.
+    // Season 1 requested and available, season 2 never requested: the series
+    // stays partly available and there is nothing to wait for.
     assert.equal(
       interval({
         status: MediaRequestStatus.COMPLETED,

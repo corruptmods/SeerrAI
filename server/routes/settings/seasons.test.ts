@@ -9,8 +9,8 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * The seasons a server runs (Settings → Appearance → Seasonal themes), and
- * what pages are told about them.
+ * The server's seasons (Settings → Appearance → Seasonal themes) and what
+ * pages are told about them.
  */
 
 const app = express();
@@ -83,7 +83,7 @@ describe('the seasons a server runs', () => {
     const res = await request(app)
       .post('/api/v1/settings/appearance/seasons')
       .send({ seasons: { holidays: { enabled: false } } });
-    // Holidays' dates don't move, so it needs them.
+    // Holidays has fixed dates, so they are required.
     assert.equal(res.status, 400);
     const ok = await request(app)
       .post('/api/v1/settings/appearance/seasons')
@@ -100,8 +100,7 @@ describe('the seasons a server runs', () => {
       {},
       { seasons: null },
       { seasons: { easter: { enabled: true } } },
-      // Diwali and Pride Month are seasons no longer, so they are unknown
-      // like any other.
+      // Diwali and Pride Month were removed, so they are unknown.
       { seasons: { diwali: { enabled: true } } },
       { seasons: { pride: { enabled: false, start: '06-01', end: '06-30' } } },
       {
@@ -156,7 +155,7 @@ describe('the seasons a server runs', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, { seasons: kept });
 
-    // The next save keeps only the seasons there are.
+    // The next save keeps only existing seasons.
     const saved = await request(app)
       .post('/api/v1/settings/appearance/seasons')
       .send({

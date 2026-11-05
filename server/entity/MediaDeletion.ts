@@ -12,10 +12,9 @@ import {
 /**
  * When a title was last removed from the library.
  *
- * Kept separately from Media because a deletion can remove that row outright,
- * and the date has to outlive it: watchlist sync uses it to tell a title
- * somebody re-added on purpose from one still sitting on a watchlist from
- * before it was deleted.
+ * Separate from Media because a deletion can remove that row, and the date must
+ * outlive it: watchlist sync uses it to tell a deliberate re-add from a title
+ * still on a watchlist from before the deletion.
  */
 @Entity()
 @Unique(['tmdbId', 'mediaType'])

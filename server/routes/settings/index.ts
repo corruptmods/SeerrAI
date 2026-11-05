@@ -170,11 +170,10 @@ settingsRoutes.post('/main', async (req, res, next) => {
   }
   const keysBefore = settings.main.personalApiKeys ?? 'off';
 
-  // The primary media server is changed under Settings → Media Servers.
+  // The primary media server is changed only under Settings → Media Servers.
   const update = omit(req.body, 'mediaServerType');
   settings.main = merge(settings.main, update);
-  // The one switch for media server sign-in shown here stands for each
-  // connected server's own.
+  // This one sign-in switch applies to each connected server's own.
   applyMediaServerLogin(update.mediaServerLogin);
   await settings.save();
 
@@ -196,8 +195,8 @@ settingsRoutes.post('/main', async (req, res, next) => {
 });
 
 /*
- * The fork's optional features: which are turned off for everyone. Set as a
- * whole list, since /main merges and a merge cannot remove a list entry.
+ * The fork's optional features turned off for everyone. Set as a whole list:
+ * /main merges, and a merge can't remove a list entry.
  */
 settingsRoutes.get('/features', (_req, res) => {
   return res
@@ -215,14 +214,14 @@ settingsRoutes.post('/features', async (req, res, next) => {
   const settings = getSettings();
   settings.main.disabledFeatures = disabled;
   await settings.save();
-  // The music jobs stop while music is off for everyone.
+  // Music jobs stop while music is off for everyone.
   refreshMusicJobs();
   return res.status(200).json({ disabled });
 });
 
 /**
- * The iCloud link to the "Fix this show" shortcut, which an admin makes
- * once and shares; everyone's Siri page offers it. Empty for none.
+ * iCloud link to the admin-shared "Fix this show" shortcut, offered on every
+ * Siri page. Empty for none.
  */
 const SHORTCUT_LINK =
   /^https:\/\/(?:www\.)?icloud\.com\/shortcuts\/[0-9a-f]{32}\/?$/i;
@@ -253,8 +252,8 @@ settingsRoutes.post('/siri', async (req, res, next) => {
 });
 
 /*
- * What counts as anime: the countries whose anime is left out unless it is
- * in Japanese (utils/isAnime). Set as a whole list, like the features.
+ * What counts as anime: countries whose anime counts only when in Japanese
+ * (utils/isAnime). Set as a whole list, like the features.
  */
 settingsRoutes.get('/anime', (_req, res) => {
   return res.status(200).json({
@@ -283,9 +282,8 @@ settingsRoutes.post('/anime', async (req, res, next) => {
 });
 
 /*
- * The server's default look (Settings → Appearance): what everyone sees who
- * has not chosen their own, and the sign-in page. Everyone can still choose
- * their own in their profile.
+ * Server default look (Settings → Appearance) for anyone without their own,
+ * and the sign-in page. Users can still choose their own in their profile.
  */
 settingsRoutes.get('/appearance', (_req, res) => {
   return res
@@ -309,8 +307,8 @@ settingsRoutes.post('/appearance', async (req, res, next) => {
 });
 
 /*
- * The seasonal themes this server runs, and when (Settings → Appearance).
- * Everyone can still switch them off for themselves.
+ * The server's seasonal themes and their dates (Settings → Appearance).
+ * Users can still turn them off for themselves.
  */
 settingsRoutes.get('/appearance/seasons', (_req, res) => {
   return res
@@ -349,9 +347,8 @@ settingsRoutes.post('/network', async (req, res) => {
     trustedProxies?: string[];
   };
 
-  // Also Trust These Proxies: kept as entered, each checked the way Express
-  // will read it when the server starts, so a typo can't keep it from
-  // starting or quietly trust nothing.
+  // Trust These Proxies: kept as entered, each checked as Express will parse
+  // it at startup, so a typo can't stop startup or silently trust nothing.
   const trustedProxies = asked
     ?.map((entry) => entry.trim())
     .filter((entry) => entry !== '');
@@ -364,8 +361,7 @@ settingsRoutes.post('/network', async (req, res) => {
   }
 
   settings.network = merge(settings.network, rest);
-  // The whole list, set rather than merged: a merge keeps the entries past
-  // the end of a shorter list.
+  // Set, not merged: a merge keeps entries past the end of a shorter list.
   if (trustedProxies) {
     settings.network.trustedProxies = trustedProxies;
   }
@@ -401,8 +397,8 @@ settingsRoutes.post('/plex', async (req, res, next) => {
       where: { id: 1 },
     });
 
-    // Whether Plex is connected, and whether people may sign in with it,
-    // are changed under Settings → Media Servers.
+    // `connected` and `signIn` are changed only under Settings → Media
+    // Servers.
     Object.assign(settings.plex, omit(req.body, 'connected', 'signIn'));
 
     const plexClient = new PlexAPI({ plexToken: admin.plexToken });
@@ -413,8 +409,8 @@ settingsRoutes.post('/plex', async (req, res, next) => {
       throw new Error('Server not found');
     }
 
-    // Plex numbers every server's libraries 1, 2, 3…: another server's
-    // switches and last scans would land on whatever this one numbers so.
+    // Plex numbers every server's libraries 1, 2, 3…, so another server's
+    // toggles and last scans would land on this one's libraries.
     const machineId = result.MediaContainer.machineIdentifier;
     if (settings.plex.machineId && settings.plex.machineId !== machineId) {
       settings.plex.libraries = [];
@@ -466,7 +462,7 @@ settingsRoutes.get('/plex/devices/servers', async (req, res, next) => {
               plexDirectConnection.address = url.hostname;
               plexDirectConnections.push(plexDirectConnection);
 
-              // Connect to IP addresses over HTTP
+              // The IP connection uses HTTP; the plex.direct copy keeps HTTPS.
               connection.protocol = 'http';
             }
           });
@@ -544,8 +540,8 @@ settingsRoutes.put('/plex/library/:libraryId', async (req, res, next) => {
   return res.status(200).json(library);
 });
 
-// Plex's music libraries, listed by the sync below. Only while music is on
-// for everyone.
+// Plex music libraries found by the sync below; only while music is on for
+// everyone.
 settingsRoutes.get('/plex/music-library', requireMusicSettings, (_req, res) => {
   return res.status(200).json(getSettings().plex.musicLibraries ?? []);
 });
@@ -614,7 +610,7 @@ settingsRoutes.get('/health', async (_req, res, next) => {
   }
 });
 
-/** What Seerr's own container is using, with the last day behind it. */
+/** Seerr's container resource usage, with the last day's history. */
 settingsRoutes.get('/health/resources', async (_req, res, next) => {
   try {
     return res.status(200).json(await resourceMonitor.history());
@@ -623,7 +619,7 @@ settingsRoutes.get('/health/resources', async (_req, res, next) => {
   }
 });
 
-/** One page of one check's list, for paging through it on the health page. */
+/** One page of one health check's list. */
 settingsRoutes.get<{ id: string }>(
   '/health/checks/:id',
   async (req, res, next) => {
@@ -643,13 +639,8 @@ settingsRoutes.get<{ id: string }>(
 );
 
 /**
- * Searches Radarr and Sonarr for everything the health page lists as
- * stuck and searchable. Films go to each Radarr in one command; a series
- * whose whole aired season is missing gets a season search.
- */
-/**
- * Fixes one wrong Plex match the Health page lists, by its key: looked up
- * in Plex by the id Radarr or Sonarr has, matched, and read back.
+ * Fixes one wrong Plex match listed on the Health page, by key: looks it up
+ * in Plex by the Radarr or Sonarr id, matches it, and reads it back.
  */
 settingsRoutes.post<never, unknown, { key?: unknown }>(
   '/health/fix-match',
@@ -687,7 +678,7 @@ settingsRoutes.post<never, unknown, { key?: unknown }>(
   }
 );
 
-/** The matches fixed lately, by an admin or by themselves, newest first. */
+/** Recent match fixes, manual or automatic, newest first. */
 settingsRoutes.get('/health/match-fixes', async (_req, res) => {
   const fixes = await recentFixes();
   const ids = [
@@ -715,7 +706,7 @@ settingsRoutes.get('/health/match-fixes', async (_req, res) => {
   });
 });
 
-/** Puts a fix back as Plex had it. */
+/** Reverts a fix to Plex's previous match. */
 settingsRoutes.post<{ id: string }>(
   '/health/match-fixes/:id/undo',
   async (req, res, next) => {
@@ -731,6 +722,11 @@ settingsRoutes.post<{ id: string }>(
   }
 );
 
+/**
+ * Searches Radarr and Sonarr for everything the health page lists as stuck
+ * and searchable. Films go to each Radarr in one command; a series missing a
+ * whole aired season gets a season search.
+ */
 settingsRoutes.post('/health/search-all-missing', async (req, res, next) => {
   try {
     const titles = await searchableStuckTitles();
@@ -765,8 +761,8 @@ settingsRoutes.post('/health/search-all-missing', async (req, res, next) => {
 });
 
 /**
- * Removes requests no longer linked to a title — listed on the health page.
- * They cannot be sent, shown or fulfilled. Only rows with no title are
+ * Deletes requests no longer linked to a title (listed on the health page);
+ * they can't be sent, shown or fulfilled. Only rows with no title are
  * touched; their seasons, episode picks and watchers go with them.
  */
 settingsRoutes.delete('/health/unlinked-requests', async (req, res, next) => {
@@ -947,7 +943,7 @@ settingsRoutes.get(
 
           if (req.query.search) {
             if (
-              // label and data are sometimes undefined
+              // label and data can be undefined
               !searchRegexp.test(logMessage.label ?? '') &&
               !searchRegexp.test(logMessage.message) &&
               !deepValueStrings(logMessage.data ?? {}).some((val) =>
@@ -985,12 +981,12 @@ settingsRoutes.get(
   }
 );
 
-/** The last Match Check: folders the media server matched to another title. */
+/** Last Match Check: folders the media server matched to another title. */
 settingsRoutes.get('/plex-match-check', async (_req, res) => {
   return res.status(200).json(await plexMatchCheck.lastReport());
 });
 
-/** What the last Match Check found for one title, if anything. */
+/** Last Match Check findings for one title, if any. */
 settingsRoutes.get<
   never,
   unknown,
@@ -1003,8 +999,8 @@ settingsRoutes.get<
   }
 >('/plex-match-check/title', async (req, res) => {
   const tmdbId = req.query.tmdbId ? Number(req.query.tmdbId) : undefined;
-  // Every server's id for the title Seerr has, so a server that matched a
-  // folder to it wrongly is found whichever server's id the page passed.
+  // Every server's id for the title, so a wrong match is found whichever
+  // server's id the page passed.
   const media = tmdbId
     ? await getRepository(Media).findOne({
         where: {
@@ -1024,8 +1020,8 @@ settingsRoutes.get<
         })
       )
     : [];
-  // The id the page passed says nothing of which server it is on, so it is
-  // only used when Seerr does not have the title (as a Plex rating key).
+  // The passed key doesn't say which server it is from, so it is used (as a
+  // Plex rating key) only when Seerr doesn't have the title.
   const problems = await plexMatchCheck.problemFor(
     req.query.mediaType === 'tv' ? 'series' : 'movie',
     {
@@ -1035,8 +1031,8 @@ settingsRoutes.get<
       keys,
     }
   );
-  // What the check of new requests found since, shown at once: one problem
-  // a server, the newer finding first.
+  // Newer findings from the new-request check replace older ones: one
+  // problem per server, newest first.
   if (media) {
     const recent = await matchWatch.openProblems(media.id);
     const servers = new Set(recent.map((p) => p.mediaServer ?? 'Plex'));
@@ -1047,11 +1043,11 @@ settingsRoutes.get<
       ...problems.filter((p) => !servers.has(p.mediaServer ?? 'Plex'))
     );
   }
-  // `problem` is the first, for pages that show one.
+  // `problem` is the first, for pages that show only one.
   return res.status(200).json({ problem: problems[0] ?? null, problems });
 });
 
-/** The last Anime Check: series and movies that disagree with Seerr. */
+/** Last Anime Check report: series and movies that disagree with Seerr. */
 settingsRoutes.get('/anime-check', async (_req, res) => {
   return res.status(200).json(await animeCheck.lastReport());
 });
@@ -1172,7 +1168,7 @@ settingsRoutes.get('/cache', async (_req, res) => {
     ImageProxy.getImageStats('tmdb'),
     ImageProxy.getImageStats('tvdb'),
     ImageProxy.getImageStats('avatar'),
-    // Music's covers and pictures of artists, from their three hosts, as one.
+    // Music covers and artist images from their three hosts, combined.
     Promise.all(
       (Object.keys(MUSIC_IMAGE_ORIGINS) as MusicImageSource[]).map((source) =>
         ImageProxy.getImageStats(source)

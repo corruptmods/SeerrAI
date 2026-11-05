@@ -20,15 +20,14 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 
 /*
- * Transmission, Deluge, NZBGet and rTorrent, read for live progress: how
- * each one's states read as a download's stage, and each talked to through
- * a stand-in that speaks its protocol as the real one does.
+ * Transmission, Deluge, NZBGet and rTorrent live progress: how each maps its
+ * states to a download stage, against stand-ins speaking the real protocols.
  */
 
 const MB = 1024 * 1024;
 const HASH = 'ab'.repeat(20);
 const OTHER = 'cd'.repeat(20);
-/** How Sonarr names an NZB it sends NZBGet: a GUID without dashes. */
+/** Sonarr's drone id for an NZB sent to NZBGet: a dashless GUID. */
 const DRONE = '9f2c4e1ab7d34c0e8a5b6c7d8e9f0a1b';
 
 describe('reading each client’s states', () => {
@@ -82,7 +81,7 @@ describe('reading each client’s states', () => {
     assert.equal(t({ desiredAvailable: 45 }), 15);
     assert.equal(t({ desiredAvailable: 60 }), 0);
     assert.equal(t(), undefined);
-    // Web seeds have it all, though they aren't peers.
+    // Web seeds have everything, though they aren't peers.
     assert.equal(t({ desiredAvailable: 0, webseedsSendingToUs: 1 }), undefined);
   });
 
@@ -129,7 +128,7 @@ describe('reading each client’s states', () => {
       stage: 'downloading',
       secondsLeft: 20,
     });
-    // Several downloading share one speed: no time can be given to one.
+    // Several downloading share one speed, so no ETA for one.
     assert.equal(
       nzbgetQueueDownload(g('DOWNLOADING'), status, false).secondsLeft,
       undefined
@@ -197,14 +196,14 @@ describe('reading each client’s states', () => {
       secondsLeft: 5,
     });
     assert.equal(r({ complete: 1, leftBytes: 0 }).stage, 'importing');
-    // A file skipped: rTorrent counts it as left, and never as complete,
-    // as a real rTorrent 0.9.8 does. The files wanted are in.
+    // A skipped file counts as left and never complete, as in rTorrent
+    // 0.9.8. The wanted files are in.
     assert.deepEqual(r({ leftBytes: 30, wantedChunks: 0 }), {
       size: 70,
       sizeLeft: 0,
       stage: 'importing',
     });
-    // Still downloading the files wanted: what's left of them only.
+    // Still downloading wanted files: only their remainder counts.
     assert.deepEqual(r({ leftBytes: 60, wantedChunks: 2 }), {
       size: 60,
       sizeLeft: 20,
@@ -255,7 +254,7 @@ describe('reading each client’s states', () => {
         refused: ['Pack/../../srv/app.db', '/srv/app.db'],
       }
     );
-    // No folder from rTorrent: nothing is taken from the root.
+    // No folder from rTorrent: nothing under the root is removed.
     assert.deepEqual(
       rtorrentRemovals({ directory: '', isMultiFile: 0 }, ['a.mkv']),
       { files: [], folders: [], refused: ['a.mkv'] }
@@ -291,7 +290,7 @@ describe('talking to them', () => {
     ).toString();
 
   before(async () => {
-    // Transmission: 409 with a session id first; that id is then required.
+    // Transmission: a 409 with a session id first, then that id is required.
     await listen('transmission', async (req, res) => {
       const { method, arguments: args } = JSON.parse(await body(req));
       calls.push(`transmission ${method}`);
@@ -330,10 +329,9 @@ describe('talking to them', () => {
       );
     });
 
-    // Deluge: signs in with its password, and is not yet connected to its
-    // daemon, as after a restart. Deluge 2 lists daemon.get_version and no
-    // daemon.info, as a 2.x Web UI answered system.listMethods; Deluge 1.3
-    // (on its own port) the other way round.
+    // Deluge: password sign-in, not yet connected to its daemon (as after a
+    // restart). Deluge 2 lists daemon.get_version and no daemon.info, as a
+    // real 2.x system.listMethods does; Deluge 1.3 (own port) the reverse.
     let delugeConnected = false;
     await listen('deluge', async (req, res) => {
       const { method, params, id } = JSON.parse(await body(req));
@@ -377,8 +375,8 @@ describe('talking to them', () => {
       answer(null, { message: 'Unknown method', code: 2 });
     });
 
-    // NZBGet: basic auth; one job in the queue with Sonarr's drone id, one
-    // finished in the history known only by its NZBID.
+    // NZBGet: basic auth; one queued job with Sonarr's drone id, one in
+    // history known only by its NZBID.
     await listen('nzbget', async (req, res) => {
       const { method } = JSON.parse(await body(req));
       calls.push(`nzbget ${method}`);
@@ -503,7 +501,7 @@ describe('talking to them', () => {
   it('Deluge: says so when the password is wrong', async () => {
     const api = new DelugeAPI({
       ...at('deluge', { password: 'wrong' }),
-      // A different address, so the session above is not reused.
+      // A different address, so the session above isn't reused.
       hostname: 'localhost',
     });
     await assert.rejects(

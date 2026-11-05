@@ -103,7 +103,7 @@ searchProviders.push({
 
     const results: (TmdbMovieResult | TmdbTvResult | TmdbPersonResult)[] = [];
 
-    // set the media_type here since searching by external id doesn't return it
+    // Searching by external id doesn't return media_type.
     results.push(
       ...(responses.movie_results.map((movie) => ({
         ...movie,
@@ -141,7 +141,7 @@ searchProviders.push({
 
     const results: (TmdbMovieResult | TmdbTvResult | TmdbPersonResult)[] = [];
 
-    // set the media_type here since searching by external id doesn't return it
+    // Searching by external id doesn't return media_type.
     results.push(
       ...(responses.movie_results.map((movie) => ({
         ...movie,
@@ -194,7 +194,7 @@ searchProviders.push({
     if (successfulResponses.length) {
       successfulResponses.forEach((response) => {
         response.value.results.forEach((result) =>
-          // set the media_type here since the search endpoints don't return it
+          // The search endpoints don't return media_type.
           results.push(
             isMovie(result)
               ? { ...result, media_type: 'movie' }

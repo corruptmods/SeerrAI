@@ -7,9 +7,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Who sees which library on each connected media server: one person's
- * libraries, and one library taken from (or given to) everyone at once,
- * with a preview first and Undo after. Admins only, as all of /settings.
+ * Who sees which library on each media server: one user's libraries, or one
+ * library for everyone at once, with preview and Undo. Admin only, like all
+ * of /settings.
  */
 const libraryAccessRoutes = Router();
 
@@ -26,7 +26,7 @@ const personBody = z.object({
   libraries: z.array(z.string().min(1)).max(500),
 });
 
-/** Passes a refused change on with its status, anything else as a 500. */
+/** Forwards a refused change with its status, anything else as a 500. */
 const failed = (next: NextFunction, e: unknown) => {
   if (e instanceof LibraryAccessError) {
     return next({ status: e.status, message: e.message });

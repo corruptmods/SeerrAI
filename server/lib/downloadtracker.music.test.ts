@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Music downloads: Lidarr's queue, read like Radarr's and Sonarr's, each
- * item naming the album it is for, so an artist's page, an album's page and
- * a request card can each show their own.
+ * Music downloads: Lidarr's queue, read like Radarr's and Sonarr's, each item
+ * tagged with its album so artist pages, album pages and request cards show
+ * their own.
  */
 
 let queue: Record<string, unknown>[] = [];

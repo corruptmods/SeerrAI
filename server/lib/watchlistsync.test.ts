@@ -30,12 +30,12 @@ const WATCHLISTED_AT = 1700000000;
 let watchlistItems: PlexWatchlistItem[] = [];
 let watchlistedAt = new Map<string, number | null>();
 let userStateCalls: string[] = [];
-/** How long each watchlist date lookup takes, and the most at once. */
+/** Delay per watchlist date lookup; the test tracks peak concurrency. */
 let userStateDelayMs = 0;
 let userStateInFlight = 0;
 let userStateMostAtOnce = 0;
 let tmdbSeasons: number[] = [];
-/** Plex turning the user's token down, and how often it was asked. */
+/** Whether Plex rejects the user's token; calls are counted. */
 let watchlistAuthFailed = false;
 let watchlistCalls = 0;
 let tmdbAirDates = new Map<number, string>();
@@ -293,8 +293,8 @@ describe('WatchlistSync status gating', () => {
       requested.size,
       'Each item should be requested exactly once'
     );
-    // Upstream requests deleted titles again here. This fork does not: a
-    // deletion with no entry behind it is the loop a cleanup causes.
+    // Upstream re-requests deleted titles here; this fork doesn't: a deletion
+    // with no entry behind it is the loop a cleanup causes.
     assert.ok(!requested.has(`${MediaType.MOVIE}:100`));
     assert.ok(requested.has(`${MediaType.MOVIE}:101`));
     assert.ok(!requested.has(`${MediaType.MOVIE}:102`));
@@ -335,7 +335,7 @@ describe('WatchlistSync when the database cannot be read', () => {
     }
     assert.deepStrictEqual(requestedIds(), []);
 
-    // Readable again: still nothing, as it is here.
+    // Readable again: still nothing, since it is here.
     await watchlistSync.syncWatchlist();
     assert.deepStrictEqual(requestedIds(), []);
   });
@@ -597,8 +597,8 @@ describe('WatchlistSync seeding from request history', () => {
   });
 
   it('leaves a deleted title alone even when its old request predates the watchlist date', async () => {
-    // Taken off the watchlist and put back while still in the library, then
-    // deleted — before deletions were recorded, so no time is known.
+    // Removed and re-added while in the library, then deleted before deletions
+    // were recorded, so no time is known.
     const user = await configureSyncUser();
     await seedRequest({
       user,
@@ -617,7 +617,7 @@ describe('WatchlistSync seeding from request history', () => {
       WATCHLISTED_AT
     );
 
-    // Taking it off the watchlist and adding it back does bring it back.
+    // Removing and re-adding it does bring it back.
     watchlistedAt.set('rk-100', WATCHLISTED_AT + 1000);
     await watchlistSync.syncWatchlist();
 
@@ -638,7 +638,7 @@ describe('WatchlistSync seeding from request history', () => {
 
     await watchlistSync.syncWatchlist();
 
-    // Not settled by the manual request — by the title having been deleted.
+    // Settled by the deletion, not by the manual request.
     assert.deepStrictEqual(requestCalls, []);
     assert.ok(await getEntry(100, MediaType.MOVIE));
   });
@@ -684,8 +684,8 @@ describe('WatchlistSync users', () => {
 
 /*
  * This fork recorded deletions before entries were tracked. The first sync
- * after upgrading finds no entries at all, so those records are what stop it
- * bringing back everything a cleanup removed.
+ * after upgrading has no entries, so those records are what stop it bringing
+ * back everything a cleanup removed.
  */
 describe('WatchlistSync deletions recorded before entries', () => {
   const ADDED = WATCHLISTED_AT;
@@ -740,7 +740,7 @@ describe('WatchlistSync deletions recorded before entries', () => {
     tmdbAirDates = new Map([
       [1, '2020-01-01'],
       [2, '2021-01-01'],
-      // Season 3 is newer than the deletion: what the requester still wants.
+      // Season 3 is newer than the deletion: still wanted.
       [
         3,
         new Date(DELETED_AFTER.getTime() + 30 * 86400000)
@@ -829,9 +829,8 @@ describe('WatchlistSync without a watchlisted date', () => {
 });
 
 /*
- * Titles deleted before this fork recorded deletions: Seerr marks them
- * deleted, but there is no time. Each case here re-downloaded something in
- * an earlier version of this change.
+ * Titles deleted before this fork recorded deletions: marked deleted, but no
+ * time. Each case here re-downloaded something in an earlier version.
  */
 describe('WatchlistSync deletions with no recorded time', () => {
   const PAST = (daysAgo: number) =>
@@ -882,8 +881,8 @@ describe('WatchlistSync deletions with no recorded time', () => {
   });
 
   it('does not re-request seasons of a deleted show that aired after its first request', async () => {
-    // Requested at seasons 1–2; season 3 aired and downloaded later; then
-    // the whole show was deleted.
+    // Requested at seasons 1–2; season 3 aired and downloaded later; then the
+    // whole show was deleted.
     const user = await configureSyncUser();
     await seedRequest({
       user,
@@ -903,7 +902,7 @@ describe('WatchlistSync deletions with no recorded time', () => {
     await watchlistSync.syncWatchlist();
     assert.deepStrictEqual(requestCalls, []);
 
-    // Its next season is announced: that one is new, and is requested.
+    // Its next season is announced: new, so requested.
     tmdbSeasons = [1, 2, 3, 4];
     await watchlistSync.syncWatchlist();
 
@@ -918,7 +917,7 @@ describe('WatchlistSync deletions with no recorded time', () => {
     tmdbSeasons = [1, 2, 3];
     tmdbAirDates = new Map([
       [1, PAST(900)],
-      // Season 2 has no date on TMDB, but season 3 after it has aired.
+      // Season 2 has no TMDB date, but season 3 after it has aired.
       [3, PAST(100)],
     ]);
     watchlistItems = [showItem(511, 'Patchy Dates')];
@@ -934,8 +933,7 @@ describe('WatchlistSync deletions dated by the title record', () => {
   const secondsAgo = (days: number) =>
     Math.floor(daysAgo(days).getTime() / 1000);
 
-  // When Seerr last changed the row: for a deleted title, at or after its
-  // deletion.
+  // Row's last update: for a deleted title, at or after its deletion.
   const deletedAgo = async (media: Media, days: number) =>
     getRepository(Media)
       .createQueryBuilder()

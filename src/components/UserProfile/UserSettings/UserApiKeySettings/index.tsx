@@ -84,7 +84,7 @@ const messages = defineMessages(
 const LIFETIME_VALUE = (lifetime: ApiKeyLifetime) =>
   lifetime === null ? 'never' : String(lifetime);
 
-/** The visible start of a key, with the rest left out. */
+/** A key's visible prefix. */
 const Prefix = ({ prefix }: { prefix: string }) => (
   <code className="rounded bg-gray-700/60 px-1.5 py-0.5 font-mono text-xs text-gray-200">
     {prefix}…
@@ -92,8 +92,8 @@ const Prefix = ({ prefix }: { prefix: string }) => (
 );
 
 /**
- * The new key, once: shown in full with a copy button that says so, and
- * what to do with it (`hint`; how apps send a key, unless given).
+ * A new key, shown once in full with a copy button and `hint` (default: how
+ * apps send a key).
  */
 export const NewKey = ({ secret, hint }: { secret: string; hint?: string }) => {
   const intl = useIntl();
@@ -108,7 +108,7 @@ export const NewKey = ({ secret, hint }: { secret: string; hint?: string }) => {
           {intl.formatMessage(messages.newTitle)}
         </label>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-          {/* All of it on show, on a phone too: wrapped, not cut off. */}
+          {/* Wrap, never truncate, so the whole key shows on phones. */}
           <textarea
             id={inputId}
             readOnly
@@ -146,9 +146,8 @@ const UserApiKeySettings = () => {
   const { user: currentUser, hasPermission } = useUser();
   const { user } = useUser({ id: Number(router.query.userId) });
   const isOwn = !!user && currentUser?.id === user.id;
-  // Someone who manages users can see and revoke another person's keys;
-  // the server decides whose, and keeps the owner's and other admins' to
-  // the owner.
+  // Managers can view and revoke others' keys; the server enforces whose and
+  // reserves the owner's and other admins' keys to the owner.
   const managing = !!user && !isOwn && hasPermission(Permission.MANAGE_USERS);
   const endpoint =
     user && (isOwn || managing)
@@ -173,8 +172,7 @@ const UserApiKeySettings = () => {
     setMaking(true);
   };
 
-  // The new key is forgotten once the dialog has gone (afterLeave), so it
-  // doesn't flip back to the form on its way out.
+  // The key is cleared in afterLeave so the form doesn't flash while closing.
   const closeDialog = () => setMaking(false);
 
   const make = async () => {
@@ -376,8 +374,7 @@ const UserApiKeySettings = () => {
           okDisabled={!created && (!name.trim() || submitting)}
           onOk={created ? closeDialog : make}
           onCancel={created ? undefined : closeDialog}
-          // Once the key is shown, a stray click or Escape must not lose a
-          // key that is shown only this once: Done closes it.
+          // The key shows only once: only Done closes the dialog.
           backgroundClickable={!created}
         >
           {created ? (

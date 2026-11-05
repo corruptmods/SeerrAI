@@ -39,7 +39,7 @@ interface PushoverPayload extends PushoverImagePayload {
   html: number;
 }
 
-/** The most characters Pushover takes in a message. */
+/** Pushover's message length limit. */
 const MESSAGE_LIMIT = 1024;
 
 class PushoverAgent
@@ -176,9 +176,7 @@ class PushoverAgent
       message += `<small>\n<b>${extra.name}:</b> ${extra.value}</small>`;
     }
 
-    // Pushover takes at most 1,024 characters. Told why a request was
-    // declined, the requester needs the reason more than the plot summary,
-    // so the summary is left out when both do not fit.
+    // Over the limit, drop the summary to keep the decline reason.
     if (
       declineReasonOf(type, payload) &&
       message.length > MESSAGE_LIMIT &&
@@ -273,8 +271,7 @@ class PushoverAgent
       }
     }
 
-    // Held while a burst to this person is gathered into one (see the
-    // notification manager): only the admin and channel copies go now.
+    // holdUser: the user's copy goes out later in a digest.
     if (payload.notifyUser && !payload.holdUser) {
       if (
         payload.notifyUser.settings?.hasNotificationType(

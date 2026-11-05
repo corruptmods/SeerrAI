@@ -9,11 +9,11 @@ import type { Statuses } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
 
 /*
- * What Seerr already has of the artists and albums a page shows: their
- * status, read by MusicBrainz id. Nothing here asks MusicBrainz.
+ * Stored statuses of artists and albums by MusicBrainz id. Nothing here
+ * queries MusicBrainz.
  */
 
-/** Ids looked up at once; well under SQLite's 999 bound parameters. */
+/** Ids per query; well under SQLite's 999 bound parameters. */
 const CHUNK = 500;
 
 const chunks = (ids: string[]): string[][] => {
@@ -25,7 +25,7 @@ const chunks = (ids: string[]): string[][] => {
   return out;
 };
 
-/** Artists' statuses, by their MusicBrainz id. */
+/** Artist statuses by MusicBrainz id. */
 export const artistStatuses = async (ids: string[]): Promise<Statuses> => {
   const statuses: Statuses = new Map();
   for (const chunk of chunks(ids)) {
@@ -43,8 +43,8 @@ export const artistStatuses = async (ids: string[]): Promise<Statuses> => {
 };
 
 /**
- * Albums' statuses, by their MusicBrainz id. An album can sit under two
- * artists (a collaboration each has); the further along counts.
+ * Album statuses by MusicBrainz id. A collaboration can be stored under two
+ * artists; the more advanced status wins.
  */
 export const albumStatuses = async (ids: string[]): Promise<Statuses> => {
   const statuses: Statuses = new Map();
@@ -67,9 +67,8 @@ export const albumStatuses = async (ids: string[]): Promise<Statuses> => {
 };
 
 /**
- * Albums Lidarr has files for that no media server lists yet: shown as
- * being added to the library. Not while Lidarr's files decide on their own
- * (no music library switched on), when such an album is already here.
+ * Albums Lidarr has files for that no media server lists yet. Empty when
+ * Lidarr alone decides availability, since those albums count as available.
  */
 export const albumsBeingAdded = async (ids: string[]): Promise<Set<string>> => {
   const adding = new Set<string>();
@@ -92,7 +91,7 @@ export const albumsBeingAdded = async (ids: string[]): Promise<Set<string>> => {
   return adding;
 };
 
-/** Marks the albums Lidarr has and no media server lists yet. */
+/** Sets addingToLibrary on albums from albumsBeingAdded. */
 export const markBeingAdded = async <
   T extends { id: string; addingToLibrary?: boolean },
 >(
@@ -105,7 +104,7 @@ export const markBeingAdded = async <
   return albums;
 };
 
-/** How far along a status is, for choosing between two. */
+/** Status order, for picking the more advanced of two. */
 const rank = (status: MediaStatus): number =>
   [
     MediaStatus.UNKNOWN,
@@ -117,7 +116,7 @@ const rank = (status: MediaStatus): number =>
     MediaStatus.AVAILABLE,
   ].indexOf(status);
 
-/** The artist's own record, with its requests, for their page. */
+/** The artist's media row with its requests. */
 export const artistMedia = async (
   artistMbid: string
 ): Promise<Media | undefined> =>
@@ -126,7 +125,7 @@ export const artistMedia = async (
     relations: { requests: true },
   })) ?? undefined;
 
-/** Where to play an album, from the ids each server gave it. */
+/** Play links for an album from each media server's ids. */
 export const albumLinks = async (albumMbid: string): Promise<PlayLink[]> =>
   albumPlayLinks(
     await getRepository(MusicAlbum).find({

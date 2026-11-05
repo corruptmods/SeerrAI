@@ -30,10 +30,9 @@ import {
 } from 'node:test';
 
 /*
- * Linking a playlist: each link reads a page from Spotify and brings in
- * songs to look for on MusicBrainz, so a person links only so many in a
- * while, and not while many of theirs are still being looked for. Names
- * are invented.
+ * Linking a playlist reads a Spotify page and queues songs for MusicBrainz,
+ * so links are rate limited and refused while many of the user's songs are
+ * still being matched. Names are invented.
  */
 
 setupTestDb();
@@ -121,8 +120,7 @@ beforeEach(async () => {
   );
   actingAs = user;
   pageReads = mock.method(axios, 'get', async () => ({ data: spotifyPage }));
-  // MusicBrainz knows no one: each song is left unmatched. Deezer lists
-  // none of them.
+  // MusicBrainz and Deezer find nothing, so every song stays unmatched.
   mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
     count: 0,
     offset: 0,
@@ -176,7 +174,7 @@ describe('linking a playlist', () => {
       0
     );
 
-    // Someone else's waiting songs are not theirs.
+    // Another user's waiting songs don't count.
     await getRepository(MediaListSong).update(
       { listId: waiting.id },
       { requestForId: null }
@@ -185,15 +183,15 @@ describe('linking a playlist', () => {
   });
 
   it('is refused past so many tries in a while', async () => {
-    // People of their own, whom no other test has counted.
+    // Users no other test has counted.
     const someone = (id: number) => Object.assign(new User(), { id });
     actingAs = someone(777_001);
-    // A list that isn't there still counts as a try.
+    // A missing list still counts as a try.
     for (let i = 0; i < 20; i++) {
       assert.equal((await link(999_999)).status, 404);
     }
     assert.equal((await link(999_999)).status, 429);
-    // Someone else has tries of their own.
+    // Tries are counted per user.
     actingAs = someone(777_002);
     assert.equal((await link(999_999)).status, 404);
   });

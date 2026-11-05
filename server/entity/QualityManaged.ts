@@ -13,10 +13,10 @@ import {
 export type QualityItemKind = 'profile' | 'format';
 
 /**
- * Something in a Radarr or Sonarr that Seerr AI created and manages (Settings
- * → Quality): a quality profile or a custom format, by its id there. Nothing
- * else on a server is ever changed. The fingerprint is of what Seerr AI last
- * wrote, so a change made in Radarr or Sonarr itself shows.
+ * A quality profile or custom format Seerr AI created and manages in a Radarr
+ * or Sonarr (Settings → Quality), by its id there. Nothing else on a server is
+ * ever changed. The fingerprint is of what Seerr AI last wrote, so edits made
+ * in Radarr or Sonarr show.
  */
 @Entity()
 @Unique('UNIQUE_QUALITY_MANAGED', ['serverKind', 'serverId', 'itemKind', 'key'])
@@ -46,8 +46,8 @@ export class QualityManaged {
   public fingerprint: string;
 
   /**
-   * An admin kept a change someone made to it in Radarr or Sonarr: it is
-   * left as it is, and skipped, until someone puts it back.
+   * An admin kept an edit made in Radarr or Sonarr: it's left as is and skipped
+   * until reverted.
    */
   @Column({ type: 'boolean', default: false })
   public keptAsEdited: boolean;

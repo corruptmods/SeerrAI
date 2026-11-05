@@ -17,13 +17,13 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/* How each person arranges their sidebar and phone menu (Discover, Customize). */
+// How users arrange their sidebar and phone menu (Discover, Customize).
 
 describe('a sidebar order', () => {
   it('starts with what the phone bar has always shown', () => {
-    // One usual order for the sidebar and the phone. Its first five are
-    // the phone bar of 1.1.0, so nobody's bar changes; the sidebar's only
-    // change is Watch Lists moving up after Series. Music came after.
+    // One default order for sidebar and phone. Its first five are the 1.1.0
+    // phone bar, so nobody's bar changes; the sidebar only moves Watch Lists up
+    // after Series. Music was added later.
     assert.deepEqual(
       [...NAV_ITEMS],
       [
@@ -54,15 +54,15 @@ describe('a sidebar order', () => {
   });
 
   it('puts an item the saved order does not name in its default place', () => {
-    // Saved before Music, Calendar and Backfill existed, with Requests
-    // moved first.
+    // Saved before Music, Calendar and Backfill existed, with Requests moved
+    // first.
     const saved = NAV_ITEMS.filter(
       (id) => !['music', 'calendar', 'backfill', 'requests'].includes(id)
     );
     const order = orderNavItems(['requests', ...saved]);
     assert.equal(order.length, NAV_ITEMS.length);
-    // Music follows Requests by default, wherever Requests now is, and
-    // Calendar follows Music.
+    // Music follows Requests by default, wherever Requests is, and Calendar
+    // follows Music.
     assert.deepEqual(order.slice(0, 3), ['requests', 'music', 'calendar']);
     assert.equal(order.indexOf('backfill'), order.indexOf('users') + 1);
   });
@@ -81,7 +81,7 @@ describe('a sidebar order', () => {
   });
 
   it('passes over names it does not know, and repeats', () => {
-    // A name from a later version (or an earlier one) is no item here.
+    // Names from other versions aren't items here.
     assert.deepEqual(
       orderNavItems(['books', 'settings', 'settings', ...NAV_ITEMS]),
       ['settings', ...NAV_ITEMS.filter((id) => id !== 'settings')]
@@ -120,7 +120,7 @@ describe('moving an item', () => {
   });
 
   it('moves past an item someone cannot see, so it really moves', () => {
-    // Someone without Users or Backfill sees Issues then Settings; moving
+    // Without Users or Backfill, Issues is followed by Settings; moving
     // Settings up puts it before Issues, not between Users and Backfill.
     const moved = moveNavItem(order, 'settings', 'issues', 'before');
     assert.equal(moved.indexOf('settings'), moved.indexOf('issues') - 1);
@@ -169,7 +169,7 @@ describe('hiding items', () => {
 
 describe('the menus', () => {
   it('put their links in the saved order, the ones someone cannot see keeping their place', () => {
-    // Someone who cannot see Users or Settings gets the rest in order.
+    // Someone who can't see Users or Settings gets the rest in order.
     const links = [
       { id: 'discover' as const },
       { id: 'requests' as const },
@@ -179,7 +179,7 @@ describe('the menus', () => {
       sortByNavOrder(links, ['settings', 'lists', 'users', 'discover']).map(
         (link) => link.id
       ),
-      // Requests is not named, so it follows Watch Lists, as by default.
+      // Requests isn't named, so it follows Watch Lists, as by default.
       ['lists', 'requests', 'discover']
     );
   });
@@ -203,7 +203,7 @@ describe('arranging the menu', () => {
 
   it('counts as unchanged when it comes to the same menu', () => {
     const saved = { order: [], hidden: ['blocklist', 'issues'] };
-    // The default order in full is no order; hidden items in any order.
+    // The full default order equals no order; hidden items in any order.
     assert.equal(
       sameNavLayout(saved, {
         order: [...NAV_ITEMS],
@@ -270,7 +270,7 @@ describe('the bar along the bottom of a phone', () => {
   });
 
   it('gives no place to an item someone cannot use', () => {
-    // Music and Calendar switched off, no Blocklist or Issues permission.
+    // Music and Calendar off, no Blocklist or Issues permission.
     const usable = links([]).filter(
       (link) =>
         !['requests', 'music', 'calendar', 'blocklist'].includes(link.id)
@@ -286,7 +286,7 @@ describe('the bar along the bottom of a phone', () => {
 
   it('splits the order where the bar ends, hidden items keeping their place', () => {
     const [onBar, rest] = splitAtNavBar(links([]), ['series']);
-    // Series is hidden but stays where it is in the order.
+    // Series is hidden but keeps its place in the order.
     assert.deepEqual(ids(onBar), [
       'discover',
       'movies',

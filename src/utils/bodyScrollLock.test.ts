@@ -3,10 +3,8 @@ import { beforeEach, describe, it } from 'node:test';
 import { isBodyScrollLocked, lockBodyScroll } from './bodyScrollLock';
 
 /*
- * Panels, dialogs and slide-overs each stop the page behind them scrolling.
- * They open and close in any order (a dialog fading out as the AI panel
- * opens, a panel closed by leaving the page while a dialog in it is still
- * up), and the page must scroll again once the last of them is gone.
+ * Panels, dialogs and slide-overs lock scrolling and release in any order;
+ * the page must scroll again once the last is gone.
  */
 
 const page = () => ({ style: { overflow: '', touchAction: '' } });
@@ -37,8 +35,7 @@ describe('lockBodyScroll', () => {
   });
 
   it('frees the page whichever order they are released in', () => {
-    // The old lock restored what it saw when it locked: the second saw
-    // "hidden", and released last it left the page stuck.
+    // A lock that restored what it saw would restore "hidden" here.
     const dialog = lockBodyScroll(body);
     const panel = lockBodyScroll(body);
     dialog();
@@ -85,7 +82,7 @@ describe('isBodyScrollLocked', () => {
   });
 
   it('is not fooled by a style set some other way', () => {
-    // Pull to refresh sets touch-action itself while a finger is down.
+    // Pull to refresh sets touch-action while a finger is down.
     body.style.touchAction = 'none';
     assert.equal(isBodyScrollLocked(body), false);
   });

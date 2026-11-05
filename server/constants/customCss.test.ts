@@ -8,11 +8,9 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * Custom CSS. An admin's Server CSS is trusted and may bring in stylesheets
- * from elsewhere; a person's own CSS may only use pictures and fonts from
- * this server, so a style pasted from somewhere can't send anything away.
- */
+// Custom CSS. Server CSS is trusted and may import external stylesheets;
+// personal CSS may only load images and fonts from this server, so a pasted
+// style can't send anything away.
 
 const problemOf = (css: unknown) => {
   const result = checkPersonalCss(css);
@@ -82,8 +80,8 @@ svg { filter: url(#glow); mask: url("data:image/svg+xml;utf8,<svg/>"); }
   });
 
   it('reads an unquoted url() as the browser does, comments and quotes in it', () => {
-    // In an unquoted url(), /* and quotes don't start a comment or a
-    // string, so they can't hide the rest of the CSS from the check.
+    // In an unquoted url(), /* and quotes don't start a comment or string, so
+    // they can't hide the rest of the CSS from the check.
     for (const [css, address] of [
       [
         'a{background:url(/x/*)}b{background:url(https://evil.example/)}c{background:url(/y*/)}',
@@ -106,8 +104,8 @@ svg { filter: url(#glow); mask: url("data:image/svg+xml;utf8,<svg/>"); }
         css
       );
     }
-    // Not url(): a #hash, an @rule or a longer name, so no address at all;
-    // a /* in their brackets is a comment.
+    // Not url() (a #hash, an @rule or a longer name), so no address; a /* in
+    // their brackets is a comment.
     for (const css of [
       'a#url(/*)*/{color:red}',
       '@url(/*)*/;',

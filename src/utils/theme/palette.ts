@@ -1,25 +1,24 @@
 /*
- * The colours behind every built-in choice. Classic with Indigo is how
- * Seerr AI has always looked, value for value (globals.css carries the same
- * values as the page's fallback, and theme.test.ts checks they agree).
+ * Colours for every built-in choice. Classic + Indigo is the default look;
+ * globals.css repeats its values as a fallback (theme.test.ts checks they match).
  */
 import type { ThemeAccent, ThemeBackground } from '@server/constants/theme';
 import type { AccentColours, Scale } from './colour';
 import { SCALE_STEPS, accentFromColour, accentFromScale } from './colour';
 
-/** The greys of one background, and what each surface and text uses. */
+/** A background's greys and the surface and text colours they give. */
 export interface Neutrals {
   gray: Scale;
   page: string;
   surface: string;
   surfaceRaised: string;
-  /** The sidebar's gradient, top to bottom. */
+  /** Sidebar gradient, top to bottom. */
   sidebar: string;
   sidebarTo: string;
   /** Dims the page behind a window; always dark. */
   overlay: string;
   overlayStrong: string;
-  /** Behind text on pictures; always dark. */
+  /** Scrim behind text on images; always dark. */
   mediaScrim: string;
   textStrong: string;
   textDefault: string;
@@ -30,13 +29,13 @@ export interface Neutrals {
   fieldBorder: string;
 }
 
-/** A scale from its eleven colours, 50 to 950, separated by spaces. */
+/** A scale from eleven space-separated colours, 50 to 950. */
 const scale = (hexes: string): Scale =>
   Object.fromEntries(
     hexes.split(' ').map((hex, i) => [SCALE_STEPS[i], hex])
   ) as Scale;
 
-/** A dark background's surfaces, from its greys. */
+/** A dark background's surfaces from its greys. */
 const darkNeutrals = (
   gray: Scale,
   sidebar: string,
@@ -61,7 +60,7 @@ const darkNeutrals = (
 });
 
 export const DARK_BACKGROUNDS: Record<ThemeBackground, Neutrals> = {
-  // Tailwind's gray: today's colours.
+  // Tailwind's gray: the default.
   classic: darkNeutrals(
     scale(
       '#f9fafb #f3f4f6 #e5e7eb #d1d5db #9ca3af #6b7280 ' +
@@ -79,7 +78,7 @@ export const DARK_BACKGROUNDS: Record<ThemeBackground, Neutrals> = {
     '#141414',
     '#0a0a0a'
   ),
-  // Tailwind's slate: a cooler blue-grey.
+  // Tailwind's slate: cooler blue-grey.
   slate: darkNeutrals(
     scale(
       '#f8fafc #f1f5f9 #e2e8f0 #cbd5e1 #94a3b8 #64748b ' +
@@ -88,7 +87,7 @@ export const DARK_BACKGROUNDS: Record<ThemeBackground, Neutrals> = {
     '#1e293b',
     '#152036'
   ),
-  // Tailwind's stone: a warmer brown-grey.
+  // Tailwind's stone: warmer brown-grey.
   warm: darkNeutrals(
     scale(
       '#fafaf9 #f5f5f4 #e7e5e4 #d6d3d1 #a8a29e #78716c ' +
@@ -100,9 +99,8 @@ export const DARK_BACKGROUNDS: Record<ThemeBackground, Neutrals> = {
 };
 
 /*
- * Light. The greys run the other way round, so a page not yet given its own
- * light colours (bg-gray-900, text-gray-300) still comes out light with dark
- * text: 900 is the page, 800 a white panel, 300 and 400 dark enough to read.
+ * Light. Greys are inverted so gray-* classes still give a light page with
+ * dark text: 900 is the page, 800 a white panel, 300/400 readable text.
  */
 export const LIGHT: Neutrals = {
   gray: scale(
@@ -126,7 +124,7 @@ export const LIGHT: Neutrals = {
   fieldBorder: '#6b7280',
 };
 
-/** Success, warning, danger and info: a fill, text on the page, a tint. */
+/** Success, warning, danger and info: fill, page text and tint. */
 export interface StatusColours {
   fill: string;
   text: string;
@@ -135,15 +133,14 @@ export interface StatusColours {
 export type Status = 'success' | 'warning' | 'danger' | 'info';
 
 export const STATUS: Record<'dark' | 'light', Record<Status, StatusColours>> = {
-  // Today's: what buttons, badges, alerts and toasts already use.
+  // Classic's: as used by buttons, badges, alerts and toasts.
   dark: {
     success: { fill: '#22c55e', text: '#4ade80', soft: '#22c55e' },
     warning: { fill: '#eab308', text: '#eab308', soft: '#facc15' },
     danger: { fill: '#dc2626', text: '#ef4444', soft: '#dc2626' },
     info: { fill: '#6366f1', text: '#6366f1', soft: '#818cf8' },
   },
-  // Darker, solid fills under white text, and text dark enough to read on
-  // white and on the page.
+  // Darker solid fills under white text; text readable on white and the page.
   light: {
     success: { fill: '#15803d', text: '#15803d', soft: '#22c55e' },
     warning: { fill: '#b45309', text: '#854d0e', soft: '#eab308' },
@@ -153,10 +150,9 @@ export const STATUS: Record<'dark' | 'light', Record<Status, StatusColours>> = {
 };
 
 /*
- * True black, Slate and Warm. Classic keeps today's colours above, some of
- * which reach only 3:1; these have no today to keep, so their fills are a
- * step deeper (white on buttons and the pale text on badges read over them)
- * and danger and info text is light enough for 4.5:1.
+ * True black, Slate and Warm. Classic keeps its originals (some only 3:1);
+ * these use fills a step deeper so white and pale badge text read, and
+ * danger/info text that reaches 4.5:1.
  */
 export const OTHER_DARK_STATUS: Record<Status, StatusColours> = {
   success: { fill: '#15803d', text: '#4ade80', soft: '#22c55e' },
@@ -175,9 +171,8 @@ const PURPLE = scale(
 );
 
 /*
- * The approved design's text on each accent's buttons and its link colour
- * in dark and in light; the rest (hovers, tints, gradients) comes from the
- * accent's scale. theme.test.ts checks every one of them reads.
+ * An accent with the design's button text and link colours (dark and light);
+ * hovers, tints and gradients come from its scale. theme.test.ts checks contrast.
  */
 export const asDesigned = (
   accent: AccentColours,
@@ -196,11 +191,9 @@ export const asDesigned = (
 const WARM_INK = '#1c1917';
 
 /*
- * Indigo is today's, exactly: buttons indigo-600 lightening to indigo-500,
- * links and active tabs indigo-500, gradients into purple, badges
- * indigo-500 with indigo-100 text. Its link colour in dark (4:1 on the
- * page) is below what the other accents reach; it is kept so that Classic
- * does not change for anyone.
+ * Indigo matches the original look exactly: buttons indigo-600 → 500, links
+ * and active tabs indigo-500, gradients into purple, badges indigo-500 on
+ * indigo-100. Its dark link colour is only 4:1, kept so Classic never changes.
  */
 const indigo = (): AccentColours => {
   const accent = asDesigned(
@@ -290,5 +283,5 @@ export const ACCENTS: Record<Exclude<ThemeAccent, 'custom'>, AccentColours> = {
   ),
 };
 
-/** The colour a custom accent starts from before anyone picks one. */
+/** Default custom accent colour. */
 export const CUSTOM_ACCENT_START = '#0ea5e9';

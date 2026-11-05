@@ -33,9 +33,8 @@ interface AddToListProps {
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   /**
-   * Icon-only, for use inside a title card. Membership is then only fetched
-   * once opened — a grid of cards each firing their own lookup would be
-   * dozens of requests per page.
+   * Icon-only, for title cards. Membership is fetched only when opened, to
+   * avoid one lookup per card.
    */
   compact?: boolean;
 }
@@ -55,7 +54,7 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
     }
   });
 
-  // Shared key: SWR de-duplicates this across every card on the page.
+  // Shared key, so SWR dedupes this across cards.
   const { data: allLists, mutate: revalidateLists } = useSWR<ListSummary[]>(
     !compact || isOpen ? '/api/v1/list' : null
   );
@@ -133,10 +132,7 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
 
   const body = (
     <>
-      {/*
-        Saying where a title already sits avoids adding the same thing to a
-        second list without realising.
-      */}
+      {/* Show existing lists so the title isn't added to a second one unknowingly. */}
       {isInAnyList && (
         <p className="mb-2 border-b border-gray-700 px-2 pb-2 text-xs text-gray-400">
           {intl.formatMessage(messages.alreadyon, {
@@ -240,9 +236,8 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
       {isOpen &&
         (compact ? (
           /*
-            A 256px panel inside a ~150px card is clipped by the card's own
-            overflow, and a dropdown that size is awkward on a phone. The
-            modal portals above everything instead.
+            A 256px dropdown would be clipped by a ~150px card and is awkward
+            on phones, so a portalled modal is used.
           */
           <Transition
             as="div"

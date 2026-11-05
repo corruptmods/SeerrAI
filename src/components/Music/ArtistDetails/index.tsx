@@ -81,7 +81,7 @@ const hostOf = (url: string): string => {
   }
 };
 
-/** MusicBrainz's link kinds, as people know the sites. */
+/** Site names for MusicBrainz link kinds. */
 const linkName = (kind: string, url: string): string => {
   switch (kind) {
     case 'wikipedia':
@@ -101,17 +101,17 @@ const linkName = (kind: string, url: string): string => {
 
 interface DiscographyProps {
   artistId: string;
-  /** What Lidarr is downloading of theirs, for the album cards. */
+  /** Their Lidarr downloads, for the album cards. */
   downloads?: DownloadingItem[];
-  /** Changes when something was requested, to show it. */
+  /** Changes after a request, to refetch. */
   refreshToken: number;
-  /** Told when an album was requested from its card. */
+  /** Called when an album is requested from its card. */
   onRequested: () => void;
-  /** How often to ask again while something is on its way; 0 not to. */
+  /** Refresh interval while something is in progress; 0 for none. */
   follow?: number;
 }
 
-/** The artist's releases, a hundred at a time, grouped by kind. */
+/** The artist's releases, 100 per page, grouped by kind. */
 const Discography = ({
   artistId,
   downloads,
@@ -128,7 +128,7 @@ const Discography = ({
       previous && index + 1 > previous.totalPages
         ? null
         : `/api/v1/music/artist/${artistId}/albums?page=${index + 1}`,
-    // Its albums' pills move with the artist's page.
+    // Album pills refresh with the artist's page.
     { refreshInterval: follow }
   );
 
@@ -235,10 +235,7 @@ interface ArtistDetailsProps {
   artistId: string;
 }
 
-/**
- * An artist's page: who they are, from MusicBrainz, and every release they
- * have, grouped as their albums, EPs, singles and the rest.
- */
+/** An artist's page: MusicBrainz details and every release, grouped by kind. */
 const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
@@ -248,8 +245,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const [requested, setRequested] = useState(0);
   const [managing, setManaging] = useState(false);
   const router = useRouter();
-  // Followed while something of theirs is on its way, as a film's or a
-  // series' page is.
+  // Refreshes while something of theirs is in progress, as a film's page does.
   const follow = refreshIntervalHelper<MusicArtistDetails>((artist) =>
     watchMusic({
       status: artist.mediaInfo?.status,
@@ -260,8 +256,8 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
     musicOn ? `/api/v1/music/artist/${artistId}` : null,
     { refreshInterval: follow }
   );
-  // Played the way a movie or series is: on an iPhone or iPad, Plex's app
-  // opens; the viewer's own servers come first.
+  // As for films: Plex's app opens on iPhone or iPad; the viewer's own
+  // servers come first.
   const { links: playLinks } = usePlayLinks(data?.mediaInfo);
 
   // Opened from a status pill's "Manage Artist" link.
@@ -499,7 +495,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
         follow={follow(data)}
         downloads={data.mediaInfo?.downloadStatus}
         refreshToken={requested}
-        // The artist's status may change with an album asked for.
+        // An album request can change the artist's status.
         onRequested={() => mutate()}
       />
       {data.mediaInfo && hasPermission(Permission.MANAGE_REQUESTS) && (

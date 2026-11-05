@@ -1,11 +1,8 @@
-/*
- * The choices that make up how Seerr AI looks: light or dark, the accent
- * colour, the dark background and a few extras. Each person can choose
- * their own (Profile → Settings → Appearance, kept in their user settings);
- * an admin chooses the server's default (Settings → Appearance), which is
- * what everyone else sees, the sign-in page included. The colours each
- * choice stands for are in src/utils/theme; this is only what may be kept.
- */
+// Appearance choices: light or dark, accent colour, dark background and a few
+// extras. Users choose their own (Profile → Settings → Appearance, in user
+// settings); an admin sets the server default (Settings → Appearance), which
+// everyone else sees, sign-in page included. The colours behind each choice are
+// in src/utils/theme; this only defines what may be stored.
 
 import type { ThemeFile } from '@server/constants/themeFile';
 import { cleanThemeFile, withoutThemeFile } from '@server/constants/themeFile';
@@ -13,7 +10,7 @@ import { cleanThemeFile, withoutThemeFile } from '@server/constants/themeFile';
 export const THEME_MODES = ['dark', 'light', 'auto'] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
-/** Indigo is how Seerr AI has always looked. */
+/** Indigo is the original look. */
 export const THEME_ACCENTS = [
   'indigo',
   'seerr',
@@ -27,7 +24,7 @@ export const THEME_ACCENTS = [
 ] as const;
 export type ThemeAccent = (typeof THEME_ACCENTS)[number];
 
-/** The background used whenever it is dark. Classic is today's. */
+/** The dark-mode background. Classic is the original. */
 export const THEME_BACKGROUNDS = ['classic', 'black', 'slate', 'warm'] as const;
 export type ThemeBackground = (typeof THEME_BACKGROUNDS)[number];
 
@@ -37,7 +34,7 @@ export type ThemeSpacing = (typeof THEME_SPACINGS)[number];
 export const THEME_CORNERS = ['rounded', 'square'] as const;
 export type ThemeCorners = (typeof THEME_CORNERS)[number];
 
-/** What an admin sets for everyone who has not chosen their own. */
+/** The admin's default for everyone who hasn't chosen their own. */
 export interface ThemeDefaults {
   mode: ThemeMode;
   accent: ThemeAccent;
@@ -45,24 +42,24 @@ export interface ThemeDefaults {
   customAccent?: string;
   background: ThemeBackground;
   /**
-   * A theme file in use (server/constants/themeFile.ts): its colours take
-   * the place of the accent's and background's wherever it gives them.
+   * A theme file in use (server/constants/themeFile.ts); its colours replace
+   * the accent's and background's wherever it sets them.
    */
   theme?: ThemeFile;
 }
 
-/** A person's own look: the server's choices plus the extras. */
+/** A user's look: the server's choices plus the extras. */
 export interface Appearance extends ThemeDefaults {
   spacing: ThemeSpacing;
   corners: ThemeCorners;
   /**
-   * The softened backdrop behind a film or series. Off unless chosen, so
-   * title pages look as they always have.
+   * The softened backdrop behind a film or series. Off by default, so title
+   * pages keep their original look.
    */
   blur: boolean;
-  /** Solid panels instead of see-through ones. */
+  /** Solid panels instead of translucent ones. */
   solidPanels: boolean;
-  /** Seasonal themes shown on top of their own, when the server has one on. */
+  /** Show the server's seasonal theme, when one is on, over their own. */
   seasonal: boolean;
 }
 
@@ -89,8 +86,8 @@ const oneOf = <T extends string>(
 ): value is T => list.includes(value as T);
 
 /**
- * A colour as it is kept: '#rrggbb' in lower case ('#rgb' is widened).
- * Undefined for anything else, so nothing but a colour can be stored.
+ * A colour as stored: lowercase '#rrggbb' ('#rgb' is expanded). Undefined for
+ * anything else, so only colours are stored.
  */
 export const cleanHexColour = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
@@ -119,8 +116,8 @@ const cleanDefaultsPart = (
   ) {
     return undefined;
   }
-  // A theme file is checked as strictly as one being imported; one that
-  // fails makes the whole look unusable rather than quietly dropping it.
+  // Check a theme file as strictly as on import; a failing one makes the whole
+  // look invalid rather than being silently dropped.
   const theme =
     value.theme === undefined ? undefined : cleanThemeFile(value.theme);
   if (value.theme !== undefined && !theme) {
@@ -148,8 +145,7 @@ const cleanDefaultsPart = (
 };
 
 /**
- * The server's default as it is kept, or undefined if any part of it is
- * unknown or missing.
+ * The server default as stored, or undefined if any part is unknown or missing.
  */
 export const cleanThemeDefaults = (
   value: unknown
@@ -160,9 +156,9 @@ export const cleanThemeDefaults = (
     : undefined;
 
 /**
- * A person's look as it is kept, or undefined if anything in it is unknown
- * or not what it should be. The extras may be left out (they take their
- * usual values); the mode, accent and background may not.
+ * A user's look as stored, or undefined if anything is unknown or invalid.
+ * Extras may be omitted (they take defaults); mode, accent and background may
+ * not.
  */
 export const cleanAppearance = (value: unknown): Appearance | undefined => {
   if (
@@ -195,20 +191,17 @@ export const cleanAppearance = (value: unknown): Appearance | undefined => {
   };
 };
 
-/** The look of someone who has not chosen their own. */
+/** The look for someone who hasn't chosen their own. */
 export const appearanceFromDefaults = (
   defaults: ThemeDefaults
 ): Appearance => ({ ...defaults, ...EXTRAS_DEFAULTS });
 
-/*
- * A copy of the person's look is kept in a cookie on their device, so pages
- * shown before anyone signs in (the sign-in page) look the way they left
- * it. It is only ever a copy: their account decides once they are signed
- * in, and the server reads it as strictly as anything sent to it.
- */
+// A copy of the user's look is kept in a device cookie, so pages shown before
+// sign-in look as they left them. Only a copy: the account decides once signed
+// in, and the server validates it as strictly as any input.
 export const THEME_COOKIE = 'seerr-theme';
 
-/** A theme file is left out: cookies are small, and the account has it. */
+/** Omits the theme file: cookies are small, and the account has it. */
 export const appearanceCookieValue = (appearance: Appearance): string =>
   encodeURIComponent(JSON.stringify(withoutThemeFile(appearance)));
 

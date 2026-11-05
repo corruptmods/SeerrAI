@@ -42,8 +42,8 @@ const stubTmdb = () => {
 };
 
 /**
- * Muting is separate from deleting: someone who turns off notifications for
- * their own request must keep the request.
+ * Muting is separate from deleting: muting your own request must keep the
+ * request.
  */
 describe('request watch state', () => {
   setupTestDb();
@@ -120,7 +120,7 @@ describe('request watch state', () => {
     currentActor = requester;
     actor = () => currentActor;
 
-    // A reachable notification channel, so the watch routes do not refuse.
+    // A reachable notification channel, so the watch routes don't refuse.
     await getRepository(UserPushSubscription).save(
       new UserPushSubscription({
         user: requester,
@@ -214,8 +214,8 @@ describe('request watch state', () => {
   });
 
   it('neither re-announces nor re-sends a request when muting it', async (t) => {
-    // Approved and declined without the save hooks, as they would have been
-    // long before anyone turns notifications off.
+    // Approved and declined without save hooks, as they'd have been long before
+    // notifications are turned off.
     const approved = await makeRequest(requester, 60004);
     const declined = await makeRequest(requester, 60005);
     await getRepository(MediaRequest).update(declined.id, {
@@ -240,8 +240,8 @@ describe('request watch state', () => {
     }
 
     assert.equal(sendToRadarr.mock.callCount(), 0, 'nothing sent to Radarr');
-    // Counted by kind: the auto-approval notice from creating the request is
-    // sent without being waited for, and may land after the mock is set.
+    // Counted by type: the auto-approval notice from creating the request isn't
+    // awaited and may land after the mock is set.
     assert.deepEqual(
       notify.mock.calls
         .map((c) => c.arguments[2])

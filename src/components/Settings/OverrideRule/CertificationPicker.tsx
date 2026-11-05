@@ -27,20 +27,19 @@ interface CertificationsResponse {
 interface CertificationPickerProps {
   /** Film ratings for a Radarr rule, TV ones for a Sonarr rule. */
   type: 'movie' | 'tv';
-  /** The country ratings are read for: the server's Discover region. */
+  /** Country to read ratings for: the server's Discover region. */
   region: string;
   value?: string | null;
   onChange: (value: string | null) => void;
   isDisabled?: boolean;
-  /** The id of the label naming the whole picker. */
+  /** Id of the label naming the picker. */
   labelledBy?: string;
 }
 
 /**
- * Picks the age ratings an override rule matches: the Discover region's,
- * then the US ones a title without a rating there is matched by. A rating
- * already on the rule for any other country stays listed, so it can be
- * taken off.
+ * Picks the age ratings an override rule matches: the Discover region's, then
+ * the US ones used for titles unrated there. Ratings already on the rule for
+ * other countries stay listed so they can be removed.
  */
 const CertificationPicker = ({
   type,
@@ -115,9 +114,8 @@ const CertificationPicker = ({
           ...kept,
         ];
 
-        // The region is always listed, to say so when TMDB has no ratings
-        // for it (its titles then go by their US rating). Other countries
-        // only when there is something to pick.
+        // The region always shows, to say when TMDB has none (its titles then use
+        // US ratings). Other countries show only with something to pick.
         if (shown.length === 0 && country !== region) {
           return null;
         }

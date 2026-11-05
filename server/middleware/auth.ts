@@ -10,11 +10,11 @@ import { getSettings } from '@server/lib/settings';
 import type { Request, RequestHandler } from 'express';
 
 /**
- * Whether a request says who it is with an API key: an X-Api-Key header,
- * even an empty one. Keys are only ever read from that header, never from
- * the address. Such a request is the key's alone: it is never answered as
- * whoever's session cookie came with it, and another site can't make a
- * browser send the header, so it needs no CSRF token.
+ * Whether a request authenticates with an API key: an X-Api-Key header, even
+ * empty. Keys are only read from that header, never the URL. Such a request
+ * belongs to the key alone: never answered as whoever's session cookie came
+ * along, and since other sites can't make a browser send the header, it needs
+ * no CSRF token.
  */
 export const sentApiKey = (req: Request): boolean =>
   req.header('X-API-Key') !== undefined;
@@ -33,29 +33,25 @@ export const checkUser: Middleware = async (req, res, next) => {
   if (apiKey && apiKey === settings.main.apiKey) {
     const userRepository = getRepository(User);
 
-    let userId = 1; // Work on original administrator account
-
-    // If a User ID is provided, we will act on that user's behalf
-    if (req.header('X-API-User')) {
-      userId = Number(req.header('X-API-User'));
-    }
+    // X-API-User acts on that user's behalf; else the original admin account.
+    const apiUser = req.header('X-API-User');
+    const userId = apiUser ? Number(apiUser) : 1;
 
     user = await userRepository.findOne({ where: { id: userId } });
     req.authMethod = 'apiKey';
   } else if (sentApiKey(req)) {
-    // Any other key is a personal one or wrong. The key decides who this
-    // is, whatever session came with it, and one that is refused is
-    // answered here: never served as the session, which would let a request
-    // that skipped the CSRF check act as whoever's cookie came along. Some
-    // requests pass through here twice (AI Search reads its body after
-    // this); the key is checked, counted and logged once.
+    // Any other key is personal or wrong. The key decides who this is, whatever
+    // session came along, and a rejected key is answered here: never served as
+    // the session, which would let a request that skipped the CSRF check act as
+    // the cookie's owner. Some requests pass through twice (AI Search reads its
+    // body after this); the key is checked, counted and logged once.
     const outcome: ApiKeyOutcome = (res.locals.personalKeyOutcome ??=
       await authenticateApiKey(req, apiKey ?? ''));
     if ('status' in outcome) {
       if (outcome.retryAfter) {
         res.set('Retry-After', String(outcome.retryAfter));
       }
-      // Siri's shortcut says `say` aloud, so a refused Siri key is heard.
+      // Siri's shortcut speaks `say`, so a rejected Siri key is heard.
       res.status(outcome.status).json({
         status: outcome.status,
         message: outcome.message,

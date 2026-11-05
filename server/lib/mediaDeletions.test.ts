@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 
 /**
  * Deletion times live outside Media because deleting a title can remove that
- * row outright, and watchlist sync still needs the date afterwards.
+ * row, and watchlist sync still needs the date afterwards.
  */
 describe('media deletion records', () => {
   setupTestDb();

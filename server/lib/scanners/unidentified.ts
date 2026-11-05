@@ -1,16 +1,14 @@
 /*
- * Titles a scan skipped because the media server has not identified them
- * yet. A server that has just found new files lists them before it has
- * looked them up, so for a while they have no TMDB, TVDB or IMDb id and
- * nothing to match them by. That is normal, not a failure: each is noted
- * at debug level, and the scan ends with one line saying how many there
- * were and what to do about them.
+ * Titles a scan skipped because the media server hasn't identified them
+ * yet. New files are listed before lookup, so briefly have no TMDB, TVDB or
+ * IMDb id. That's normal, not a failure: each is logged at debug level and
+ * the scan ends with one summary line saying how many and what to do.
  */
 
 /** Whether a skipped title is a film or a series. */
 export type TitleKind = 'film' | 'series';
 
-/** A title as the log names it: never the server's whole record. */
+/** A title as the log names it; never the server's whole record. */
 export interface ItemLabel {
   name: string;
   year?: number;
@@ -24,9 +22,8 @@ export const nameOf = (item: ItemLabel): string =>
   item.year ? `${item.name} (${item.year})` : item.name;
 
 /**
- * A title with no id to match it by. The message is what the scan always
- * said, so anything keeping it (Plex's list of titles to try again) is
- * unchanged.
+ * A title with no id to match it by. Keep the message stable: Plex's retry
+ * list stores it.
  */
 export class NotIdentifiedError extends Error {
   constructor(
@@ -39,7 +36,7 @@ export class NotIdentifiedError extends Error {
   }
 }
 
-/** How many names the summary line carries. */
+/** Max names in the summary line. */
 const EXAMPLES = 5;
 
 interface Wording {
@@ -47,7 +44,7 @@ interface Wording {
   server: string;
   /** What the server calls it: Plex matches, Jellyfin and Emby identify. */
   verb: 'matched' | 'identified';
-  /** Where in the server to hurry it along. */
+  /** Where in the server to speed it up. */
   hint: string;
 }
 
@@ -88,14 +85,14 @@ export class UnidentifiedTitles {
 
   constructor(private readonly wording: Wording) {}
 
-  /** Starts afresh, for a new scan. */
+  /** Resets for a new scan. */
   public clear(): void {
     this.films = 0;
     this.series = 0;
     this.names = [];
   }
 
-  /** Counts a skipped title; answers the debug line to log for it. */
+  /** Counts a skipped title; returns its debug log line. */
   public add(kind: TitleKind, item: ItemLabel): string {
     if (kind === 'film') {
       this.films += 1;
@@ -108,7 +105,7 @@ export class UnidentifiedTitles {
     return `Skipped ${nameOf(item)}: ${this.wording.server} hasn't ${this.wording.verb} it yet`;
   }
 
-  /** The scan's one summary line, with the first few names; none if none. */
+  /** The scan's summary line with the first few names; undefined if none. */
   public summary(): { message: string; examples: string[] } | undefined {
     if (!this.films && !this.series) {
       return undefined;

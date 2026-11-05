@@ -1,19 +1,17 @@
 /*
- * Seerr AI's own quality presets against TRaSH Guides, before every build
- * (quality-check.sh, which build.sh runs). Says what changed in TRaSH Guides
- * since the presets were last reviewed against it, and what the presets
- * could take from it. A report only: it never stops a build.
+ * Reviews Seerr AI's quality presets against TRaSH Guides before every build
+ * (quality-check.sh, run by build.sh): what changed since the last review,
+ * and what the presets could adopt. Report only; never fails a build.
  *
  *   node --experimental-strip-types --no-warnings bin/quality-review.mjs
  *     [--cache DIR]  keep fetched files here, so only changed ones are fetched
  *     [--accept]     record the current TRaSH Guides as reviewed
  *
- * The review is kept in server/lib/quality/trash-reviewed.json. It reads
- * TRaSH Guides with the same code the app does (trashData.ts).
+ * The review is kept in server/lib/quality/trash-reviewed.json. Parsing
+ * reuses the app's trashData.ts.
  * TRaSH Guides: https://trash-guides.info, MIT licence, copyright TRaSH.
  */
-// A command-line script run by bare Node.js: it prints, and can't use the
-// app's @server/ paths.
+// A CLI script for bare Node: prints, and can't use @server/ paths.
 /* eslint-disable no-console, no-relative-import-paths/no-relative-import-paths */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -56,7 +54,7 @@ const get = async (url, json = true) => {
   return json ? res.json() : res.text();
 };
 
-/** TRaSH Guides at its newest commit, read as the app reads it. */
+/** TRaSH Guides at its newest commit, parsed as the app does. */
 const fetchTrash = async () => {
   const head = await get(`https://api.github.com/repos/${REPO}/commits/master`);
   const commit = head.sha;
@@ -106,7 +104,7 @@ const hash = (value) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
 const sorted = (values) => [...new Set(values)].sort();
 
-/** What the review compares, per app. */
+/** The facts the review compares, per app. */
 const factsOf = (trash) =>
   Object.fromEntries(
     KINDS.map((kind) => {

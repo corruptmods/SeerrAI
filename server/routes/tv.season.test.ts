@@ -23,8 +23,8 @@ import path from 'node:path';
 import { after, beforeEach, describe, it } from 'node:test';
 
 /*
- * The season endpoint reports which episodes active requests already cover,
- * so the series page never offers Request for one that is on its way.
+ * The season endpoint reports which episodes active requests cover, so the
+ * series page never offers Request for one on its way.
  */
 
 setupTestDb();
@@ -263,7 +263,7 @@ describe('episodes on their way, on the season endpoint', () => {
         episodes.map((e) => [e.episodeNumber, e.download ?? null]),
         [
           [1, null],
-          // Two downloads of it: the one furthest along.
+          // Two downloads of it: the furthest along wins.
           [2, { stage: 'downloading', size: 1000, sizeLeft: 400 }],
           [3, { stage: 'queued', size: 1000, sizeLeft: 1000 }],
           [4, null],

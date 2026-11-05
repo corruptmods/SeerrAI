@@ -5,11 +5,9 @@ import { User } from '@server/entity/User';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 
 /**
- * The accounts already linked to these Jellyfin or Emby users (on the
- * server of that kind), keyed by the
- * user's id in its plain form (no dashes, lower case). Accounts made by older
- * imports, or from Emby, can hold the same id with dashes or capitals, so the
- * comparison is made on the plain form of both.
+ * Accounts linked to these Jellyfin or Emby user ids, keyed by plain id (no
+ * dashes, lower case). Older imports and Emby store ids with dashes or
+ * capitals, so both sides are compared in plain form.
  */
 export const linkedJellyfinUsers = async (
   jellyfinUserIds: string[],

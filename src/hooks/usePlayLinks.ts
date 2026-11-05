@@ -10,9 +10,8 @@ import {
 import { useMemo } from 'react';
 
 /**
- * Where the viewer can play a title: every server's links, their own
- * servers first, for a title's page; and the one link to offer for it and
- * for its 4K version, for badges and cards.
+ * The viewer's play links: all of them (their servers first) for title
+ * pages, and the single pick for it and its 4K version for badges and cards.
  */
 const usePlayLinks = (media: MediaPlayInfo | undefined) => {
   const { user } = useUser();

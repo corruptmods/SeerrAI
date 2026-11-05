@@ -4,9 +4,8 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /*
- * A user's Plex watchlist and its cache: a reply from Discover that is not
- * a watchlist must never be kept, or If-None-Match pins it and every later
- * request gets a 304 for it.
+ * Watchlist caching: a Discover reply that isn't a watchlist must never be
+ * cached, or If-None-Match pins it and every later request gets a 304.
  */
 
 interface Reply {
@@ -36,8 +35,8 @@ const metadata = (ratingKey: string, tmdbId: number) => ({
 });
 
 /**
- * A PlexTvAPI whose watchlist requests get the given replies in turn, and
- * whose metadata lookups answer from a table. Records the If-None-Match sent.
+ * A PlexTvAPI whose watchlist requests get `replies` in turn and whose
+ * metadata lookups answer from `details`. Records each If-None-Match sent.
  */
 const apiWith = (replies: Reply[], details: Record<string, unknown> = {}) => {
   const api = new PlexTvAPI('token-a');
@@ -103,8 +102,8 @@ describe('PlexTvAPI.getWatchlist', () => {
     await api.getWatchlist({ offset: 0 });
     await api.getWatchlist({ offset: 20 });
     const again = await api.getWatchlist({ offset: 20 });
-    // The second page is asked for without the first's tag, and a 304 for
-    // it answers with its own titles.
+    // Page 2 is requested without page 1's ETag, and its 304 serves its own
+    // titles.
     assert.deepEqual(sent, [undefined, undefined, '"p2"']);
     assert.deepEqual(
       again.items.map((i) => i.tmdbId),
@@ -151,7 +150,7 @@ describe('PlexTvAPI.getWatchlist', () => {
       [603, 604]
     );
     assert.equal(during.totalSize, 2);
-    // Still asking with the good ETag after the bad reply.
+    // The good ETag is still sent after the bad reply.
     assert.deepEqual(sent, [undefined, '"v1"', '"v1"']);
   });
 

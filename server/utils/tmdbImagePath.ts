@@ -1,7 +1,7 @@
 /**
- * A TMDB image path as TMDB hands them out ("/kqjL17yufvn9OVLyXYpvtyrFfak.jpg"),
- * or null. Paths that arrive from a browser are checked with this before they
- * are stored, because other people's pages build image addresses from them.
+ * A TMDB image path as TMDB issues them ("/kqjL17yufvn9OVLyXYpvtyrFfak.jpg"),
+ * or null. Browser-supplied paths are checked with this before storing, since
+ * other users' pages build image URLs from them.
  */
 export const tmdbImagePath = (value: unknown): string | null =>
   typeof value === 'string' &&

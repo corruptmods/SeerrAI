@@ -9,8 +9,8 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * The server's default look (Settings → Appearance): what everyone sees
- * who hasn't chosen their own, and the sign-in page.
+ * Server default look (Settings → Appearance): for anyone without their own,
+ * and the sign-in page.
  */
 
 const app = express();

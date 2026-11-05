@@ -83,18 +83,14 @@ interface MusicRequestItemProps {
   revalidateList: () => void;
 }
 
-/**
- * A music request on the Requests page: the artist and album or how many,
- * where the albums are, who asked and when, and what can be done with it.
- */
+/** A music request row on the Requests page. */
 const MusicRequestItem = ({
   request,
   revalidateList,
 }: MusicRequestItemProps) => {
   const intl = useIntl();
   const { user, hasPermission } = useUser();
-  // On screen now, for checking on the request; near the screen, for
-  // loading its picture before it is scrolled to.
+  // In view: refresh the request. Near the screen: preload its picture.
   const { ref: viewRef, inView } = useInView();
   const { ref: nearRef, nearness } = useNearScreen();
   const ref = useMemo(() => bothRefs(viewRef, nearRef), [viewRef, nearRef]);
@@ -229,8 +225,8 @@ const MusicRequestItem = ({
           </div>
         </div>
         <div className="z-10 mt-4 flex w-full flex-col justify-center space-y-2 pl-4 pr-4 xl:mt-0 xl:w-96 xl:items-end xl:pl-0">
-          {/* Retry, or first send it to another Lidarr, profile or
-              folder. Side by side, as Approve and Decline are. */}
+          {/* Retry, or edit (Lidarr, profile, folder) first; side by side
+              like Approve and Decline. */}
           {requestData.status === MediaRequestStatus.FAILED && manages && (
             <div className="flex w-full flex-row space-x-2">
               <span className="w-full">

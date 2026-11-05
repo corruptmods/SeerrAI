@@ -1,11 +1,9 @@
-/*
- * Shared by the server, which builds each title's searchable text, and the
- * page, which matches a filter against it — so both read text the same way.
- */
+// Shared by the server, which builds each title's searchable text, and the
+// page, which matches filters against it, so both normalize text the same way.
 
 /**
- * Lower case, accents dropped and punctuation as spaces, so "Rosélie" finds
- * "roselie" and "Web-Weaver" finds "web weaver".
+ * Lowercases, drops accents and turns punctuation into spaces, so "Rosélie"
+ * finds "roselie" and "Web-Weaver" finds "web weaver".
  */
 export const normalizeSearchText = (text: string): string =>
   text
@@ -15,7 +13,7 @@ export const normalizeSearchText = (text: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 
-/** The words of a filter, normalized. */
+/** A filter's normalized words. */
 export const searchWords = (query: string): string[] =>
   normalizeSearchText(query).split(' ').filter(Boolean);
 

@@ -14,15 +14,15 @@ import { after, before, describe, it } from 'node:test';
 import sharp from 'sharp';
 
 /*
- * The image route as a browser meets it: who may add to the cache, what a
- * response says about the image, and what a bad path gets.
+ * The image route as a browser sees it: who may add to the cache, response
+ * headers, and bad paths.
  */
 
 const unique = `${process.pid}-${Date.now()}`;
 const poster = (name: string) => `/t/p/w300_and_h450_face/${unique}${name}.jpg`;
 let upstream: string[] = [];
 let base = '';
-/** A real backdrop, for the paths named "real", which can be converted. */
+/** A real backdrop for the "real" paths, which can be converted. */
 let realJpeg: Buffer;
 let server: ReturnType<express.Express['listen']>;
 const SECRET = 'test-secret';
@@ -50,7 +50,7 @@ before(async () => {
     ])
     .jpeg({ quality: 90 })
     .toBuffer();
-  // The upstream, standing in for image.tmdb.org.
+  // Upstream stand-in for image.tmdb.org.
   Object.defineProperty(tmdbImageProxy(), 'axios', {
     configurable: true,
     value: {
@@ -74,7 +74,7 @@ before(async () => {
       },
     },
   });
-  // Sessions as the app keeps them: a signed cookie naming a stored session.
+  // Sessions as the app stores them: a signed cookie naming a stored session.
   const store = new session.MemoryStore();
   await new Promise<void>((resolve) =>
     store.set('signed-in', { cookie: {}, userId: 1 } as never, () => resolve())
@@ -170,8 +170,7 @@ describe('GET /imageproxy/tmdb/...', () => {
   });
 
   it('knows the browser has it however its ETag comes back', async () => {
-    // A CDN that compressed the response hands its ETag back weak; a
-    // browser may list several.
+    // A compressing CDN returns the ETag weak; a browser may list several.
     for (const tag of ['W/"poster1"', '"older", "poster1"']) {
       const res = await get(poster('b'), { 'if-none-match': tag });
       assert.equal(res.status, 304, tag);
@@ -196,7 +195,7 @@ describe('GET /imageproxy/tmdb/...', () => {
   it('answers 404 for an image TMDB does not have, for a while', async () => {
     const res = await get(poster('gone'), SIGNED_IN);
     assert.equal(res.status, 404);
-    // The browser need not ask again while the server would not either.
+    // The browser needn't revalidate while the server wouldn't either.
     assert.equal(res.headers.get('cache-control'), 'public, max-age=600');
   });
 
@@ -220,7 +219,7 @@ describe('GET /imageproxy/tmdb/...', () => {
       '/t/p/w780_filter(duotone,ffffff,bababa)/abc.png',
       '/t/p/w1920_and_h800_multi_faces/abc.jpg',
       '/t/p/w154/logo.svg',
-      // As most backdrops in the app are addressed: a doubled slash.
+      // As most app backdrops are addressed: a doubled slash.
       '/t/p/w1920_and_h800_multi_faces//abc.jpg',
       '/t/p/w1440_and_h320_multi_faces//abc.jpg',
     ]) {
@@ -290,7 +289,7 @@ describe('GET /imageproxy/tmdb/...', () => {
       `/t/p/w1920_and_h800_multi_faces/${unique}real-out${n}.jpg`;
     const types: string[] = [];
     for (let n = 0; n < 22; n += 1) {
-      // Cached by someone signed in, then asked for converted by anyone.
+      // Cached by a signed-in user, then requested converted by anyone.
       await get(path(n), SIGNED_IN);
       const res = await get(`${path(n)}?f=webp&w=480`);
       assert.equal(res.status, 200);
@@ -298,14 +297,14 @@ describe('GET /imageproxy/tmdb/...', () => {
         `${res.headers.get('content-type')} ${res.headers.get('cache-control')}`
       );
     }
-    // Twenty converted, then the original, not to be kept under the
-    // converted address.
+    // Twenty converted, then the original, marked not to be cached under the
+    // converted URL.
     assert.deepEqual(types, [
       ...Array(20).fill('image/webp public, max-age=31536000, immutable'),
       'image/jpeg no-store',
       'image/jpeg no-store',
     ]);
-    // A copy already made is served to anyone.
+    // An existing copy is served to anyone.
     const made = await get(`${path(0)}?f=webp&w=480`);
     assert.equal(made.headers.get('content-type'), 'image/webp');
   });
@@ -323,16 +322,16 @@ describe('GET /imageproxy/tmdb/...', () => {
 describe('music’s pictures', () => {
   const ALBUM = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
   const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
-  /** Albums only these tests ask for, so each starts uncached. */
+  /** Albums only these tests request, so each starts uncached. */
   const COVER = `${unique.replace(/\D/g, '').padStart(8, '0').slice(-8)}-5b29-3f6c-b8a4-91d6e2f07a35`;
   const MISSING = `${COVER.slice(0, 8)}-0000-3926-a536-22c65f834433`;
   const music = (path: string, headers: Record<string, string> = {}) =>
     fetch(base.replace(/\/tmdb$/, path), { headers, redirect: 'manual' });
 
   /*
-   * The Cover Art Archive and archive.org, standing in: the archive
-   * redirects each cover to a file at archive.org, which says it keeps it
-   * only briefly, or answers 404 for an album with no cover.
+   * Stand-ins for the Cover Art Archive and archive.org: the archive redirects
+   * each cover to an archive.org file with a short cache lifetime, or returns
+   * 404 for an album without a cover.
    */
   let archived: string[] = [];
   let archive: http.Server;
@@ -364,7 +363,7 @@ describe('music’s pictures', () => {
       res.end();
     });
     await new Promise<void>((r) => caa.listen(0, '127.0.0.1', () => r()));
-    // A real client, so redirects are followed as they are in use.
+    // A real client, so redirects are followed as in production.
     Object.defineProperty(musicImageProxy('caa'), 'axios', {
       configurable: true,
       value: axios.create({
@@ -372,7 +371,7 @@ describe('music’s pictures', () => {
         timeout: 5000,
       }),
     });
-    // fanart.tv and TheAudioDB send no lifetime of their own here.
+    // fanart.tv and TheAudioDB send no cache lifetime here.
     for (const source of ['fanart', 'tadb'] as const) {
       Object.defineProperty(musicImageProxy(source), 'axios', {
         configurable: true,
@@ -400,7 +399,7 @@ describe('music’s pictures', () => {
       ],
       ['/tadb/images/media/artist/thumb/abc.jpg', 'https://r2.theaudiodb.com'],
     ]) {
-      // Someone signed out is sent to the picture where it is.
+      // Signed-out users are redirected upstream.
       const res = await music(path);
       assert.equal(res.status, 302, path);
       assert.equal(
@@ -416,7 +415,7 @@ describe('music’s pictures', () => {
     const res = await music(path, SIGNED_IN);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/jpeg');
-    // Not immutable: someone can put a better cover at the same address.
+    // Not immutable: a better cover can appear at the same URL.
     assert.equal(res.headers.get('cache-control'), 'public, max-age=2592000');
     assert.equal(
       Buffer.compare(Buffer.from(await res.arrayBuffer()), realJpeg),
@@ -453,7 +452,7 @@ describe('music’s pictures', () => {
         `${format} is smaller`
       );
     }
-    // And smaller ones of a large cover, as for a backdrop.
+    // And smaller variants of a large cover, as for a backdrop.
     const small = await music(
       `/caa/release-group/${COVER}/front-1200?f=webp&w=480`,
       SIGNED_IN

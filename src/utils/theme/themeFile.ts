@@ -1,7 +1,6 @@
 /*
- * Theme files on the page (the format is in server/constants/themeFile.ts):
- * exporting what someone has as a file, importing one into a look, and the
- * built-in gallery. Their colours are put in place by themeFileColours.ts.
+ * Theme file export, import and the built-in gallery (format in
+ * server/constants/themeFile.ts; colours applied in themeFileColours.ts).
  */
 import type {
   Appearance,
@@ -22,9 +21,8 @@ const scaleOf = (scale: Scale) =>
   Object.fromEntries(SCALE_STEPS.map((step) => [String(step), scale[step]]));
 
 /**
- * What someone has, as a theme file: every colour in light and dark, so
- * importing it gives exactly this look back, and the extras that go with
- * it. A theme file in use keeps its name and author.
+ * A look as a theme file: every colour in both modes, so importing it
+ * round-trips, plus extras. An active theme file keeps its name and author.
  */
 export const exportThemeFile = (
   appearance: Appearance,
@@ -71,10 +69,9 @@ export const exportThemeFile = (
 const EXTRAS = ['spacing', 'corners', 'blur', 'solidPanels'] as const;
 
 /**
- * A look with a theme file imported: the file's colours, and the mode and
- * extras it brings; whatever it leaves out stays as the person had it. Its
- * fill becomes the custom accent too, which is what the sign-in page and
- * safe mode show, as they leave theme files out.
+ * A look with a theme file applied; anything the file omits is unchanged.
+ * Its fill also becomes the custom accent, which sign-in and safe mode show
+ * since they omit theme files.
  */
 export const appearanceWithThemeFile = <T extends ThemeDefaults>(
   look: T,
@@ -101,9 +98,8 @@ const modesOf = (mode: ThemeMode): ('dark' | 'light')[] =>
   mode === 'auto' ? ['dark', 'light'] : [mode];
 
 /**
- * Text in a theme file's colours that would be hard to read (under 4.5:1),
- * as "mode:name". Only pairs the file has a hand in are counted: built-in
- * colours are checked by their own tests.
+ * Text/background pairs involving the theme file's colours under 4.5:1, as
+ * "mode:name". Built-in colours are covered by their own tests.
  */
 export const hardToRead = (appearance: Appearance): string[] => {
   const file = appearance.theme;
@@ -143,12 +139,12 @@ export const hardToRead = (appearance: Appearance): string[] => {
   return problems;
 };
 
-/** The built-in looks offered on the Appearance page. */
+/** Built-in looks on the Appearance page. */
 export const THEME_GALLERY: {
   id: 'classic' | 'midnight' | 'daylight' | 'ember';
   look: Partial<ThemeDefaults>;
 }[] = [
-  // How Seerr AI has always looked.
+  // The default look.
   {
     id: 'classic',
     look: { mode: 'dark', accent: 'indigo', background: 'classic' },
@@ -157,12 +153,12 @@ export const THEME_GALLERY: {
     id: 'midnight',
     look: { mode: 'dark', accent: 'teal', background: 'black' },
   },
-  // Light leaves the dark background as it was.
+  // Light leaves the dark background unchanged.
   { id: 'daylight', look: { mode: 'light', accent: 'indigo' } },
   { id: 'ember', look: { mode: 'dark', accent: 'rose', background: 'warm' } },
 ];
 
-/** The gallery's look a look is, if any; never one with a theme file. */
+/** The gallery look matching a look, if any; never for a theme file. */
 export const galleryLookIn = (
   appearance: ThemeDefaults
 ): (typeof THEME_GALLERY)[number] | undefined =>

@@ -36,9 +36,9 @@ import logger from '@server/logger';
 import { createHash } from 'node:crypto';
 
 /*
- * Subtitles as Bazarr has them, for title pages. Bazarr knows a movie by
- * its Radarr id and a series by its Sonarr id, which Seerr records on the
- * title when it sends a request (its "external service id").
+ * Bazarr subtitles for title pages. Bazarr knows a movie by its Radarr id and
+ * a series by its Sonarr id, which Seerr stores on the title when it sends a
+ * request (its "external service id").
  */
 
 export const subtitlesReady = (): boolean =>
@@ -47,9 +47,9 @@ export const subtitlesReady = (): boolean =>
 export const bazarr = (): BazarrAPI => new BazarrAPI(getSettings().bazarr);
 
 /**
- * The Radarr or Sonarr server Bazarr follows. Bazarr follows one of each,
- * and Seerr cannot ask which, so it is taken to be the main (not 4K) server
- * new requests go to: the one marked default, or the only one there is.
+ * The Radarr or Sonarr server Bazarr follows. Bazarr follows one of each and
+ * Seerr can't ask which, so it is assumed to be the main (non-4K) default
+ * server, or the only one.
  */
 const followedServer = (servers: DVRSettings[]): DVRSettings | undefined => {
   const main = servers.filter((server) => !server.is4k);
@@ -57,11 +57,11 @@ const followedServer = (servers: DVRSettings[]): DVRSettings | undefined => {
 };
 
 /**
- * The id Bazarr knows a title by: the one Radarr or Sonarr gave it, but only
- * when the title is on the server Bazarr follows. Each server numbers its
- * titles on its own, so the same id on another server names some other
- * title in Bazarr, whose subtitles would be shown, replaced or deleted
- * instead. A title on another server counts as not in Bazarr.
+ * Bazarr's id for a title: its Radarr or Sonarr id, but only when the title is
+ * on the server Bazarr follows. Ids are per server, so the same id from
+ * another server names a different title in Bazarr, whose subtitles would be
+ * shown, replaced or deleted instead. A title on another server counts as not
+ * in Bazarr.
  */
 export const bazarrIdOf = (
   media: Pick<Media, 'mediaType' | 'serviceId' | 'externalServiceId'>
@@ -76,8 +76,8 @@ export const bazarrIdOf = (
   if (!followed) {
     return undefined;
   }
-  // Without a record of its server, the id can only be trusted when there
-  // is a single main server it could have come from.
+  // With no recorded server, trust the id only when there is a single main
+  // server it could have come from.
   const onFollowed =
     media.serviceId == null
       ? servers.filter((server) => !server.is4k).length === 1
@@ -86,8 +86,8 @@ export const bazarrIdOf = (
 };
 
 /**
- * A title Seerr has: whether Radarr or Sonarr has it at all, and the id
- * Bazarr knows it by, when Bazarr can have it.
+ * Whether Radarr or Sonarr has the title at all, and Bazarr's id for it when
+ * Bazarr can have it.
  */
 export const arrIdFor = async (
   mediaType: MediaType,
@@ -102,17 +102,17 @@ export const arrIdFor = async (
   };
 };
 
-/** The file's name, without the folders it is in on the server. */
+/** The file name without its server folders. */
 export const fileNameOf = (path: string): string =>
   path.split(/[\\/]/).pop() ?? path;
 
 /*
- * Bazarr's history actions, as it numbers them. A sync changes the timing
- * of a subtitle, not where it came from; the others say where the file at
- * that path came from, or that it was deleted.
+ * Bazarr's history action numbers. A sync changes a subtitle's timing, not its
+ * origin; the others say where the file at that path came from, or that it
+ * was deleted.
  */
 const ACTION_DELETED = 0;
-/** Downloaded by Bazarr's own search, chosen by hand, or an upgrade. */
+/** Bazarr's own search, a manual pick, or an upgrade. */
 const FROM_A_PROVIDER = new Set([1, 2, 3]);
 const ACTION_UPLOADED = 4;
 const ACTION_TRANSLATED = 6;
@@ -123,9 +123,9 @@ export interface FileOrigin {
 }
 
 /**
- * Where each subtitle file came from, by path: for each path, the newest
- * action that put a file there (or deleted it) decides. History comes
- * newest first. A path with no such action is left out.
+ * Origin of each subtitle file by path: the newest action that wrote or
+ * deleted it decides. History is newest first. Paths with no such action are
+ * omitted.
  */
 export const originsOf = (
   history: BazarrHistoryEntry[]
@@ -151,7 +151,7 @@ export const originsOf = (
     } else if (entry.action === ACTION_TRANSLATED) {
       origin = { origin: 'translated' };
     } else if (entry.action !== ACTION_DELETED) {
-      // A sync, or anything else that leaves the file as it came.
+      // A sync, or anything else that keeps the file's origin.
       continue;
     }
     decided.add(path);
@@ -162,7 +162,7 @@ export const originsOf = (
   return origins;
 };
 
-/** The subtitle files, by path, whose current copy Whisper made. */
+/** Subtitle paths whose current file Whisper made. */
 export const transcribedPaths = (history: BazarrHistoryEntry[]): Set<string> =>
   new Set(
     [...originsOf(history)]
@@ -201,7 +201,7 @@ export const toMissing = (missing: BazarrMissing): MissingSubtitle => ({
   forced: !!missing.forced,
 });
 
-/** What Bazarr matched a search result on, by the names it uses. */
+/** Bazarr's names for what a search result matched on. */
 const MATCH_FIELDS = [
   'title',
   'series',
@@ -234,16 +234,16 @@ export const toSearchResult = (
 });
 
 /*
- * What a manual search offered, by title ("movie:3745", "episode:139851").
- * Bazarr names a search result by the provider's subtitle object, pickled,
- * and unpickles whatever is sent back to download it: a forged one would
- * run code in Bazarr. So only a result Bazarr itself offered for the same
- * title, in the last hour, is ever sent back. Only a hash of each is kept.
+ * Manual search offers, by title ("movie:3745", "episode:139851"). Bazarr
+ * identifies a result by the provider's pickled subtitle object and unpickles
+ * whatever is sent back to download it, so a forged one would run code in
+ * Bazarr. Only a result Bazarr itself offered for the same title within the
+ * last hour is ever sent back. Only hashes are kept.
  */
 const OFFER_TTL_MS = 60 * 60_000;
-/** Titles whose offers are kept, the least recently searched dropped first. */
+/** Titles whose offers are kept; least recently searched dropped first. */
 const OFFERED_TITLES = 500;
-/** Results kept for one title, over its searches. */
+/** Results kept per title across its searches. */
 const OFFERS_PER_TITLE = 2000;
 const offers = new Map<string, Map<string, number>>();
 
@@ -254,7 +254,7 @@ const offerHash = (choice: { provider: string; subtitle: string }) =>
     .update(choice.subtitle)
     .digest('base64');
 
-/** Notes the results a search for a title offered. */
+/** Records the results a search for a title offered. */
 export const rememberOffered = (
   title: string,
   results: Pick<BazarrSearchResult, 'provider' | 'subtitle'>[]
@@ -281,7 +281,7 @@ export const rememberOffered = (
   }
 };
 
-/** Whether a search for the title offered this result, recently. */
+/** Whether a recent search for the title offered this result. */
 export const wasOffered = (
   title: string,
   choice: { provider: string; subtitle: string }
@@ -290,10 +290,10 @@ export const wasOffered = (
   return at !== undefined && Date.now() - at < OFFER_TTL_MS;
 };
 
-/** For tests: forget what searches offered. */
+/** For tests: clears recorded offers. */
 export const forgetOffered = () => offers.clear();
 
-/** Each language profile's name, and the languages it asks for. */
+/** Each language profile's name and languages. */
 const profilesOf = async (api: BazarrAPI) =>
   new Map(
     (await api.getLanguageProfiles()).map((profile) => [
@@ -336,9 +336,9 @@ export const movieSubtitles = async (
 };
 
 /*
- * Where an episode's subtitle came from is only in its own history, one
- * request per episode. Each episode's answer is kept for a
- * while, and dropped as soon as Seerr changes that episode's subtitles.
+ * An episode's subtitle origins are only in its own history, one request per
+ * episode. Each answer is cached for a while and dropped as soon as Seerr
+ * changes that episode's subtitles.
  */
 const HISTORY_TTL_MS = 30 * 60_000;
 const HISTORY_CONCURRENCY = 6;
@@ -356,14 +356,13 @@ const originsForEpisodes = async (
   episodes: BazarrEpisode[]
 ): Promise<Map<number, Map<string, FileOrigin>>> => {
   const now = Date.now();
-  // Answers past their time are dropped, not kept for every episode ever
-  // looked at.
+  // Drop expired answers so the cache doesn't grow with every episode viewed.
   for (const [id, cached] of episodeOrigins) {
     if (now - cached.at >= HISTORY_TTL_MS) episodeOrigins.delete(id);
   }
   const found = new Map<number, Map<string, FileOrigin>>();
   const toAsk = episodes.filter((episode) => {
-    // Only a file has an origin to tell.
+    // Only files have an origin.
     if (!(episode.subtitles ?? []).some((subtitle) => subtitle.path)) {
       return false;
     }
@@ -389,7 +388,7 @@ const originsForEpisodes = async (
         });
         found.set(episode.sonarrEpisodeId, origins);
       } catch {
-        // Unknown for now; asked again next time.
+        // Unknown for now; retried next time.
       }
     }
   };
@@ -438,7 +437,7 @@ export const seriesSubtitles = async (
   };
 };
 
-/** Bazarr's episode, by the season and episode numbers Seerr shows. */
+/** Bazarr's episode by the season and episode numbers Seerr shows. */
 export const findEpisode = async (
   sonarrSeriesId: number,
   seasonNumber: number,
@@ -449,16 +448,15 @@ export const findEpisode = async (
       episode.season === seasonNumber && episode.episode === episodeNumber
   );
 
-/** The language of a search result, as Bazarr keys languages ("en"). */
+/** A search result's language, as Bazarr keys languages ("en"). */
 const languageOf = (result: BazarrSearchResult): string =>
   (result.language ?? '').toLowerCase().split(/[^a-z]/)[0];
 
 /**
- * The languages a movie or episode lacks that a transcription can fill
- * without replacing anything: a language its profile wants, with no plain
- * subtitle file in it. Whisper writes a plain subtitle (neither forced nor
- * SDH), under the same name a plain file in that language has, so a
- * language with only its forced or SDH copy missing is not one.
+ * Languages a movie or episode lacks that a transcription can fill without
+ * replacing anything: wanted by its profile, with no plain subtitle file.
+ * Whisper writes a plain subtitle (not forced or SDH) under the plain file's
+ * name, so a language missing only its forced or SDH copy is not a gap.
  */
 export const gapsOf = (
   item:
@@ -480,9 +478,8 @@ export const gapsOf = (
 };
 
 /**
- * The Whisper result of a search: what transcribing means to Bazarr. One
- * in a language that is a gap comes first; with `onlyGaps`, it is that or
- * nothing.
+ * A search's Whisper result (how Bazarr transcribes). One in a gap language
+ * comes first; with `onlyGaps`, it is that or nothing.
  */
 export const whisperResult = (
   results: BazarrSearchResult[],
@@ -497,18 +494,18 @@ export const whisperResult = (
 };
 
 interface TranscribeOptions {
-  /** Queued because a search found nothing: it only ever fills a gap. */
+  /** Queued because a search found nothing: only ever fills a gap. */
   auto?: boolean;
-  /** The Whisper result that search offered, so it is not asked again. */
+  /** The Whisper result that search offered, so it isn't searched again. */
   known?: BazarrSearchResult;
 }
 
-/** Times a transcription Bazarr lost (by restarting) is asked for again. */
+/** Times a transcription lost to a Bazarr restart is requested again. */
 const MAX_ASKS = 3;
-/** How long Bazarr may take to come back after it restarts. */
+/** How long Bazarr may take to come back after a restart. */
 const BACK_WAIT_MS = 10 * 60_000;
 
-/** Each Whisper subtitle in a history, told apart by when and where. */
+/** Whisper subtitles in a history, keyed by time and path. */
 const whisperMarks = (history: BazarrHistoryEntry[]): Set<string> =>
   new Set(
     history
@@ -520,7 +517,7 @@ const whisperMarks = (history: BazarrHistoryEntry[]): Set<string> =>
       )
   );
 
-/** Waits until Bazarr answers again, for a while; whether it did. */
+/** Waits a while for Bazarr to answer again; whether it did. */
 const bazarrBack = async (): Promise<boolean> => {
   const until = Date.now() + BACK_WAIT_MS;
   for (;;) {
@@ -540,12 +537,11 @@ const bazarrBack = async (): Promise<boolean> => {
 };
 
 /**
- * Bazarr's way to transcribe: download the Whisper result of a search, and
- * follow Bazarr's job until it ends. It is done once Bazarr's history has
- * a new Whisper subtitle for it. A transcription Bazarr lost, by being
- * restarted, is searched for and asked for again; one queued because
- * nothing was found checks first that the gap is still there, as Bazarr's
- * own searches may have filled it meanwhile.
+ * Transcribes via Bazarr: downloads a search's Whisper result and follows the
+ * job until it ends; done once history has a new Whisper subtitle for it. A
+ * transcription lost to a Bazarr restart is searched and requested again. One
+ * queued because nothing was found first rechecks the gap, as Bazarr's own
+ * searches may have filled it meanwhile.
  */
 const transcribeWith = async ({
   search,
@@ -566,14 +562,14 @@ const transcribeWith = async ({
   watch: JobWatch;
 }) => {
   for (let ask = 1; ; ask++) {
-    // Asked for by hand, the gaps only say which language to prefer.
+    // Requested manually, gaps only pick the preferred language.
     const languages = await gaps().catch((e) => {
       if (auto) {
         throw e;
       }
       return [] as string[];
     });
-    // Its search result is Bazarr's no longer once Bazarr restarted.
+    // After a Bazarr restart its old search result is no longer valid.
     const offered = ask === 1 ? known : undefined;
     if (
       auto &&
@@ -595,7 +591,7 @@ const transcribeWith = async ({
         return;
       }
     } else if (end === 'finished') {
-      // Nothing to check it by: Bazarr says it is done.
+      // Nothing to verify against: take Bazarr's word that it is done.
       return;
     }
     if (end === 'gone' && ask < MAX_ASKS && (await bazarrBack())) {
@@ -621,10 +617,10 @@ const transcribeWith = async ({
 };
 
 /**
- * Why Bazarr cannot transcribe right now, or null when it can (or cannot
- * be asked). Most often it paused its WhisperAI provider after a request
- * to Whisper timed out (Whisper busy with another job), and offers no
- * Whisper result until the pause is over.
+ * Why Bazarr can't transcribe now, or null when it can (or can't be asked).
+ * Usually it paused its WhisperAI provider after a Whisper request timed out
+ * (Whisper busy with another job) and offers no Whisper result until the
+ * pause ends.
  */
 export const whisperUnavailable = async (): Promise<SubtitleError | null> => {
   const providers = await bazarr()
@@ -653,7 +649,7 @@ export const whisperUnavailable = async (): Promise<SubtitleError | null> => {
 export const noWhisperReason = async (): Promise<SubtitleError> =>
   (await whisperUnavailable()) ?? { code: 'noWhisper' };
 
-/** A reason Whisper cannot be used, in English, for the log and the API. */
+/** English text for a Whisper problem, for the log and API. */
 export const whisperProblemText = (reason: SubtitleError): string => {
   switch (reason.code) {
     case 'whisperOff':
@@ -667,7 +663,7 @@ export const whisperProblemText = (reason: SubtitleError): string => {
   }
 };
 
-/** What Bazarr is told to download for a search result. */
+/** The download request Bazarr gets for a search result. */
 export const choiceOf = (result: BazarrSearchResult) => ({
   provider: result.provider,
   subtitle: result.subtitle,
@@ -676,7 +672,7 @@ export const choiceOf = (result: BazarrSearchResult) => ({
   originalFormat: result.original_format,
 });
 
-/** The episodes a scope covers, leaving out any already transcribed. */
+/** Episodes in a scope, minus any already transcribed. */
 export const episodesToTranscribe = (
   episodes: EpisodeSubtitles[],
   scope: TranscribeScope,
@@ -703,8 +699,8 @@ export const episodesToTranscribe = (
   });
 
 /**
- * Queues a movie's transcription under its title ("movie:603"), so the
- * title page shows its progress. Returns how many were added.
+ * Queues a movie's transcription under its title ("movie:603") so the title
+ * page shows progress. Returns how many were added.
  */
 export const queueMovieTranscription = (
   owner: string,
@@ -729,7 +725,7 @@ export const queueMovieTranscription = (
     },
   ]);
 
-/** One episode's transcription, for the queue. */
+/** One episode's transcription task. */
 const episodeTask = (
   owner: string,
   seriesId: number,
@@ -771,7 +767,7 @@ const episodeTask = (
   };
 };
 
-/** Queues the episodes a scope covers, one at a time; returns how many. */
+/** Queues a scope's episodes one at a time; returns how many. */
 export const queueSeriesTranscription = async (
   owner: string,
   seriesId: number,
@@ -803,9 +799,8 @@ export const queueSeriesTranscription = async (
 // ---- When a search finds nothing -------------------------------------------
 
 /*
- * Whether Bazarr has Whisper turned on, asked at most once a minute: a
- * search that found nothing is followed by a transcription only when there
- * is something to transcribe with.
+ * Whether Bazarr has Whisper on, checked at most once a minute: an empty
+ * search is followed by a transcription only when Whisper is available.
  */
 const WHISPER_CHECK_MS = 60_000;
 let whisperChecked: { at: number; on: boolean } | undefined;
@@ -818,22 +813,22 @@ export const whisperOn = async (): Promise<boolean> => {
   try {
     on = (await bazarr().getProviders()).includes(WHISPER_PROVIDER);
   } catch {
-    // Unknown: not this time.
+    // Unknown: skip this time.
   }
   whisperChecked = { at: Date.now(), on };
   return on;
 };
 
-/** For tests: ask Bazarr again. */
+/** For tests: recheck Bazarr next time. */
 export const forgetWhisper = () => {
   whisperChecked = undefined;
 };
 
 /**
- * After a manual search: when no provider had a subtitle in a language the
- * title lacks, Whisper's transcription is queued for it instead, with the
- * result that search offered. Nothing on disk is ever replaced: with no gap
- * nothing is queued. Undefined when a provider had what was missing.
+ * After a manual search with no provider result in a language the title
+ * lacks, queues a Whisper transcription with that search's result. Never
+ * replaces anything on disk: no gap, nothing queued. Undefined when a
+ * provider had what was missing.
  */
 export const transcribeIfNone = (
   results: BazarrSearchResult[],
@@ -900,10 +895,10 @@ export const searchEpisodeOrTranscribe = async (
 };
 
 /**
- * Bazarr's own search for what a movie is missing, then a transcription of
- * whatever it still lacks. Bazarr answers once its search is over, which
- * can take minutes; the title's status says it is searching meanwhile.
- * Returns how many transcriptions were queued.
+ * Bazarr's own search for what a movie is missing, then transcriptions for
+ * what it still lacks. Bazarr answers when its search ends, which can take
+ * minutes; the title's status shows it searching meanwhile. Returns how many
+ * transcriptions were queued.
  */
 export const searchMissingMovieOrTranscribe = async (
   owner: string,
@@ -912,7 +907,7 @@ export const searchMissingMovieOrTranscribe = async (
   const searched = await transcriber.searching(owner, (watch) =>
     bazarr().searchMissingMovie(radarrId, watch)
   );
-  // What a search Bazarr did not finish would have found is not known.
+  // Results of an unfinished search are unknown.
   if (searched !== 'finished' || !(await whisperOn())) {
     return 0;
   }
@@ -922,7 +917,7 @@ export const searchMissingMovieOrTranscribe = async (
   return queueMovieTranscription(owner, radarrId, { auto: true });
 };
 
-/** The same for a series: each episode still lacking one is transcribed. */
+/** Same for a series: each episode still lacking one is transcribed. */
 export const searchMissingSeriesOrTranscribe = async (
   owner: string,
   seriesId: number
@@ -931,9 +926,9 @@ export const searchMissingSeriesOrTranscribe = async (
     bazarr().searchMissingSeries(seriesId, watch)
   );
   const episodes = await bazarr().getEpisodes(seriesId);
-  // What the search downloaded changes where their subtitles came from.
+  // The search's downloads change those episodes' subtitle origins.
   episodes.forEach((episode) => forgetEpisodeHistory(episode.sonarrEpisodeId));
-  // What a search Bazarr did not finish would have found is not known.
+  // Results of an unfinished search are unknown.
   if (searched !== 'finished' || !(await whisperOn())) {
     return 0;
   }

@@ -91,8 +91,7 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
         commitTag
       ));
     } else if (commitTag !== 'local') {
-      // A stable install is only offered stable releases, and only one
-      // newer than the version it runs.
+      // A stable install is only offered newer stable releases.
       updateAvailable = releaseUpdateAvailable(
         await githubApi.getSeerrReleases(),
         currentVersion
@@ -162,7 +161,7 @@ router.get(
 );
 router.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
 router.use('/search', isAuthenticated(), searchRoutes);
-// Before Discover's own routes, which it is part of.
+// Before Discover's own routes, which it nests under.
 router.use('/discover/music', isAuthenticated(), discoverMusicRoutes);
 router.use('/discover', isAuthenticated(), discoverRoutes);
 router.use('/request', isAuthenticated(), requestRoutes);
@@ -191,15 +190,15 @@ router.use('/issueComment', isAuthenticated(), issueCommentRoutes);
 router.use('/now-playing', isAuthenticated(), nowPlayingRoutes);
 router.use('/auth', authRoutes);
 router.use('/style', styleRoutes);
-// Signed-in only at the group, as every other group is. Each list route also
-// checks for itself, but a future one that forgot would otherwise be public.
+// Signed-in only at the group, like every other group. Each list route also
+// checks, but a future one that forgot would otherwise be public.
 router.use('/list', isAuthenticated(), listRoutes);
 router.use('/maintainerr', isAuthenticated(), maintainerrRoutes);
 router.use('/subtitles', isAuthenticated(), subtitleRoutes);
 router.use('/ai', isAuthenticated(), aiRoutes);
 router.use('/backfill', isAuthenticated(Permission.ADMIN), backfillRoutes);
 router.use('/agent', isAuthenticated(Permission.ADMIN), agentRoutes);
-// What Backfill is doing about the titles someone asked for, for them.
+// Backfill progress on the titles someone requested, for them.
 router.use('/backfill-status', isAuthenticated(), backfillStatusRoutes);
 // Mounted for any signed-in user: each rule-management route requires admin
 // itself, and the advanced-request preview has its own permission check.

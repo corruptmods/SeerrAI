@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Admins hear when a connected service newly has a problem: once it has
- * been seen twice in a row, once only, and again only after it has cleared.
+ * Admins are alerted when a service newly has a problem: after two sightings
+ * in a row, once, and again only after it clears.
  */
 
 const service = (over: Partial<HealthCheck>): HealthCheck => ({
@@ -128,8 +128,8 @@ describe('health alerts', () => {
       count: 1,
       items: [{ title: 'Indexers unavailable', detail: 'IndexerStatusCheck' }],
     });
-    // Radarr answered, but its health list timed out: nothing is known of
-    // its indexers this time, which is not the same as their being fine.
+    // Radarr answered but its health list timed out: indexers are unknown,
+    // not fine.
     const radarrUnread = service({
       id: 'radarr:0',
       name: 'Radarr',
@@ -145,7 +145,7 @@ describe('health alerts', () => {
     healthAlerts.consider(problemsIn([radarrIndexers]));
     assert.equal(sent.length, 1, 'not told again after a slow answer');
 
-    // Read in full and clear: told again if it comes back.
+    // Fully read and clear: alert again if it recurs.
     healthAlerts.consider(problemsIn([service({ id: 'radarr:0' })]));
     healthAlerts.consider(problemsIn([radarrIndexers]));
     healthAlerts.consider(problemsIn([radarrIndexers]));

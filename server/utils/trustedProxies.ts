@@ -4,22 +4,17 @@ import express from 'express';
 import net from 'node:net';
 
 /**
- * The proxies whose word on someone's address is always taken when
- * Settings → Network → Enable Proxy Support is on: those on this machine
- * (loopback), on its link (link-local), on the private network (10.x,
- * 172.16-31.x, 192.168.x, fc00::/7), which is where a reverse proxy or a
- * Docker network sits, and in the shared address space 100.64.0.0/10. That
- * last one is where Tailscale gives out addresses (its IPv6 ones are under
- * fc00::/7 already), and carrier-grade NAT; nobody on the internet can
- * connect from it.
+ * Proxies always trusted for client addresses when Settings → Network → Enable
+ * Proxy Support is on: loopback, link-local, private networks (10.x,
+ * 172.16-31.x, 192.168.x, fc00::/7, where reverse proxies and Docker networks
+ * sit), and shared address space 100.64.0.0/10 (Tailscale's IPv4 range, plus
+ * carrier-grade NAT; unreachable from the internet).
  *
- * Not every proxy: X-Forwarded-For is a list anyone can start, and with
- * every hop trusted the address used is its first entry, whatever the
- * person sending the request wrote there. The sign-in limits count wrong
- * passwords per address, so that would let someone guess without limit by
- * writing a new address each time. Trusting only known proxies, the
- * address used is the last one a trusted proxy added: the one it really
- * saw.
+ * Not every proxy: anyone can start an X-Forwarded-For list, and with every hop
+ * trusted its first entry is used, whatever the client wrote. Sign-in limits
+ * count failed passwords per address, so that would allow unlimited guessing
+ * with a new address each time. Trusting only known proxies uses the last
+ * address a trusted proxy added: the one it actually saw.
  */
 export const LOCAL_PROXIES = [
   'loopback',
@@ -29,11 +24,9 @@ export const LOCAL_PROXIES = [
 ];
 
 /**
- * The addresses Cloudflare's proxy (the orange cloud) connects from,
- * trusted only with Trust Cloudflare on. As published at
- * https://cloudflare.com/ips, checked on 15 October 2026. Cloudflare Tunnel
- * needs none of this: the tunnel connects from this machine or the local
- * network.
+ * Cloudflare proxy (orange cloud) addresses, trusted only with Trust Cloudflare
+ * on. From https://cloudflare.com/ips, checked 15 October 2026. Cloudflare
+ * Tunnel needs none: it connects from this machine or the local network.
  */
 export const CLOUDFLARE_PROXIES = [
   '103.21.244.0/22',
@@ -60,14 +53,13 @@ export const CLOUDFLARE_PROXIES = [
   '2c0f:f248::/32',
 ];
 
-// Only used to have Express check an entry exactly as it will read it.
+// Only used to validate an entry exactly as Express will parse it.
 const checker = express();
 
 /**
- * Whether an entry in Also Trust These Proxies is an address or a range
- * (IPv4 or IPv6, with a /prefix or an IPv4 netmask) that Express takes.
- * Names Express knows, such as "loopback", are left out: those are trusted
- * already or are not what the field is for.
+ * Whether an Also Trust These Proxies entry is an address or range Express
+ * accepts (IPv4 or IPv6, with a /prefix or IPv4 netmask). Express names such as
+ * "loopback" are rejected: already trusted or not what the field is for.
  */
 export const isProxyAddress = (entry: string): boolean => {
   if (net.isIP(entry.split('/')[0]) === 0) {
@@ -82,11 +74,10 @@ export const isProxyAddress = (entry: string): boolean => {
 };
 
 /**
- * Every proxy trusted with Enable Proxy Support on: those always trusted,
- * Cloudflare's if Trust Cloudflare is on, then the ones the admin listed.
- * A listed entry Express would refuse (only possible by editing
- * settings.json by hand, since saving checks them) is left out with a
- * warning, so the server still starts.
+ * Every proxy trusted with Enable Proxy Support on: the local ones,
+ * Cloudflare's if Trust Cloudflare is on, then the admin's list. An entry
+ * Express would reject (possible only by hand-editing settings.json, since
+ * saving validates) is skipped with a warning so the server still starts.
  */
 export const trustedProxies = (
   network: Pick<NetworkSettings, 'trustCloudflare' | 'trustedProxies'>

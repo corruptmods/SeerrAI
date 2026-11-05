@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * What an admin is told when a single sign-on provider's discovery address
- * answers "not found" (404): with just a host entered, where Authentik
- * keeps it.
+ * The admin message when an SSO provider's discovery URL returns 404 with
+ * just a host entered, where Authentik keeps it.
  */
 
-/** As openid-client throws when discovery answers with this status. */
+/** The error openid-client throws when discovery returns this status. */
 const answered = (status: number) =>
   Object.assign(new Error('"response" is not a conform response'), {
     code: 'OAUTH_RESPONSE_IS_NOT_CONFORM',

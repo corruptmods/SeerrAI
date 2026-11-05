@@ -17,29 +17,27 @@ import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import { Not } from 'typeorm';
 
 /*
- * Rows of the Music page that are each person's own, from the music they
- * have asked for: what they asked for, more by those artists, and artists
- * like them. Only their own requests are read, so no one sees another's
- * taste. A row is empty for someone who has asked for no music.
+ * Personal Music page rows built from the user's own requests only, so no
+ * one sees another's taste. Empty for users with no music requests.
  */
 
-/** Requests read for a person's rows: plenty, newest first. */
+/** Requests read per user, newest first. */
 const REQUESTS_READ = 200;
-/** Artists whose other albums are shown, the most recently asked first. */
+/** Artists whose other albums are shown, most recent first. */
 const ARTISTS_FOR_MORE = 10;
-/** Artists ListenBrainz is asked about, one call each. */
+/** Artists sent to ListenBrainz, one call each. */
 const ARTISTS_FOR_LIKE = 5;
-/** The most a row lists. */
+/** Max items per row. */
 const ROW_MOST = 60;
 
 interface Asked {
-  /** Release groups asked for, or that a song asked for is on. */
+  /** Requested release groups, including requested songs' albums. */
   albums: MusicAlbumResult[];
-  /** The artists, newest asked first. */
+  /** Requested artists, newest first. */
   artists: { id: string; name: string }[];
 }
 
-/** What a person has asked for, newest first, declined requests aside. */
+/** A user's non-declined music requests, newest first. */
 const askedBy = async (userId: number): Promise<Asked> => {
   const requests = await getRepository(MediaRequest).find({
     where: {
@@ -88,7 +86,7 @@ const askedBy = async (userId: number): Promise<Asked> => {
   };
 };
 
-/** The albums a person asked for (and those their songs are on). */
+/** Albums the user requested, including their songs' albums. */
 export const yourMusicRequests = async (
   userId: number
 ): Promise<MusicAlbumResult[]> => {
@@ -100,10 +98,9 @@ export const yourMusicRequests = async (
 };
 
 /**
- * Their artists' other studio albums and EPs, newest first. From the
- * albums MusicBrainz has already listed for each (as the artist's page
- * asks); an artist not listed yet is asked for in the background, and
- * shows here next time, so the page never waits on MusicBrainz.
+ * Other studio albums and EPs by the user's artists, newest first. Uses
+ * cached MusicBrainz lists; uncached artists are fetched in the background
+ * and appear next time, so the page never waits on MusicBrainz.
  */
 export const moreFromYourArtists = async (
   userId: number
@@ -158,10 +155,9 @@ export const moreFromYourArtists = async (
 };
 
 /**
- * Artists people listen to alongside theirs, from ListenBrainz (off with
- * its rows, under Settings → Music). Each artist's list is weighed on its
- * own, so one artist with many does not crowd out the rest; artists they
- * have already asked for are left out.
+ * Similar artists from ListenBrainz (toggle in Settings → Music), excluding
+ * ones already requested. Scores are normalised per artist so one long list
+ * doesn't crowd out the rest.
  */
 export const artistsLikeYours = async (
   userId: number

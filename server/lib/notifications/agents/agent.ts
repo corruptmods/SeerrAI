@@ -9,8 +9,7 @@ import type { Notification } from '..';
 
 export interface NotificationPayload {
   /**
-   * The line above the title, in English. Webhooks are sent this; the other
-   * channels show `eventTitle` in their own language when there is one.
+   * English event line, sent to webhooks; other channels localize `eventTitle`.
    */
   event?: string;
   eventTitle?: EventTitle;
@@ -28,17 +27,17 @@ export interface NotificationPayload {
   pendingRequestsCount?: number;
   isAdmin?: boolean;
   /**
-   * An in-app path to open, for notifications about something other than a
-   * title or an issue (Backfill's approval page).
+   * In-app path for notifications not about a title or issue (e.g. Backfill
+   * approval).
    */
   actionUrl?: string;
   actionUrlTitle?: string;
   /**
-   * The person's own copy is held back, to be sent with others like it as
-   * one; the admin and channel copies still go.
+   * Skip the user's copy (it goes in a digest); admin and channel copies still
+   * send.
    */
   holdUser?: boolean;
-  /** Several notifications gathered into one, for the person alone. */
+  /** A user-only digest of several notifications. */
   digest?: boolean;
 }
 

@@ -4,10 +4,8 @@ import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { getSettings, NotificationAgentKey } from '@server/lib/settings';
 
 /**
- * Whether a user has any working way to receive a notification.
- *
- * Offering to notify someone who has no channel configured produces a silent
- * no-op, so the UI needs to know this before letting them opt in.
+ * Whether a user has any working notification channel. Opting in without one
+ * is a silent no-op, so the UI checks this first.
  */
 export const getNotificationChannels = async (
   user: User
@@ -15,7 +13,7 @@ export const getNotificationChannels = async (
   const settings = getSettings().notifications.agents;
   const channels: string[] = [];
 
-  // Web push: a live subscription for at least one device.
+  // Web push: a live subscription on at least one device.
   if (settings.webpush?.enabled) {
     const deviceCount = await getRepository(UserPushSubscription).count({
       where: { user: { id: user.id } },

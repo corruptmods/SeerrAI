@@ -15,8 +15,8 @@ import { beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * What the admin agent keeps of a title between conversations: which tool
- * calls make a note, how they are told to it, and how long they are kept.
+ * Admin-agent notes kept per title between conversations: which tool calls
+ * make one, how they are told, and how long they are kept.
  */
 
 const AT = '2026-10-01T12:00:00.000Z';

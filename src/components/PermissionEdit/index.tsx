@@ -94,16 +94,14 @@ export const PermissionEdit = ({
 }: PermissionEditProps) => {
   const intl = useIntl();
   const settings = useSettings();
-  // Watchlists are kept on Plex for people with Plex and here for everyone
-  // else, so they are named after every connected server.
+  // Watchlists live on Plex for Plex users and here for others, so name every connected server.
   const watchlistServers = intl.formatList(
     settings.currentSettings.mediaServers.map(
       (server) => SERVER_NAMES[server.kind]
     ),
     { type: 'conjunction' }
   );
-  // Music's permissions, once there is music to request. Request and
-  // Auto-Approve cover music as they cover films and series.
+  // Music permissions, once music is set up; Request and Auto-Approve cover it too.
   const musicReady = settings.currentSettings.musicReady;
 
   const permissionList: PermissionItem[] = [

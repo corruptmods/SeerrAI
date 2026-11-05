@@ -6,23 +6,21 @@ import type {
 } from '@server/lib/backfill/sonarr';
 
 /*
- * Sonarr's and Radarr's size limits: for each quality, the smallest and
- * largest a file may be, in MB a minute of what it holds. Sonarr v5 keeps
- * them in each quality profile, Radarr (and Sonarr before v5) for each
- * quality alike. Backfill and the admin agent hand files to them to
- * import, which never checks these, so they are checked here: a release
- * outside them is only ever taken once an admin says so.
+ * Sonarr's and Radarr's per-quality size limits, in MB per minute. Sonarr v5
+ * keeps them per profile; Radarr and older Sonarr globally per quality.
+ * Backfill and the admin agent import files directly, which skips these
+ * checks, so they run here: a release outside them needs admin approval.
  */
 
 const MB = 1024 * 1024;
 
-/** A quality's limits, in MB a minute; no max is no limit. */
+/** A quality's limits in MB per minute; null max is no limit. */
 export interface SizeLimit {
   min: number;
   max: number | null;
 }
 
-/** Each quality's limits, by quality id: the profile's, else the app's. */
+/** Limits by quality id: the profile's, else the app's. */
 export const limitsOf = (
   profile: SonarrQualityProfile,
   definitions: QualityDefinition[]
@@ -53,16 +51,15 @@ export const limitsOf = (
 const gb = (bytes: number) =>
   `${(bytes / 1024 ** 3).toFixed(bytes < 10 * 1024 ** 3 ? 1 : 0)} GB`;
 
-/** One file outside its quality's limits, said plainly. */
+/** A file outside its quality's limits, with a readable note. */
 export interface SizeProblem {
   index: number;
   note: string;
 }
 
 /**
- * The files of a plan to be taken (filled or upgraded) that are outside
- * their quality's limits. A file of several episodes may be that many
- * times one's size. Unknown runtimes and qualities with no limits pass.
+ * Filled or upgraded plan files outside their quality's limits. Multi-episode
+ * files scale by episode count. Unknown runtimes and unlimited qualities pass.
  */
 export const sizeProblems = (
   plan: PlanEntry[],
@@ -94,7 +91,7 @@ export const sizeProblems = (
   return problems;
 };
 
-/** "Over Sonarr's size limits: 6.2 GB is over …", for a pack's reason. */
+/** A pack's reason line, e.g. "Outside the size limits: 6.2 GB is over …". */
 export const sizeNote = (problems: SizeProblem[]): string | undefined =>
   problems.length
     ? `Outside the size limits: ${problems

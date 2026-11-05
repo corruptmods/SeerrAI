@@ -16,8 +16,8 @@ import { describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * Which titles a scan searches: what someone asked for first, but every
- * title in turn, so the same few never take every scan.
+ * Which titles a scan searches: requested ones first, but every title in
+ * turn, so the same few never take every scan.
  */
 
 const HOUR = 60 * 60 * 1000;

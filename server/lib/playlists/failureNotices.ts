@@ -12,18 +12,17 @@ import { truncate } from 'lodash';
 import { In } from 'typeorm';
 
 /*
- * A playlist import makes a request for each artist, and songs that
- * couldn't be got fail them one after another, over hours. Rather than a
- * notification for each, a playlist's failures are told as one, once none
- * has failed for a while (or they have been gathering an hour).
+ * A playlist import makes one request per artist, which can fail one by one
+ * over hours. Failures are sent as one notification per playlist once they
+ * go quiet (or after an hour).
  */
 
-/** How long after the last failure its playlist's are told. */
+/** Quiet time after the last failure before notifying. */
 export const QUIET_MS = 10 * 60_000;
-/** The longest failures are held before being told anyway. */
+/** Max time failures are held before notifying anyway. */
 export const LONGEST_MS = 60 * 60_000;
 
-/** The playlist each of these requests was made from, if any. */
+/** Playlist id each request was made from, if any. */
 export const playlistOfRequests = async (
   requestIds: number[]
 ): Promise<Map<number, number>> => {
@@ -33,8 +32,8 @@ export const playlistOfRequests = async (
     where: { requestId: In(requestIds) },
     order: { id: 'ASC' },
   });
-  // Made from the playlist: in its owner's name. A song may follow someone
-  // else's request for it, which is theirs to be told of.
+  // Only requests in the playlist owner's name count; a song following
+  // someone else's request is theirs to be notified of.
   const requesters = new Map(
     (
       await getRepository(MediaRequest).find({
@@ -63,9 +62,8 @@ const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
   song.version ? `${song.title} (${song.version})` : song.title;
 
 /**
- * Tells each playlist's failed requests as one notification, once they
- * have settled: the requests are claimed as told, so none is told again
- * on its own. Those still gathering wait for a later pass.
+ * Sends one notification per playlist's settled failures, claiming each
+ * request so it isn't notified again alone. Unsettled ones wait.
  */
 export const notifyPlaylistFailures = async (
   requests: MediaRequest[],
@@ -113,28 +111,27 @@ export const notifyPlaylistFailures = async (
       const image = songs[0]?.albumMbid
         ? albumCoverUrl(songs[0].albumMbid)
         : undefined;
+      const what = count
+        ? `${count} ${count === 1 ? 'song' : 'songs'}`
+        : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`;
       const message = truncate(names.join(', '), {
         length: 500,
         separator: /,? /,
         omission: '…',
       });
-      // Admins and channels as a failed request; the owner by Playlist
-      // Updates, which they choose apart from failed requests.
+      // Admins and channels get a failed-request notice; the owner gets a
+      // Playlist Update, which they configure separately.
       notificationManager.sendNotification(Notification.MEDIA_FAILED, {
         ...mediaEvent(Notification.MEDIA_FAILED, MediaType.MUSIC, false),
-        // The playlist's own name stays on its page.
-        subject: `Playlist import — ${
-          count
-            ? `${count} ${count === 1 ? 'song' : 'songs'}`
-            : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`
-        }`,
+        // The playlist's name is left to its page.
+        subject: `Playlist import — ${what}`,
         message,
         image,
         media: first.media,
         request: first,
         notifyAdmin: true,
         notifySystem: true,
-        // Named so they aren't sent the admins' copy as well.
+        // Set so the owner isn't also sent the admins' copy.
         notifyUser: owner,
         holdUser: true,
         actionUrl: `/lists/${listId}`,
@@ -145,9 +142,6 @@ export const notifyPlaylistFailures = async (
           select: { id: true, name: true },
           where: { id: listId },
         });
-        const what = count
-          ? `${count} ${count === 1 ? 'song' : 'songs'}`
-          : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`;
         notificationManager.sendNotification(Notification.PLAYLIST_UPDATE, {
           subject: `${list?.name ?? 'Your playlist'}: ${what} couldn’t be got`,
           message,

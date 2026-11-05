@@ -2,10 +2,7 @@ import useSettings from '@app/hooks/useSettings';
 import { IMAGE_FORMATS } from '@server/constants/images';
 import { useEffect, useState } from 'react';
 
-/**
- * Whether this browser takes image-set() with types, so a background can
- * offer the proxy's AVIF and WebP copies as <picture> does for an <img>.
- */
+/** Whether image-set() takes types, so a background can offer AVIF and WebP. */
 const supportsTypedImageSet = () =>
   typeof CSS !== 'undefined' &&
   CSS.supports(
@@ -31,13 +28,11 @@ interface PosterBackgroundProps {
 }
 
 /**
- * A poster drawn as a background image, served through Seerr's image proxy
- * when caching is on.
+ * A poster as a background image, through Seerr's image proxy when caching
+ * is on.
  *
- * If the proxied image fails — a bad cache entry, a proxy hiccup — it falls
- * back to fetching straight from TMDB rather than leaving a blank tile. A
- * background image raises no load event of its own, so the URL is probed with
- * an Image and the direct address substituted only if the proxy errors.
+ * Falls back to TMDB directly if the proxied image fails. A background image
+ * has no load event, so the URL is probed with an Image.
  */
 const PosterBackground = ({
   posterPath,
@@ -55,7 +50,7 @@ const PosterBackground = ({
       : direct;
 
   const [src, setSrc] = useState(proxied);
-  // Decided after the first render, so it matches the server's.
+  // Set after the first render, to match the server render.
   const [typedImageSet, setTypedImageSet] = useState(false);
 
   useEffect(() => {
@@ -77,9 +72,8 @@ const PosterBackground = ({
         setSrc(direct);
       }
     };
-    // The copy the background itself will use, so the probe is the same
-    // download rather than a second one: every browser that takes typed
-    // image-set() takes AVIF, the set's first choice.
+    // Probe the copy the background will use, so it is one download: every
+    // browser with typed image-set() takes AVIF, the set's first choice.
     probe.src = supportsTypedImageSet()
       ? `${proxied}?f=${IMAGE_FORMATS[0]}`
       : proxied;

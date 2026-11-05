@@ -163,7 +163,7 @@ let packFiles: PackFile[];
 
 const stateFor = (...known: KnownRelease[]): AgentState =>
   ({
-    // An admin asked: every tool is open to it.
+    // An admin asked, so every tool is available.
     run: {
       id: 1,
       trigger: 'ask',
@@ -242,7 +242,7 @@ beforeEach(() => {
   mock.method(lidarr, 'getAlbumQueueCount', async () => 0);
   mock.method(lidarr, 'getQualityProfile', async () => PROFILE);
   mock.method(lidarr, 'parse', async (title: string) => parse(title));
-  // Each client's own, not the class's.
+  // Per-client methods, not the class's.
   mock.method(BackfillLidarr, 'forServer', (server: LidarrSettings) =>
     Object.assign(forServer.call(BackfillLidarr, server), {
       getAlbums: async () => [ALBUM, OTHER],
@@ -257,7 +257,7 @@ beforeEach(() => {
       return [release(FOLDER) as ProwlarrRelease];
     }
   );
-  // Films and series on TMDB: none here.
+  // No TMDB films or series.
   mock.method(lookups, 'tmdb', async () => ({ results: [] }));
   mock.method(backfill, 'filesOf', async () => ({ files: packFiles }));
   mock.method(backfill, 'approve', async (candidateId: number) => {

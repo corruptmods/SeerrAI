@@ -55,6 +55,14 @@ const UserSettings = ({ children }: UserSettingsProps) => {
     return <ErrorPage statusCode={500} />;
   }
 
+  // Only managers act on others' settings, and only the owner on the owner's
+  // or an admin's.
+  const cannotManageThem =
+    !hasPermission(Permission.MANAGE_USERS, currentUser?.permissions ?? 0) ||
+    (currentUser?.id !== 1 &&
+      (user.id === 1 ||
+        hasPermission(Permission.ADMIN, user.permissions ?? 0)));
+
   const settingsRoutes: SettingsRoute[] = [
     {
       text: intl.formatMessage(messages.menuGeneralSettings),
@@ -91,25 +99,14 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       text: intl.formatMessage(messages.menuPasskeys),
       route: '/settings/passkeys',
       regex: /\/settings\/passkeys/,
-      // Managed by the person it signs in. Someone who manages users can
-      // also remove one, except the owner's or another admin's.
-      hidden:
-        currentUser?.id !== user.id &&
-        (!hasPermission(
-          Permission.MANAGE_USERS,
-          currentUser?.permissions ?? 0
-        ) ||
-          (currentUser?.id !== 1 &&
-            (user.id === 1 ||
-              hasPermission(Permission.ADMIN, user.permissions ?? 0)))),
+      // Own passkeys; managers can also remove others'.
+      hidden: currentUser?.id !== user.id && cannotManageThem,
     },
     {
       text: intl.formatMessage(messages.menuApiKeys),
       route: '/settings/api-keys',
       regex: /\/settings\/api-keys/,
-      // Your own, once an admin lets you make them. Someone who manages
-      // users sees another person's while keys are on, except the owner's
-      // or another admin's.
+      // Own keys when allowed; managers see others' while keys are on.
       hidden:
         settings.currentSettings.personalApiKeys === 'off' ||
         (currentUser?.id === user.id
@@ -118,21 +115,14 @@ const UserSettings = ({ children }: UserSettingsProps) => {
               Permission.MANAGE_USERS,
               currentUser?.permissions ?? 0
             )
-          : !hasPermission(
-              Permission.MANAGE_USERS,
-              currentUser?.permissions ?? 0
-            ) ||
-            (currentUser?.id !== 1 &&
-              (user.id === 1 ||
-                hasPermission(Permission.ADMIN, user.permissions ?? 0)))),
+          : cannotManageThem),
     },
     {
       text: intl.formatMessage(messages.menuSiri),
       route: '/settings/siri',
       regex: /\/settings\/siri/,
-      // Your own, while Siri reports are on and you may report problems.
-      // Someone who manages users sees another person's, to revoke its key,
-      // except the owner's or another admin's.
+      // Own while Siri is on and you may report issues; managers see others'
+      // to revoke the key.
       hidden:
         currentUser?.id === user.id
           ? !siriOn ||
@@ -141,13 +131,7 @@ const UserSettings = ({ children }: UserSettingsProps) => {
               user.permissions ?? 0,
               { type: 'or' }
             )
-          : !hasPermission(
-              Permission.MANAGE_USERS,
-              currentUser?.permissions ?? 0
-            ) ||
-            (currentUser?.id !== 1 &&
-              (user.id === 1 ||
-                hasPermission(Permission.ADMIN, user.permissions ?? 0))),
+          : cannotManageThem,
     },
     {
       text: intl.formatMessage(messages.menuNotifications),
@@ -164,7 +148,7 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       text: intl.formatMessage(messages.menuLibraries),
       route: '/settings/libraries',
       regex: /\/settings\/libraries/,
-      // An admin, for someone else with an account on a media server.
+      // Admins only, for another user with a media server account.
       requiredPermission: Permission.ADMIN,
       hidden: currentUser?.id === user.id || !user.linkedServers?.length,
     },

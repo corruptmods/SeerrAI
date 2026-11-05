@@ -49,37 +49,32 @@ import {
 import logger from '@server/logger';
 
 /*
- * Fixing what someone says is wrong with a title, as an admin would: find
- * subtitles (or transcribe them), look for missing episodes, replace a
- * broken file with a different release, check a season whose episodes are
- * mixed up, or replace a whole season. Asked for from AI Search or by
- * reporting an issue; on an issue, each step is written as a comment, which
- * tells the reporter.
+ * Auto-fix for reported problems: subtitles (or transcription), missing
+ * episodes, broken files, mixed-up seasons, whole-season replacement.
+ * Triggered from AI Search or an issue; on an issue each step is a comment.
  *
- * A file is only ever removed once another release for it has been found
- * (for a whole season, once it has been grabbed), and the same title is
- * replaced at most once a day, except by an admin replacing a season. A
- * whole season is replaced at once for an admin; anyone else's waits for
- * an admin to approve it on the admin agent's page.
+ * A file is removed only once a replacement release is found (for a season,
+ * grabbed). A title is replaced at most once a day, except an admin's season
+ * replace. Non-admin season replacements wait for admin approval.
  */
 
 const LABEL = 'Auto-fix';
-/** Said when the admin agent will look further, should nothing turn up. */
+/** Suffix for when the admin agent will follow up if nothing turns up. */
 const agentAfter = (req: { issueId?: number }) =>
   req.issueId
     ? ' If nothing turns up, the admin agent looks further and answers here.'
     : ' If nothing turns up, the admin agent looks further.';
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
-/** The most episodes one "wrong episode" report replaces. */
+/** Max episodes one "wrong episode" report replaces. */
 const MAX_REPLACED = 6;
-/** Files one person (not an admin) can have replaced in a day. */
+/** Daily file replacements per non-admin. */
 const MAX_REPLACED_PER_DAY = 10;
 const TOO_MANY =
   'You have had as many files replaced today as allowed. An admin can replace more, or try again tomorrow.';
-/** Fixes of any kind one person (not an admin) can ask for in a day. */
+/** Daily fixes of any kind per non-admin. */
 const MAX_FIXES_PER_DAY = 30;
-/** The most episodes of a season checked against where they came from. */
+/** Max episodes per season checked against their source release. */
 const MAX_CHECKED = 60;
 
 export type FixKind =
@@ -101,19 +96,19 @@ export const FIX_KINDS: FixKind[] = [
 
 export interface FixRequest {
   kind: FixKind;
-  /** A film's or series' record; for music, the artist's. */
+  /** The film or series; for music, the artist. */
   media: Media;
-  /** For music, the album it is about; none for the artist's every album. */
+  /** Music only: the album; omitted means all the artist's albums. */
   album?: MusicAlbum;
   seasonNumber?: number;
   episodeNumber?: number;
-  /** Two-letter language code, for subtitles. */
+  /** Two-letter subtitle language code. */
   language?: string;
-  /** For subtitles: the ones there are wrong, not merely missing. */
+  /** Subtitles present are wrong, not just missing. */
   replace?: boolean;
-  /** Who asked: their limits apply, and what they may see is shown. */
+  /** Requester: their limits and visibility apply. */
   user: User;
-  /** The issue it was reported on, to answer there. */
+  /** Issue to reply on. */
   issueId?: number;
 }
 
@@ -121,15 +116,15 @@ export interface FixResult {
   kind: FixKind;
   ok: boolean;
   message: string;
-  /** A page in Seerr that follows what was started. */
+  /** Seerr page tracking what was started. */
   link?: string;
-  /** Nothing applied (the title is not on the server): say nothing. */
+  /** Not applicable (title not on the server); stay silent. */
   skipped?: boolean;
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** An error whose message is fit to show the person who asked. */
+/** An error whose message is safe to show the requester. */
 class Shown extends Error {}
 const pad = (n: number) => String(n).padStart(2, '0');
 const label = (s?: number, e?: number) =>
@@ -168,7 +163,7 @@ const LANGUAGES: Record<string, string> = {
   indonesian: 'id',
 };
 
-/** The language named first in the text, as a two-letter code. */
+/** First language named in the text, as a two-letter code. */
 const languageIn = (text: string): string | undefined => {
   const lower = text.toLowerCase();
   let first: { at: number; code: string } | undefined;
@@ -206,9 +201,8 @@ const numberOf = (word: string) =>
   NUMBER_WORDS[word.toLowerCase()] ?? Number(word);
 
 /**
- * The season and episode named in what someone wrote: "S06E03", "6x03",
- * "season 6", "s6", "season six episode two", "episode 3 of season 6".
- * Whatever is not named is left out.
+ * Season/episode named in text: "S06E03", "6x03", "season 6", "s6",
+ * "season six episode two", "episode 3 of season 6". Unnamed parts are omitted.
  */
 export const seasonEpisodeIn = (
   text: string
@@ -230,12 +224,12 @@ export const seasonEpisodeIn = (
 };
 
 /**
- * A whole season, named as such. The number is optional as a group, never
- * as `\s*\d*\s+`, which takes time squared in a long run of spaces.
+ * "Whole season" phrasing. The number is an optional group, not `\s*\d*\s+`,
+ * which is quadratic on long runs of spaces.
  */
 const WHOLE_SEASON =
   /\b(whole|entire|full|complete)\s+(season|series)\b|\ball\s+(of\s+)?(the\s+)?season\b|\bseason(?:\s*\d+)?\s+(is\s+)?(all|completely|totally|entirely)\b/i;
-/** Everything there, in other words. */
+/** "All episodes/files" phrasing. */
 const WHOLE_OTHERWISE =
   /\b(every|all( of)?( the)?) (episodes?|files?)\b|\b(replace|redownload|re-download)\s+(it|them)\s+all\b/i;
 const REPLACE_WORDS =
@@ -244,8 +238,8 @@ const BAD_WORDS =
   /\b(bad|messed[ -]?up|a mess|wrong|broken|corrupt\w*|garbage|trash|screwed( up)?|ruined|unwatchable|mixed[ -]?up)\b/i;
 
 /**
- * A whole season to be replaced: the whole season said to be bad, or a
- * season (and no one episode) to be replaced or downloaded again.
+ * A whole season called bad, or a season (no single episode) to replace or
+ * redownload.
  */
 const wholeSeason = (text: string) => {
   const named = seasonEpisodeIn(text);
@@ -261,7 +255,7 @@ const wholeSeason = (text: string) => {
   );
 };
 
-/** The wrong episode or film: named as such, never just "wrong". */
+/** Wrong episode or film, named explicitly; bare "wrong" doesn't match. */
 const WRONG_EPISODE =
   /\b(wrong|different|incorrect)\s+(episode|ep|movie|film)\b|\bnot the (right|correct|same) (episode|ep|movie|film)\b|\b(episodes?|eps?)\b[^.]{0,30}\b(mislabel+ed|mixed[ -]?up|out of order|swapped)\b|\b(mislabel+ed|mixed[ -]?up|swapped)\b[^.]{0,30}\b(episodes?|eps?)\b|\bis actually (episode|ep)\b|\bplays (episode|ep)\b/i;
 const MISSING =
@@ -274,10 +268,9 @@ const BROKEN =
   /\b(broken|corrupt\w*|won'?t (play|load|start)|doesn'?t (play|load|work)|can'?t (play|watch)|no (sound|audio|picture|video)|black screen|green screen|stutter\w*|freez\w*|glitch\w*|pixelat\w*|artifact\w*|cuts? (out|off)|audio (is )?(out of sync|missing|wrong)|bad (quality|file|copy|encode))\b/i;
 
 /**
- * What a report or request asks to have fixed, from its words and, for an
- * issue, its type. A subtitle issue is only ever about subtitles; a video or
- * audio issue is about the file unless it names the wrong episode. Nothing
- * when it is not clear.
+ * The fix a report asks for, from its text and issue type. Subtitle issues
+ * are always subtitles; video/audio issues are the file unless they name the
+ * wrong episode. Undefined when unclear.
  */
 export const classify = (
   text: string,
@@ -313,7 +306,7 @@ export const classify = (
   return undefined;
 };
 
-/** What each fix is, in a sentence: "this reads as …". */
+/** Phrase for each fix kind: "this reads as …". */
 export const KIND_SAID: Record<FixKind, string> = {
   subtitles: 'a subtitle problem',
   transcribe: 'a request for subtitles from the audio',
@@ -324,10 +317,9 @@ export const KIND_SAID: Record<FixKind, string> = {
 };
 
 /**
- * What a report asks to have fixed: the word rules first, then the AI
- * model when they can't tell and "Understand Reports" is on. `by` says
- * which, as a model's reading is only ever a suggestion for files to be
- * replaced.
+ * Reads a report by rules, then the AI model if unclear and "Understand
+ * Reports" is on. `by` matters: an AI reading is only a suggestion for
+ * file-replacing fixes.
  */
 export const readReport = async (
   text: string,
@@ -339,7 +331,7 @@ export const readReport = async (
   return read ? { ...read, by: 'ai' } : undefined;
 };
 
-/** The server and id a title has there; the 4K one only when that is all. */
+/** The title's server and id; 4K only when it's the only one. */
 const serviceOf = (media: Media) =>
   !media.externalServiceId && media.externalServiceId4k
     ? { serverId: media.serviceId4k, id: media.externalServiceId4k }
@@ -393,9 +385,9 @@ const needsSeason = (req: FixRequest) =>
   req.episodeNumber !== undefined &&
   req.seasonNumber === undefined;
 
-/** One file swapped for another release, through Sonarr or Radarr. */
+/** Swapping one file for another release via Sonarr or Radarr. */
 interface Swap {
-  /** "S01E02", or nothing for a movie. */
+  /** "S01E02"; unset for a movie. */
   name?: string;
   app: 'Sonarr' | 'Radarr';
   episodeId?: number;
@@ -406,10 +398,10 @@ interface Swap {
   search: () => Promise<void>;
 }
 
-/** "S05E17 (202)": an episode number with its absolute number in brackets. */
+/** "S05E17 (202)": episode number with the absolute number in brackets. */
 const BRACKETED_ABSOLUTE = /S\d{1,2}E\d{1,3}\b.*?\((\d{2,4})\)/i;
 
-/** "22:55" or "1:02:03" in minutes. */
+/** Parses "22:55" or "1:02:03" to minutes. */
 export const minutesOf = (runTime?: string): number | undefined => {
   if (!runTime) return undefined;
   const parts = runTime.split(':').map(Number);
@@ -423,16 +415,15 @@ export const minutesOf = (runTime?: string): number | undefined => {
   return h * 60 + m + s / 60;
 };
 
-/** Whether a file is far longer or shorter than its episode should be. */
+/** Whether a file's length is far off the expected runtime. */
 export const wrongLength = (expected?: number, actual?: number): boolean =>
   !!expected &&
   actual !== undefined &&
   Math.abs(actual - expected) > Math.max(5, expected * 0.35);
 
 /**
- * Whether most files of a season are off by the same number: the files are
- * fine and only numbered differently. Needs three such files, and four in
- * five of the files whose origin points elsewhere to agree.
+ * A shared numbering offset across a season (files fine, numbering off).
+ * Needs at least three, and 80% of the offset files, to agree.
  */
 const commonOffset = (offsets: (number | undefined)[]): number | undefined => {
   const known = offsets.filter((o): o is number => o !== undefined && o !== 0);
@@ -446,23 +437,23 @@ const commonOffset = (offsets: (number | undefined)[]): number | undefined => {
 type Outcome = Omit<FixResult, 'kind'>;
 
 interface IssueFixOptions {
-  /** Who filed it, when someone else filed it for them; their limits apply. */
+  /** Whom it was filed for, if by someone else; their limits apply. */
   actor?: User;
-  /** What AI Search already worked out, instead of reading the report. */
+  /** AI Search's reading, used instead of re-reading the report. */
   asked?: Pick<FixRequest, 'kind' | 'language' | 'replace'>;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 class AutoFix {
-  /** When each title was last fixed each way, to keep from repeating. */
+  /** Last fix time per title and kind, to prevent repeats. */
   private recent = new Map<string, number>();
-  /** What each person used today, by "kind:user:day". */
+  /** Daily usage by "kind:user:day". */
   private used = new Map<string, number>();
 
   /**
-   * Claims a key for a while: undefined if it was claimed too recently,
-   * otherwise a way to give it back when nothing came of it.
+   * Claims a key; undefined if claimed within `within`, else a callback that
+   * releases it.
    */
   private claim(key: string, within: number): (() => void) | undefined {
     const now = Date.now();
@@ -480,9 +471,9 @@ class AutoFix {
   }
 
   /**
-   * Takes one of today's allowance for this person, before the work, so
-   * reports made at the same moment cannot all get through. Admins are not
-   * limited. Returns a refund, or undefined when none is left.
+   * Takes one daily allowance before the work, so simultaneous reports can't
+   * all pass. Admins are unlimited. Returns a refund, or undefined if none
+   * left.
    */
   private take(
     what: 'fix' | 'replace',
@@ -502,13 +493,13 @@ class AutoFix {
     return () => this.used.set(key, Math.max(0, (this.used.get(key) ?? 1) - 1));
   }
 
-  /** Forgets what was done, for tests. */
+  /** Clears state, for tests. */
   public reset() {
     this.recent.clear();
     this.used.clear();
   }
 
-  /** Fixes started from issues, still running. */
+  /** Running issue fixes. */
   private pending = new Set<Promise<FixResult | undefined>>();
 
   public enabledFor(user?: User | null): boolean {
@@ -532,8 +523,7 @@ class AutoFix {
         mediaId: req.media.id,
         errorMessage: message(e),
       });
-      // Only messages written for people are shown; the rest can name
-      // servers on the network, so they stay in the log.
+      // Only Shown errors reach the user; others may name internal hosts.
       return {
         ok: false,
         message:
@@ -592,7 +582,7 @@ class AutoFix {
   private async subtitles(req: FixRequest): Promise<Outcome> {
     if (!subtitlesReady()) return NO_BAZARR('subtitles cannot be fetched');
     if (!req.media.externalServiceId) return NOT_ON_SERVER;
-    // Bazarr follows one Radarr and one Sonarr; another's ids are not its.
+    // Bazarr follows one Radarr and one Sonarr; other servers' ids don't apply.
     const arrId = bazarrIdOf(req.media);
     if (!arrId) return NOT_IN_BAZARR;
     if (needsSeason(req)) return ASK_SEASON;
@@ -611,8 +601,8 @@ class AutoFix {
     isMovie: boolean
   ): Promise<Outcome> {
     const api = bazarr();
-    // A whole series or season: Bazarr's own search for what is missing,
-    // which can take a long while, then Whisper for what it cannot find.
+    // Whole series/season: Bazarr's (slow) missing search, then Whisper for the
+    // rest.
     if (!isMovie && req.episodeNumber === undefined) {
       searchMissingSeriesOrTranscribe(`tv:${req.media.tmdbId}`, arrId).catch(
         (e) =>
@@ -672,8 +662,8 @@ class AutoFix {
       };
     }
 
-    // Wrong subtitles are replaced in the languages there are; otherwise
-    // what is missing is fetched. English when nothing says.
+    // Replace: the present languages; otherwise the missing ones; default
+    // English.
     const present = [
       ...new Set(
         (item.subtitles ?? []).filter((s) => !s.forced).map((s) => s.code2)
@@ -700,7 +690,7 @@ class AutoFix {
       )
       .sort(
         (a, b) =>
-          // A wrong subtitle is replaced from somewhere else first.
+          // When replacing, prefer a different provider.
           Number(req.replace && a.provider === lastProvider) -
             Number(req.replace && b.provider === lastProvider) ||
           Number(isTrue(a.hearing_impaired)) -
@@ -840,10 +830,8 @@ class AutoFix {
   }
 
   /**
-   * An album's missing tracks, or one that never came: Lidarr searches for
-   * it again, and Backfill (with Music too on) looks for releases Lidarr
-   * can't see. Without an album, Lidarr searches for every missing album of
-   * the artist's.
+   * Lidarr re-searches the album, and Backfill (with Music on) looks for
+   * releases Lidarr can't see. Without an album, all the artist's missing ones.
    */
   private async missingMusic(req: FixRequest): Promise<Outcome> {
     const lidarrs = getSettings().lidarr;
@@ -933,7 +921,7 @@ class AutoFix {
         new Date(ep.airDateUtc).getTime() < now
     );
     if (!missing.length) {
-      // Nothing to fetch, so it is something else: asked, not turned away.
+      // Nothing missing: ask what's actually wrong.
       return {
         ok: false,
         message:
@@ -943,7 +931,7 @@ class AutoFix {
       };
     }
     const count = `${missing.length} missing episode${missing.length === 1 ? '' : 's'}`;
-    // Sonarr's own search first; Backfill for the packs Sonarr cannot see.
+    // Sonarr search first; Backfill for packs Sonarr can't see.
     await sonarr.api.searchEpisodes(missing.map((ep) => ep.id));
     const handedOn = await this.handOn(
       req,
@@ -969,8 +957,8 @@ class AutoFix {
   }
 
   /**
-   * Has the admin agent look further once these searches are over, should
-   * they find nothing; not for a title an admin set aside in Backfill.
+   * Queues an admin agent follow-up if the searches find nothing; not for
+   * titles ignored in Backfill.
    */
   private async handOn(
     req: FixRequest,
@@ -1004,8 +992,8 @@ class AutoFix {
   }
 
   /**
-   * Starts a Backfill search for the title, when Backfill is set up and an
-   * admin has not set it aside or seen it done. Admins get its page.
+   * Starts a Backfill search unless unconfigured, ignored or done. Admins get
+   * its page link.
    */
   private async backfillSearch(
     req: FixRequest,
@@ -1064,8 +1052,7 @@ class AutoFix {
         message: `${name} has no file, so Sonarr was asked to search for it.`,
       };
     }
-    // One file holding several episodes is left to an admin: removing it
-    // would take the others with it.
+    // A multi-episode file is left to an admin: removing it removes the others.
     const sharing = all.filter(
       (ep) => ep.id !== episode.id && ep.episodeFileId === episode.episodeFileId
     );
@@ -1136,10 +1123,9 @@ class AutoFix {
   }
 
   /**
-   * Removes the file only once another release is in hand (Sonarr and
-   * Radarr would not import a release of the same quality over it), then
-   * grabs that release. Counts against the person's replacements for the
-   * day unless nothing was removed.
+   * Removes the file only once a replacement is found (the *arrs won't import
+   * same quality over it), then grabs it. Counts toward the daily limit
+   * unless nothing was removed.
    */
   private async swap(user: User, swap: Swap): Promise<Outcome> {
     const refund = this.take('replace', user, MAX_REPLACED_PER_DAY);
@@ -1181,10 +1167,9 @@ class AutoFix {
   }
 
   /**
-   * Replaces every file of a season with another release (see season.ts):
-   * at once for an admin, who may do it again the same day; anyone else's
-   * is put to an admin to approve, once a day per season. A movie has one
-   * file, so replacing "all of it" is replacing that.
+   * Replaces every file of a season (season.ts): immediately for admins
+   * (repeatable the same day); others need admin approval, once a day per
+   * season. For a movie, replaces its one file.
    */
   private async replaceSeason(req: FixRequest): Promise<Outcome> {
     if (req.media.mediaType === MediaType.MOVIE) {
@@ -1237,7 +1222,7 @@ class AutoFix {
     const plan = await planSeason(sonarr.api, sonarr.id, season);
     if ('nothing' in plan) {
       if (plan.noFiles) {
-        // Nothing there to replace: what is wanted is searched for.
+        // No files: search for the monitored ones instead.
         const wanted = plan.noFiles.filter((ep) => ep.monitored);
         if (wanted.length) {
           await sonarr.api.searchEpisodes(wanted.map((ep) => ep.id));
@@ -1272,7 +1257,7 @@ class AutoFix {
       arrId: sonarr.id,
     };
     if (!isAdmin(req.user)) {
-      // Asked on their behalf, through the admin agent's approvals.
+      // Queued for approval in the admin agent.
       const run = await agent.awaitApproval({
         title,
         name: plan.name,
@@ -1308,7 +1293,7 @@ class AutoFix {
     }
     const outcome = await carryOutSeason(sonarr.api, plan);
     if (outcome.ok && req.issueId) {
-      // Whoever reported it hears when the season is back.
+      // Tell the reporter when the season is back.
       await agent
         .follow({
           title,
@@ -1336,11 +1321,9 @@ class AutoFix {
   }
 
   /**
-   * Checks every file in the season against the release it came from and
-   * its length. When most files are off by the same number, the files are
-   * fine and the numbering is not, which needs an admin, not new downloads.
-   * Otherwise the reported episode and any others that look wrong are
-   * replaced with other releases.
+   * Checks each file in the season against its source release and length.
+   * A shared offset means the numbering is wrong, which needs an admin, not
+   * downloads. Otherwise replaces the reported episode and any that look wrong.
    */
   private async wrongEpisode(req: FixRequest): Promise<Outcome> {
     if (req.media.mediaType === MediaType.MOVIE) {
@@ -1380,9 +1363,8 @@ class AutoFix {
       const origin = originOf(file, history);
       let mappedTo: ArrEpisode[] = [];
       if (origin) {
-        // A name that gives both its own SxxEyy and the absolute number in
-        // brackets ("S05E17 (202)") means the absolute one; anything else
-        // is read by Sonarr, with its scene mappings.
+        // "S05E17 (202)" means the bracketed absolute number; otherwise
+        // Sonarr parses it with its scene mappings.
         const bracketed = origin.match(BRACKETED_ABSOLUTE)?.[1];
         const absolute = bracketed
           ? byAbsolute.get(Number(bracketed))
@@ -1410,7 +1392,7 @@ class AutoFix {
         });
         continue;
       }
-      // A file holding two episodes runs long on purpose.
+      // Multi-episode files are long by design.
       const minutes = minutesOf(file?.mediaInfo?.runTime);
       if (
         mappedTo.length <= 1 &&
@@ -1478,11 +1460,9 @@ class AutoFix {
   }
 
   /**
-   * Tries to fix what a new issue reports, and writes what happened on the
-   * issue. `actor` is who filed it (an admin may file for someone else):
-   * their switch and limits apply. `asked` is what AI Search already worked
-   * out, used instead of reading the report again. Runs in the background;
-   * never throws.
+   * Tries to fix a new issue and comments the outcome on it. `actor` is the
+   * user it was filed for (their switch and limits apply); `asked` is AI
+   * Search's reading. Runs in the background; never throws.
    */
   public fromIssue(
     issueId: number,
@@ -1494,7 +1474,7 @@ class AutoFix {
     return work;
   }
 
-  /** Settles once the fixes running in the background are done. */
+  /** Resolves when background fixes finish. */
   public async idle(): Promise<void> {
     await Promise.all([...this.pending]);
   }
@@ -1517,8 +1497,8 @@ class AutoFix {
         .join('\n');
       let asked = options.asked ?? classify(text, issue.issueType);
       if (!asked) {
-        // The rules couldn't tell: the AI model may. What it reads as a fix
-        // that replaces files is left for an admin, as nobody confirmed it.
+        // Rules unclear: ask the model. File-replacing readings are left to
+        // an admin, since nobody confirmed them.
         const read = await askAboutReport(text, {
           user: actor,
           episode: issue.media.mediaType === MediaType.TV,
@@ -1536,8 +1516,8 @@ class AutoFix {
         }
         asked = read;
       }
-      // Filed on All Seasons, but the report names one: that one, on the
-      // issue too, so it shows where the problem is.
+      // Filed on All Seasons but the text names one: use it and set it on the
+      // issue.
       let seasonNumber = issue.problemSeason || undefined;
       let episodeNumber = issue.problemEpisode || undefined;
       if (

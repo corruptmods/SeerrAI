@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /**
- * The cap is what stops Plex Discover metadata lookups going out all at once
- * and timing out the watchlist sync (seerr-team/seerr#3235). Everything else
- * in the fork that fans out to an external API relies on it too.
+ * The cap stops Plex Discover metadata lookups going out all at once and timing
+ * out watchlist sync (seerr-team/seerr#3235). Everything in the fork that fans
+ * out to an external API relies on it.
  */
 describe('mapWithConcurrency', () => {
-  /** Runs `fn` over `items` while recording how many ran at once. */
+  /** Runs `fn` over `items`, recording peak concurrency. */
   const track = async <T, R>(
     items: readonly T[],
     limit: number,

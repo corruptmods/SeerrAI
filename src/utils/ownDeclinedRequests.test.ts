@@ -22,10 +22,7 @@ const request = (
   declineReason: reason,
 });
 
-/**
- * Which declined requests a person is told about on a title's page: their
- * own latest one, if it was declined with a reason.
- */
+/** On a title page, the viewer sees their latest request if declined with a reason. */
 describe("a person's declined request on a title page", () => {
   it('names their latest request when it was declined with a reason', () => {
     const declined = request(MediaRequestStatus.DECLINED, {

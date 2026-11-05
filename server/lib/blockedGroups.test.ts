@@ -18,9 +18,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Blocked release groups: which releases they catch, the custom format and
- * scores Radarr and Sonarr are given, and keeping each server in line,
- * against stand-ins that keep formats and profiles the way the apps do.
+ * Blocked release groups: matching, the custom format and scores sent to
+ * Radarr and Sonarr, and syncing each server, against in-memory stand-ins.
  */
 
 /** A Radarr or Sonarr that keeps custom formats and profiles in memory. */
@@ -177,8 +176,7 @@ describe('blocked release groups', () => {
     );
     assert.equal(sonarr.profiles[0].formatItems?.[0].score, -1);
 
-    // A second group updates the same format; scores already right are
-    // not saved again.
+    // A second group updates the same format; correct scores aren't re-saved.
     radarr.calls.length = 0;
     await setGroupBlocked('lynxseed', true);
     assert.deepEqual(radarr.calls, [`put ${made.id}`]);
@@ -186,7 +184,7 @@ describe('blocked release groups', () => {
       'quillowsap',
       'lynxseed',
     ]);
-    // The same group again, in other case, is one entry.
+    // The same group in another case is one entry.
     await setGroupBlocked('LYNXSEED', true);
     assert.deepEqual(getSettings().backfill.blockedGroups, [
       'quillowsap',
@@ -217,7 +215,7 @@ describe('blocked release groups', () => {
       problems[0],
       /^Radarr could not be updated \(connect ECONNREFUSED\)/
     );
-    // Trying again later brings it in line.
+    // A later retry syncs it.
     assert.deepEqual(await syncBlockedGroups(), problems);
   });
 

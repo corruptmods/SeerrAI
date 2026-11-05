@@ -10,33 +10,31 @@ import {
 import { takeWords } from '@server/lib/music/songs';
 
 /*
- * A song's file among what Soulseek's sharers answered a search with: the
- * file named as the song (never a live or remixed take, nor from a live
- * album's folder), in a folder or name with the artist's, as long as the
- * track when both lengths are known. Of the sharers with the songs, the one
- * with the most of them, then one with a free upload slot, the shortest
- * queue, lossless files, and the fastest upload.
+ * Picks song files from Soulseek results: named as the song (no live or
+ * remix take, no live album folder), with the artist in the path, and a
+ * matching length when known. Sharers rank by most songs, free upload slot,
+ * shortest queue, lossless, then upload speed.
  */
 
-/** A file's length may be this far from the track's and still be it. */
+/** Max length difference between a file and its track. */
 const SAME_LENGTH_MS = 8000;
 const LOSSLESS = /\.(flac|alac|wav|aiff?|ape|wv)$/i;
 
-/** What Soulseek is searched for: the artist and the song, as words. */
+/** Soulseek query: artist and song title as plain words. */
 export const soulseekQuery = (artist: string, title: string): string =>
   `${takeWords(artist)} ${takeWords(title)}`.replace(/\s+/g, ' ').trim();
 
 export interface SoulseekChoice {
   username: string;
-  /** Each song's file, its path as the sharer names it. */
+  /** Each song's file, with the sharer's path. */
   files: SongFetchFile[];
-  /** The folder the first song is in, as the sharer names it. */
+  /** Sharer's folder of the first song. */
   folder: string;
 }
 
 const folderOf = (path: string) => path.replace(/[\\/][^\\/]*$/, '');
 
-/** The sharer to take the songs from, and each song's file of theirs. */
+/** Best sharer for the songs, and their file for each. */
 export const chooseSharer = (
   responses: SlskdResponse[],
   wanted: { song: SongRequest; track: LidarrTrack }[],
@@ -100,10 +98,7 @@ export const chooseSharer = (
     : undefined;
 };
 
-/**
- * Answers to several searches as one list, one answer for each sharer: a
- * sharer found by two songs' searches holds both.
- */
+/** Merges several searches' results into one response per sharer. */
 export const mergeResponses = (lists: SlskdResponse[][]): SlskdResponse[] => {
   const bySharer = new Map<string, SlskdResponse>();
   for (const response of lists.flat()) {

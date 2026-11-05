@@ -2,13 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 
 /**
- * A hook to help with debouncing state
+ * useState plus a debounced copy of the value.
  *
- * This hook basically acts the same as useState except it is also
- * returning a deobuncedValue that can be used for things like
- * debouncing input into a search field
- *
- * @param initialValue Initial state value
  * @param debounceTime Debounce time in ms
  */
 const useDebouncedState = <S>(

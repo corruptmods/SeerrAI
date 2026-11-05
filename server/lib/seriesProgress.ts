@@ -16,15 +16,15 @@ export interface EpisodeRef {
 export interface SeriesProgress {
   /** not_started: nothing finished; up_next: behind what's here; caught_up. */
   state: 'not_started' | 'up_next' | 'caught_up';
-  /** The next available episode to watch, when there is one. */
+  /** The next available episode to watch, if any. */
   next?: EpisodeRef;
   /** Available episodes after the furthest one finished. */
   remaining: number;
-  /** The furthest episode finished, when there is one. */
+  /** The furthest episode finished, if any. */
   furthest?: EpisodeRef;
 }
 
-/** How long a viewer's position is reused before asking the server again. */
+/** Cache lifetime for a viewer's position. */
 const CACHE_MS = 10 * 60 * 1000;
 const cache = new Map<string, { at: number; value: SeriesProgress | null }>();
 
@@ -32,12 +32,11 @@ const compare = (a: EpisodeRef, b: EpisodeRef) =>
   a.season - b.season || a.episode - b.episode;
 
 /**
- * Where a viewer is in a series, given their completed plays and what is in
- * the library.
+ * A viewer's position in a series from their completed plays and the library.
  *
- * Uses the *furthest* episode they finished, not the most recent: someone who
- * rewatches an early episode after finishing season two is still up to season
- * three. Specials are ignored, since they sit outside the run of the show.
+ * Uses the *furthest* finished episode, not the latest: rewatching an early
+ * episode after finishing season two still leaves them at season three.
+ * Specials are ignored, being outside the show's run.
  */
 export const workOutProgress = (
   finished: EpisodeRef[],
@@ -77,19 +76,18 @@ export const workOutProgress = (
 };
 
 /**
- * Progress through each series on a list, for one viewer.
+ * One viewer's progress through each series on a list.
  *
- * Returns nothing for a series it cannot answer honestly — the viewer has
- * no account on the media server, there is no watch history to ask (no
- * Tautulli for Plex) or it is not answering, or nothing of the series is in
- * the library — rather than a misleading "not started".
+ * Omits a series it can't answer honestly (no media server account, no watch
+ * history source such as Tautulli for Plex or it isn't answering, or nothing
+ * of the series in the library) instead of a misleading "not started".
  */
 export const getSeriesProgress = async (
   viewer: User,
   tmdbIds: number[]
 ): Promise<Record<number, SeriesProgress>> => {
-  // Expired positions are dropped as each page asks, or every viewer and
-  // series ever looked at would stay in memory for the life of the server.
+  // Drop expired positions on each call, or every viewer and series ever seen
+  // would stay in memory for the server's lifetime.
   const now = Date.now();
   for (const [key, entry] of cache) {
     if (now - entry.at >= CACHE_MS) {
@@ -117,8 +115,8 @@ export const getSeriesProgress = async (
       return;
     }
 
-    // Keyed on the server's own ids for the viewer and the series, so a
-    // re-added title or a relinked account never inherits a cached position.
+    // Keyed on the server's own viewer and series ids, so a re-added title or
+    // relinked account never inherits a cached position.
     const key = `${viewer.id}:${viewerId}:${ids.join(',')}`;
     const cached = cache.get(key);
 
@@ -150,8 +148,8 @@ export const getSeriesProgress = async (
           episode: Number(play.episode),
         }));
     } catch (e) {
-      // Leave this series out rather than claim it was never watched. Not
-      // cached, so the next load asks again.
+      // Omit this series instead of claiming it was never watched. Not cached,
+      // so the next load retries.
       logger.debug(`Could not read watch progress from ${source.label}`, {
         label: 'Watch Progress',
         tmdbId: series.tmdbId,
@@ -188,5 +186,5 @@ export const getSeriesProgress = async (
   return result;
 };
 
-/** Tests only: how many positions are held. */
+/** Tests only: number of cached positions. */
 export const seriesProgressCachedForTests = (): number => cache.size;

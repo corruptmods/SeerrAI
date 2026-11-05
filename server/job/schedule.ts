@@ -38,11 +38,11 @@ import schedule from 'node-schedule';
 interface ScheduledJob {
   id: JobId;
   /**
-   * The media server the job works with: it is registered while that server
-   * is connected (refreshMediaServerJobs).
+   * The media server this job uses; registered only while it's connected
+   * (refreshMediaServerJobs).
    */
   server?: MediaServerKind;
-  /** A music job: registered while music is set up and on. */
+  /** A music job, registered only while music is set up and enabled. */
   music?: boolean;
   job: schedule.Job;
   name: string;
@@ -56,11 +56,9 @@ interface ScheduledJob {
 export const scheduledJobs: ScheduledJob[] = [];
 
 /**
- * The work of one scheduled job, waited for, with anything it throws logged
- * and dropped. A job's failure (a service down, a bad answer) must not leave
- * a rejected promise nobody waits for: Node stops the whole server on one.
- * Only the message and stack are logged, since an API client's error carries
- * the request it made, API key included.
+ * Wraps a job's work so anything it throws is logged and dropped: an unhandled
+ * rejection stops the server. Logs only message and stack, since API client
+ * errors carry the request, API key included.
  */
 export const runJob =
   (name: string, work: () => unknown) => async (): Promise<void> => {
@@ -75,17 +73,15 @@ export const runJob =
     }
   };
 
-/** A server's recently added scan. */
 const recentScanner = (kind: MediaServerKind) =>
   kind === 'plex' ? plexRecentScanner : jellyfinScanners(kind).recent;
 
-/** The jobs that work with one media server, for while it is connected. */
+/** Jobs for one media server, registered while it's connected. */
 const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
   const jobs = getSettings().jobs;
 
   if (kind === 'plex') {
     return [
-      // Run recently added plex scan every 5 minutes
       {
         id: 'plex-recently-added-scan',
         server: 'plex',
@@ -105,7 +101,6 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
         running: () => plexRecentScanner.status().running,
         cancelFn: () => plexRecentScanner.cancel(),
       },
-      // Run full plex scan every 24 hours
       {
         id: 'plex-full-scan',
         server: 'plex',
@@ -142,7 +137,8 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
           })
         ),
       },
-      // Give new Plex friends an account, when Auto-Import Plex Users is on
+      // Creates accounts for new Plex friends when Auto-Import Plex Users is
+      // on.
       {
         id: 'plex-user-import',
         server: 'plex',
@@ -169,7 +165,6 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
   const fullId = `${kind}-full-scan` as const;
 
   return [
-    // Run the recently added scan every 5 minutes
     {
       id: recentId,
       server: kind,
@@ -189,7 +184,6 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
       running: () => scanners.recent.status().running,
       cancelFn: () => scanners.recent.cancel(),
     },
-    // Run the full scan every 24 hours
     {
       id: fullId,
       server: kind,
@@ -213,8 +207,8 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
 };
 
 /**
- * The music jobs, for while music is set up and on. Each run reads every
- * connected server's music libraries, and Lidarr.
+ * Music jobs, registered while music is set up and enabled. Each run reads
+ * every connected server's music libraries and Lidarr.
  */
 const musicJobs = (): ScheduledJob[] => {
   if (!musicReady()) {
@@ -235,8 +229,8 @@ const musicJobs = (): ScheduledJob[] => {
           logger.debug('Starting scheduled job: Music Sync', {
             label: 'Jobs',
           });
-          // Then what Lidarr downloaded but won't import, for songs asked
-          // for (lib/music/blockedImports).
+          // Then Lidarr downloads stuck before import, for requested songs
+          // (lib/music/blockedImports).
           return musicSync.run().finally(() => blockedImports.run());
         })
       ),
@@ -284,11 +278,10 @@ const musicJobs = (): ScheduledJob[] => {
 };
 
 /**
- * Registers the jobs of every connected media server, and only theirs: run
- * when a server is connected or removed, so its scans start or stop without
- * a restart. Jobs already registered are scheduled afresh from their saved
- * schedules; a scan under way on a server still connected carries on, and
- * one on a server no longer connected is stopped.
+ * Registers jobs for exactly the connected media servers, so scans start or
+ * stop without a restart when a server is added or removed. Existing jobs are
+ * rescheduled from their saved schedules; a running scan on a still-connected
+ * server continues, one on a removed server is stopped.
  */
 export const refreshMediaServerJobs = (): void => {
   const servers = connectedServers();
@@ -306,13 +299,13 @@ export const refreshMediaServerJobs = (): void => {
   scheduledJobs.unshift(...servers.flatMap(mediaServerJobs));
 };
 
-/** The jobs have been started (startJobs); until then none are registered. */
+/** Set by startJobs; no jobs are registered before then. */
 let started = false;
 
 /**
- * Registers the music jobs while music is set up and on, and only then: run
- * when a Lidarr is added, changed or removed, or music is switched on or
- * off for everyone. A music scan under way stops when music does.
+ * Registers music jobs only while music is set up and enabled. Called when a
+ * Lidarr is added, changed or removed, or music is toggled globally. A running
+ * music scan stops when music is disabled.
  */
 export const refreshMusicJobs = (): void => {
   if (!started) {
@@ -333,24 +326,23 @@ export const refreshMusicJobs = (): void => {
 
 export const startJobs = (): void => {
   const jobs = getSettings().jobs;
-  // Started again (a media server set up after Seerr AI started): the jobs
-  // already scheduled are replaced, not scheduled a second time. A job
-  // under way finishes; only its next runs are cancelled.
+  // On restart (e.g. a media server set up later), replace scheduled jobs
+  // rather than duplicating them. Running jobs finish; only future runs are
+  // cancelled.
   if (started) {
     scheduledJobs.forEach((scheduledJob) => scheduledJob.job.cancel());
     scheduledJobs.length = 0;
   }
   started = true;
 
-  // Each connected media server's scans, the primary one's first.
+  // Each connected media server's scans, primary first.
   refreshMediaServerJobs();
 
-  // Music's scans, once music is set up.
   refreshMusicJobs();
 
-  // Watchlist sync: Plex watchlists, and public Trakt watchlists on any
-  // media server. The id stays as it was, so saved schedules carry over.
-  // It runs every few minutes, so its schedule is edited in minutes.
+  // Watchlist sync: Plex watchlists, and public Trakt watchlists on any media
+  // server. The id is kept so saved schedules carry over. Edited in minutes
+  // since it runs every few.
   scheduledJobs.push({
     id: 'plex-watchlist-sync',
     name: 'Watchlist Sync',
@@ -369,7 +361,6 @@ export const startJobs = (): void => {
     running: () => watchlistSync.running,
   });
 
-  // Run full radarr scan every 24 hours
   scheduledJobs.push({
     id: 'radarr-scan',
     name: 'Radarr Scan',
@@ -387,7 +378,6 @@ export const startJobs = (): void => {
     cancelFn: () => radarrScanner.cancel(),
   });
 
-  // Run full sonarr scan every 24 hours
   scheduledJobs.push({
     id: 'sonarr-scan',
     name: 'Sonarr Scan',
@@ -405,7 +395,7 @@ export const startJobs = (): void => {
     cancelFn: () => sonarrScanner.cancel(),
   });
 
-  // Checks if media is still available in plex/sonarr/radarr libs
+  // Checks media is still in the media server, Sonarr and Radarr libraries.
   scheduledJobs.push({
     id: 'availability-sync',
     name: 'Media Availability Sync',
@@ -425,9 +415,8 @@ export const startJobs = (): void => {
     cancelFn: () => availabilitySync.cancel(),
   });
 
-  // Run download sync every minute. Requested titles just imported are
-  // looked for on each media server alongside it, in case one matched them
-  // to another title (lib/matchWatch).
+  // Also checks just-imported requested titles on each media server, in case
+  // one was matched to another title (lib/matchWatch).
   scheduledJobs.push({
     id: 'download-sync',
     name: 'Download Sync',
@@ -443,8 +432,8 @@ export const startJobs = (): void => {
         try {
           await downloadTracker.updateDownloads();
         } finally {
-          // It reads the media servers, not the queues: it goes on when
-          // a queue cannot be read.
+          // Reads the media servers, not the queues, so it runs even if a queue
+          // can't be read.
           await matchWatch.run();
         }
       })
@@ -452,11 +441,10 @@ export const startJobs = (): void => {
   });
   downloadTracker.onEachImport((imported) => matchWatch.noteImports(imported));
 
-  // A minute after Radarr or Sonarr imports something, every connected
-  // media server's recently added scan runs (and again each minute, a few
-  // times, until the media server lists it), so the title shows as
-  // available then rather than at the next scheduled scan. Music Sync runs
-  // with them. One server's scan failing does not hold up the others'.
+  // A minute after a Radarr or Sonarr import, run every connected server's
+  // recently added scan (retrying each minute a few times until it lists the
+  // title), so it shows available before the next scheduled scan. Music Sync
+  // runs with them. One failing scan doesn't hold up the others.
   downloadTracker.whenImported(async () => {
     const scanners: { run: () => Promise<void> }[] = connectedServers()
       .map(recentScanner)
@@ -472,7 +460,7 @@ export const startJobs = (): void => {
     await Promise.allSettled(scanners.map((scanner) => scanner.run()));
   });
 
-  // Track per-episode availability from Sonarr
+  // Per-episode availability from Sonarr.
   scheduledJobs.push({
     id: 'episode-sync',
     name: 'Episode Sync',
@@ -488,7 +476,7 @@ export const startJobs = (): void => {
     ),
   });
 
-  // Request each followed series' new seasons as they premiere
+  // Requests followed series' new seasons as they premiere.
   scheduledJobs.push({
     id: 'future-seasons',
     name: 'Future Season Requests',
@@ -506,7 +494,7 @@ export const startJobs = (): void => {
     ),
   });
 
-  // Catch any availability or failure notification the subscribers missed
+  // Catches availability and failure notifications the subscribers missed.
   scheduledJobs.push({
     id: 'notification-reconcile',
     name: 'Notification Reconcile',
@@ -524,7 +512,6 @@ export const startJobs = (): void => {
     ),
   });
 
-  // Reset download sync everyday at 01:00 am
   scheduledJobs.push({
     id: 'download-sync-reset',
     name: 'Download Sync Reset',
@@ -542,7 +529,6 @@ export const startJobs = (): void => {
     ),
   });
 
-  // Run image cache cleanup every 24 hours
   scheduledJobs.push({
     id: 'image-cache-cleanup',
     name: 'Image Cache Cleanup',
@@ -555,10 +541,9 @@ export const startJobs = (): void => {
         logger.info('Starting scheduled job: Image Cache Cleanup', {
           label: 'Jobs',
         });
-        // Images not seen for a month past their expiry, from every source,
-        // then the least recently used, to keep the cache under its limit.
-        // Expired images seen since are kept: they are revalidated with the
-        // host, not downloaded again, when next asked for.
+        // Evict images unseen for a month past expiry, from every source, then
+        // least recently used ones to stay under the limit. Expired images seen
+        // since are kept and revalidated on next request.
         return (async () => {
           for (const source of IMAGE_CACHES) {
             await ImageProxy.clearCache(source);
@@ -588,8 +573,8 @@ export const startJobs = (): void => {
     cancelFn: () => blocklistedTagsProcessor.cancel(),
   });
 
-  // Report only: Sonarr series and Radarr movies that disagree with what
-  // Seerr says they are, anime or not. Nothing is changed.
+  // Report only: Sonarr series and Radarr movies whose anime status disagrees
+  // with Seerr's. Changes nothing.
   scheduledJobs.push({
     id: 'anime-check',
     name: 'Anime Check',
@@ -607,8 +592,8 @@ export const startJobs = (): void => {
     cancelFn: () => animeCheck.cancel(),
   });
 
-  // Backfill: finds stuck series and searches a few each run. Does nothing
-  // until it is turned on and set up in Settings → Backfill.
+  // Finds stuck series and searches a few each run. No-op until enabled and set
+  // up in Settings → Backfill.
   scheduledJobs.push({
     id: 'backfill-scan',
     name: 'Backfill Scan',
@@ -626,7 +611,7 @@ export const startJobs = (): void => {
     cancelFn: () => backfill.cancel(),
   });
 
-  // Moves approved backfills along: downloading, importing, cleaning up.
+  // Advances approved backfills: downloading, importing, cleaning up.
   scheduledJobs.push({
     id: 'backfill-monitor',
     name: 'Backfill Downloads',
@@ -636,13 +621,13 @@ export const startJobs = (): void => {
     job: schedule.scheduleJob(
       jobs['backfill-monitor'].schedule,
       runJob('Backfill Downloads', async () => {
-        // And songs taken from albums, through Backfill's indexers and
-        // client; neither waits on the other's trouble.
+        // Also songs taken from albums, via Backfill's indexers and client;
+        // each runs regardless of the other failing.
         const [series, songs] = await Promise.allSettled([
           backfill.tick(),
           songFetcher.tick(),
         ]);
-        // Both told, should both fail.
+        // Throw only when both fail.
         if (series.status === 'rejected' && songs.status === 'rejected') {
           logger.error('Songs taken from albums could not move along', {
             label: 'Jobs',
@@ -660,9 +645,8 @@ export const startJobs = (): void => {
     running: () => backfill.monitorStatus().running || songFetcher.isRunning(),
   });
 
-  // Looks at what Radarr and Sonarr grab, and at imports that get stuck
-  // (lib/downloadCheck). Does nothing until it's turned on in Settings →
-  // Backfill, and needs nothing else of Backfill's.
+  // Checks Radarr and Sonarr grabs and stuck imports (lib/downloadCheck). No-op
+  // until enabled in Settings → Backfill; needs nothing else from Backfill.
   scheduledJobs.push({
     id: 'download-check',
     name: 'Download Check',
@@ -676,8 +660,8 @@ export const startJobs = (): void => {
     running: () => downloadCheck.status().running,
   });
 
-  // Quality profiles (Settings → Quality): does nothing until an admin
-  // manages a server there, or turns on Backfill's step-down.
+  // Quality profiles (Settings → Quality). No-op until an admin manages a
+  // server there or enables Backfill's step-down.
   scheduledJobs.push({
     id: 'quality-check',
     name: 'Quality Profiles Check',
@@ -692,8 +676,8 @@ export const startJobs = (): void => {
   });
 
   // Report only: folders a media server matched to a different title than
-  // Sonarr or Radarr has in them (Settings → Health), on every connected
-  // server. The id stays as it was, so saved schedules carry over.
+  // Sonarr or Radarr has (Settings → Health), on every connected server. The id
+  // is kept so saved schedules carry over.
   if (connectedServers().length) {
     scheduledJobs.push({
       id: 'plex-match-check',
@@ -715,8 +699,8 @@ export const startJobs = (): void => {
     });
   }
 
-  // Tells admins when a connected service newly has a problem, the same
-  // problems the Health page lists.
+  // Alerts admins when a connected service newly has a problem listed on the
+  // Health page.
   scheduledJobs.push({
     id: 'health-watch',
     name: 'Health Alerts',

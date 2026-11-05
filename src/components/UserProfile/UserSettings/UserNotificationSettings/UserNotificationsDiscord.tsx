@@ -131,7 +131,7 @@ const UserNotificationsDiscord = () => {
               />
             )}
             <div className="form-row">
-              {/* Names the list of IDs below, however many there are. */}
+              {/* Labels the ID list below. */}
               <label id="discordIdsLabel" className="text-label">
                 {intl.formatMessage(messages.discordId)}
                 {!!data?.discordEnabledTypes && (

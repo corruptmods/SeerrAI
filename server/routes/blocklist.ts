@@ -22,11 +22,9 @@ import { z } from 'zod';
 const blocklistRoutes = Router();
 
 /*
- * A title taken off the blocklist. One that only exists because it was
- * blocklisted is removed. One with requests or issues is kept and reset
- * instead: removing it would cascade and delete that history, which matters
- * now that titles already requested or downloaded can be blocklisted, one
- * at a time or a whole collection at once.
+ * Release a title from the blocklist. Media that exists only because of the
+ * blocklist is removed; media with requests or issues is reset instead, since
+ * removing it would cascade-delete that history.
  */
 const releaseBlocklistedMedia = async (
   mediaItem: Media,
@@ -57,11 +55,13 @@ export const blocklistAdd = z.object({
   user: z.coerce.number().optional(),
   blocklistedTags: z.string().optional(),
   /**
-   * Also remove it from Radarr/Sonarr, deleting its files. Admin only: this
-   * is the one blocklist action that destroys data.
+   * Also remove it from Radarr/Sonarr, deleting its files. Admin only: the one
+   * blocklist action that destroys data.
    */
   removeFiles: z.boolean().optional(),
-  /** Why it was blocklisted. Shown on the blocklist and in the title's history. */
+  /**
+   * Why it was blocklisted; shown on the blocklist and in the title's history.
+   */
   reason: z.string().trim().max(500).optional(),
 });
 
@@ -91,7 +91,7 @@ blocklistRoutes.get(
       let query = getRepository(Blocklist)
         .createQueryBuilder('blocklist')
         .leftJoinAndSelect('blocklist.user', 'user')
-        .where('1 = 1'); // Allow use of andWhere later
+        .where('1 = 1'); // Lets later filters use andWhere
 
       switch (filter) {
         case 'manual':
@@ -183,7 +183,7 @@ blocklistRoutes.post(
       const body = blocklistAdd.parse(req.body);
       const removeFiles = body.removeFiles;
       // Credited to whoever adds it, whatever the body says. Blank after
-      // trimming means no reason, not an empty one.
+      // trimming means no reason.
       const values = {
         tmdbId: body.tmdbId,
         mediaType: body.mediaType,
@@ -193,8 +193,8 @@ blocklistRoutes.post(
         reason: body.reason || undefined,
       };
 
-      // Checked before anything is written, so a refused request changes
-      // nothing rather than leaving a blocklist entry behind.
+      // Checked before any write, so a refused request leaves no blocklist
+      // entry.
       if (removeFiles && !req.user?.hasPermission(Permission.ADMIN)) {
         return next({
           status: 403,
@@ -202,8 +202,8 @@ blocklistRoutes.post(
         });
       }
 
-      // Also declines its pending and approved requests, files removed or
-      // not, so none of them can be approved and sent on afterwards.
+      // Also declines its pending and approved requests (files removed or not),
+      // so none can be approved and sent on later.
       const declinedRequests = await Blocklist.addToBlocklist({
         blocklistRequest: values,
       });
@@ -244,15 +244,14 @@ blocklistRoutes.post(
         return;
       }
 
-      // A malformed body — a reason that is too long, say — is the caller's
-      // mistake, not a server fault.
+      // A malformed body (e.g. too-long reason) is the caller's error, not a
+      // server fault.
       if (error instanceof z.ZodError) {
         return next({ status: 400, message: error.issues[0]?.message });
       }
 
       if (error instanceof QueryFailedError) {
-        // Checked for both engines: this used to test SQLite's errno 19
-        // only, so on Postgres a duplicate came back as a vague 409.
+        // Checked for both SQLite and Postgres.
         if (isUniqueViolation(error)) {
           return next({ status: 412, message: 'Item already blocklisted' });
         }
@@ -309,9 +308,8 @@ blocklistRoutes.post(
         );
         const mediaByTmdbId = new Map(existingMedia.map((m) => [m.tmdbId, m]));
 
-        // One film at a time: each insert has a savepoint of its own, and
-        // savepoints taken side by side on one transaction would undo each
-        // other's work.
+        // One film at a time: each insert has its own savepoint, and concurrent
+        // savepoints on one transaction would undo each other.
         for (const part of uniqueParts) {
           if (blocklistByTmdbId.has(part.id)) {
             continue;
@@ -326,9 +324,9 @@ blocklistRoutes.post(
           });
 
           try {
-            // In a savepoint: on Postgres a failed insert aborts the whole
-            // transaction otherwise, and the film blocklisted meanwhile by
-            // someone else could not be picked up below.
+            // In a savepoint: otherwise on Postgres a failed insert aborts the
+            // whole transaction, and a film blocklisted concurrently by someone
+            // else couldn't be picked up below.
             await withNestedTransaction(em, (nested) =>
               nested.getRepository(Blocklist).save(blocklist)
             );

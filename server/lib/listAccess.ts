@@ -2,9 +2,8 @@ import { getRepository } from '@server/datasource';
 import { MediaList } from '@server/entity/MediaList';
 
 /**
- * Lists are private: only the owner and the users the owner has added can see
- * one. Every route resolves access through this, so visibility is enforced in
- * one place rather than per-handler.
+ * Lists are private: only the owner and users they added can see one. Every
+ * route resolves access here, so visibility is enforced in one place.
  */
 export const loadAccessibleList = async (
   listId: number,
@@ -30,7 +29,7 @@ export const loadAccessibleList = async (
   return isMember ? { list, isOwner: false } : null;
 };
 
-/** Ids of every list a user can see: their own, plus ones shared with them. */
+/** Ids of every list a user can see: their own plus those shared with them. */
 export const accessibleListIds = async (userId: number): Promise<number[]> => {
   const owned = await getRepository(MediaList).find({
     select: { id: true },

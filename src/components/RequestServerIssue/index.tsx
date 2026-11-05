@@ -12,19 +12,15 @@ interface RequestServerIssueProps {
     NonFunctionProperties<MediaRequest>,
     'status' | 'is4k' | 'serverIssue'
   >;
-  /**
-   * On a request card, where room is short: what happened, on at most two
-   * lines, with what to do about it in its tooltip (and read out with it).
-   */
+  /** For request cards: the problem in two lines, the fix in its tooltip (also read aloud). */
   compact?: boolean;
   className?: string;
 }
 
 /**
- * Why a failed request could not be sent, when it is for want of a server
- * ("Its Radarr server was removed."), and, for a request manager, what to
- * do about it: retry, edit it to choose a server, or add one in Settings.
- * Nothing otherwise.
+ * Explains a request that failed for lack of a server ("Its Radarr server
+ * was removed.") and, for managers, the fix: retry, edit, or add one in
+ * Settings. Nothing otherwise.
  */
 const RequestServerIssue = ({
   request,

@@ -1,38 +1,36 @@
 /**
- * Turns a block of pasted text — typically a notes app list — into title
- * lines that can be searched.
+ * Turns pasted text (typically a notes app list) into searchable title lines.
  *
- * People's lists are messy: bullets, numbering, dashes, years in brackets,
- * trailing notes after a hyphen. This strips the decoration and pulls out a
- * year when one is present, since that makes matching far more reliable.
+ * Strips bullets, numbering, dashes and trailing notes after a hyphen, and
+ * extracts a year when present, since that makes matching far more reliable.
  */
 
 export interface ParsedLine {
-  /** The original line, shown to the user so they can see what was matched. */
+  /** The original line, shown so the user can see what was matched. */
   raw: string;
   /** The cleaned title used for searching. */
   title: string;
   /** A four-digit year found in the line, if any. */
   year?: number;
   /**
-   * The line looked like it referred to a whole set — "Harmony Lane series",
-   * "the Kessler trilogy". Only a hint: "Grey Static series" means a TV show,
-   * so both readings are offered rather than one being assumed.
+   * The line seemed to name a whole set ("Harmony Lane series", "the Kessler
+   * trilogy"). Only a hint: "Grey Static series" means a TV show, so both
+   * readings are offered.
    */
   collectionHint?: boolean;
 }
 
-/** Bullets, numbering and checkbox marks that lead a line in a notes app. */
+/** Notes-app bullets, numbering and checkbox marks at a line's start. */
 const LEADING_DECORATION = /^\s*(?:[-*•‣▪◦–—]|\[[ xX]\]|\d+[.)])\s*/;
 
 /** A year in brackets or parentheses, e.g. "(1999)" or "[1999]". */
 const BRACKETED_YEAR = /[([]\s*(19\d{2}|20\d{2}|21\d{2})\s*[)\]]/;
 
-/** Words people use for a whole set of films. */
+/** Words for a whole set of films. */
 const COLLECTION_HINT =
   /\s+(?:the\s+)?(series|collection|trilogy|quadrilogy|saga|movies|films|franchise)\s*$/i;
 
-/** "all Milo Thistle movies" — the leading word is not part of the title. */
+/** "all Milo Thistle movies": the leading word isn't part of the title. */
 const LEADING_ALL = /^all\s+(?:the\s+)?/i;
 
 /** A bare year at the end of a line, e.g. "Scorch 1995". */
@@ -66,14 +64,14 @@ export const parseTitleList = (text: string): ParsedLine[] => {
       }
     }
 
-    // Anything after " - " is usually a personal note rather than the title.
+    // Anything after " - " is usually a personal note, not the title.
     working = working.split(/\s+[-–—]\s+/)[0].trim();
 
-    // Trailing punctuation left behind by the trimming above.
+    // Trailing punctuation left by the trimming above.
     working = working.replace(/[,;:]+$/, '').trim();
 
-    // Strip a trailing "series" / "trilogy" so the search matches the title
-    // itself, but remember that it was there.
+    // Strip a trailing "series" / "trilogy" so the search matches the title,
+    // but remember it.
     const collectionHint = COLLECTION_HINT.test(working);
 
     if (collectionHint) {

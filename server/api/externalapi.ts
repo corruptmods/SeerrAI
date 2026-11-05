@@ -6,23 +6,19 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 import axios from 'axios';
 import rateLimit from 'axios-rate-limit';
 
-// 5 minute default TTL (in seconds)
+// Seconds.
 const DEFAULT_TTL = 300;
 
-// 10 seconds default rolling buffer (in ms)
+// Milliseconds.
 const DEFAULT_ROLLING_BUFFER = 10000;
 
 /**
- * How long a client of a public service, or of the media server, waits for
- * an answer when it is not told otherwise. Without one, a request that never
- * gets an answer holds up whatever asked (a scan, a watchlist sync) for good.
+ * Default request timeout. Without one, a request that never answers stalls
+ * its caller (a scan, a watchlist sync) forever.
  */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
-/*
- * Cached answers being refreshed in the background, by cache key: one
- * refresh at a time each, however many people ask meanwhile.
- */
+/** Cache keys refreshing in the background; one refresh per key at a time. */
 const refreshing = new Set<string>();
 
 export interface ExternalAPIOptions {
@@ -69,8 +65,8 @@ class ExternalAPI {
     this.cache = options.nodeCache;
   }
 
-  // transform runs before the cache write; an answer `keep` turns down is
-  // returned but not kept, so the next call asks again.
+  // transform runs before the cache write; data `keep` rejects is returned
+  // but not cached, so the next call fetches again.
   protected async get<T>(
     endpoint: string,
     config?: AxiosRequestConfig,
@@ -104,9 +100,8 @@ class ExternalAPI {
   }
 
   /**
-   * A POST is kept in the cache only when its caller gives how long: most
-   * change something or sign in, and an answer kept from before would hide
-   * that the service is down now.
+   * Cached only when the caller passes a ttl: most POSTs change something or
+   * sign in, and a stale answer would hide that the service is down.
    */
   protected async post<T>(
     endpoint: string,
@@ -148,7 +143,7 @@ class ExternalAPI {
     if (cachedItem) {
       const keyTtl = this.cache?.getTtl(cacheKey) ?? 0;
 
-      // If the item has passed our rolling check, fetch again in background
+      // Past the rolling buffer: refresh in the background.
       if (
         keyTtl - (ttl ?? DEFAULT_TTL) * 1000 <
           Date.now() - DEFAULT_ROLLING_BUFFER &&
@@ -161,8 +156,8 @@ class ExternalAPI {
             this.cache?.set(cacheKey, response.data, ttl ?? DEFAULT_TTL);
           })
           .catch((e) => {
-            // The kept answer stays until the next try. Only the message is
-            // logged: the request itself carries API keys and tokens.
+            // Keep the cached answer. Log only the message: the request
+            // carries API keys and tokens.
             logger.warn('Could not refresh a cached answer', {
               label: 'External API',
               endpoint,

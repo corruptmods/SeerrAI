@@ -33,11 +33,10 @@ import request from 'supertest';
 setupTestDb();
 
 /*
- * An Emby install upgrading: its settings move to Emby's own block (settings
- * migration 0010), then at startup the ids Emby gave titles and people move
- * to Emby's own columns, once. Afterwards it works as before: people sign
- * in with Emby, scans find titles, avatars and play links resolve, and
- * Quick Connect (Jellyfin's alone) is still not offered.
+ * An Emby install upgrading: settings move to Emby's block (settings
+ * migration 0010), then at startup Emby's title and user ids move to Emby's
+ * columns, once. Afterwards sign-in, scans, avatars and play links work, and
+ * Quick Connect (Jellyfin only) stays hidden.
  */
 
 const EMBY_SERVER = {
@@ -72,7 +71,7 @@ const upgradeSettings = () => {
     .pendingEmbySplit;
 };
 
-/** What an Emby install's database held: Emby's ids in Jellyfin's columns. */
+/** An Emby install's database: Emby's ids in Jellyfin's columns. */
 const seedEmbyInstall = async () => {
   const users = getRepository(User);
   await users.update(1, {
@@ -184,8 +183,7 @@ describe("moving an Emby install's ids", () => {
   });
 
   it('records the Jellyfin-typed accounts of an old Emby install as Emby ones', async () => {
-    // Installs that told Emby apart only by JELLYFIN_TYPE recorded their
-    // people as Jellyfin accounts.
+    // JELLYFIN_TYPE-only installs recorded these users as Jellyfin accounts.
     upgradeSettings();
     const { person } = await seedEmbyInstall();
     await getRepository(User).update(person.id, {
@@ -396,7 +394,7 @@ describe('setting up a new server', () => {
   app.use(checkUser);
   app.use('/auth', authRoutes);
 
-  // Setup starts the scheduled jobs; they are stopped when the tests end.
+  // Setup starts scheduled jobs; stop them after the tests.
   after(() => schedule.gracefulShutdown());
 
   const setUp = async (serverType: MediaServerType) => {

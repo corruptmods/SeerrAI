@@ -23,11 +23,11 @@ export interface QuotaResponse {
   movie: QuotaStatus;
   tv: QuotaStatus;
   /**
-   * Albums, counted as seasons are for series, and songs, one each, unless
-   * songs have a limit of their own.
+   * Albums (counted like seasons) and songs (one each), unless songs have
+   * their own limit.
    */
   music: QuotaStatus;
-  /** Songs, when Settings → Music gives them a limit of their own. */
+  /** Songs, when Settings → Music gives them their own limit. */
   song?: QuotaStatus;
 }
 

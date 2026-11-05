@@ -26,21 +26,19 @@ export interface PlexPin {
   code: string;
 }
 
-/** Plex's sign-in page, which takes its settings after `#!?`. */
+/** Plex's sign-in page; settings go after `#!?`. */
 const PLEX_AUTH_URL = 'https://app.plex.tv/auth/#!';
 
-/** How long a single request to plex.tv may take. */
+/** Per-request timeout for plex.tv. */
 const PLEX_TIMEOUT_MS = 15000;
 
 /**
- * Why signing in with Plex did not happen, for the page to say in plain
- * words:
- * - popup: the Plex window could not open, and the page could not go to
- *   Plex itself either;
- * - closed: the Plex window was closed before Plex was reached;
- * - unreachable: plex.tv could not be reached, or did not answer in time;
- * - expired: the sign-in took too long, or was started in another tab;
- * - notSignedIn: they came back from Plex without signing in;
+ * Why a Plex sign-in failed:
+ * - popup: no popup, and same-tab sign-in wasn't possible either;
+ * - closed: the popup closed before reaching Plex;
+ * - unreachable: plex.tv unreachable or timed out;
+ * - expired: took too long, or started in another tab;
+ * - notSignedIn: returned from Plex without signing in;
  * - failed: anything else.
  */
 export type PlexSignInProblem =
@@ -61,7 +59,7 @@ export class PlexSignInError extends Error {
   }
 }
 
-/** The problem behind any error from signing in with Plex. */
+/** Maps any Plex sign-in error to its problem. */
 export const plexSignInProblemOf = (e: unknown): PlexSignInProblem =>
   e instanceof PlexSignInError ? e.problem : 'failed';
 
@@ -72,7 +70,7 @@ class PlexOAuth {
 
   private pin?: PlexPin;
   private popup?: Window;
-  /** The last window asked for could not be opened at all. */
+  /** The last popup failed to open. */
   private popupBlocked = false;
 
   private authToken?: string;
@@ -129,14 +127,11 @@ class PlexOAuth {
   }
 
   /**
-   * Signs in with Plex in the window opened by preparePopup, and resolves
-   * to the Plex token once Plex says the person has signed in.
+   * Signs in via the popup from preparePopup; resolves to the Plex token.
    *
-   * When that window could not be opened and `sameTab` says what the
-   * sign-in is for, this tab goes to Plex instead and comes back to the
-   * same page (see plexSameTab.ts), which finishes it with finishSameTab;
-   * it then resolves to undefined as the page is left. Every failure is a
-   * PlexSignInError.
+   * If the popup failed and `sameTab` is given, navigates this tab to Plex
+   * instead (see plexSameTab.ts; finished by finishSameTab) and resolves to
+   * undefined. Failures throw PlexSignInError.
    */
   public async login(
     plexClientIdentifier: string,
@@ -163,7 +158,7 @@ class PlexOAuth {
       const blocked = this.popupBlocked || !this.popup;
       this.popup = undefined;
       if (!blocked) {
-        // They closed the window themselves while it was loading.
+        // Closed by the user while loading.
         throw new PlexSignInError('closed');
       }
       if (sameTab && this.goToPlex(sameTab)) {
@@ -178,10 +173,8 @@ class PlexOAuth {
   }
 
   /**
-   * Finishes a sign-in this tab went to Plex for: asks Plex whether the
-   * PIN was signed in to, a few times over a couple of seconds in case
-   * Plex sent them back a moment before it had noted it. Resolves to the
-   * Plex token.
+   * Finishes a same-tab sign-in; resolves to the Plex token. Retries for a
+   * couple of seconds in case Plex redirects before recording the claim.
    */
   public async finishSameTab(
     plexClientIdentifier: string,
@@ -194,8 +187,7 @@ class PlexOAuth {
     }
     this.pin = { id: pending.id, code: pending.code };
 
-    // Plex forgets a PIN once it has expired; a PIN it doesn't know of yet
-    // is looked for again, as the window's polling does.
+    // Plex forgets expired PINs; an unknown PIN is retried, as popup polling does.
     let unknownPin = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
@@ -224,7 +216,7 @@ class PlexOAuth {
     throw new PlexSignInError(unknownPin ? 'expired' : 'notSignedIn');
   }
 
-  /** Plex's sign-in page for the current PIN, coming back to `forwardUrl`. */
+  /** Plex's sign-in URL for the current PIN, returning to `forwardUrl`. */
   private authUrl(forwardUrl?: string): string {
     if (!this.plexHeaders || !this.pin) {
       throw new PlexSignInError('failed');
@@ -248,10 +240,7 @@ class PlexOAuth {
     return `${PLEX_AUTH_URL}?${this.encodeData(params)}`;
   }
 
-  /**
-   * Sends this tab to Plex's sign-in, to come back to the page it is on.
-   * False, and nowhere sent, when the PIN can't be kept for the return.
-   */
+  /** Sends this tab to Plex's sign-in. False, without navigating, if the PIN can't be stored. */
   private goToPlex(purpose: PlexSignInPurpose): boolean {
     if (!this.pin) return false;
     const kept = savePendingPlexSignIn(sessionStore(), {
@@ -334,7 +323,7 @@ class PlexOAuth {
         'Window is undefined. Are you running this in the browser?'
       );
     }
-    // Fixes dual-screen position                         Most browsers      Firefox
+    // Dual-screen position: most browsers, then Firefox.
     const dualScreenLeft =
       window.screenLeft != undefined ? window.screenLeft : window.screenX;
     const dualScreenTop =
@@ -352,7 +341,7 @@ class PlexOAuth {
     const left = width / 2 - w / 2 + dualScreenLeft;
     const top = height / 2 - h / 2 + dualScreenTop;
 
-    //Set url to login/plex/loading so browser doesn't block popup
+    // Open on login/plex/loading so the browser doesn't block the popup.
     const newWindow = window.open(
       '/login/plex/loading',
       title,
@@ -365,7 +354,7 @@ class PlexOAuth {
         ', left=' +
         left
     );
-    // Some blockers hand back a window that is already closed.
+    // Some blockers return an already-closed window.
     this.popupBlocked = !newWindow || newWindow.closed;
     if (newWindow && !newWindow.closed) {
       newWindow.focus();

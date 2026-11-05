@@ -7,16 +7,15 @@ import { getSettings } from '@server/lib/settings';
 import { isAxiosError } from 'axios';
 
 /*
- * What went wrong for Backfill, in plain words, and what kind of problem
- * it is: an app out of reach is waited out, and only a problem with the
- * release itself marks the release dead.
+ * Puts Backfill errors in plain words and classifies them: an unreachable
+ * app is waited out; only a problem with the release itself marks it dead.
  */
 
-/** An error's message, or what was thrown as text. */
+/** An error's message, or the thrown value as text. */
 export const message = (e: unknown) =>
   e instanceof Error ? e.message : String(e);
 
-/** Failures of the network itself: nothing answered, or not in time. */
+/** Network-level failures: no answer, or not in time. */
 const UNREACHABLE = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
@@ -31,10 +30,9 @@ const UNREACHABLE = new Set([
 ]);
 
 /**
- * Whether an error says only that Sonarr, Radarr or the download client
- * could not be reached for now: no answer at all, or a proxy in front of it
- * saying it is down. A job waits that out rather than counting it towards
- * giving up, since nothing is wrong with the download itself.
+ * Whether an error only means Sonarr, Radarr or the download client is
+ * unreachable for now: no answer, or a proxy reporting it down. Jobs wait
+ * this out instead of counting it toward giving up.
  */
 export const isUnreachable = (e: unknown, depth = 0): boolean => {
   if (!e || typeof e !== 'object' || depth > 3) return false;
@@ -42,11 +40,11 @@ export const isUnreachable = (e: unknown, depth = 0): boolean => {
     return [502, 503, 504].includes(e.response.status);
   }
   const { code, cause } = e as { code?: unknown; cause?: unknown };
-  // Sonarr's and Radarr's own calls wrap what went wrong as the cause.
+  // Sonarr and Radarr API wrappers put the original error in `cause`.
   return UNREACHABLE.has(String(code ?? '')) || isUnreachable(cause, depth + 1);
 };
 
-/** The HTTP request an error came from, looking into what it wraps. */
+/** The HTTP request behind an error, searching wrapped causes. */
 export const requestOf = (
   e: unknown,
   depth = 0
@@ -65,8 +63,8 @@ export const requestOf = (
 };
 
 /**
- * Which of the apps Backfill talks to an error came from, by the address
- * it was asking: "Sonarr", "SABnzbd", "Prowlarr".
+ * Which app an error came from, by request address: "Sonarr", "SABnzbd",
+ * "Prowlarr".
  */
 const appAsked = (e: unknown): string | undefined => {
   const url = requestOf(e)?.url;
@@ -85,17 +83,13 @@ const appAsked = (e: unknown): string | undefined => {
   ].find(at)?.name;
 };
 
-/**
- * A problem put in plain words already, carrying what came in as its
- * cause for the server's log.
- */
+/** An error already in plain words; its cause keeps the original for the log. */
 export class SaidPlainly extends Error {}
 
 /**
- * What went wrong, in plain words, for the cases met often: a limit
- * reached, an app not answering, an API key refused. Anything else is
- * said as it came. `indexer` is the indexer a release was being fetched
- * from, when it was.
+ * Plain words for common failures: a limit reached, an app not answering,
+ * an API key refused. Anything else passes through. `indexer` is the
+ * indexer a release was fetched from, if any.
  */
 export const plainProblem = (e: unknown, indexer?: string): string => {
   if (e instanceof IndexerLimitReached || e instanceof SaidPlainly) {
@@ -115,14 +109,14 @@ export const plainProblem = (e: unknown, indexer?: string): string => {
 };
 
 /**
- * Something wrong with the release itself rather than with Seerr, the apps
- * or the download client: only then is it marked dead when its job gives up.
+ * A fault in the release itself, not Seerr, the apps or the download client:
+ * only then is it marked dead when its job gives up.
  */
 export class ReleaseProblem extends Error {}
 
 /**
- * A Usenet post in archives, or with scrambled file names: its files
- * cannot be listed before it is downloaded.
+ * A Usenet post in archives or with scrambled names: its files can't be
+ * listed before download.
  */
 export class PackedRelease extends Error {
   constructor(public readonly packing: 'archives' | 'scrambled') {

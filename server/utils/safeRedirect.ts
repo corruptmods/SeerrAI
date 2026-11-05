@@ -1,11 +1,9 @@
-/*
- * Where to go after signing in. The page someone was sent away from rides
- * along as `/login?redirect=...` (or through a single sign-on provider and
- * back), and only ever comes back as a path on this site: anything else
- * (another site, a script, the sign-in page itself) goes home instead.
- *
- * Shared by the sign-in page and the server, so both follow the same rules.
- */
+// Where to go after sign-in. The original page rides along as
+// `/login?redirect=...` (or through an SSO provider and back), and is only
+// honoured as a path on this site: anything else (another site, a script, the
+// sign-in page itself) goes home.
+//
+// Shared by the sign-in page and the server, so both follow the same rules.
 
 const BASE = 'http://localhost';
 
@@ -15,16 +13,15 @@ const isSignInPage = (pathname: string) => {
 };
 
 export const safeRedirect = (value: unknown): string => {
-  // A path on this site starts with one slash. Two, or a backslash, which
-  // browsers read as a slash, starts another site's address.
+  // A same-site path starts with one slash. Two, or a backslash (which browsers
+  // treat as a slash), starts another site's URL.
   if (typeof value !== 'string' || !/^\/(?![/\\])/.test(value)) {
     return '/';
   }
 
   try {
-    // Tabs, backslashes and dot segments can still make an address that
-    // looked like a path resolve to another site, so it is read the way a
-    // browser would and checked again.
+    // Tabs, backslashes and dot segments can still make a path-looking value
+    // resolve to another site, so parse it as a browser would and check again.
     const url = new URL(value, BASE);
     if (
       url.origin !== BASE ||
@@ -39,7 +36,7 @@ export const safeRedirect = (value: unknown): string => {
   }
 };
 
-/** The sign-in page, set to come back to `path` afterwards. */
+/** The sign-in page URL, returning to `path` afterwards. */
 export const loginUrl = (path?: string): string => {
   const target = safeRedirect(path);
   return target === '/'

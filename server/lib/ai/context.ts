@@ -17,31 +17,29 @@ import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
 /*
- * The little each feature tells the model about a person, and turning the
- * titles a model names back into real ones.
+ * What each feature tells the model about a user, and mapping the titles a
+ * model names back to real ones.
  */
 
-/** Short, so "what I just watched" is what they just watched. */
+/** Short, so "what I just watched" stays current. */
 const RECENT_MS = 5 * 60 * 1000;
 const recent = new Map<number, { at: number; value: Activity }>();
 
-/** Plays shorter than this are someone checking what a title is. */
+/** Plays below this percent are someone sampling a title. */
 const STARTED_PERCENT = 20;
 
 export interface Activity {
-  /** Where the titles came from: watch history, or failing that, requests. */
+  /** Watch history, or requests when there is none. */
   source: 'watched' | 'requested' | 'none';
   /** Newest first. */
   items: { name: string; at?: number }[];
 }
 
 /**
- * What someone has been watching lately, newest first, as "Title (year)" for
- * films and "Title (series)" for shows: from the server's watch history
- * (Tautulli for Plex, the server itself for Jellyfin and Emby), counting a show they
- * are part-way through. Failing that, what they requested, marked as such so
- * it is never passed off as watched. Names only: nothing else about them
- * leaves the server.
+ * Recent watching, newest first, as "Title (year)" or "Title (series)", from
+ * watch history (Tautulli for Plex, the server itself for Jellyfin and Emby),
+ * including shows part-way through. Falls back to requests, marked so they
+ * are never passed off as watched. Only names leave the server.
  */
 export const recentActivity = async (user: User): Promise<Activity> => {
   const hit = recent.get(user.id);
@@ -62,7 +60,7 @@ export const recentActivity = async (user: User): Promise<Activity> => {
           play.kind === 'movie'
             ? `${play.title}${play.year ? ` (${play.year})` : ''}`
             : `${play.title} (series)`;
-        // Newest first, so the first play of a title is its latest.
+        // History is newest first, so a title's first play is its latest.
         if (!watched.has(name)) {
           watched.set(name, play.at);
         }
@@ -113,7 +111,7 @@ export const recentActivity = async (user: User): Promise<Activity> => {
   return value;
 };
 
-/** Forget what was gathered, so the next answer asks again. */
+/** Clears the cache so the next answer refetches. */
 export const forgetRecentActivity = () => recent.clear();
 
 /** Just the names, for features that only need someone's taste. */
@@ -146,11 +144,10 @@ export interface NamedTitle {
   t: string;
   /** Year of first release, if the model knows it. */
   y?: number | null;
-  /** movie or tv. */
   k: 'movie' | 'tv';
 }
 
-/** Posters fetched ahead: about what an answer shows before scrolling. */
+/** Posters prefetched: about what an answer shows before scrolling. */
 const POSTERS_WARMED = 12;
 
 type MappedResult =
@@ -158,9 +155,9 @@ type MappedResult =
   | ReturnType<typeof mapTvResult>;
 
 /**
- * The TMDB entry for each title a model named, with this person's view of
- * its status (available, requested...), in the order named, without repeats.
- * A title TMDB cannot find is dropped rather than guessed.
+ * The TMDB entry for each title the model named, with this user's status,
+ * in order and deduplicated. A title TMDB cannot find is dropped, not
+ * guessed.
  */
 export const resolveTitles = async (
   user: User,
@@ -188,8 +185,8 @@ export const resolveTitles = async (
 };
 
 /**
- * TMDB titles as the app shows them, each with what the library knows of
- * it (status, requests), in the order given, without repeats.
+ * TMDB titles as the app shows them, with library status and requests, in
+ * order and deduplicated.
  */
 export const withLibraryStatus = async (
   user: User,
@@ -205,9 +202,8 @@ export const withLibraryStatus = async (
       !!seen.add(`${f.kind}:${f.result.id}`)
   );
 
-  // The posters shown first start on their way now, while the rest of the
-  // answer is put together, rather than once the browser has drawn the
-  // cards. Only when posters are served from Seerr's own cache.
+  // Prefetch the first posters while the answer is assembled, not after the
+  // browser draws the cards. Only when Seerr serves cached images.
   if (getSettings().main.cacheImages) {
     warmTmdbImages(
       unique
@@ -255,7 +251,7 @@ export const label = (
   return year ? `${name} (${year})` : name;
 };
 
-/** Cut to a length, on a word where possible. */
+/** Truncates to `max`, at a word boundary where possible. */
 export const clip = (text: string, max: number) => {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (clean.length <= max) {

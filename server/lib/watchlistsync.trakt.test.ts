@@ -18,8 +18,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 /*
- * Requests from a Trakt watchlist, alone or beside a Plex one. The Plex
- * watchlist's own behaviour is in watchlistsync.test.ts.
+ * Requests from a Trakt watchlist, alone or alongside Plex. Plex-only
+ * behaviour is in watchlistsync.test.ts.
  */
 
 const ADDED = 1_760_000_000;
@@ -116,7 +116,7 @@ const syncUser = async ({ plex = false } = {}): Promise<User> => {
   return user;
 };
 
-/** The title as it is after someone deleted it from the library. */
+/** The title after it was deleted from the library. */
 const deleteTitle = (tmdbId: number) =>
   getRepository(Media).save(
     new Media({
@@ -190,7 +190,7 @@ describe('watchlist sync from Trakt', () => {
       'Plex is asked only for its own'
     );
 
-    // Plex's sign-in expiring leaves the title on both as it was.
+    // An expired Plex sign-in leaves a title on both unchanged.
     plexAuthFailed = true;
     await watchlistSync.syncWatchlist();
     assert.equal(requests.length, 2);
@@ -268,7 +268,7 @@ describe('watchlist sync from Trakt', () => {
     assert.equal(requests.length, 1);
     await deleteTitle(611);
 
-    // Trakt cannot be read: the title now goes by Plex's time.
+    // Trakt unreadable: the title now uses Plex's time.
     trakt = new TraktError('private', 'private');
     await watchlistSync.syncWatchlist();
     // And back.

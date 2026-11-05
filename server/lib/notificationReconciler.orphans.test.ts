@@ -13,10 +13,9 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /*
- * A failed request whose title is gone — as the live health page found — must
- * be passed over, not retried on every reconcile pass. It used to be claimed,
- * fail to send for want of a title, be released, and log two errors, every
- * few minutes, for as long as it existed.
+ * A failed request whose title is gone must be skipped, not retried every
+ * pass: otherwise it is claimed, fails to send without a title, is released,
+ * and logs two errors every few minutes for as long as it exists.
  */
 
 setupTestDb();

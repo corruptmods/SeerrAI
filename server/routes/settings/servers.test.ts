@@ -11,8 +11,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Radarr, Sonarr and Maintainerr servers in settings, behind the real
- * OpenAPI validator and an error handler like the app's.
+ * Radarr, Sonarr and Maintainerr settings, behind the real OpenAPI validator
+ * and an error handler like the app's.
  */
 
 setupTestDb();
@@ -31,14 +31,14 @@ before(async () => {
       servers.push(server);
     });
 
-  // Maintainerr answering its version.
+  // Maintainerr answering with its version.
   maintainerrPort = await listen((_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify('2.14.0'));
   });
 
-  // Radarr 7 with Allowed Hosts set to localhost: any other name gets
-  // ASP.NET's own page.
+  // Radarr 7 with Allowed Hosts set to localhost: any other hostname gets
+  // ASP.NET's error page.
   radarr7Port = await listen((req, res) => {
     if ((req.headers.host ?? '').split(':')[0] !== 'localhost') {
       res.statusCode = 400;
@@ -81,7 +81,7 @@ before(async () => {
       err: { status?: number; message: string },
       _req: express.Request,
       res: express.Response,
-      // Express tells an error handler by its four parameters.
+      // Express detects an error handler by its four parameters.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: express.NextFunction
     ) => res.status(err.status || 500).json({ message: err.message })
@@ -159,7 +159,7 @@ describe('Radarr, Sonarr and Maintainerr servers in settings', () => {
       const second = await call('POST', `/${list}`, body('Second'));
       const id = Number(second.body.id);
 
-      // Removing the newest server, and then every server.
+      // Remove the newest server, then every server.
       assert.equal((await call('DELETE', `/${list}/${id}`)).status, 200);
       const third = await call('POST', `/${list}`, body('Third'));
       assert.deepEqual([third.status, third.body.id], [201, id + 1]);
@@ -207,7 +207,7 @@ describe('Radarr, Sonarr and Maintainerr servers in settings', () => {
       /add 127\.0\.0\.1 to Allowed Hosts in Radarr/
     );
 
-    // By a name it allows: connected.
+    // An allowed hostname connects.
     const allowed = await test('localhost');
     assert.equal(allowed.status, 200);
     assert.deepEqual(allowed.body.profiles, [{ id: 1, name: 'Any' }]);

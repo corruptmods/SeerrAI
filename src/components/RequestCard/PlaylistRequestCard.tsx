@@ -23,9 +23,8 @@ const messages = defineMessages('components.RequestCard.PlaylistRequestCard', {
 });
 
 /**
- * Where a playlist's songs stand, as one pill, as a request's: here, partly
- * here, on their way, waiting for approval, or failed when every song
- * requested failed.
+ * A playlist's combined status pill: available, partly available, processing,
+ * pending, or failed when every song failed.
  */
 export const playlistStatus = (
   group: Pick<
@@ -43,15 +42,12 @@ export const playlistStatus = (
   return group.failed > 0 ? 'failed' : MediaStatus.PENDING;
 };
 
-/**
- * The song requests made from one playlist, as one card in a row of
- * requests (Recent Requests), rather than a card for each.
- */
+/** One card for all song requests from a playlist (Recent Requests). */
 const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
   const { ref, nearness } = useNearScreen();
-  // Lists are private: someone who can't open it goes to the requests.
+  // Lists are private; those who can't open it go to the requests.
   const href = group.canOpen
     ? `/lists/${group.listId}`
     : `/users/${group.requestedBy.id}/requests`;
@@ -67,13 +63,13 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
     .filter(([key]) => group[key] > 0)
     .map(([key, message]) => intl.formatMessage(message, { count: group[key] }))
     .join(' · ')
-    // A part written in lower case may come first.
+    // The first part may be lower case.
     .replace(/^./, (first) => first.toLocaleUpperCase(intl.locale));
   const covers = group.albums.slice(0, 4);
   const status = playlistStatus(group);
 
   return (
-    // As tall as a film's or a series' card, whose poster is 2:3.
+    // Matches a title card's height (2:3 poster).
     <div
       className="relative flex min-h-[9.5rem] w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-subtle sm:min-h-[12.5rem] sm:w-96"
       data-testid="request-card"
@@ -134,8 +130,7 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
             </Link>
           </div>
         )}
-        {/* As a music request's albums and songs: on a phone, the status
-            alone, so the card is as tall as the others in the row. */}
+        {/* Like music requests: status only on phones, to match card heights. */}
         {progress && (
           <div className="my-0.5 hidden whitespace-normal text-sm sm:my-1 sm:block">
             {progress}

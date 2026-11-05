@@ -21,14 +21,14 @@ const SearchInput = () => {
   const intl = useIntl();
   const { searchValue, setSearchValue, setIsOpen, clear } = useSearchInput();
   const musicOn = useFeature('music');
-  // The full hint does not fit beside the header's buttons on a phone;
-  // the label says it all to a screen reader at any width.
+  // The full hint doesn't fit on a phone; the label gives it to screen
+  // readers at any width.
   const wide = useMediaQuery('(min-width: 640px)');
   const fullHint = intl.formatMessage(
     musicOn ? messages.searchPlaceholderMusic : messages.searchPlaceholder
   );
   const field = useRef<HTMLInputElement>(null);
-  // Searches as the words come, as typing does.
+  // Searches as words arrive, like typing.
   const voice = useVoiceInput(
     useCallback(
       (text: string) => {

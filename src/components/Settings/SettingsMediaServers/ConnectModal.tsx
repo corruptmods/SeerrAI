@@ -24,12 +24,11 @@ import { useIntl } from 'react-intl';
 import { mutate } from 'swr';
 
 /*
- * Connecting a media server from Settings → Media Servers, loaded only when
- * Connect is pressed. Plex: the owner signs in with Plex, then picks one of
- * their servers. Jellyfin and Emby: the address, then an administrator's
- * sign-in or an API key. Then, for any of them, the libraries it has, found
- * there and then: films and series, and music (while music is on), each to
- * switch on or off before the dialog is closed.
+ * Connecting a media server from Settings → Media Servers, loaded only on
+ * Connect. Plex: the owner signs in, then picks a server. Jellyfin and Emby:
+ * the address, then an admin sign-in or API key. Then, for any of them, its
+ * libraries as found now (films, series and, while music is on, music), each
+ * switched on or off before closing.
  */
 
 const messages = defineMessages(
@@ -124,7 +123,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const [plexAccount, setPlexAccount] = useState(server.ownerAccount);
   const [devices, setDevices] = useState<PlexDevice[]>();
 
-  // The address, as Seerr last reached the server when it has been before.
+  // The address Seerr last reached the server at, if any.
   const [hostname, setHostname] = useState(server.address.ip ?? '');
   const [port, setPort] = useState(
     String(server.address.port || (isPlex ? 32400 : 8096))
@@ -178,9 +177,8 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     return intl.formatMessage(messages.errorUnknown, { server: name });
   };
 
-  // Signing in to Plex: in a window, or in this tab, coming back to this
-  // dialog (Settings → Media Servers opens it again), then linking the
-  // account it gave.
+  // Plex sign-in: in a window, or in this tab and back to this dialog (Settings
+  // → Media Servers reopens it), then link the account it returns.
   const plexLogin = usePlexLogin({
     purpose: 'connect',
     enabled: isPlex,
@@ -266,7 +264,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
       const res = await axios.post<Library[]>(
         `${settingsEndpoint}/library/sync`
       );
-      // The music ones as this sync found them, not as last seen.
+      // Music libraries as this sync found them, not as last cached.
       if (music.ready) {
         const key = musicLibrariesKey(settingsEndpoint);
         await mutate(

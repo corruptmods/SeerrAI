@@ -6,18 +6,13 @@ import logger from '@server/logger';
 import { IsNull, Not } from 'typeorm';
 
 /**
- * Emby used to keep its ids in Jellyfin's columns: the ids of titles on
- * the server, and people's Emby accounts. Emby now has columns of its own,
- * and on a server that was set up with Emby the ids are moved there once,
- * at startup, after the settings say so (settings migration 0010) and
- * before any job runs. Nothing else about the titles or the people changes:
- * avatars, account types and sign-in carry on as before. (The one
- * exception: accounts an old install recorded as Jellyfin ones, from when
- * Emby was told apart only by JELLYFIN_TYPE, are recorded as Emby's.)
+ * On an Emby server, moves Emby's title and account ids out of Jellyfin's
+ * columns into Emby's own. Runs once at startup when settings migration 0010
+ * flags it, before any job. Accounts recorded as Jellyfin (from when Emby was
+ * told apart only by JELLYFIN_TYPE) become Emby accounts; nothing else changes.
  *
- * It is done here rather than as a database migration because those run
- * before the settings are read, and whether the server is Emby is only
- * known from the settings.
+ * Not a database migration: those run before settings are read, and only the
+ * settings say whether the server is Emby.
  */
 export const splitEmbyData = async (): Promise<void> => {
   const settings = getSettings();
@@ -29,8 +24,8 @@ export const splitEmbyData = async (): Promise<void> => {
     await manager.query(
       `UPDATE "media" SET "embyMediaId" = "jellyfinMediaId", "embyMediaId4k" = "jellyfinMediaId4k", "jellyfinMediaId" = NULL, "jellyfinMediaId4k" = NULL WHERE "jellyfinMediaId" IS NOT NULL OR "jellyfinMediaId4k" IS NOT NULL`
     );
-    // Installs that told Emby apart only by JELLYFIN_TYPE gave their people
-    // Jellyfin accounts; on this server those were always Emby accounts.
+    // JELLYFIN_TYPE-only installs made these Jellyfin accounts; here they are
+    // Emby's.
     await manager.update(
       User,
       { userType: UserType.JELLYFIN, jellyfinUserId: Not(IsNull()) },

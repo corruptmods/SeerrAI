@@ -12,18 +12,16 @@ import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 /**
- * Regression cover for two faults that produced blank posters:
+ * Guards against blank posters:
  *
- *  - the cache directory was cleared before writing, so a concurrent request
- *    for the same image could delete the file another had just written;
- *  - the read then took whatever the directory listed first, including a
- *    partially written temporary file.
+ *  - clearing the cache directory before writing lets a concurrent request
+ *    delete a file another just wrote;
+ *  - a read must never pick up a partially written temporary file.
  */
 describe('image proxy cache', () => {
   const cacheRoot = join(tmpdir(), `seerr-imageproxy-test-${process.pid}`);
-  // The proxy resolves its cache directory when the module loads, so the
-  // directory cannot be redirected from here. Unique paths per run keep every
-  // test genuinely cold instead.
+  // The cache directory is resolved at module load and can't be redirected;
+  // unique paths per run keep each test cold.
   const unique = `${process.pid}-${Date.now()}`;
   const path = (name: string) => `/t/p/w500/${unique}-${name}.jpg`;
   let upstreamCalls = 0;
@@ -59,8 +57,8 @@ describe('image proxy cache', () => {
     await promises.rm(cacheRoot, { recursive: true, force: true });
     delete process.env.CONFIG_DIRECTORY;
 
-    // The proxy wrote into the default cache directory, since it resolves
-    // that at module load. Remove only this run's entries.
+    // Written to the default cache directory (resolved at load); remove only
+    // this run's entries.
     const defaultDir = join(__dirname, '../../config/cache/images/tmdb');
 
     try {
@@ -129,9 +127,8 @@ describe('image proxy cache', () => {
   });
 
   it('keeps serving a complete image while the same entry is rewritten', async () => {
-    // The original fault cleared the directory before writing, so a reader
-    // arriving mid-write found nothing. Hammering one path with concurrent
-    // reads and writes must never produce an empty buffer.
+    // Concurrent reads and writes on one path must never yield an empty
+    // buffer.
     await proxy.getImage(path('rewrite'));
 
     const results = await Promise.all(
@@ -145,8 +142,8 @@ describe('image proxy cache', () => {
   });
 
   it('does not let a stalled fetch block later images', async () => {
-    // A fetch that never answers must give up (the proxy sets a timeout)
-    // rather than keep that poster, and whoever waits on it, waiting.
+    // A fetch that never answers must time out rather than block the poster
+    // and its waiters.
     const slow = new ImageProxy('tmdb', 'https://image.tmdb.org', {});
     let released = false;
 
@@ -186,15 +183,15 @@ describe('image proxy cache', () => {
   it('reports a stale entry rather than discarding it', async () => {
     const image = await proxy.getImage(path('stale'));
 
-    // An expired entry is still served and refreshed in the background, so a
-    // poster never disappears while it revalidates.
+    // An expired entry is served and refreshed in the background, so posters
+    // never vanish while revalidating.
     assert.ok(image.imageBuffer.length > 0);
     assert.equal(typeof image.meta.isStale, 'boolean');
   });
 });
 
 describe('clearing old images from the cache', () => {
-  // Where the proxy keeps its cache, resolved as it does when it loads.
+  // The proxy's cache directory, resolved as at module load.
   const cacheDir = process.env.CONFIG_DIRECTORY
     ? join(process.env.CONFIG_DIRECTORY, 'cache/images')
     : join(__dirname, '../../config/cache/images');
@@ -310,8 +307,8 @@ describe('what the image cache keeps, and how it serves it', () => {
       (await proxy.getImage(path('photo'))).meta.contentType,
       'image/jpeg'
     );
-    // "image/svg" (from the file extension) is not a type browsers will
-    // draw; a logo served that way would be blank.
+    // "image/svg" (from the extension) isn't a type browsers render; the logo
+    // would be blank.
     assert.equal(
       (await proxy.getImage(path('logo', 'svg'))).meta.contentType,
       'image/svg+xml'
@@ -360,9 +357,9 @@ describe('what the image cache keeps, and how it serves it', () => {
 });
 
 /*
- * A host's pictures are fetched from that host. A redirect elsewhere (a
- * host that was taken over, or one answering for another) is not followed
- * onto the server's own network.
+ * A host's images are fetched from that host. A redirect elsewhere (a
+ * taken-over host, or one answering for another) isn't followed onto the
+ * server's own network.
  */
 describe('image redirects', () => {
   const unique = `${process.pid}-${Date.now()}`;

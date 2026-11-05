@@ -1,11 +1,11 @@
 /*
- * The choices offered when editing a job's schedule, and the schedule each
- * one saves (with seconds first, as the server's scheduler reads it).
+ * The schedule choices offered when editing a job, and the cron each saves
+ * (seconds first, as the server's scheduler reads it).
  *
  * A cron step only repeats evenly when it divides its field: "every 18 hours"
- * written as a step ran at midnight and 6pm, six hours apart, and "every 3
- * days" restarted on the 1st of each month. So only choices that really
- * repeat that often are offered. A week is a day of the week, not a step.
+ * as a step runs at midnight and 6pm, and "every 3 days" restarts on the 1st
+ * of each month. So only evenly repeating choices are offered. A week is a day
+ * of the week, not a step.
  */
 
 export type ScheduleInterval = 'seconds' | 'minutes' | 'hours' | 'days';
@@ -39,9 +39,9 @@ export const scheduleFor = (
 };
 
 /**
- * Which choice a saved schedule is, so the editor opens on it rather than on
- * a default that saving would quietly put in its place. Undefined for a
- * schedule none of the choices make (an older one, or one set by hand).
+ * The choice a saved schedule matches, so the editor opens on it rather than on
+ * a default that saving would silently substitute. Undefined when no choice
+ * makes it (an older or hand-set schedule).
  */
 export const choiceFor = (
   interval: ScheduleInterval,

@@ -10,9 +10,9 @@ import { describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * Scans from more than one media server (and from Radarr and Sonarr) on
- * the same titles: each writes only its own server's ids, and two finding a
- * title at once add it once.
+ * Several media servers (plus Radarr and Sonarr) scanning the same titles:
+ * each writes only its own server's ids, and concurrent finds add a title
+ * once.
  */
 
 class ProbeScanner extends BaseScanner<unknown> {

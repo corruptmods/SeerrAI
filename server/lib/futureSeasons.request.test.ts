@@ -11,9 +11,9 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /*
- * Following a series, through the real request path rather than a stub:
- * Seerr refuses a second automatic request for the same title and person,
- * which once meant only the first new season was ever asked for.
+ * Following a series through the real request path, which refuses a second
+ * automatic request for the same title and user; later seasons must still be
+ * requested.
  */
 
 setupTestDb();

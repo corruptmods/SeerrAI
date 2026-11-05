@@ -239,8 +239,7 @@ interface RequestCardProps {
 }
 
 const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
-  // Near the screen, for loading the title (and its pictures) before the
-  // card is scrolled to; on screen now, for checking on the request.
+  // Near: preload the title and images. In view: poll the request.
   const { ref: nearRef, near, nearness } = useNearScreen();
   const { ref: viewRef, inView } = useInView();
   const ref = useMemo(() => bothRefs(nearRef, viewRef), [nearRef, viewRef]);
@@ -265,8 +264,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     `/api/v1/request/${request.id}`,
     {
       fallbackData: request,
-      // Only while it can be seen: a card scrolled out of the row is not
-      // asked about again until it comes back into view.
+      // Only poll while visible.
       refreshInterval: inView
         ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
             watchRequest,
@@ -278,8 +276,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
 
   const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
-  // Whether the admin agent (an AI) is looking for it: only while the card
-  // can be seen and the request is approved and not yet all here.
+  // Whether the AI admin agent is searching: only while visible, approved
+  // and not fully available.
   const shown = requestData ?? request;
   const mayBeLooked =
     inView &&
@@ -362,10 +360,10 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       <RequestModal
         show={showEditModal}
         tmdbId={request.media.tmdbId}
-        // The requests listed here are for films and series.
+        // Only films and series reach this card.
         type={request.type as VideoMediaType}
         is4k={request.is4k}
-        // As it is now: it may have failed since the list was loaded.
+        // The current request, which may have failed since the list loaded.
         editRequest={requestData}
         onCancel={() => setShowEditModal(false)}
         onComplete={() => {
@@ -414,7 +412,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          {/* The year on a phone too, as a music card has its artist. */}
+          {/* The year shows on phones too, like a music card's artist. */}
           <div className="flex text-xs font-medium text-strong">
             {(isMovie(title) ? title.releaseDate : title.firstAirDate)?.slice(
               0,
@@ -428,7 +426,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 : `/tv/${requestData.media.tmdbId}`
             }
             title={isMovie(title) ? title.title : title.name}
-            // A long name takes a second line rather than being cut short.
+            // Long names wrap to a second line.
             className="line-clamp-2 whitespace-normal break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
           >
             {isMovie(title) ? title.title : title.name}
@@ -482,8 +480,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             <span className="mr-2 hidden flex-none font-bold sm:block">
               {intl.formatMessage(globalMessages.status)}
             </span>
-            {/* While the admin agent looks for it, that is what's
-                happening, in place of the request's own status. */}
+            {/* The AI search replaces the request status while it runs. */}
             {aiSearching ? (
               <AiSearchingBadge className="flex-none" />
             ) : requestData.status === MediaRequestStatus.DECLINED ? (
@@ -544,7 +541,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                       buttonSize="sm"
                       disabled={isRetrying}
                       onClick={() => retryRequest()}
-                      // Its label is hidden on a phone.
+                      // The label is hidden on phones.
                       aria-label={intl.formatMessage(globalMessages.retry)}
                     >
                       <ArrowPathIcon
@@ -559,7 +556,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                       </span>
                     </Button>
                   </Tooltip>
-                  {/* Another server, profile or folder, before retrying. */}
+                  {/* Change server, profile or folder before retrying. */}
                   <Tooltip content={intl.formatMessage(messages.editrequest)}>
                     <Button
                       buttonType="default"
@@ -720,7 +717,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
   );
 };
 
-/** Music has a card of its own: it has no TMDB title to look up. */
+/** Music gets its own card, having no TMDB title. */
 const RequestCardFor = (props: RequestCardProps) =>
   props.request.type === MediaType.MUSIC ? (
     <MusicRequestCard request={props.request} />

@@ -85,20 +85,16 @@ const SettingsTabs = ({
   const intl = useIntl();
   const router = useRouter();
   const { user: currentUser } = useUser();
-  // A page can have two sets of tabs (Settings, then a section's own), and
-  // each dropdown's label must find its own.
+  // A page can have two tab sets (Settings, then a section's), so each
+  // dropdown label needs its own id.
   const selectId = useId();
 
   /*
-   * Load the other sections' code in the background once this one has
-   * settled. Each page's code otherwise downloads the first time it is
-   * opened — over half a megabyte for Services — so the first visit to each
-   * was slow. Links pre-load themselves, but on a phone these tabs are a
-   * dropdown, which never did. Next.js only downloads here, without running
-   * anything, and the service worker keeps it across restarts, so this costs
-   * once per update. One page at a time, after a pause so the open page
-   * comes first; it stops when the menu goes away. Only sections this user
-   * can see.
+   * Prefetch the other visible sections' code once this one settles (over
+   * half a megabyte for Services). Links prefetch themselves, but on a phone
+   * these tabs are a dropdown. Next.js only downloads, and the service worker
+   * keeps it across restarts, so this costs once per update. One page at a
+   * time after a pause; stops on unmount.
    */
   const visibleRoutes = settingsRoutes
     .filter(

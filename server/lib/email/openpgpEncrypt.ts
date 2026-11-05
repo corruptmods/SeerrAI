@@ -25,7 +25,7 @@ class PGPEncryptor extends Transform {
     this._encryptionKeys = options.encryptionKeys;
   }
 
-  // just save the whole message
+  // Buffer the whole message; encryption happens in _flush.
   _transform = (
     chunk: Uint8Array,
     _encoding: BufferEncoding,
@@ -36,12 +36,10 @@ class PGPEncryptor extends Transform {
     callback();
   };
 
-  // Actually do stuff
   _flush = async (callback: TransformCallback): Promise<void> => {
     const message = Buffer.concat(this._messageChunks, this._messageLength);
 
     try {
-      // Reconstruct message as buffer
       const validPublicKeys = await Promise.all(
         this._encryptionKeys.map((armoredKey) =>
           openpgp.readKey({ armoredKey })
@@ -49,13 +47,11 @@ class PGPEncryptor extends Transform {
       );
       let privateKey: openpgp.PrivateKey | undefined;
 
-      // Just return the message if there is no one to encrypt for
       if (!validPublicKeys.length) {
         this.push(message);
         return callback();
       }
 
-      // Only sign the message if private key and password exist
       if (this._signingKey && this._password) {
         privateKey = await openpgp.decryptKey({
           privateKey: await openpgp.readPrivateKey({
@@ -68,11 +64,8 @@ class PGPEncryptor extends Transform {
       const emailPartDelimiter = '\r\n\r\n';
       const messageParts = message.toString().split(emailPartDelimiter);
 
-      /**
-       * In this loop original headers are split up into two parts,
-       * one for the email that is sent
-       * and one for the encrypted content
-       */
+      // Split headers: content headers go inside the encrypted part, the rest
+      // stay outside.
       const header = messageParts.shift() as string;
       const emailHeaders: string[][] = [];
       const contentHeaders: string[][] = [];
@@ -107,12 +100,7 @@ class PGPEncryptor extends Transform {
         }
       }
 
-      // Generate a new boundary for the email content
       const boundary = 'nm_' + randomBytes(14).toString('hex');
-      /**
-       * Concatenate everything into single strings
-       * and add pgp headers to the email headers
-       */
       const emailHeadersRaw =
         emailHeaders.map((line) => line.join('\r\n')).join('\r\n') +
         '\r\n' +
@@ -179,8 +167,6 @@ class PGPEncryptor extends Transform {
 }
 
 export const openpgpEncrypt = (options: EncryptorOptions) => {
-  // Disabling this line because I don't want to fix it but I am tired
-  // of seeing the lint warning
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (mail: any, callback: () => unknown): void {
     if (!options.encryptionKeys.length) {

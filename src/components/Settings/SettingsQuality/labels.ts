@@ -3,7 +3,7 @@ import type { PresetKey } from '@server/lib/quality/types';
 import type { IntlShape } from 'react-intl';
 
 /*
- * Names the Quality page, its preview and What it does share: presets,
+ * Names shared by the Quality page, its preview and What it does: presets,
  * Seerr AI's own formats, and server states.
  */
 

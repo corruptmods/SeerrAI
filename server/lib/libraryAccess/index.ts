@@ -28,16 +28,13 @@ import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { In } from 'typeorm';
 
 /*
- * Who sees which library on Plex, Jellyfin and Emby, changed from Seerr AI:
- * one person's libraries, or one library taken from (or given to) everyone
- * at once. Administrators on Jellyfin and Emby see everything and are never
- * changed; nobody is left with no library. Each change is kept for its
- * history and Undo.
+ * Library sharing on Plex, Jellyfin and Emby: per person, or one library for
+ * everyone at once. Jellyfin/Emby admins are never changed; nobody is left
+ * with no library. Each change is recorded for history and Undo.
  */
 
 export { LibraryAccessError };
 
-/** One change to make: who, and what they are to have. */
 interface Move {
   person: ServerPerson;
   to: AccessSet;
@@ -46,11 +43,11 @@ interface Move {
 const sameSet = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((id) => b.includes(id));
 
-/** The person's id as Seerr AI keeps it, to match their account. */
+/** Normalizes a server person id to the form stored on User. */
 const plainId = (kind: MediaServerKind, id: string): string =>
   kind === 'plex' ? id : (normalizeJellyfinGuid(id) ?? id);
 
-/** What a bulk change would do, and the changes it would make. */
+/** Plans a bulk add/remove of one library, with the moves to make. */
 export const planBulk = (
   kind: MediaServerKind,
   access: ServerAccess,
@@ -117,7 +114,7 @@ export const planBulk = (
   return plan;
 };
 
-/** A person as pages see them: the server's handle stays here. */
+/** Strips the server handle (`ref`) before sending to clients. */
 const publicPerson = (person: ServerPerson): AccessPerson => {
   const copy: Partial<ServerPerson> = { ...person };
   delete copy.ref;
@@ -131,10 +128,9 @@ const why = (e: unknown): string => {
 };
 
 class LibraryAccess {
-  /** Servers with a change under way. */
   private busy = new Set<MediaServerKind>();
 
-  /** The server's reader and writer. */
+  /** The access reader/writer for a connected server. */
   public async server(kind: MediaServerKind): Promise<AccessServer> {
     if (!connectedServers().includes(kind)) {
       throw new LibraryAccessError(
@@ -145,7 +141,7 @@ class LibraryAccess {
     return isJellyfinFamily(kind) ? jellyfinAccess(kind) : plexAccess();
   }
 
-  /** Reads the server, with each person's Seerr AI account where linked. */
+  /** Reads the server and attaches linked Seerr AI user ids. */
   private async read(
     kind: MediaServerKind,
     server: AccessServer,
@@ -168,7 +164,6 @@ class LibraryAccess {
     return access;
   }
 
-  /** Every library on a server and who has it. */
   public async view(kind: MediaServerKind): Promise<LibraryAccessView> {
     const access = await this.read(kind, await this.server(kind));
     const people = access.people.filter((person) => !person.admin);
@@ -183,7 +178,7 @@ class LibraryAccess {
     };
   }
 
-  /** What taking a library from everyone, or giving it, would do. */
+  /** Previews a bulk change without making it. */
   public async plan(
     kind: MediaServerKind,
     libraryId: string,
@@ -219,7 +214,7 @@ class LibraryAccess {
     }
   }
 
-  /** Makes each change in turn; one refused does not stop the rest. */
+  /** Applies moves in turn; a failure is recorded and the rest continue. */
   private async make(
     server: AccessServer,
     access: ServerAccess,
@@ -257,7 +252,7 @@ class LibraryAccess {
     };
   }
 
-  /** Takes a library from everyone, or gives it to everyone, at once. */
+  /** Removes a library from, or adds it to, everyone. */
   public async apply(
     kind: MediaServerKind,
     libraryId: string,
@@ -294,7 +289,7 @@ class LibraryAccess {
     });
   }
 
-  /** Gives one person exactly these libraries, or every one. */
+  /** Sets one person's libraries, or all. */
   public async setPerson(
     kind: MediaServerKind,
     personId: string,
@@ -352,10 +347,7 @@ class LibraryAccess {
     });
   }
 
-  /**
-   * Puts back what a change did, for each person it changed who still is
-   * as it left them: anyone changed again since is left alone.
-   */
+  /** Reverts a change, skipping anyone changed again since. */
   public async undo(id: number): Promise<AccessResult> {
     const repo = getRepository(LibraryAccessChange);
     const change = await repo.findOneBy({ id });
@@ -419,7 +411,6 @@ class LibraryAccess {
     });
   }
 
-  /** The latest changes, newest first. */
   public async history(
     kind?: MediaServerKind,
     take = 20
@@ -465,7 +456,7 @@ class LibraryAccess {
     });
   }
 
-  /** A person's libraries on each connected server they have an account on. */
+  /** A user's libraries on each connected server they're linked to. */
   public async forUser(userId: number): Promise<UserLibraryAccess[]> {
     const user = await getRepository(User).findOne({ where: { id: userId } });
     if (!user) {

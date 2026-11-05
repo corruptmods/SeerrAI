@@ -26,8 +26,8 @@ interface Season {
 }
 
 /**
- * A spoiler-free "previously on" for a series, up to the next episode this
- * person has not seen (from their watch history), or wherever they choose.
+ * Spoiler-free recap up to the user's next unwatched episode (from watch
+ * history) or a chosen one.
  */
 const CatchMeUp = ({
   tmdbId,
@@ -50,7 +50,7 @@ const CatchMeUp = ({
     .filter((s) => s.seasonNumber >= 1 && s.episodeCount > 0)
     .sort((a, b) => a.seasonNumber - b.seasonNumber);
 
-  // Nothing to recap in a first season's first episode.
+  // A lone one-episode season has nothing to recap.
   if (
     !on('aiRecap') ||
     !regular.length ||
@@ -64,8 +64,7 @@ const CatchMeUp = ({
     if (position) {
       return;
     }
-    // Where they are, if their history says; otherwise the start of the
-    // latest season, the usual reason for wanting a recap.
+    // Use watch history if known, else the start of the latest season.
     const latest = regular[regular.length - 1];
     let start = { season: latest.seasonNumber, episode: 1 };
     try {
@@ -83,7 +82,7 @@ const CatchMeUp = ({
         setKnown(true);
       }
     } catch {
-      // Chosen by hand instead.
+      // The user picks the position by hand.
     }
     if (
       start.season === regular[0].seasonNumber &&

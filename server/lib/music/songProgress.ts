@@ -8,20 +8,19 @@ import { SEARCHING_SOON } from '@server/lib/music/songFetchWaits';
 import { In } from 'typeorm';
 
 /*
- * Where a requested song is on its way, for a playlist's page to say of
- * each: Lidarr looking for its single, Seerr searching for a release of
- * its album, waiting to search again, downloading or importing.
+ * Per-song progress for a playlist page: single search, album search,
+ * waiting to retry, downloading or importing.
  */
 
 export type SongProgress =
-  /** Lidarr is looking for the single that has it. */
+  /** Lidarr is searching for the song's single. */
   | { step: 'single'; release: string }
-  /** Seerr is setting up its album in Lidarr, about to search. */
+  /** Seerr is adding the album to Lidarr before searching. */
   | { step: 'preparing'; release: string }
   | { step: 'searching'; release: string }
-  /** Nothing found yet; searched again then. */
+  /** Nothing found yet; retries at searchAgainAt. */
   | { step: 'waiting'; release: string; searchAgainAt: Date }
-  /** A release is chosen, waiting for a download slot. */
+  /** Release chosen, waiting for a download slot. */
   | { step: 'slot'; release: string }
   | { step: 'downloading'; release: string; percent: number | null }
   | { step: 'importing'; release: string };
@@ -36,7 +35,7 @@ type Song = Pick<
   | 'sourceAlbumTitle'
 >;
 
-/** How much of a download is done, in whole percent, when known. */
+/** Download progress in whole percent, or null when size is unknown. */
 const percentOf = (item: { size: number; sizeLeft: number }) =>
   item.size > 0
     ? Math.max(
@@ -48,7 +47,7 @@ const percentOf = (item: { size: number; sizeLeft: number }) =>
       )
     : null;
 
-/** A download in Lidarr's queue, or Backfill's, for the release. */
+/** Progress from Lidarr's or Backfill's download queue for the album. */
 const downloadOf = (
   albumMbid: string,
   release: string
@@ -60,7 +59,7 @@ const downloadOf = (
     : { step: 'downloading', release, percent: percentOf(item) };
 };
 
-/** Each approved song's progress, by its recording. */
+/** Progress of each approved song, keyed by recording id. */
 export const songProgress = async (
   songs: Song[],
   now = new Date()
@@ -114,7 +113,7 @@ export const songProgress = async (
     } else if (
       fetch.searchAgainAt &&
       fetch.searchAgainAt > now &&
-      // Waiting minutes for Prowlarr or an indexer to answer is searching.
+      // A short wait on Prowlarr or an indexer still counts as searching.
       !fetch.stage?.startsWith(SEARCHING_SOON)
     ) {
       progress.set(song.recordingMbid, {

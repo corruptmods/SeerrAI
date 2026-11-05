@@ -53,7 +53,7 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   saveFailed: 'Music settings could not be saved.',
 });
 
-/** Music's settings as the server shows them: no key, only that one is set. */
+/** As the server shows them: no key, only whether one is set. */
 export interface ShownMusicSettings {
   musicbrainzUrl: string;
   contactEmail: string;
@@ -140,9 +140,8 @@ export const musicSourceSchema = (intl: IntlShape) => ({
 });
 
 /*
- * Where music's details come from: MusicBrainz, ListenBrainz, TheAudioDB,
- * the most albums one request may ask for, and asking for songs one at a
- * time. The fields of Settings →
+ * Music's detail sources: MusicBrainz, ListenBrainz, TheAudioDB, the most
+ * albums per request, and fetching songs one at a time. Fields of Settings →
  * Music's form, which loads and saves them with the rest of the page.
  */
 const MusicSources = ({

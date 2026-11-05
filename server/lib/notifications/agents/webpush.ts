@@ -15,10 +15,10 @@ import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
 import webpush from 'web-push';
 import {
-  hasNotificationType,
   Notification,
-  shouldSendAdminNotification,
   WEB_PUSH_STARTING_TYPES,
+  hasNotificationType,
+  shouldSendAdminNotification,
 } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
@@ -65,10 +65,8 @@ interface PushNotificationPayload {
   pendingRequestsCount?: number;
   isAdmin?: boolean;
   /**
-   * The words for the Approve and Decline buttons on a request waiting for
-   * approval, and for the notice shown when a tap on one does not go
-   * through, in the person's language: the service worker has none of its
-   * own.
+   * Localized Approve/Decline labels and failure text; the service worker has
+   * no i18n.
    */
   actionLabels?: {
     approve: string;
@@ -89,18 +87,14 @@ interface WebPushError extends Error {
 }
 
 /**
- * Decides whether a user should receive a web push notification of this type.
- *
- * Someone who has never chosen their web push types gets the starting ones
- * (WEB_PUSH_STARTING_TYPES), the availability notification they signed
- * their device up for among them; a choice they saved is honoured.
+ * Whether the user gets this web push type; WEB_PUSH_STARTING_TYPES if they
+ * never chose.
  */
 export const wantsWebPush = (
   user: User | undefined,
   type: Notification
 ): boolean => {
-  // A broken sign-in is not something to opt out of: a user who had turned
-  // it off would never learn their watchlist had stopped syncing.
+  // Not opt-out: the user would never learn their watchlist stopped syncing.
   if (type === Notification.PLEX_REAUTH) {
     return true;
   }
@@ -115,7 +109,7 @@ export const wantsWebPush = (
   return settings.hasNotificationType(NotificationAgentKey.WEBPUSH, type);
 };
 
-/** What web push sends; each person picks theirs in their own settings. */
+/** Types web push can send; each user picks theirs. */
 const WEB_PUSH_NOTIFICATION_TYPES: number[] = [
   Notification.MEDIA_PENDING,
   Notification.MEDIA_APPROVED,
@@ -161,7 +155,7 @@ class WebPushAgent
     const intl = getIntl(locale);
     const { embedPoster } = getSettings().notifications.agents.webpush;
 
-    // Several at once, gathered into one: it says everything itself.
+    // A digest carries its own text.
     if (payload.digest) {
       return {
         notificationType: Notification[type],
@@ -193,17 +187,10 @@ class WebPushAgent
 
     let message: string | undefined;
     switch (type) {
+      // These carry their own message (and, for some, the page to open).
       case Notification.TEST_NOTIFICATION:
-        message = payload.message;
-        break;
-      // List activity supplies its own sentence, e.g. "Jordan added Zelvara."
       case Notification.LIST_ACTIVITY:
-        message = payload.message;
-        break;
       case Notification.PLEX_REAUTH:
-        message = payload.message;
-        break;
-      // Backfill supplies its own sentence and the page to open.
       case Notification.BACKFILL:
       case Notification.HEALTH:
       case Notification.WRONG_MATCH:
@@ -222,7 +209,7 @@ class WebPushAgent
           quality,
           mediaType,
         });
-        // Push shows no extra fields, so the estimate goes in the message.
+        // Push has no extra fields, so the estimate goes in the message.
         const expected = payload.extra?.find(
           (field) => field.name === 'Expected'
         )?.value;
@@ -318,9 +305,8 @@ class WebPushAgent
 
     const kind = payload.media?.mediaType;
 
-    // Availability and failure notifications lead with what happened and put
-    // the title in the body, which reads better in a phone notification than
-    // a bare title followed by a plot synopsis.
+    // Availability and failure lead with the event and put the title in the
+    // body; reads better on a phone than a title plus synopsis.
     let subject = payload.subject;
 
     if (type === Notification.MEDIA_AVAILABLE && payload.subject) {
@@ -389,7 +375,6 @@ class WebPushAgent
     type: Notification,
     payload: NotificationPayload
   ): Promise<boolean> {
-    // Types web push has no words for are left out.
     if (!WEB_PUSH_NOTIFICATION_TYPES.includes(type)) {
       return true;
     }
@@ -407,9 +392,8 @@ class WebPushAgent
       pushSub: UserPushSubscription,
       notificationPayload: Buffer
     ) => {
-      // Addresses are checked when a device signs up; one saved before that
-      // check, anywhere but a browser push service, is never called and is
-      // forgotten.
+      // Endpoints are validated at signup; delete older ones that aren't a
+      // browser push service rather than call them.
       if (!isPushServiceEndpoint(pushSub.endpoint)) {
         logger.warn(
           'Removing a web push subscription that is not at a browser push service',
@@ -440,7 +424,6 @@ class WebPushAgent
             },
           },
           notificationPayload,
-          // Gives up on a push service that stops answering.
           { timeout: NOTIFICATION_TIMEOUT_MS }
         );
       } catch (e) {
@@ -488,12 +471,8 @@ class WebPushAgent
       );
     }
 
-    // Approvals and declines used to send every admin an extra push that only
-    // updated the app badge and showed nothing. Browsers require a push to
-    // show a notification: WebKit revokes the subscription of an app that
-    // does not, so on an iPhone those pushes cost the admin their
-    // notifications. The app refreshes the badge itself whenever it is
-    // opened or focused, so they are no longer sent.
+    // No silent badge-only pushes to admins: WebKit revokes the subscription
+    // of an app whose push shows nothing. The app refreshes its badge on focus.
     if (payload.notifyAdmin) {
       const users = await userRepository.find();
 

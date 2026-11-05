@@ -1,6 +1,6 @@
 /**
- * Turning a pasted written list into titles, and committing the confirmed
- * matches onto a list.
+ * Matches a pasted written list to titles and adds the confirmed matches to
+ * a list.
  */
 import TheMovieDb from '@server/api/themoviedb';
 import TraktAPI, { parseTraktUrl, TraktError } from '@server/api/trakt';
@@ -29,8 +29,8 @@ import { Router } from 'express';
 import { In } from 'typeorm';
 
 /**
- * The TMDB titles a written line may mean, best first: a year in the line
- * decides between namesakes, and "… series" puts collections first.
+ * TMDB titles a written line may mean, best first: a year picks between
+ * namesakes, and "… series" puts collections first.
  */
 const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
   const search = await tmdb.searchMulti({ query: line.title });
@@ -68,8 +68,7 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
       };
     });
 
-  // A year in the pasted line is a strong signal; prefer an exact match
-  // on it, then fall back to whatever TMDB thought was most popular.
+  // Prefer an exact year match, then TMDB's popularity order.
   let ranked = line.year
     ? [
         ...candidates.filter((c) => c.year === line.year),
@@ -77,9 +76,8 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
       ]
     : candidates;
 
-  // "Harmony Lane series" probably means the set — but "Grey Static
-  // series" means a TV show, so a collection is only promoted to the top,
-  // never forced. Both readings stay in the list.
+  // "Harmony Lane series" means the set, but "Grey Static series" a TV show,
+  // so a collection is promoted, never forced; both readings stay.
   if (line.collectionHint) {
     ranked = [
       ...ranked.filter((c) => c.mediaType === 'collection'),
@@ -89,8 +87,7 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
 
   const shortlist = ranked.slice(0, CANDIDATES_PER_LINE);
 
-  // Tell the user how many films a collection would add, so "Add" is not
-  // a surprise.
+  // Show how many films a collection would add, so "Add" isn't a surprise.
   const withCounts = await mapWithConcurrency(shortlist, 2, async (c) => {
     if (c.mediaType !== 'collection') {
       return c;
@@ -124,9 +121,8 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
 
 const listRoutes = Router();
 
-// Turns pasted text into candidate matches for review. Deliberately does not
-// add anything: automatic title matching gets things wrong, so the user
-// confirms before any of it lands on a list.
+// Turns pasted text into candidate matches for review. Adds nothing: title
+// matching makes mistakes, so the user confirms first.
 listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
   try {
     const text = String(req.body.text ?? '');
@@ -161,9 +157,9 @@ listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
 });
 
 /**
- * The films and series on a public Trakt list or watchlist, from a pasted
- * link. Trakt gives TMDB's id for nearly all of them; /import/resolve turns
- * them into matches to review, a batch at a time.
+ * Films and series on a public Trakt list or watchlist, from a pasted link.
+ * Trakt gives TMDB ids for nearly all; /import/resolve turns them into
+ * matches to review, a batch at a time.
  */
 listRoutes.post('/import/trakt', isAuthenticated(), async (req, res) => {
   const source = parseTraktUrl(String(req.body.url ?? ''));
@@ -206,9 +202,9 @@ listRoutes.post('/import/trakt', isAuthenticated(), async (req, res) => {
 });
 
 /**
- * Titles known by TMDB id (from Trakt) as matches to review, like a written
- * list's lines: each with its poster, and a search by name for the odd one
- * with no id, or an id TMDB no longer has.
+ * Turns TMDB ids (from Trakt) into matches to review, like a written list's
+ * lines: each with its poster, searching by name when the id is missing or
+ * unknown to TMDB.
  */
 listRoutes.post(
   '/import/resolve',
@@ -280,7 +276,7 @@ listRoutes.post<{ listId: string }>(
       if (!access) {
         return next({ status: 404, message: 'List not found.' });
       }
-      // A playlist holds songs; films and series go on a watch list.
+      // Playlists hold songs; films and series go on watch lists.
       if (access.list.kind === 'music') {
         return next({
           status: 400,
@@ -311,12 +307,8 @@ listRoutes.post<{ listId: string }>(
       let requestFailed = 0;
       let notRequested = 0;
 
-      /**
-       * Resolve everything to a flat list of titles first, so the writes can
-       * be batched. Previously each entry cost an existence check, an insert
-       * and an optional request in sequence — a sixty-title import was a
-       * hundred and eighty round trips in a row.
-       */
+      // Resolve to a flat list of titles first so the writes can be batched,
+      // not three sequential round trips per entry.
       const resolved: {
         tmdbId: number;
         mediaType: 'movie' | 'tv';
@@ -341,13 +333,12 @@ listRoutes.post<{ listId: string }>(
         resolved.push({
           tmdbId,
           mediaType: entry.mediaType === 'tv' ? 'tv' : 'movie',
-          // Shown to everyone on the list; only a real TMDB path is kept.
+          // Shown to everyone on the list, so keep only a real TMDB path.
           posterPath: tmdbImagePath(entry.posterPath),
         });
       }
 
-      // A collection stands for its films; expand so the list holds real
-      // titles rather than a reference to a set.
+      // Expand collections so the list holds real titles, not a set.
       const expanded = await mapWithConcurrency(
         collections,
         3,
@@ -370,8 +361,7 @@ listRoutes.post<{ listId: string }>(
               posterPath: part.poster_path ?? null,
             }));
           } catch (e) {
-            // Counted as skipped so the import still reports honestly, but
-            // without this the user cannot tell which collection failed.
+            // Counted as skipped; the log says which collection failed.
             logger.warn('Could not expand a collection on import', {
               label: 'API',
               collectionId: tmdbId,
@@ -383,9 +373,8 @@ listRoutes.post<{ listId: string }>(
         }
       );
 
-      // Each film of a collection counts towards the limit like any other
-      // title, or a few collections could put thousands on a list at once.
-      // Taken in the order they were chosen; the rest are reported skipped.
+      // Collection films count towards the limit, or a few collections could
+      // add thousands. Taken in chosen order; the rest are reported skipped.
       for (const part of expanded.flat()) {
         if (resolved.length < IMPORT_ITEM_LIMIT) {
           resolved.push(part);
@@ -394,7 +383,7 @@ listRoutes.post<{ listId: string }>(
         }
       }
 
-      // One query for what is already there, rather than one per title.
+      // One query for existing items, not one per title.
       const alreadyOnList = resolved.length
         ? await itemRepository.find({
             select: { tmdbId: true, mediaType: true },
@@ -414,7 +403,7 @@ listRoutes.post<{ listId: string }>(
       for (const entry of resolved) {
         const key = `${entry.mediaType}:${entry.tmdbId}`;
 
-        // Already on the list, or listed twice in the same import.
+        // Already on the list, or twice in this import.
         if (present.has(key) || seen.has(key)) {
           skipped++;
           continue;
@@ -440,17 +429,11 @@ listRoutes.post<{ listId: string }>(
 
         added = toInsert.length;
 
-        /*
-         * One at a time. Each request reads and writes several rows and then
-         * dispatches to Radarr or Sonarr, so running them in parallel meant
-         * concurrent queries on a shared connection — the thing pg warns
-         * about — for no real gain, since the dispatch is the slow part and
-         * the *arr instances are happier fed steadily anyway.
-         */
-        // Bounded like "request what's missing": a pasted list of a hundred
-        // titles, or a collection or two, would otherwise send a hundred
-        // requests to Radarr and Sonarr from one click. The rest stay on the
-        // list, where they can be requested in turn.
+        // One at a time: each request reads and writes rows, then dispatches
+        // to Radarr or Sonarr; in parallel they would run concurrent queries
+        // on a shared connection (which pg warns about) for no gain.
+        // Bounded like "request what's missing", so one click can't send
+        // hundreds of requests; the rest stay on the list to request later.
         const toRequest = alsoRequest
           ? toInsert.slice(0, REQUEST_BATCH_LIMIT)
           : [];
@@ -471,9 +454,8 @@ listRoutes.post<{ listId: string }>(
       }
 
       if (added) {
-        // Touch the list so recency ordering reflects the import. Saving the
-        // loaded entity would also re-persist whatever relations came with
-        // it, which is how sharing broke; only the timestamp needs writing.
+        // Touch the list for recency ordering. Update by id: saving the loaded
+        // entity would re-persist its loaded relations and break sharing.
         await getRepository(MediaList).update(access.list.id, {
           updatedAt: new Date(),
         });

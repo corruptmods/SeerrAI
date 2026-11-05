@@ -42,10 +42,10 @@ import { Not } from 'typeorm';
 setupTestDb();
 
 /*
- * Backfill for movies: judging packs against one movie with Radarr's
- * parser, and a movie followed from Radarr's wanted list to its import.
- * Radarr, Prowlarr and qBittorrent are stubbed at their API clients; the
- * parse answers have the shapes the live Radarr gave.
+ * Movie Backfill: packs judged against one movie with Radarr's parser, and
+ * a movie tracked from Radarr's wanted list to import. Radarr, Prowlarr and
+ * qBittorrent are stubbed at their API clients, with parse answers shaped
+ * like a live Radarr's.
  */
 
 const GB = 1024 ** 3;
@@ -344,8 +344,8 @@ const RELEASE: ProwlarrRelease = {
 };
 
 /**
- * Radarr's and Sonarr's own wanted lists, kept before any test stands in
- * for them: a method stood in for twice is not always put back as it was.
+ * The real wanted-list methods, saved before any test stubs them: a method
+ * stubbed twice isn't always restored correctly.
  */
 const radarrWanted = BackfillRadarr.prototype.getWanted;
 const sonarrWanted = BackfillSonarr.prototype.getWanted;
@@ -1482,7 +1482,7 @@ describe('Backfill when something goes wrong', () => {
     done = true;
     await backfill.tick();
     assert.equal((await jobNow(job.id)).status, 'importing');
-    // Radarr's own calls wrap what went wrong.
+    // Radarr API wrappers put the original error in `cause`.
     const radarrDown = mock.method(
       BackfillRadarr.prototype,
       'getCommand',
@@ -1530,7 +1530,7 @@ describe('Backfill when something goes wrong', () => {
       'found'
     );
 
-    // Put right, and approved again: the torrent kept is taken on.
+    // Fixed and re-approved: the kept torrent is reused.
     mappings.mock.restore();
     listsCategory();
     const adds = mock.method(

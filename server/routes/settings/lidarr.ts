@@ -8,10 +8,9 @@ import { answerHostRefused } from '@server/utils/hostRefused';
 import { Router } from 'express';
 
 /*
- * Lidarr servers, for music, set up from Settings → Services like Radarr's.
- * There is no 4K Lidarr, so one server is the default. Adding a default
- * Lidarr is what makes music appear for everyone; while an admin has music
- * turned off for everyone, these settings are gone too.
+ * Lidarr servers for music (Settings → Services), like Radarr's. No 4K, so
+ * there is one default. A default Lidarr turns music on for everyone; while
+ * an admin has music off for everyone, these settings are unavailable.
  */
 const lidarrRoutes = Router();
 
@@ -24,7 +23,7 @@ const asSaved = (body: LidarrSettings, id: number): LidarrSettings => ({
   is4k: false,
 });
 
-/** One default at a time: a new default takes over from the old one. */
+/** Clears every default except `except`: only one at a time. */
 const clearDefaults = (except?: number) => {
   for (const server of getSettings().lidarr) {
     if (server.id !== except) {
@@ -39,8 +38,7 @@ lidarrRoutes.get('/', (_req, res) => {
 
 lidarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
-  // Never a removed server's id: artists keep the id of the server they
-  // are on.
+  // Never reuse a removed server's id: artists keep the id of their server.
   const newLidarr = asSaved(
     req.body as LidarrSettings,
     settings.newId('lidarr')
@@ -50,7 +48,7 @@ lidarrRoutes.post('/', async (req, res) => {
   }
   settings.lidarr = [...settings.lidarr, newLidarr];
   await settings.save();
-  // The music jobs run once there is a default Lidarr.
+  // Music jobs run only once there is a default Lidarr.
   refreshMusicJobs();
   return res.status(201).json(newLidarr);
 });
@@ -97,7 +95,7 @@ lidarrRoutes.post<
       message: e instanceof Error ? e.message : String(e),
     });
 
-    // Turned away for the name it was reached by: say how to let it in.
+    // Refused for the hostname used: tell the admin how to allow it.
     if (answerHostRefused(res, 'Lidarr', e)) return;
     next({ status: 500, message: 'Failed to connect to Lidarr' });
   }

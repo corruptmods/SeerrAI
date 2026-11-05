@@ -11,24 +11,23 @@ import { isPgsql } from '@server/utils/dbType';
 import { In, IsNull, LessThan, Not } from 'typeorm';
 
 /*
- * Keeps the database from filling with rows nothing reads any more, and
- * gives the space back. Every night: sessions that ended, Backfill's
- * finished downloads and the packs it looked at past the days kept, old
- * admin agent conversations, music details long past their time; then the database is vacuumed (Postgres) or
- * checkpointed and compacted when worth it (SQLite).
+ * Nightly pruning of rows nothing reads: ended sessions, Backfill's finished
+ * downloads and spent packs past the days kept, old admin agent
+ * conversations, long-expired music details. Then vacuums (Postgres) or
+ * checkpoints and compacts when worth it (SQLite).
  *
- * What people made is never touched: requests, issues, history, watchlists,
- * and packs an admin turned down (Backfill must not offer those again).
+ * Never touches user data: requests, issues, history, watchlists, and packs
+ * an admin rejected (Backfill must not offer those again).
  */
 
 const LABEL = 'Database';
 const DAY = 24 * 60 * 60 * 1000;
 
-/** Statuses a Backfill download no longer changes from. */
+/** Terminal Backfill download statuses. */
 const FINISHED_JOBS: BackfillJob['status'][] = ['done', 'failed', 'cancelled'];
 /**
- * Packs that are only a record of what happened. Ready ones wait for an
- * admin; skipped ones keep a refused release from being offered again.
+ * Packs that are only a record. Not ready (they await an admin) or skipped
+ * (they stop a refused release being offered again).
  */
 const SPENT_CANDIDATES: BackfillCandidate['status'][] = [
   'approved',
@@ -37,7 +36,7 @@ const SPENT_CANDIDATES: BackfillCandidate['status'][] = [
   'failed',
 ];
 
-/** SQLite is compacted once free pages are this share of the file. */
+/** Compact SQLite once free pages reach this share of the file. */
 const SQLITE_FREE_SHARE = 0.1;
 
 export interface MaintenanceReport {
@@ -69,8 +68,8 @@ const pruneSessions = async (now: number): Promise<number> => {
 };
 
 /**
- * Backfill's finished downloads past the days kept, and the packs they and
- * old searches left behind. A pack a kept download came from stays with it.
+ * Backfill's finished downloads past the days kept, and their spent packs.
+ * A pack a kept download came from is kept.
  */
 const pruneBackfill = async (
   now: number
@@ -96,8 +95,8 @@ const pruneBackfill = async (
 };
 
 /**
- * Download Check's findings past Backfill's days kept, except those still
- * waiting for an admin.
+ * Download Check findings past Backfill's days kept, except those awaiting an
+ * admin.
  */
 const pruneDownloadChecks = async (now: number): Promise<number> => {
   const days = getSettings().backfill.historyDays;
@@ -110,9 +109,8 @@ const pruneDownloadChecks = async (now: number): Promise<number> => {
 };
 
 /**
- * Kept MusicBrainz answers a month past their time. One just past it is
- * still shown while a fresh copy is fetched; one this old is for an artist
- * or album nobody has looked at since.
+ * Delete MusicBrainz data a month past expiry. Recently expired data is
+ * still shown while refreshing; data this old is for something nobody views.
  */
 const MUSIC_METADATA_GRACE = 30 * DAY;
 
@@ -125,8 +123,8 @@ const pruneMusicMetadata = async (now: number): Promise<number> => {
 
 const vacuum = async (): Promise<string> => {
   if (isPgsql) {
-    // Outside a transaction, as VACUUM must be. Autovacuum does this too,
-    // but not right after a night's deletes, and not the statistics.
+    // Must run outside a transaction. Autovacuum lags the night's deletes
+    // and doesn't refresh statistics.
     await dataSource.query('VACUUM (ANALYZE)');
     return 'VACUUM (ANALYZE)';
   }
@@ -138,7 +136,7 @@ const vacuum = async (): Promise<string> => {
     'PRAGMA freelist_count'
   )) as { freelist_count: number }[];
   const done = ['checkpoint'];
-  // Rewriting the whole file is only worth it once much of it is empty.
+  // A full rewrite is only worth it once much of the file is empty.
   if (pages > 0 && free / pages >= SQLITE_FREE_SHARE) {
     await dataSource.query('VACUUM');
     await dataSource.query('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -149,7 +147,7 @@ const vacuum = async (): Promise<string> => {
   return done.join(', ');
 };
 
-/** One pass. A call while one is running returns null at once. */
+/** One pass; returns null at once if one is already running. */
 export const runDbMaintenance = async (
   now = Date.now()
 ): Promise<MaintenanceReport | null> => {
@@ -166,11 +164,12 @@ export const runDbMaintenance = async (
     try {
       vacuumed = await vacuum();
     } catch (e) {
-      // Pruning still counts; the next night tries again.
-      vacuumed = `failed: ${e instanceof Error ? e.message : String(e)}`;
+      // Pruning still counts; the next night retries.
+      const message = e instanceof Error ? e.message : String(e);
+      vacuumed = `failed: ${message}`;
       logger.warn('Database vacuum failed', {
         label: LABEL,
-        errorMessage: e instanceof Error ? e.message : String(e),
+        errorMessage: message,
       });
     }
     last = {

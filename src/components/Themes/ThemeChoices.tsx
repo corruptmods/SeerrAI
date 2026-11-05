@@ -36,7 +36,6 @@ const messages = defineMessages('components.Themes.ThemeChoices', {
     'Safe mode is on in this tab, so theme files aren’t shown. Your choice is still saved.',
 });
 
-/** The gallery's names, by id. */
 const GALLERY_NAMES = {
   classic: messages.classic,
   midnight: messages.midnight,
@@ -44,7 +43,7 @@ const GALLERY_NAMES = {
   ember: messages.ember,
 } as const;
 
-/** A theme file's name made safe to save a file as. */
+/** Theme name sanitised for use as a filename. */
 const fileName = (name: string) =>
   `${
     name
@@ -54,9 +53,8 @@ const fileName = (name: string) =>
   }.seerr-theme.json`;
 
 /**
- * Profile → Settings → Appearance → Themes: the built-in looks, importing
- * a theme file (with a preview first) and exporting one's own. Part of the
- * Appearance form: a choice shows at once and is kept on Save.
+ * Built-in looks plus theme import and export. Choices preview at once and save
+ * with the Appearance form.
  */
 const ThemeChoices = ({ isOwn }: { isOwn: boolean }) => {
   const intl = useIntl();

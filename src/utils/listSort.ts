@@ -1,7 +1,6 @@
 /*
- * The orders a watch list can be shown in. Each section of the list (to
- * watch, not available yet, watched) is sorted on its own, so availability is
- * already the outermost grouping and is not offered again here.
+ * Watch list sort orders. Each section (to watch, unavailable, watched) is
+ * sorted separately, so availability isn't offered as a sort.
  */
 
 export const LIST_SORTS = [
@@ -35,16 +34,13 @@ const collator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
-/** A date TMDB left blank or unparseable. */
+/** Epoch ms, or undefined for a blank or unparseable date. */
 const time = (value: string | undefined) => {
   const parsed = value ? Date.parse(value) : NaN;
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-/**
- * Orders by one of the dates, putting titles without that date last in either
- * direction: an unannounced release is neither the newest nor the oldest.
- */
+/** Sorts by a date, with undated titles last in either direction. */
 const byDate =
   <T extends Sortable>(pick: (item: T) => string | undefined, dir: 1 | -1) =>
   (a: T, b: T) => {
@@ -56,11 +52,7 @@ const byDate =
     return (ta - tb) * dir;
   };
 
-/**
- * A new array in the order asked for. Ties fall back to the order titles were
- * added, newest first, and then the item id, so the order never shuffles
- * between visits.
- */
+/** A sorted copy. Ties break by date added (newest first), then id, so the order is stable. */
 export const sortListItems = <T extends Sortable>(
   items: T[],
   sort: ListSort

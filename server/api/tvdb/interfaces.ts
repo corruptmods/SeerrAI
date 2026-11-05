@@ -209,9 +209,6 @@ export function convertTmdbLanguageToTvdbWithFallback(
   tmdbCode: string,
   fallback: string
 ): string {
-  // First try exact match
   const tvdbCode = convertTMDBToTVDB(tmdbCode);
-  if (tvdbCode) return tvdbCode;
-
-  return tvdbCode || fallback || 'eng'; // Default to English if no match found
+  return tvdbCode || fallback || 'eng';
 }

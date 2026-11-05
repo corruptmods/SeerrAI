@@ -9,13 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
-/*
- * Settings migration 0012: Settings → Music kept where music could be
- * searched and how much a search showed. Only "in All" is left; a settings
- * file saved before still loads, and loses the rest.
- */
+// Migration 0012: old music search options load and are dropped, keeping only
+// "in All".
 
-/** Music's settings as the version with the longer Music tab saved them. */
+/** Music settings as saved by the old, longer Music tab. */
 const before = () => ({
   musicbrainzUrl: 'http://192.168.1.5:5000',
   contactEmail: 'admin@example.com',
@@ -31,7 +28,7 @@ const before = () => ({
   },
 });
 
-/** A settings file from an up-to-date install but for music's search. */
+/** An up-to-date settings file except for music search. */
 const install = (music: unknown) => ({
   main: {
     mediaServerType: MediaServerType.PLEX,
@@ -57,7 +54,7 @@ afterEach(async () => {
   );
 });
 
-/** Runs every migration on a settings file, as starting Seerr AI does. */
+/** Runs all migrations on a settings file, as startup does. */
 const start = async (settings: unknown) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'seerr-settings-'));
   dirs.push(dir);
@@ -99,8 +96,7 @@ describe('settings migration 0012 (music search)', () => {
     assert.deepEqual(migrated.music.search, { inAll: true });
     assert.deepEqual(saved, migrated, 'the trimmed settings are saved');
 
-    // Running with them: the Music tab, music search and everyone's pages
-    // see only what is left, and that is all a save writes.
+    // At run time only the kept options are seen and saved.
     const settings = getSettings();
     settings.music = migrated.music;
     assert.deepEqual(settings.music.search, { inAll: true });

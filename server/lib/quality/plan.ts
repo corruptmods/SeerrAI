@@ -35,9 +35,9 @@ import { getSettings } from '@server/lib/settings';
 import { createHash } from 'crypto';
 
 /*
- * What applying a server's choices would change (the preview), worked out
- * from what the server has now. Nothing here writes to a server; applying
- * and undoing are in lib/quality/engine.
+ * What applying a server's choices would change (the preview), computed
+ * from the server's current state. Nothing here writes to a server; apply
+ * and undo live in lib/quality/engine.
  */
 
 export class QualityError extends Error {
@@ -56,7 +56,7 @@ export class QualityError extends Error {
   }
 }
 
-/** A server's choices, or the defaults before an admin made any. */
+/** A server's choices, or the defaults if none are saved. */
 export const configFor = (ref: QualityServerRef): QualityServerSettings => {
   const server = serverSettingsOf(ref);
   const saved = getSettings().quality.servers.find(
@@ -73,7 +73,7 @@ export const configFor = (ref: QualityServerRef): QualityServerSettings => {
     : defaults;
 };
 
-/** Every Radarr and Sonarr server, as refs. */
+/** Every Radarr and Sonarr server as a ref. */
 export const allServers = (): QualityServerRef[] => [
   ...getSettings().radarr.map((s) => ({
     kind: 'radarr' as const,
@@ -89,9 +89,8 @@ const hash = (value: unknown) =>
   createHash('sha1').update(JSON.stringify(value)).digest('hex');
 
 /**
- * A server's choices as they shape what is built, kept when they are
- * applied: a later TRaSH Guides update is then told from choices nobody
- * has applied yet.
+ * Hash of the choices that shape the build, stored on apply so a later
+ * TRaSH Guides update can be told apart from unapplied choices.
  */
 export const choicesOf = (
   config: QualityServerSettings,
@@ -108,8 +107,8 @@ export const choicesOf = (
     bandStep: config.bandStep,
     fillGaps,
     requests: [config.requestPreset ?? '', config.animeRequestPreset ?? ''],
-    // Only once a preset has its own size, so a server applied before they
-    // could still reads as applied.
+    // Omitted when no preset has its own size, so hashes stored without
+    // sizes still match.
     ...(config.sizes && Object.keys(config.sizes).length
       ? {
           sizes: PRESET_KEYS.flatMap((preset) =>
@@ -134,7 +133,7 @@ export interface ServerContext {
 
 const majorOf = (version: string) => Number(version.split('.')[0]) || 0;
 
-/** Sonarr before v4 has no custom formats, so nothing can be set up. */
+/** Sonarr before v4 has no custom formats, so it can't be managed. */
 export const supported = (kind: ArrKind, version: string) =>
   kind === 'radarr' || majorOf(version) >= 4;
 
@@ -144,7 +143,7 @@ const hasSizes = (items: ArrProfileItem[]): boolean =>
       (item.quality && item.maxSize !== undefined) || hasSizes(item.items ?? [])
   );
 
-/** What a server has now: its profiles, formats and delay profiles. */
+/** A server's current profiles, formats and delay profiles. */
 export const loadContext = async (
   ref: QualityServerRef
 ): Promise<ServerContext> => {
@@ -190,7 +189,7 @@ export const desiredFor = (
   fillGaps = getSettings().quality.trash.fillGaps
 ): DesiredState => buildDesired(config, facts, trash, fillGaps);
 
-/** Format ids to names, for reading a profile's scores. */
+/** Format id → name, for reading a profile's scores. */
 export const namesOf = (formats: ArrCustomFormat[]): Map<number, string> =>
   new Map(
     formats
@@ -229,10 +228,9 @@ const qualityNames = (items: ArrProfileItem[]): Map<number, string> => {
 };
 
 /**
- * What a profile is, for telling whether it changed: its qualities and
- * scores by format name. Formats scored 0 (every new format lands in every
- * profile at 0) and the blocked release groups format (kept in step on its
- * own) are left out.
+ * A profile's qualities and scores by format name, for change detection.
+ * Excludes formats scored 0 (every new format lands in every profile at 0)
+ * and the blocked release groups format (synced separately).
  */
 export const profileFingerprint = (
   profile: Partial<ArrQualityProfile>,
@@ -277,30 +275,27 @@ const fingerprintOf = (format: ArrCustomFormat, dropFalse: boolean) =>
   });
 
 /**
- * A format's rules in short. A field left out and one that is false are
- * the same: TRaSH Guides leaves out a language rule's exceptLanguage, and
- * Radarr and Sonarr answer with it false.
+ * A format's rules as a fingerprint. Omitted and false fields are equal:
+ * TRaSH Guides omits a language rule's exceptLanguage and Radarr and Sonarr
+ * return it false.
  */
 export const formatFingerprint = (format: ArrCustomFormat) =>
   fingerprintOf(format, true);
 
-/**
- * Whether a format is as it was kept: by its fingerprint, or by the one
- * kept before false fields counted as left out.
- */
+/** Matches a stored fingerprint computed with or without false fields. */
 export const formatMatches = (format: ArrCustomFormat, stored: string) =>
   stored === fingerprintOf(format, true) ||
   stored === fingerprintOf(format, false);
 
 /**
- * The delay profile every title without its own tags uses: the only one
- * Seerr AI changes. Radarr and Sonarr always have it.
+ * The default (untagged) delay profile: the only one Seerr AI changes.
+ * Radarr and Sonarr always have it.
  */
 export const defaultDelay = (delays: ArrDelayProfile[]) =>
   delays.find((d) => !d.tags?.length);
 
-// What changed, for the preview and History. Words are the page's own;
-// these say what, so they can be put in any language.
+// Change details for the preview and History. Structured rather than worded
+// so the page can translate them.
 export type ChangeDetail =
   | { kind: 'score'; format: string; from: number; to: number }
   | { kind: 'cutoff'; from: string; to: string }
@@ -318,7 +313,7 @@ export type ChangeDetail =
       to: string;
     };
 
-/** What a format does to a release that matches it, in one profile. */
+/** What a format does to a matching release in one profile. */
 export type FormatEffect =
   | 'never'
   | 'last-resort'
@@ -354,13 +349,13 @@ export interface Preview {
   /** Nothing has been applied to this server yet. */
   first: boolean;
   changes: PreviewChange[];
-  /** The admin's own profiles: left as they are. */
+  /** The admin's own profiles, left untouched. */
   ownProfiles: { id: number; name: string; titles: number }[];
   skipped: DesiredState['skipped'];
   sizesOnProfile: boolean;
   /**
-   * What this preview would change, in short: an apply given it changes
-   * nothing if that is no longer so.
+   * Hash of what this preview would change; an apply with a stale token
+   * changes nothing.
    */
   token: string;
 }
@@ -368,12 +363,12 @@ export interface Preview {
 export interface Plan {
   ctx: ServerContext;
   config: QualityServerSettings;
-  /** The copy of TRaSH Guides it was worked out from. */
+  /** The TRaSH Guides copy this was computed from. */
   trash: TrashData | null;
   fillGaps: boolean;
   desired: DesiredState;
   rows: QualityManaged[];
-  /** Server format ids by desired format key, for those it has. */
+  /** Server format id by desired format key, for formats the server has. */
   formatIds: Map<string, number>;
   preview: Preview;
 }
@@ -450,7 +445,7 @@ const profileDetails = (
   return details;
 };
 
-/** The blocked release groups format scored as it is everywhere else. */
+/** Scores the blocked release groups format as it is everywhere else. */
 export const withBlockScore = <T extends Partial<ArrQualityProfile>>(
   profile: T,
   formats: ArrCustomFormat[]
@@ -472,7 +467,7 @@ export const withBlockScore = <T extends Partial<ArrQualityProfile>>(
   };
 };
 
-/** Placeholder ids for formats not yet in the server, for the preview. */
+/** Placeholder ids for formats not yet on the server, for the preview. */
 const withPlaceholders = (
   ctx: ServerContext,
   desired: DesiredState,
@@ -491,9 +486,9 @@ const withPlaceholders = (
 };
 
 /**
- * Which server format each desired format is: the one Seerr AI made for
- * it, or else one of its name no other format of Seerr AI's has. No two
- * desired formats ever share one.
+ * Maps each desired format to a server format: the one Seerr AI created for
+ * it, else a same-named one no other Seerr AI format owns. No two desired
+ * formats share one.
  */
 export const matchFormats = (
   formats: ArrCustomFormat[],
@@ -529,10 +524,10 @@ export const matchFormats = (
 };
 
 /**
- * Radarr and Sonarr take each format name once. A format whose name
- * another on the server already has, in any case (one Seerr AI no longer
- * uses, say), or another it makes has, gets a number on the end, so the
- * apply never stops there.
+ * Radarr and Sonarr allow each format name once, in any case. A desired
+ * format whose name is taken on the server (say, by one Seerr AI no longer
+ * uses) or by another desired format gets a number suffix so the apply
+ * doesn't fail.
  */
 export const unclash = (
   formats: ArrCustomFormat[],
@@ -561,7 +556,7 @@ export const unclash = (
   return { ...desired, formats: out };
 };
 
-/** The server profile a preset is: the one Seerr AI made, or one of its name. */
+/** A preset's server profile: the one Seerr AI created, else one by name. */
 export const matchProfile = (
   ctx: ServerContext,
   desired: DesiredProfile,
@@ -579,8 +574,8 @@ export const matchProfile = (
 };
 
 /**
- * A preview in short: its changes, and what they would write (a create
- * names nothing it writes), for telling whether it still holds.
+ * Hash of a preview's changes plus the desired state (a create's details
+ * don't say what it writes), to check the preview still holds.
  */
 const tokenOf = (changes: PreviewChange[], desired: DesiredState) =>
   hash({
@@ -620,8 +615,8 @@ export const planFor = async (
     details: ChangeDetail[] = []
   ) => changes.push({ itemKind, key, name, action, details });
 
-  // What each format does, profile by profile, so the preview can say
-  // which avoid a release and which make it likelier to be grabbed.
+  // Each format's effect per profile, so the preview can say which avoid a
+  // release and which favor it.
   const effects = new Map<string, NonNullable<PreviewChange['effects']>>();
   for (const profile of desired.profiles) {
     for (const scored of profile.formats) {
@@ -679,8 +674,8 @@ export const planFor = async (
       formats
     );
     const details = profileDetails(current, next, names);
-    // Changed in the app in a way the details don't name (its name, say):
-    // still put back.
+    // Changed in the app in a way the details don't cover (e.g. its name):
+    // still restored.
     const drifted =
       !!row && profileFingerprint(current, names) !== row.fingerprint;
     change(
@@ -721,8 +716,8 @@ export const planFor = async (
     );
   }
 
-  // Where new requests to this server go (its Services settings): onto
-  // the presets' profiles, unless they are left as they are.
+  // Point new requests to this server (its Services settings) at the
+  // presets' profiles, unless left as is.
   const server = serverSettingsOf(ref);
   if (server) {
     const wanted = requestPresetsOf(config, server.is4k);

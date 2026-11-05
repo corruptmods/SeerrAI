@@ -16,14 +16,13 @@ const VERBS: Record<ListActivity, string> = {
 };
 
 /**
- * What to call whoever made a change. displayName is populated when a user
- * is loaded from the database; the fallbacks keep a notification from
- * reading "undefined added ...".
+ * The actor's name. displayName is populated when a user is loaded from the
+ * database; the fallbacks avoid "undefined added ...".
  */
 const nameOf = (actor: User): string =>
   actor.displayName || actor.plexUsername || actor.username || 'Someone';
 
-/** Everyone who sees a list, but whoever made the change. */
+/** Everyone who sees a list, except the actor. */
 const recipientsOf = async (list: MediaList, actor: User): Promise<User[]> => {
   const members = await getRepository(MediaListMember).find({
     where: { listId: list.id },
@@ -47,10 +46,9 @@ const posterUrl = (path?: string | null) =>
   path ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${path}` : undefined;
 
 /**
- * Tells everyone who shares a list that its contents changed.
- *
- * A list with no members is private to its owner, so nothing is sent. The
- * person who made the change never hears about their own action.
+ * Tells everyone sharing a list that its contents changed. A list with no
+ * members is private, so nothing is sent; the actor never hears of their own
+ * change.
  */
 export const notifyListActivity = async (
   list: MediaList,
@@ -98,8 +96,8 @@ export const notifyListActivity = async (
 };
 
 /**
- * Tells everyone who shares a list that several titles were added at once,
- * as by an import or a collection, in one notice rather than one each.
+ * Tells everyone sharing a list that several titles were added at once (an
+ * import or collection), in one notice instead of one each.
  */
 export const notifyListAdded = async (
   list: MediaList,
@@ -141,12 +139,11 @@ export const notifyListAdded = async (
 };
 
 /**
- * Tells someone a list has been shared with them.
+ * Tells users a list was shared with them.
  *
- * Only newly added members are told — re-saving the sharing dialog should not
- * notify people who were already on the list. Uses the same notification type
- * as other list activity, so a user who has turned that off is not notified
- * here either.
+ * Only newly added members are told, so re-saving the sharing dialog doesn't
+ * re-notify existing members. Uses the same notification type as other list
+ * activity, so users who turned that off aren't notified here either.
  */
 export const notifyListShared = async (
   list: MediaList,

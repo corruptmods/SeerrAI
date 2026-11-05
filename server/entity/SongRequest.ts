@@ -11,25 +11,25 @@ import {
 import { MediaRequest } from './MediaRequest';
 
 /**
- * One song asked for in a music request, beside the albums it may hold:
- * one version of it (a MusicBrainz recording), as it was when asked for,
- * so cards and notifications never wait on MusicBrainz.
+ * One song in a music request, alongside its albums: one version (a MusicBrainz
+ * recording), stored as requested so cards and notifications never wait on
+ * MusicBrainz.
  */
 @Entity()
 class SongRequest {
   @PrimaryGeneratedColumn()
   public id: number;
 
-  /** The version asked for: its MusicBrainz recording id. */
+  /** The requested version's MusicBrainz recording id. */
   @Column({ type: 'varchar' })
   @Index()
   public recordingMbid: string;
 
-  /** The song's title, without what names the version. */
+  /** The song's title, without the version qualifier. */
   @Column({ type: 'varchar' })
   public title: string;
 
-  /** What tells the version apart ("radio edit"), when anything does. */
+  /** The version qualifier ("radio edit"), if any. */
   @Column({ type: 'varchar', nullable: true })
   public version: string | null;
 
@@ -37,7 +37,7 @@ class SongRequest {
   @Column({ type: 'int', nullable: true })
   public length: number | null;
 
-  /** The album or single it is best known from (a release-group id). */
+  /** The album or single it's best known from (a release-group id). */
   @Column({ type: 'varchar', nullable: true })
   public albumMbid: string | null;
 
@@ -45,8 +45,8 @@ class SongRequest {
   public albumTitle: string | null;
 
   /**
-   * The single or EP it is fetched through: one of the artist's that holds
-   * this very version, as Lidarr adds any album. None when it is only on
+   * The single or EP it's fetched through: one of the artist's containing this
+   * exact version, added like any album in Lidarr. Null when it's only on
    * albums.
    */
   @Column({ type: 'varchar', nullable: true })
@@ -56,9 +56,9 @@ class SongRequest {
   public singleTitle: string | null;
 
   /**
-   * The album it is taken from when it is on no single: the artist's own,
-   * the earliest (see lib/music/songs albumFor). Only once Settings → Music
-   * allows songs to be taken from albums.
+   * The album it's taken from when on no single: the artist's own, earliest
+   * (see lib/music/songs albumFor). Only once Settings → Music allows taking
+   * songs from albums.
    */
   @Column({ type: 'varchar', nullable: true })
   public sourceAlbumMbid: string | null;
@@ -66,7 +66,7 @@ class SongRequest {
   @Column({ type: 'varchar', nullable: true })
   public sourceAlbumTitle: string | null;
 
-  /** Every album and single it is on, best known first. */
+  /** Every album and single it's on, best known first. */
   @Column({ type: 'simple-array', default: '' })
   public releaseGroups: string[];
 
@@ -74,9 +74,8 @@ class SongRequest {
   public status: MediaRequestStatus;
 
   /**
-   * For one being taken from an album: what is being done for it now
-   * ("Downloading, 40%"). Not a column: filled in where requests are
-   * listed (lib/music/albumStatuses).
+   * For a song taken from an album: its current progress ("Downloading, 40%").
+   * Not a column: filled where requests are listed (lib/music/albumStatuses).
    */
   public fetchStage?: string;
 

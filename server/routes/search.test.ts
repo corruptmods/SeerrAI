@@ -11,9 +11,9 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Search: TMDB's search across everything never returns collections, so
- * they are searched for separately and shown with the rest. Search can also
- * be for films only (with their collections) or series only.
+ * Search: TMDB's multi search never returns collections, so they're searched
+ * separately and merged in. Search can also be films only (with collections) or
+ * series only.
  */
 
 setupTestDb();
@@ -51,8 +51,8 @@ const series = (id: number) => ({
   first_air_date: '2020-01-01',
   origin_country: ['US'],
 });
-// TMDB's film and series searches leave out media_type: every result is
-// of the one kind asked for.
+// TMDB's film and series searches omit media_type: every result is the kind
+// asked for.
 const untyped = (result: object) =>
   Object.fromEntries(
     Object.entries(result).filter(([key]) => key !== 'media_type')
@@ -68,7 +68,7 @@ const collection = (id: number) => ({
   adult: false,
 });
 
-// Pages of each search, by page number; TMDB pages hold up to 20.
+// Pages of each search by page number; TMDB pages hold up to 20.
 let multiPages: Record<number, ReturnType<typeof film>[]> = {};
 let multiTotal = { pages: 1, results: 0 };
 let collectionPages: Record<number, ReturnType<typeof collection>[]> = {};
@@ -77,7 +77,7 @@ let collectionsDown = false;
 let collectionPagesAsked: number[] = [];
 let filmPages: Record<number, ReturnType<typeof film>[]> = {};
 let seriesPages: Record<number, ReturnType<typeof series>[]> = {};
-/** Which of TMDB's searches were used. */
+/** Which TMDB searches were used. */
 let asked: string[] = [];
 
 const stub = (name: string, value: unknown) =>
@@ -230,7 +230,7 @@ describe('GET /search', () => {
         [3, 5],
       ]
     );
-    // Past the collections' last page there is nothing more to ask for.
+    // Nothing is fetched past the collections' last page.
     assert.ok(!collectionPagesAsked.includes(3));
   });
 

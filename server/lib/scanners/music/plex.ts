@@ -8,16 +8,16 @@ import type { MusicSource } from '@server/lib/scanners/music/source';
 import type { MusicLibrary } from '@server/lib/settings';
 
 /*
- * Plex's music libraries, as albums to place. Plex gives an album's
- * MusicBrainz id as `mbid://<id>`, which with some agents is a release's
- * rather than the album's, so it is left to the matcher to tell. Plex lists
- * no folders for albums; for the few the ids cannot place, one track's file
- * gives the album's and artist's folders.
+ * Plex music libraries as albums to place. Plex gives an album's
+ * MusicBrainz id as `mbid://<id>`, which with some agents is a release id
+ * rather than the album's, so the matcher decides. Plex lists no album
+ * folders; for the few the ids can't place, one track's file gives the
+ * album and artist folders.
  */
 
 const PAGE_SIZE = 500;
 
-/** Albums a run may look into a track of, to find their folders. */
+/** Max albums per run whose track is looked up to find folders. */
 export const PLEX_TRACK_LOOKUPS = 100;
 
 /** The MusicBrainz id among an item's ids, if Plex has one. */
@@ -33,7 +33,7 @@ export class PlexMusicSource implements MusicSource {
 
   private constructor(private client: PlexAPI) {}
 
-  /** As the owner, whose Plex token Seerr reads Plex with. */
+  /** Opens as the owner, whose Plex token Seerr uses. */
   public static async open(): Promise<PlexMusicSource> {
     const admin = await getRepository(User).findOne({
       select: { id: true, plexToken: true },

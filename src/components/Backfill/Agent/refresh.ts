@@ -1,9 +1,6 @@
 /*
- * How often the agent's pages ask again, in milliseconds, by the status of
- * the runs on show. A working run changes by the second. A held run (a
- * reported title, waiting on Sonarr's or Radarr's search and Backfill's)
- * starts on its own once they are over, so it is checked every 10 seconds
- * to show that without a reload.
+ * Poll interval in ms for the runs shown. A held run (waiting on the *arr and
+ * Backfill searches) starts by itself, so it is polled every 10 s.
  */
 export const runRefreshMs = (
   statuses: string[],

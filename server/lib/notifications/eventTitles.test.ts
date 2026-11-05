@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it, mock } from 'node:test';
 
 describe('notification event lines in English', () => {
-  // What webhooks have always been sent, and still are.
+  // Webhooks must keep receiving these exact strings.
   it('are word for word what they were', () => {
     const cases: [Notification, MediaType, boolean, string][] = [
       [Notification.MEDIA_PENDING, MediaType.MOVIE, false, 'New Movie Request'],
@@ -92,10 +92,8 @@ describe('notification event lines in English', () => {
   });
 });
 
-/*
- * The new lines are only in English until they are translated, so the
- * channels are checked with a line that already is: "Available".
- */
+// Newer lines are English-only until translated, so channels are checked with
+// "Available".
 const translated = {
   message: {
     id: 'notifications.common.available',
@@ -236,8 +234,7 @@ describe('notification event lines in each channel', () => {
 
 describe('a request’s notification', () => {
   it('carries its event line to be put in each channel’s language', async () => {
-    // The client sets its methods on each instance, so the stub swallows
-    // that write.
+    // The client assigns methods per instance; the stub swallows that write.
     Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
       configurable: true,
       set() {},

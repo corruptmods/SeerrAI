@@ -37,11 +37,11 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Subtitles, against a stand-in Bazarr answering with what a real one
- * (1.6.3) sends, and a stand-in Plex server, behind the real OpenAPI
- * validator. Like a real Bazarr, it runs downloads and searches as jobs
- * in its queue and answers as soon as one is queued; a job that finishes
- * a transcription writes Whisper's subtitle into the history.
+ * Subtitles through the real OpenAPI validator, against a stand-in Bazarr
+ * returning what a real one (1.6.3) sends, and a stand-in Plex server. Like
+ * real Bazarr, it runs downloads and searches as queued jobs and responds once
+ * queued; a finished transcription job writes Whisper's subtitle into the
+ * history.
  */
 
 setupTestDb();
@@ -82,7 +82,7 @@ const movie = {
   missing_subtitles: [],
 };
 
-const SEASON_4 = '/tv/BRIXO Shurikan - Wyverns Waking/Season 4/';
+const SEASON_4 = '/tv/Lantern Song - Harbour Lights/Season 4/';
 const episode = (n: number, subtitles: unknown[], missing = false) => ({
   sonarrSeriesId: SONARR_ID,
   sonarrEpisodeId: 139840 + n,
@@ -176,20 +176,20 @@ const searchResults = [
   },
 ];
 
-/** What the stand-in Bazarr has now; each test starts from the above. */
+/** The stand-in Bazarr's current state; each test starts from the above. */
 let movieNow: Omit<typeof movie, 'missing_subtitles'> & {
   missing_subtitles: unknown[];
 } = movie;
 let resultsNow: typeof searchResults = searchResults;
 let providersOn = ['opensubtitlescom', 'whisperai'];
-/** A provider Bazarr has paused: its error and when it tries again. */
+/** Providers Bazarr has paused: error and retry time. */
 let pausedNow: Record<string, { status: string; retry: string }> = {};
 /** Holds Bazarr's own search open until released. */
 let searchGate: Promise<void> | undefined;
-/** Holds Plex's answers about single episodes open until released. */
+/** Holds Plex's single-episode answers until released. */
 let plexGate: Promise<void> | undefined;
 
-/** Off: an older Bazarr, with no job list, that answers once it is done. */
+/** False: an older Bazarr without a job list, which responds when done. */
 let jobsApi = true;
 let jobs: {
   job_id: number;
@@ -198,14 +198,17 @@ let jobs: {
   last_run_time?: string;
 }[] = [];
 let nextJob = 1;
-/** Holds every job waiting in the queue until released. */
+/** Holds every queued job until released. */
 let jobGate: Promise<void> | undefined;
 /**
- * How the next jobs end: done, done with nothing saved, failed, or lost
- * to Bazarr restarting. Done when there are none left.
+ * How the next jobs end: done, done with nothing saved, failed, or lost to a
+ * Bazarr restart. Done when none are left.
  */
 let jobEnds: ('completed' | 'empty' | 'failed' | 'lost')[] = [];
-/** Whisper subtitles finished jobs wrote, newest first, by episode id or "movie". */
+/**
+ * Whisper subtitles written by finished jobs, newest first, by episode id or
+ * "movie".
+ */
 let whisperWritten: Record<string, unknown[]> = {};
 
 const movieHistory = [
@@ -217,7 +220,7 @@ const movieHistory = [
   },
 ];
 
-/** What the stand-ins were asked to change. */
+/** Changes the stand-ins were asked to make. */
 let writes: { method: string; path: string; fields: Record<string, string> }[] =
   [];
 let plexWrites: {
@@ -331,7 +334,7 @@ before(async () => {
               ? [
                   {
                     sonarrSeriesId: SONARR_ID,
-                    title: 'BRIXO Shurikan: Wyverns Waking',
+                    title: 'Lantern Song: Harbour Lights',
                     profileId: 2,
                   },
                 ]
@@ -375,7 +378,7 @@ before(async () => {
         new URLSearchParams(await readBody(req))
       );
       writes.push({ method: req.method, path: p, fields });
-      // What a finished transcription leaves: Whisper's subtitle.
+      // A finished transcription leaves Whisper's subtitle.
       const done = () => {
         if (fields.provider !== 'whisperai') return;
         const key = fields.episodeid ?? 'movie';
@@ -405,7 +408,7 @@ before(async () => {
           p === '/providers/movies'
             ? `Manually downloading Subtitles for ${movie.title}`
             : p === '/providers/episodes'
-              ? `Manually downloading Subtitles for BRIXO Shurikan: Wyverns Waking - S04E${String(
+              ? `Manually downloading Subtitles for Lantern Song: Harbour Lights - S04E${String(
                   Number(fields.episodeid) - 139840
                 ).padStart(
                   2,
@@ -413,7 +416,7 @@ before(async () => {
                 )} - Episode ${Number(fields.episodeid) - 139840}`
               : p === '/movies'
                 ? `Downloading missing subtitles for ${movie.title}`
-                : 'Downloading missing subtitles for BRIXO Shurikan: Wyverns Waking',
+                : 'Downloading missing subtitles for Lantern Song: Harbour Lights',
         status: 'pending',
       };
       jobs.push(job);
@@ -444,7 +447,7 @@ before(async () => {
       res.statusCode = 204;
       return res.end();
     }
-    // Bazarr answers anything else with its web page.
+    // Bazarr serves its web page for anything else.
     res.setHeader('Content-Type', 'text/html');
     res.end('<!doctype html><title>Bazarr</title>');
   });
@@ -529,7 +532,7 @@ before(async () => {
   );
   port = await listen(app);
 
-  // plex.tv lists the servers someone can use, each with their own token.
+  // plex.tv lists the servers someone can use, each with its own token.
   Object.defineProperty(PlexTvAPI.prototype, 'getDevices', {
     configurable: true,
     value: async () => [
@@ -567,8 +570,8 @@ beforeEach(async () => {
   };
   settings.main.disabledFeatures = [];
   settings.main.mediaServerType = MediaServerType.PLEX;
-  // Bazarr follows the main servers; the second ones number their titles
-  // on their own, so the same ids name other titles there.
+  // Bazarr tracks the main servers; the second ones number titles
+  // independently, so the same ids are other titles there.
   settings.radarr = [
     { id: 0, name: 'Radarr', is4k: false, isDefault: true },
     { id: 1, name: 'Radarr Anime', is4k: false, isDefault: false },
@@ -627,7 +630,7 @@ beforeEach(async () => {
       externalServiceId: SONARR_ID,
       ratingKey: '900',
     }),
-    // On the second servers, under ids the main ones gave other titles.
+    // On the second servers, under ids the main ones use for other titles.
     new Media({
       tmdbId: 990001,
       mediaType: MediaType.MOVIE,
@@ -821,7 +824,7 @@ describe('searching, downloading and deleting', () => {
   });
 
   it('downloads only a result Bazarr offered for that title', async () => {
-    // Bazarr unpickles what it is sent back: a made-up one runs as code.
+    // Bazarr unpickles what it's sent back: a forged one runs as code.
     actingAs = manager;
     const choice = {
       provider: 'opensubtitlescom',
@@ -939,7 +942,7 @@ describe('searching, downloading and deleting', () => {
     assert.equal(during.body.searching, true, 'followed while it searches');
 
     release();
-    // Episode 11 still has no English: Whisper's, from a fresh search.
+    // Episode 11 still lacks English: Whisper's, from a fresh search.
     await waitFor(() => writes.length === 2);
     assert.deepEqual(
       [writes[1].path, writes[1].fields.episodeid, writes[1].fields.provider],
@@ -1135,7 +1138,7 @@ describe('a search that finds nothing', () => {
   });
 
   it('skips a transcription whose gap was filled while it waited', async () => {
-    // Queued when English was missing; by its turn, Bazarr has found one.
+    // Queued while English was missing; by its turn Bazarr has found one.
     queueMovieTranscription('movie:471906', RADARR_ID, {
       auto: true,
       known: searchResults[1],
@@ -1154,7 +1157,7 @@ describe('transcribing', () => {
       TranscriptionStatus & { added: number }
     >('POST', '/tv/318472/transcription', { scope: 'notTranscribed' });
     assert.equal(status, 202);
-    // 10, 11 and 19; 18 is Whisper's already.
+    // 10, 11 and 19; 18 already has Whisper's.
     assert.equal(body.added, 3);
     await waitFor(
       () => writes.filter((w) => w.path === '/providers/episodes').length === 3
@@ -1193,7 +1196,7 @@ describe('transcribing', () => {
       seasonNumber: 4,
     });
     await waitFor(() => writes.length === 1);
-    // Queued in Bazarr behind its other jobs: the page says so.
+    // Queued in Bazarr behind other jobs: the status says so.
     await waitFor(() => !!transcriber.status('tv:318472').waitingInBazarr);
     await new Promise((resolve) => setTimeout(resolve, 100));
     assert.equal(writes.length, 1, 'the next waits its turn');
@@ -1214,7 +1217,7 @@ describe('transcribing', () => {
     jobEnds = ['lost'];
     await call('POST', '/movie/471906/transcription');
     await waitFor(() => !transcriber.status('movie:471906').running);
-    // Searched again: the result it had was Bazarr's before the restart.
+    // Searched again: the previous result was from before Bazarr restarted.
     assert.deepEqual(
       writes.map((w) => [w.path, w.fields.provider]),
       [
@@ -1411,7 +1414,7 @@ describe('the subtitle your own Plex player starts with', () => {
     }
     release();
     await waitFor(() => plexWrites.length >= 2);
-    // Long enough for a pass still going to have written too.
+    // Long enough for a running pass to have written too.
     await new Promise((resolve) => setTimeout(resolve, 200));
     assert.deepEqual(
       plexWrites.map((w) => [w.path, w.query.subtitleStreamID]).sort(),
@@ -1433,8 +1436,8 @@ describe('the subtitle your own Plex player starts with', () => {
   });
 
   it('limits how often one person sets a series, as each goes through every episode', async () => {
-    // A series not in Plex: refused after the limit is counted, with no
-    // episodes gone through. Past the limit the answer is plain text.
+    // A series not in Plex: refused after the limit counts it, with no episodes
+    // processed. Past the limit the response is plain text.
     const choose = () =>
       new Promise<number>((resolve, reject) => {
         const payload = JSON.stringify({ language: 'eng' });
@@ -1469,8 +1472,8 @@ describe('the subtitle your own Plex player starts with', () => {
   it('never sends the token it kept for one Plex server to another', async () => {
     const read = () => call('GET', '/movie/471906/plex-default');
     assert.equal((await read()).status, 200);
-    // Seerr moved to the other server plex.tv lists: its own token, which
-    // the stand-in (the old server's address) turns away.
+    // Seerr moved to the other server plex.tv lists: its own token, which the
+    // stand-in (the old server's address) rejects.
     getSettings().plex.machineId = 'other';
     assert.equal((await read()).status, 502);
   });

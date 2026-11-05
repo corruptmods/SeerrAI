@@ -49,14 +49,14 @@ const messages = defineMessages('components.Settings.DownloadClientModal', {
   validationApiKeyRequired: 'You must provide the API key',
 });
 
-/** As the settings page is sent it: no key or password, only that one is set. */
+/** Client as the settings API returns it: no secrets, only `has*` flags. */
 export type ShownDownloadClient = DownloadClientSettings & {
   hasApiKey?: boolean;
   hasPassword?: boolean;
 };
 
 interface DownloadClientModalProps {
-  /** The client being edited, or null to add one. */
+  /** Client being edited, or null to add one. */
   client: ShownDownloadClient | null;
   onClose: () => void;
   onSave: () => void;
@@ -84,8 +84,7 @@ const DownloadClientModal = ({
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from a client that already worked; a new one must pass a
-  // test before it can be added.
+  // A saved client already passed a test; a new one must pass before adding.
   const [isValidated, setIsValidated] = useState(!!client);
 
   const schema = Yup.object().shape({
@@ -95,7 +94,7 @@ const DownloadClientModal = ({
     hostname: Yup.string()
       .trim()
       .required(intl.formatMessage(messages.validationHostnameRequired))
-      // Just the host: no scheme, path, port or spaces.
+      // Host only: no scheme, path, port or spaces.
       .matches(
         /^[^\s/:]+$/,
         intl.formatMessage(messages.validationHostnameRequired)
@@ -113,7 +112,7 @@ const DownloadClientModal = ({
     }),
   });
 
-  /** What is sent: only what the server takes, never the "is set" flags. */
+  /** Request body: only fields the server accepts, never the `has*` flags. */
   const toBody = (values: FormValues) => ({
     name: values.name.trim(),
     type: values.type,
@@ -122,7 +121,7 @@ const DownloadClientModal = ({
     useSsl: values.useSsl,
     urlBase: values.urlBase.trim(),
     apiKey: values.type === 'sabnzbd' ? values.apiKey : '',
-    // Deluge's Web UI has a password and no username; SABnzbd a key instead.
+    // Deluge's Web UI has no username; SABnzbd uses an API key instead.
     username:
       values.type === 'sabnzbd' || values.type === 'deluge'
         ? ''
@@ -159,8 +158,7 @@ const DownloadClientModal = ({
     }
   };
 
-  // Changing where the client is, or how to sign in, means the earlier test
-  // no longer counts.
+  // Changing a connection or sign-in field invalidates the last test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,
@@ -210,7 +208,7 @@ const DownloadClientModal = ({
             }
             onSave();
           } catch (e) {
-            // The server tests the connection again before saving.
+            // The server re-tests before saving.
             setIsValidated(false);
             addToast(
               intl.formatMessage(messages.toastTestFailure, {

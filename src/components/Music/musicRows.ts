@@ -9,8 +9,8 @@ const messages = defineMessages('components.Music.musicRows', {
 });
 
 /*
- * Music's Discover rows: each row's list on the server, and its title. The
- * music page (/discover/music) shows them all, and each in full.
+ * Music Discover rows: server list key and title. /discover/music shows all
+ * of them, and each in full.
  */
 
 export const MUSIC_ROWS = [
@@ -49,8 +49,8 @@ export const MUSIC_ROWS = [
 export type MusicRow = (typeof MUSIC_ROWS)[number];
 
 /**
- * Each person's own rows, from the music they have asked for, above the
- * rest on the Music page; empty, and so not shown, until they ask for some.
+ * Personal rows from the person's requests, above the rest; empty (hidden)
+ * until they request something.
  */
 export const PERSONAL_MUSIC_ROWS = [
   { show: 'your-requests', title: messages.yourRequests },

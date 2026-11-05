@@ -5,16 +5,11 @@ import type { Play, WatchSource } from '@server/lib/watchHistory/types';
 import logger from '@server/logger';
 
 /*
- * Watch history from several media servers at once: Tautulli for Plex, and
- * Jellyfin and Emby themselves. Each server's ids are told apart by the
- * server's name in front ("plex:123", "jellyfin:4f2a…"), so a title, an
- * episode or a person on one server is never taken for one on another.
- * Asked for history, it asks every server the person or title is on and
- * puts the answers together; one server failing gives the others' answers
- * (and a line in the log) rather than no answer at all.
+ * Watch history merged across servers. Ids are prefixed with the server
+ * ("plex:123", "jellyfin:4f2a…") so they never collide. One server failing
+ * is logged and the others' answers are still returned.
  */
 
-/** One server's watch history, and the server it is for. */
 export interface ServerWatchSource {
   server: MediaServerKind;
   source: WatchSource;
@@ -22,7 +17,7 @@ export interface ServerWatchSource {
 
 const tag = (server: MediaServerKind, id: string) => `${server}:${id}`;
 
-/** The server and its own id, from a tagged id; undefined when untagged. */
+/** Splits a tagged id; undefined when untagged. */
 const untag = (
   id: string
 ): { server: MediaServerKind; id: string } | undefined => {
@@ -55,8 +50,8 @@ export class CompositeWatchSource implements WatchSource {
   }
 
   /**
-   * Every account the person has on a server with history, tagged: one
-   * string, so it also tells a person's linked accounts apart in caches.
+   * All the user's tagged server ids, joined, so caches key on the set of
+   * linked accounts.
    */
   public viewerOf(user: User): string | undefined {
     const ids = this.sources.flatMap(({ server, source }) => {
@@ -72,7 +67,7 @@ export class CompositeWatchSource implements WatchSource {
     );
   }
 
-  /** Tagged ids, sorted out by the server they are for. */
+  /** Groups tagged ids by source, prefixes stripped. */
   private byServer(
     ids: string[]
   ): Map<WatchSource, [MediaServerKind, string[]]> {
@@ -109,9 +104,8 @@ export class CompositeWatchSource implements WatchSource {
   }
 
   /**
-   * Asks each server given, and puts their plays together. A server that
-   * fails is logged and left out; only when every one fails does it throw,
-   * since "could not ask" is not "watched nothing".
+   * Merges plays from each server. A failing server is logged and skipped;
+   * throws only if all fail, since "could not ask" is not "watched nothing".
    */
   private async gather(
     asked: ServerWatchSource[],
@@ -146,12 +140,10 @@ export class CompositeWatchSource implements WatchSource {
     return plays;
   }
 
-  /** The servers this person has an account on. */
   private linked(user: User): ServerWatchSource[] {
     return this.sources.filter(({ source }) => !!source.viewerOf(user));
   }
 
-  /** The servers this title is on. */
   private holding(media: Media): ServerWatchSource[] {
     return this.sources.filter(
       ({ source }) => source.titleIdsOf(media).length > 0

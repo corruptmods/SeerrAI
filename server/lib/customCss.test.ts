@@ -9,9 +9,8 @@ import { describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * The Content-Security-Policy sent with every page: stylesheets and fonts
- * come from this server, or from the places the admin's Server CSS names,
- * and nowhere else, whatever a person's own CSS tries.
+ * The CSP sent with every page: stylesheets and fonts only from this server
+ * or hosts the admin's Server CSS names, whatever a user's own CSS tries.
  */
 
 describe('the page’s Content-Security-Policy', () => {

@@ -318,11 +318,11 @@ const RequestItemError = ({
 interface RequestItemProps {
   request: RequestResultsResponse['results'][number];
   revalidateList: () => void;
-  /** When it should arrive; fetched for the whole page by the list. */
+  /** Expected arrival; fetched for the whole page by the list. */
   eta?: RequestEtaData;
-  /** Backfill's state for a stuck title; admins only, fetched by the list. */
+  /** Backfill state for a stuck title; admins only, fetched by the list. */
   backfill?: BackfillLookup;
-  /** For the person who asked: Backfill looking for it, or downloading it. */
+  /** For the requester: whether Backfill is searching or downloading it. */
   backfillStatus?: BackfillStatus;
 }
 
@@ -333,8 +333,7 @@ const RequestItem = ({
   backfill,
   backfillStatus,
 }: RequestItemProps) => {
-  // Near the screen, for loading the title (and its pictures) before the
-  // row is scrolled to; on screen now, for checking on the request.
+  // `near` preloads the title and pictures; `inView` gates request polling.
   const { ref: nearRef, near, nearness } = useNearScreen();
   const { ref: viewRef, inView } = useInView();
   const ref = useMemo(() => bothRefs(nearRef, viewRef), [nearRef, viewRef]);
@@ -352,8 +351,7 @@ const RequestItem = ({
     NonFunctionProperties<MediaRequest>
   >(`/api/v1/request/${request.id}`, {
     fallbackData: request,
-    // Only while it can be seen: a long list scrolled past is not asked
-    // about again until it comes back into view.
+    // Poll only while visible.
     refreshInterval: inView
       ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
           watchRequest,
@@ -448,10 +446,10 @@ const RequestItem = ({
       <RequestModal
         show={showEditModal}
         tmdbId={request.media.tmdbId}
-        // The requests listed here are for films and series.
+        // Music requests use MusicRequestItem, so this is a video type.
         type={request.type as VideoMediaType}
         is4k={request.is4k}
-        // As it is now: it may have failed since the list was loaded.
+        // Latest copy: it may have failed since the list loaded.
         editRequest={requestData}
         onCancel={() => setShowEditModal(false)}
         onComplete={() => {
@@ -563,8 +561,7 @@ const RequestItem = ({
                   <Badge badgeType="danger">
                     {intl.formatMessage(globalMessages.declined)}
                   </Badge>
-                  {/* Beside the badge on a wide screen, where each row is
-                      one line high; on its own row, wrapping, below that. */}
+                  {/* Inline beside the badge on xl; own wrapping row below. */}
                   {requestData.declineReason && (
                     <DeclineReason
                       reason={requestData.declineReason}
@@ -749,8 +746,10 @@ const RequestItem = ({
           </div>
         </div>
         <div className="z-10 mt-4 flex w-full flex-col justify-center space-y-2 pl-4 pr-4 xl:mt-0 xl:w-96 xl:items-end xl:pl-0">
-          {/* Retry, or first send it to another server, profile or
-              folder. Side by side, as Approve and Decline are. */}
+          {/*
+            Retry, or change server, profile or folder first; laid out like
+            Approve and Decline.
+          */}
           {requestData.status === MediaRequestStatus.FAILED &&
             hasPermission(Permission.MANAGE_REQUESTS) && (
               <div className="flex w-full flex-row space-x-2">
@@ -876,7 +875,7 @@ const RequestItem = ({
   );
 };
 
-/** Music has a row of its own: it has no TMDB title to look up. */
+/** Music gets its own row since it has no TMDB title. */
 const RequestItemFor = (props: RequestItemProps) =>
   props.request.type === MediaType.MUSIC ? (
     <MusicRequestItem

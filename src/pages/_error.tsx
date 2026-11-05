@@ -1,6 +1,6 @@
 import PageTitle from '@app/components/Common/PageTitle';
 import defineMessages from '@app/utils/defineMessages';
-import type { Undefinable } from '@app/utils/typeHelpers';
+
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { NextPage } from 'next';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl';
 
 interface ErrorProps {
   statusCode?: number;
-  /** What went wrong, for a failure in the browser rather than the server. */
+  /** The error, for client-side failures only. */
   detail?: string;
 }
 
@@ -61,18 +61,10 @@ const ErrorPage: NextPage<ErrorProps> = ({ statusCode, detail }) => {
 };
 
 ErrorPage.getInitialProps = async ({ res, err }): Promise<ErrorProps> => {
-  // Apologies for how gross ternary is but this is just temporary. Honestly,
-  // blame the nextjs docs
-  let statusCode: Undefinable<number>;
-  if (res) {
-    statusCode = res.statusCode;
-  } else {
-    statusCode = err ? err.statusCode : undefined;
-  }
+  const statusCode = res ? res.statusCode : err?.statusCode;
 
-  // A page that broke in the browser says why, so it can be reported: on a
-  // phone, particularly an installed app, there is no console to read it
-  // from. Only then: the server's own errors are not the visitor's to read.
+  // Client-side errors show their message so they can be reported (an
+  // installed phone app has no console). Server errors are never shown.
   const detail =
     !res && err?.message
       ? `${err.name}: ${err.message}`.slice(0, 300)

@@ -90,8 +90,8 @@ mediaRoutes.get('/', async (req, res, next) => {
       };
   }
 
-  // Films and series unless another type is asked for: what lists them
-  // (Recently Added) shows each as a film or a series.
+  // Films and series unless another type is requested: the consumer (Recently
+  // Added) shows each as a film or series.
   const mediaType = Object.values(MediaType).find(
     (type) => type === req.query.mediaType
   );
@@ -123,11 +123,9 @@ mediaRoutes.get('/', async (req, res, next) => {
 });
 
 /**
- * Asks Radarr or Sonarr to search now for what a title is missing — for a
- * series, only monitored episodes that have aired without a file.
- *
- * Registered before '/:id/:status', which would otherwise take
- * "search-missing" as a status.
+ * Ask Radarr or Sonarr to search now for what a title is missing (for a series,
+ * only monitored aired episodes without a file). Registered before
+ * '/:id/:status', which would take "search-missing" as a status.
  */
 mediaRoutes.post<{ id: string }, unknown, { is4k?: boolean }>(
   '/:id/search-missing',
@@ -143,7 +141,7 @@ mediaRoutes.post<{ id: string }, unknown, { is4k?: boolean }>(
         return next({ status: 404, message: 'Media not found.' });
       }
 
-      // Music turned off: its artists are not searched for either.
+      // With music off, artists can't be searched either.
       if (
         media.mediaType === MediaType.MUSIC &&
         !featureEnabled('music', req.user)
@@ -222,7 +220,6 @@ mediaRoutes.post<
             );
 
             if (!season) {
-              // Create the season if it doesn't exist
               season = seasonRepository.create({
                 seasonNumber: expectedSeason?.seasonNumber,
               });
@@ -269,9 +266,9 @@ mediaRoutes.delete(
         where: { id: Number(req.params.id) },
       });
 
-      // Recorded before the row goes, so watchlist sync can still tell a
-      // stale watchlist entry from one added after this deletion. Not for
-      // an artist: deletions are kept by TMDB id, and every artist's is 0.
+      // Recorded before deleting the row so watchlist sync can tell a stale
+      // entry from one added afterwards. Not for artists: deletions are keyed
+      // by TMDB id, which is 0 for every artist.
       if (isVideo(media.mediaType)) {
         await recordMediaDeletion(media.tmdbId, media.mediaType);
       }
@@ -299,8 +296,8 @@ mediaRoutes.delete(
 );
 
 /**
- * A title's history, newest first, for the manage panel. Looked up by title
- * rather than media id, so it outlives the media row.
+ * Newest-first history of a title for the manage panel. Keyed by title, not
+ * media id, so it outlives the media row.
  */
 mediaRoutes.get(
   '/history/:mediaType/:tmdbId',
@@ -382,13 +379,12 @@ mediaRoutes.delete(
 );
 
 /**
- * Roughly when a title should arrive, for one being processed with no
- * request behind it — added in Radarr or Sonarr directly, say. Seerr shows it
- * as "Requested" all the same; with a request, the request's own estimate is
- * used instead.
+ * Arrival estimate for a title being processed with no request (e.g. added
+ * directly in Radarr or Sonarr), which Seerr still shows as "Requested".
+ * Requested titles use the request's estimate instead.
  */
 mediaRoutes.get<{ id: string }>('/:id/eta', async (req, res, next) => {
-  // Switched off for everyone or by this person: nothing to estimate.
+  // Off globally or for this person: nothing to estimate.
   if (!featureEnabled('arrivalEstimates', req.user)) {
     return res.status(200).json({ stage: 'unknown' });
   }
@@ -402,7 +398,7 @@ mediaRoutes.get<{ id: string }>('/:id/eta', async (req, res, next) => {
     return res.status(200).json(
       await estimateTitle(
         media,
-        // The validator may already have made it a boolean.
+        // The validator may have made it a boolean already.
         String(req.query.is4k) === 'true',
         req.user?.settings?.discoverRegion || defaultRegion()
       )
@@ -413,16 +409,16 @@ mediaRoutes.get<{ id: string }>('/:id/eta', async (req, res, next) => {
 });
 
 /**
- * Who has watched a title, and when last, from the server's watch history
- * (Tautulli for Plex, Jellyfin or Emby themselves) — for the title page.
- * Admins only, as the watch data behind the manage panel is.
+ * Who watched a title and when last, from the server's watch history (Tautulli
+ * for Plex, Jellyfin or Emby directly), for the title page. Admins only, like
+ * the manage panel's watch data.
  */
 mediaRoutes.get<{ id: string }>(
   '/:id/watched-by',
   isAuthenticated(Permission.ADMIN),
   async (req, res, next) => {
     try {
-      // Turned off: nobody is asked who watched anything.
+      // Feature off: don't query watch history.
       if (!featureEnabled('whoWatched', req.user)) {
         return res.status(200).json({ configured: false, people: [] });
       }
@@ -448,8 +444,8 @@ mediaRoutes.get<{ id: string }>(
 );
 
 /**
- * A title's anime setting and where it sits in Sonarr or Radarr against it,
- * for the manage panel (lib/animePlacement).
+ * A title's anime setting and its Sonarr or Radarr placement against it, for
+ * the manage panel (lib/animePlacement).
  */
 mediaRoutes.get<{ id: string }, AnimePlacement>(
   '/:id/anime',
@@ -474,8 +470,8 @@ mediaRoutes.get<{ id: string }, AnimePlacement>(
 );
 
 /**
- * Sets a title anime (true), not anime (false) or back to automatic (null),
- * and moves it in Sonarr or Radarr to match.
+ * Set a title anime (true), not anime (false) or automatic (null), and move it
+ * in Sonarr or Radarr to match.
  */
 mediaRoutes.put<
   { id: string },
@@ -516,7 +512,7 @@ mediaRoutes.get<{ id: string }, MediaWatchDataResponse>(
   async (req, res, next) => {
     const settings = getSettings().tautulli;
 
-    // Tautulli is Plex's watch history: read only while Plex is connected.
+    // Tautulli is Plex's watch history: only read while Plex is connected.
     if (
       !isConnected('plex') ||
       !settings.hostname ||

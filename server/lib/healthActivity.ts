@@ -8,9 +8,8 @@ import { getSettings } from '@server/lib/settings';
 import { In, IsNull, MoreThanOrEqual, Not } from 'typeorm';
 
 /*
- * What Download Check and the admin agent did in the last week, for the
- * Health page: enough to see they are working, without opening Backfill.
- * Counts only; what each one was is on the Backfill page.
+ * Last week's Download Check and admin agent activity for the Health page.
+ * Counts only; details are on the Backfill page.
  */
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -80,7 +79,7 @@ export const healthActivity = async (
     const jobs = getRepository(BackfillJob);
     const [conversations, recent, started] = await Promise.all([
       runs.count({ where: { createdAt: MoreThanOrEqual(since) } }),
-      // Runs that worked this week, for the changes they made this week.
+      // Runs active this week; their changes are filtered to this week below.
       runs.find({
         select: { id: true, actions: true },
         where: [

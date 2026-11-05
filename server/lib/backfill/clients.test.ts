@@ -31,11 +31,10 @@ setupTestDb();
 
 /*
  * Backfill with every download client, end to end: the engine and each
- * client's own API code, against a stand-in that speaks that client's
- * protocol and keeps its torrents (or NZB jobs) as the client would. A pack
- * is approved, only its chosen file downloads, Sonarr imports it, and the
- * download is removed with its data. Prowlarr and Sonarr are stubbed at
- * their API clients.
+ * client's API code against a stand-in that speaks its protocol and keeps
+ * torrents (or NZB jobs) as the client would. A pack is approved, only its
+ * chosen file downloads, Sonarr imports it, and the download is removed
+ * with its data. Prowlarr and Sonarr are stubbed at their API clients.
  */
 
 const ben = (value: unknown): Buffer => {
@@ -849,8 +848,8 @@ describe('Backfill with Deluge', () => {
     useClient('deluge');
     const candidate = await seed('torrent', { kind: 'torrent', data: TORRENT });
     await backfill.approve(candidate.id, { mode: 'missing' });
-    // Left to Deluge's own settings, one set to remove torrents at their
-    // ratio would take this one, files and all, the moment it is done.
+    // Otherwise Deluge's remove-at-ratio could delete it and its files once
+    // done.
     assert.equal(swarm.torrents.get(HASH)?.removeAtRatio, false);
   });
 });

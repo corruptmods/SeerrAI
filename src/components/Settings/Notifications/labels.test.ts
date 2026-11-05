@@ -4,11 +4,10 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 
 /*
- * Every label on a notification settings page, the admin's and each
- * person's own, names a control that is on that page. A label pointing at
- * an id nothing has reads fine on screen, but a screen reader announces the
- * control without its name and clicking the label does nothing. Read from
- * the source: the pages need the whole app around them to render.
+ * Every label on a notification settings page (admin's and per-user) must
+ * point at a control id on that page; otherwise a screen reader announces the
+ * control without its name and clicking the label does nothing. Reads the
+ * source, since the pages need the whole app to render.
  */
 
 const SRC = path.join(__dirname, '../../..');
@@ -27,13 +26,13 @@ const pages = (folder: string): string[] =>
           : []
   );
 
-/** The ids a page's labels point at, where they are written out. */
+/** Ids a page's labels point at, where written literally. */
 const labelTargets = (source: string): string[] =>
   [...source.matchAll(/htmlFor=(?:"([^"]+)"|\{'([^']+)'\})/g)].map(
     (match) => match[1] ?? match[2]
   );
 
-/** The ids a page gives its controls, where they are written out. */
+/** Ids a page gives its controls, where written literally. */
 const controlIds = (source: string): Set<string> =>
   new Set(
     [...source.matchAll(/\b(?:id|inputId)=(?:"([^"]+)"|\{'([^']+)'\})/g)].map(

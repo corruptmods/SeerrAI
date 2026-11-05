@@ -9,7 +9,7 @@ import {
 
 describe('the feature switches each page shows', () => {
   it('leave music off Settings → Features, which has every other one', () => {
-    // Music is switched on Settings → Music; Features only points there.
+    // Music is switched on Settings → Music; Features links there.
     for (const musicReady of [true, false]) {
       const shown = shownFeatures(NOT_ON_FEATURES_PAGE, musicReady);
       assert.equal(shown.includes('music'), false);
@@ -25,7 +25,6 @@ describe('the feature switches each page shows', () => {
   });
 
   it('still offer music to each person, once it is there', () => {
-    // Profile → Settings → Features is unchanged.
     assert.equal(shownFeatures([], true).includes('music'), true);
     assert.equal(shownFeatures([], false).includes('music'), false);
   });

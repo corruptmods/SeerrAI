@@ -51,7 +51,7 @@ const UserProfile = () => {
   const intl = useIntl();
   const router = useRouter();
   const settings = useSettings();
-  // Albums have a quota of their own once there is music to request.
+  // Music adds an album quota.
   const showMusic = useFeature('music');
   const { user, error } = useUser({
     id: Number(router.query.userId),
@@ -81,8 +81,8 @@ const UserProfile = () => {
       ? `/api/v1/user/${user.id}/quota`
       : null
   );
-  // Their Plex account, while Plex is connected: where their watch history
-  // (Tautulli) and Plex watchlist come from.
+  // Watch history (Tautulli) and Plex watchlist need a linked account on a
+  // connected Plex.
   const hasPlex =
     !!user &&
     connectedAccountServers(
@@ -473,7 +473,7 @@ const UserProfile = () => {
                   id={item.id}
                   tmdbId={item.tmdbId}
                   tvdbId={item.tvdbId}
-                  // Watch history only ever has films and series.
+                  // Watch history is video only.
                   type={item.mediaType as VideoMediaType}
                 />
               ))}

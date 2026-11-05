@@ -7,11 +7,10 @@ import { before, describe, it } from 'node:test';
 
 /*
  * Every API route the app registers must be declared in seerr-api.yml. The
- * OpenAPI validator runs before the routers and answers an undeclared path
- * with "not found", so a route missing from the spec is a feature that
- * silently does nothing (see docs/FORK.md, rule 1). This records the routes
- * exactly as the app registers them, rather than reading the source, so a new
- * router or mount point cannot slip past.
+ * OpenAPI validator runs before the routers and answers undeclared paths with
+ * "not found", so a route missing from the spec silently does nothing (see
+ * docs/FORK.md, rule 1). Routes are recorded as the app registers them, not
+ * read from source, so no new router or mount point slips past.
  */
 
 interface Recorded {
@@ -69,7 +68,10 @@ proto.use = function (this: object, ...args: unknown[]) {
 const join = (a: string, b: string) =>
   `${a.replace(/\/$/, '')}/${b.replace(/^\//, '')}`.replace(/\/$/, '') || '/';
 
-/** "/user/:id/settings" and "/user/{userId}/settings" compare equal. */
+/**
+ * Normalize so "/user/:id/settings" and "/user/{userId}/settings" compare
+ * equal.
+ */
 const shape = (p: string) =>
   p
     .replace(/:\w+/g, '{}')

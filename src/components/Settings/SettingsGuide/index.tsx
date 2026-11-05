@@ -148,8 +148,8 @@ const Pill = ({
 };
 
 /**
- * For admins: how requests, downloads, Backfill and the checks fit
- * together here, in one page, for anyone new to running it.
+ * For new admins: how requests, downloads, Backfill and the checks fit
+ * together.
  */
 const SettingsGuide = () => {
   const intl = useIntl();

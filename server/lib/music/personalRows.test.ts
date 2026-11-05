@@ -24,8 +24,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * The Music page's rows of each person's own: from their music requests
- * only, never anyone else's.
+ * Personal Music page rows come from the user's own requests only.
  */
 
 setupTestDb();
@@ -103,7 +102,7 @@ const ask = async (
     { listeners: false }
   );
 
-/** Albums MusicBrainz already listed for an artist, as its page leaves. */
+/** Caches an artist's MusicBrainz album list, as the artist page does. */
 const listed = (
   artistId: string,
   groups: {
@@ -169,7 +168,7 @@ describe('a person’s own music rows', () => {
     assert.deepEqual(
       rows.map((album) => [album.id, album.artistName, album.status]),
       [
-        // A song's album, as the song is on it.
+        // A requested song's album.
         [TIDE, 'Moonlurker', undefined],
         [STATIC_GARDEN, 'Glasswing', MediaStatus.AVAILABLE],
       ]
@@ -261,7 +260,7 @@ describe('a person’s own music rows', () => {
                 score: 4500,
                 reference_mbid: id,
               },
-              // One they asked for themselves is left out.
+              // Already requested by the user: excluded.
               {
                 artist_mbid: MOONLURKER,
                 name: 'Moonlurker',
@@ -282,7 +281,7 @@ describe('a person’s own music rows', () => {
 
     const rows = await artistsLikeYours(listener.id);
     assert.deepEqual(asked.sort(), [GLASSWING, MOONLURKER].sort());
-    // Like B is near the top of both lists: ahead of Like A, top of one.
+    // Like B ranks high in both lists, so beats Like A, top of one.
     assert.deepEqual(
       rows.map((a) => a.id),
       [LIKE_B, LIKE_A]

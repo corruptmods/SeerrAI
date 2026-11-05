@@ -25,10 +25,7 @@ const libraryUpdateSchema = z.object({
   enabled: z.boolean(),
 });
 
-/**
- * Settings for a Jellyfin or an Emby server: the same pages and calls for
- * both, mounted at /settings/jellyfin and /settings/emby.
- */
+/** Jellyfin or Emby settings (/settings/jellyfin and /settings/emby). */
 const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
   const routes = Router();
   const name = serverName(kind);
@@ -62,10 +59,10 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
         throw new ApiError(result?.status, ApiErrorCode.InvalidUrl);
       }
 
-      // Whether the server is connected, and whether people may sign in
-      // with it, are changed under Settings → Media Servers.
+      // `connected` and `signIn` are changed only under Settings → Media
+      // Servers.
       Object.assign(settings[kind], omit(req.body, 'connected', 'signIn'));
-      // Another server's libraries are not this one's.
+      // A different server: drop the old server's libraries.
       if (settings[kind].serverId && settings[kind].serverId !== result.Id) {
         settings[kind].libraries = [];
         settings[kind].musicLibraries = [];
@@ -140,11 +137,10 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
       ({ libraries, musicLibraries } = await client.getAllLibraries());
 
       if (libraries.length === 0 && musicLibraries.length === 0) {
-        // Check if no libraries are found due to the fallback to user views
-        // This only affects LDAP users
+        // No libraries may mean the fallback to user views (LDAP users only).
         const account = await client.getUser();
 
-        // Automatic Library grouping is not supported when user views are used to get library
+        // Automatic library grouping doesn't work with user views.
         if (account.Configuration.GroupedFolders?.length > 0) {
           return next({
             status: 501,
@@ -179,8 +175,8 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
     });
 
     settings[kind].libraries = newLibraries;
-    // Music libraries are kept apart, so film and series scans never walk
-    // them; they are switched on under Music Libraries.
+    // Kept separate so film and series scans never walk music libraries;
+    // they are enabled under Music Libraries.
     settings[kind].musicLibraries = musicLibraries.map(
       (library): MusicLibrary => {
         const existing = (settings[kind].musicLibraries ?? []).find(
@@ -200,8 +196,8 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
     return res.status(200).json(settings[kind].libraries);
   });
 
-  // The music libraries, listed by the sync above. Only while music is on
-  // for everyone.
+  // Music libraries found by the sync above; only while music is on for
+  // everyone.
   routes.get('/music-library', requireMusicSettings, (_req, res) => {
     return res.status(200).json(jellyfinFamily(kind).musicLibraries ?? []);
   });
@@ -231,8 +227,8 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
     const client = await jellyfinClient(kind, { asAdmin: true });
     const resp = await client.getUsers();
 
-    // People already imported are left out, as on Import Plex Users: they
-    // are refreshed on every import instead.
+    // Omit users already imported, as on Import Plex Users: every import
+    // refreshes them.
     const linked = await linkedJellyfinUsers(
       resp.users.map((user) => user.Id),
       kind

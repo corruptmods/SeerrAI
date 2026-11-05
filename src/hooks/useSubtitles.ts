@@ -11,14 +11,14 @@ import useSWR from 'swr';
 
 export type SubtitlesKind = 'movie' | 'tv';
 
-/** Bazarr is set up and the Subtitles switch is on for this person. */
+/** Whether Bazarr is set up and Subtitles is on for this user. */
 export const useSubtitlesOn = (): boolean => {
   const { currentSettings } = useSettings();
   const on = useFeature('subtitles');
   return currentSettings.subtitlesReady && on;
 };
 
-/** What this person may do with subtitles, beyond seeing them. */
+/** The user's subtitle permissions beyond viewing. */
 export const useSubtitleRights = () => {
   const { hasPermission } = useUser();
   return {
@@ -45,10 +45,7 @@ export const useMovieSubtitles = (tmdbId: number, on: boolean) =>
 export const useSeriesSubtitles = (tmdbId: number, on: boolean) =>
   useSWR<SeriesSubtitles>(on ? subtitlesKey('tv', tmdbId) : null, READ_OPTIONS);
 
-/**
- * Checked often only while Bazarr is searching, or a transcription is
- * queued or under way.
- */
+/** Polls fast only while Bazarr is searching or a transcription is queued or running. */
 export const useTranscription = (
   kind: SubtitlesKind,
   tmdbId: number,
@@ -59,8 +56,7 @@ export const useTranscription = (
     {
       ...READ_OPTIONS,
       refreshInterval: (latest) =>
-        // Every 5 seconds while Bazarr is on it, as often as Seerr AI
-        // looks at Bazarr's queue; queued only, every 10.
+        // 5s while active (matching Seerr AI's Bazarr queue polling); 10s while queued.
         latest && (latest.searching || latest.running)
           ? 5_000
           : latest && latest.queued > 0

@@ -47,17 +47,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * A title's subtitles, from Bazarr. Anyone signed in sees them and sets
- * the subtitle their own Plex player starts with; searching, downloading
- * and transcribing are for people who manage requests; deleting a file is
- * for admins. Off (no Bazarr, or the Subtitles switch off) means not found.
+ * A title's subtitles, from Bazarr. Anyone signed in can view them and set
+ * their own Plex player's default subtitle; searching, downloading and
+ * transcribing need MANAGE_REQUESTS; deleting a file needs admin. Off (no
+ * Bazarr, or the Subtitles switch off) responds not found.
  */
 const subtitleRoutes = Router();
 
 /*
- * A failure is answered with a code the page turns into words in the
- * viewer's language (see the error handler at the end), and the same
- * reason in English as `message`, for anything else reading the API.
+ * Failures carry a code the client translates (see the error handler at the
+ * end), plus the English reason as `message` for other API consumers.
  */
 interface Failure {
   status: number;
@@ -93,7 +92,7 @@ const bazarrFailed = (next: NextFunction, e: unknown, what: string) => {
   next(failure(502, 'bazarrFailed', 'Bazarr did not answer.'));
 };
 
-/** Whisper cannot be used now: says why, or carries on. */
+/** If Whisper is unavailable, send why and return true. */
 const whisperRefused = async (next: NextFunction): Promise<boolean> => {
   const paused = await whisperUnavailable();
   if (paused) {
@@ -114,7 +113,7 @@ const MEDIA_TYPE: Record<MediaKind, MediaType> = {
   tv: MediaType.TV,
 };
 
-/** The title's Radarr or Sonarr id, or a "not found" already sent. */
+/** The title's Radarr or Sonarr id, or undefined after sending not found. */
 const arrId = async (
   kind: MediaKind,
   tmdbIdParam: string,
@@ -134,7 +133,7 @@ const arrId = async (
       )
     );
   } else if (!id) {
-    // On a Radarr or Sonarr that Bazarr does not follow.
+    // On a Radarr or Sonarr that Bazarr doesn't track.
     next(
       notFound(
         'notInBazarr',
@@ -153,7 +152,10 @@ type EpisodeParams = {
   episodeNumber: string;
 };
 
-/** The series' Sonarr id and Bazarr's episode, or a "not found" sent. */
+/**
+ * The series' Sonarr id and Bazarr episode, or undefined after sending not
+ * found.
+ */
 const episodeOf = async (params: EpisodeParams, next: NextFunction) => {
   const seriesId = await arrId('tv', params.tmdbId, next);
   if (!seriesId) {
@@ -221,15 +223,15 @@ subtitleRoutes.get<{ tmdbId: string }>(
 const manage = isAuthenticated(Permission.MANAGE_REQUESTS);
 
 /*
- * A search for a title's subtitles. Asked with `transcribeIfNone`, a
- * search where no provider has a subtitle the title is missing queues
- * Whisper's transcription of it instead, and says so in `noneFound`.
+ * Search a title's subtitles. With `transcribeIfNone`, if no provider has a
+ * missing subtitle, queue a Whisper transcription instead and report it in
+ * `noneFound`.
  */
-// The API validator may already have made it a boolean.
+// The API validator may have made it a boolean already.
 const transcribeIfNone = (req: Request) =>
   ['true', '1'].includes(String(req.query.transcribeIfNone));
 
-/** What a search offered, noted so only those can be downloaded. */
+/** Record what a search offered so only those can be downloaded. */
 const searchResponse = (
   title: string,
   found: {
@@ -244,7 +246,7 @@ const searchResponse = (
   };
 };
 
-// Bazarr's names for the titles searches offer results for.
+// Bazarr keys for the titles searches offer results for.
 const movieOffers = (radarrId: number) => `movie:${radarrId}`;
 const episodeOffers = (sonarrEpisodeId: number) => `episode:${sonarrEpisodeId}`;
 
@@ -301,8 +303,8 @@ subtitleRoutes.get<EpisodeParams>(
   }
 );
 
-// A Whisper transcription goes through the transcription route, one at a
-// time, never held open here for the hours it can take.
+// Whisper goes through the transcription route, one at a time, never held open
+// here for the hours it can take.
 const choiceBody = z.object({
   provider: z
     .string()
@@ -382,9 +384,9 @@ subtitleRoutes.post<EpisodeParams>(
 );
 
 /*
- * Bazarr's own search for what a title is missing, which can take a long
- * while; whatever it still lacks afterwards is transcribed with Whisper.
- * The title's transcription status follows both.
+ * Bazarr's search for what a title is missing (can be slow); anything still
+ * missing afterwards is transcribed with Whisper. The title's transcription
+ * status tracks both.
  */
 const searchMissing = (run: () => Promise<number>, what: string) => {
   run().catch((e) =>
@@ -450,7 +452,7 @@ subtitleRoutes.delete<{ tmdbId: string; subtitleId: string }>(
       const subtitle = movie?.subtitles?.find(
         (s) => s.id === Number(req.params.subtitleId)
       );
-      // Only a file can be deleted; a track inside the video stays.
+      // Only external files can be deleted, not embedded tracks.
       if (!subtitle?.path) {
         return next(notFound('notOnDisk', 'That subtitle file is not there.'));
       }
@@ -565,7 +567,7 @@ subtitleRoutes.post<{ tmdbId: string }>(
   }
 );
 
-// ---- The subtitle the viewer's own Plex player starts with -----------------
+// ---- The viewer's own Plex default subtitle --------------------------------
 
 const ratingKeyOf = async (kind: MediaKind, tmdbIdParam: string) => {
   const tmdbId = idParam(tmdbIdParam);
@@ -647,8 +649,8 @@ subtitleRoutes.get<{ tmdbId: string }>(
   }
 );
 
-// Each choice for a series goes through every episode in the background,
-// so how often one person can make one is limited.
+// Each series choice runs over every episode in the background, so it's rate
+// limited per user.
 const seriesChoices = perUserRateLimit({ windowMs: 60_000, limit: 20 });
 
 subtitleRoutes.put<{ tmdbId: string }>(
@@ -681,8 +683,8 @@ subtitleRoutes.put<{ tmdbId: string }>(
   }
 );
 
-// The failures above, with their codes; anything else goes on to the
-// server's own error handler.
+// Send the failures above with their codes; anything else goes to the server's
+// error handler.
 subtitleRoutes.use(
   (err: unknown, _req: Request, res: Response, next: NextFunction) => {
     const failed = err as Partial<Failure> | undefined;

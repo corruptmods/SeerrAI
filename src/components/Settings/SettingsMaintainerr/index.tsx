@@ -31,9 +31,8 @@ const messages = defineMessages('components.Settings.SettingsMaintainerr', {
 });
 
 /*
- * Maintainerr servers, laid out like the Radarr and Sonarr sections: a tile per
- * server with Edit and Delete, a dashed tile to add one, and a dialog for the
- * details.
+ * Maintainerr servers, laid out like Radarr and Sonarr: a tile per server with
+ * Edit and Delete, a dashed tile to add one, and a dialog for the details.
  */
 const SettingsMaintainerr = () => {
   const intl = useIntl();

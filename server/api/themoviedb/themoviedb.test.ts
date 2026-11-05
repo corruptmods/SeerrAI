@@ -4,10 +4,7 @@ import logger from '@server/logger';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
-/*
- * TMDB's searches, when TMDB does not answer: still an empty page for the
- * callers, but no longer silent.
- */
+/* A search TMDB doesn't answer: an empty page for callers, and a warning. */
 
 let warned: unknown[][] = [];
 

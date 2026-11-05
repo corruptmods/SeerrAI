@@ -23,8 +23,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Maintainerr integration against two fake Maintainerr servers that speak its
- * real API shapes, with Seerr's routes behind the real OpenAPI validator.
+ * Maintainerr integration against two fake Maintainerr servers using its real
+ * API shapes, with Seerr's routes behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -262,7 +262,7 @@ const seed = () => {
       },
     ],
   };
-  // A second server also holds movie 101, sooner; and one title of its own.
+  // A second server also holds movie 101, sooner, plus one title of its own.
   b.collections = [
     {
       id: 40,
@@ -654,8 +654,8 @@ describe('Keep', () => {
   });
 
   it('leaves alone a server that does not allow it, even when its deletion is further off', async () => {
-    // B deletes 101 tomorrow, but its window is shorter still, so only
-    // A's deletion counts as soon and Keep is offered.
+    // B deletes 101 tomorrow, but its window is shorter still, so only A's
+    // deletion counts as soon and Keep is offered.
     getSettings().maintainerr = [
       server(a, 0),
       server(b, 1, { allowKeep: false, soonDays: 0 }),
@@ -710,8 +710,8 @@ describe('Maintainerr servers in settings', () => {
       '/api/v1/settings/maintainerr',
       { ...server(b, 0), id: undefined, name: 'Third' }
     );
-    // Titles may still carry the removed server's id, so the new one must
-    // not take it over.
+    // Titles may still carry the removed server's id, so the new one must not
+    // reuse it.
     assert.equal(third.body.id, 2, 'one past the highest it has ever had');
 
     const { body } = await call<MaintainerrSettings[]>(

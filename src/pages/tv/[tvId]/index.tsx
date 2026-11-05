@@ -11,8 +11,7 @@ interface TvPageProps {
 
 const TvPage: NextPage<TvPageProps> = ({ tv }) => {
   const router = useRouter();
-  // Keyed by the title, so going from one series' page straight to
-  // another's starts afresh instead of keeping the first one's state.
+  // Keyed by title so navigating between series resets state.
   return <TvDetails key={String(router.query.tvId)} tv={tv} />;
 };
 

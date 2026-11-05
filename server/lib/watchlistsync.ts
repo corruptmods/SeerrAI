@@ -31,34 +31,29 @@ import { Permission } from './permissions';
 /*
  * Each watchlist entry is acted on once.
  *
- * Plex records when a title was put on a watchlist. Sync keeps that time per
- * user and title, so an entry it has already acted on is left alone however
- * often the title is later deleted — and taking a title off the watchlist and
- * adding it back gives a new time, which is a new entry and is requested
- * again. For a series, the seasons already handled are kept too, so a new
- * season still comes through for a show that was deleted.
+ * Plex records when a title was added to a watchlist. Sync stores that time
+ * per user and title, so a handled entry is left alone however often the
+ * title is later deleted, while removing and re-adding gives a new time: a
+ * new entry, requested again. For series the handled seasons are stored too,
+ * so a new season still comes through for a deleted show.
  *
- * Taken from seerr-team/seerr's feat/watchlist-entry-tracking, which fixes
- * #3222.
+ * From seerr-team/seerr's feat/watchlist-entry-tracking, which fixes #3222.
  */
 
 /** A request made just before Plex's timestamp still counts as acting on it. */
 const CLOCK_SKEW_SECONDS = 300;
 
-/**
- * A title on someone's watchlist: their Plex watchlist, their public Trakt
- * watchlist, or both.
- */
+/** A title on a user's Plex watchlist, public Trakt watchlist, or both. */
 export interface WatchItem {
   tmdbId: number;
   tvdbId?: number;
   type: 'movie' | 'show';
   title: string;
-  /** Plex's id for it, to ask Plex when it was added. */
+  /** Plex's id, used to ask Plex when it was added. */
   plexRatingKey?: string;
-  /** When Plex says it was added, if it said (see syncWithoutTimestamp). */
+  /** When Plex says it was added, if it did (see syncWithoutTimestamp). */
   addedAt?: Date;
-  /** When it went on the Trakt watchlist, in seconds since 1970. */
+  /** When it was added on Trakt, seconds since epoch. */
   traktListedAt?: number;
 }
 
@@ -67,22 +62,21 @@ const mediaTypeOf = (item: WatchItem) =>
 
 const keyOf = (item: WatchItem) => `${mediaTypeOf(item)}:${item.tmdbId}`;
 
-/** Which watchlist a title's time comes from: Trakt's, when it is on it. */
+/** Which watchlist a title's time comes from: Trakt's when it is on it. */
 const sourceOf = (item: WatchItem): WatchlistSource =>
   item.traktListedAt !== undefined ? 'trakt' : 'plex';
 
 /**
- * Plex watchlists are read only while Seerr is connected to Plex: someone
- * who signed in with Plex once is not synced from Plex on a server that
- * only has Jellyfin or Emby.
+ * Plex watchlists are read only while Seerr is connected to Plex: a user who
+ * once signed in with Plex isn't synced from Plex on a Jellyfin/Emby-only
+ * server.
  */
 const onPlex = () => isConnected('plex') || !primaryServer();
 
 /**
- * How often a user whose Plex sign-in has expired is tried again. They have
- * been told to sign in again (and the Health page lists them), so asking
- * Plex every few minutes only fills the log; once an hour still notices a
- * rejection that was Plex's own passing fault.
+ * Retry interval for a user whose Plex sign-in expired. They have been told
+ * to sign in again (and Health lists them), so polling every few minutes only
+ * fills the log; hourly still catches a transient Plex rejection.
  */
 export const EXPIRED_RETRY_MS = 60 * 60 * 1000;
 
@@ -90,7 +84,7 @@ class WatchlistSync {
   public running = false;
   /** When each user with an expired sign-in was last tried. */
   private expiredTriedAt = new Map<number, number>();
-  /** When each user whose Trakt watchlist cannot be read was last told of. */
+  /** When each user was last warned their Trakt watchlist can't be read. */
   private traktWarnedAt = new Map<number, number>();
 
   public async syncWatchlist() {
@@ -106,8 +100,7 @@ class WatchlistSync {
     try {
       const userRepository = getRepository(User);
 
-      // People with a Plex sign-in (on a Plex server), or a Trakt watchlist
-      // to read.
+      // Users with a Plex sign-in (on a Plex server) or a Trakt watchlist.
       const sources = [
         ...(onPlex() ? ["user.plexToken != ''"] : []),
         ...(getSettings().trakt.clientId
@@ -126,7 +119,7 @@ class WatchlistSync {
         .where(sources.join(' OR '))
         .getMany();
 
-      // One user's failure must not cost everyone after them their sync.
+      // One user's failure must not skip the users after them.
       for (const user of users) {
         try {
           await this.syncUserWatchlist(user);
@@ -144,8 +137,8 @@ class WatchlistSync {
   }
 
   /**
-   * Whether the user has auto-requests and watchlist sync on for this kind
-   * of title.
+   * Whether the user has auto-request and watchlist sync on for this kind of
+   * title.
    */
   private syncsType(user: User, item: WatchItem): boolean {
     return item.type === 'movie'
@@ -179,7 +172,6 @@ class WatchlistSync {
       !user.settings?.watchlistSyncMovies &&
       !user.settings?.watchlistSyncTv
     ) {
-      // Skip sync if user settings have it disabled
       return;
     }
 
@@ -190,8 +182,8 @@ class WatchlistSync {
     const { plexTvApi } = watchlist;
     const response = watchlist;
 
-    // Strict: a database it cannot read must stop the sync, not read as
-    // "nothing here yet" and request the whole watchlist again.
+    // Strict: an unreadable database must stop the sync, not read as empty and
+    // request the whole watchlist again.
     const mediaItems = await Media.findRelatedMedia(
       user,
       response.items.map((i) => ({
@@ -217,8 +209,7 @@ class WatchlistSync {
             .getMany()
         : [];
 
-    // A deleted title is not settled by its old request: whether it comes
-    // back is for the entry to decide, below.
+    // A deleted title's old request doesn't settle it; its entry decides below.
     const autoRequestedTmdbIds = new Set(
       existingAutoRequests
         .filter(
@@ -277,14 +268,13 @@ class WatchlistSync {
     }
 
     /*
-     * A title with no entry yet — every title, on the first sync after entries
-     * began to be tracked — is settled by whether it was deleted, and when.
-     * The fork's deletion records give the time. A title Seerr has marked
-     * deleted with no record was deleted before those began: its row's last
-     * update is the best time there is, and can only be at or after the
-     * deletion, so it errs towards leaving the title alone. Re-downloading
-     * something the owner deleted is the worse mistake; someone who does want
-     * it back takes it off their watchlist and adds it again, a new entry.
+     * A title with no entry yet (every title on the first sync after tracking
+     * began) is settled by whether and when it was deleted, using the fork's
+     * deletion records. A title marked deleted with no record predates them:
+     * its row's last update is the best time available and is at or after the
+     * deletion, so it errs towards leaving the title alone. Re-downloading what
+     * the owner deleted is the worse mistake; a user who wants it back removes
+     * and re-adds it, a new entry.
      */
     const deletionTimes = await getDeletionTimes(unavailableTmdbIds);
     const markedDeleted = new Map<string, Date>(
@@ -295,12 +285,10 @@ class WatchlistSync {
 
     const tmdb = new TheMovieDb();
 
-    // When each title went on the watchlist, looked up five at a time
-    // rather than one after another: Plex sometimes takes its full timeout
-    // per title, and one slow user held up everyone synced after them.
-    // A title on the Trakt watchlist goes by Trakt's time, which is always
-    // there and stays put whatever Plex does; only a Plex-only title asks
-    // Plex.
+    // Watchlist-add times, five lookups at a time: Plex sometimes takes its
+    // full timeout per title, and one slow user held up everyone after them. A
+    // title on Trakt uses Trakt's time, which is always present and stable;
+    // only Plex-only titles ask Plex.
     const watchlistedAtByKey = new Map<string, number | null>();
     await mapWithConcurrency(
       unavailableItems.filter(
@@ -329,14 +317,12 @@ class WatchlistSync {
       let candidateSeasons: number[] = [];
 
       try {
-        // Sonarr finds a series by its TVDB id; without one the request
-        // could not go anywhere.
+        // Sonarr finds series by TVDB id; without one the request can't go
+        // anywhere.
         if (mediaItem.type === 'show' && !mediaItem.tvdbId) {
           throw new Error('Missing TVDB ID from the watchlist');
         }
 
-        // Check if they have auto-request permissons and watchlist sync
-        // enabled for the media type
         if (!this.syncsType(user, mediaItem)) {
           continue;
         }
@@ -359,10 +345,10 @@ class WatchlistSync {
 
         entryStamp = watchlistedAt;
 
-        // Times from the two watchlists never match, so a title whose time
-        // now comes from the other one (Trakt could not be read this time, or
-        // a Trakt username was just added) is the same entry, not a re-add:
-        // its new time is noted and nothing is requested again for it.
+        // Times from the two watchlists never match, so a title whose time now
+        // comes from the other source (Trakt unreadable this time, or a Trakt
+        // username just added) is the same entry, not a re-add: store the new
+        // time, request nothing.
         const sameSource =
           !entry || (entry.watchlistedFrom ?? 'plex') === source;
         if (entry && !sameSource) {
@@ -389,8 +375,8 @@ class WatchlistSync {
         if (entry && !rearmed) {
           handledSeasons = entry.seasons.map((s) => s.seasonNumber);
         } else if (!entry) {
-          // An auto-request made after the watchlist add means sync already
-          // acted on this entry.
+          // An auto-request after the watchlist add means sync already handled
+          // this entry.
           const priorRequests = (autoRequestsByKey.get(key) ?? []).filter(
             (r) =>
               Math.floor(r.createdAt.getTime() / 1000) >=
@@ -403,9 +389,8 @@ class WatchlistSync {
             )
           );
 
-          // Deleted after it went on the watchlist, or at a time not
-          // recorded: this entry is the stale one a cleanup was meant to be
-          // rid of, not a request for it again.
+          // Deleted after the watchlist add, or at an unknown time: this is the
+          // stale entry a cleanup meant to get rid of, not a new request.
           deletedSinceAdded =
             deleted &&
             (!deletedAt ||
@@ -447,8 +432,8 @@ class WatchlistSync {
           continue;
         }
 
-        // Mirrors how 'all' expands in MediaRequest.request, which always
-        // drops season 0.
+        // Mirrors how 'all' expands in MediaRequest.request, which drops season
+        // 0.
         const tmdbShow = await tmdb.getTvShow({ tvId: mediaItem.tmdbId });
         const seasons = tmdbShow.seasons.filter(
           (season) => season.season_number !== 0
@@ -511,8 +496,7 @@ class WatchlistSync {
         }
 
         switch (e.constructor) {
-          // Nothing new was requested but the entry has still been acted on,
-          // so record it.
+          // Nothing new requested, but the entry was handled, so record it.
           case DuplicateMediaRequestError:
           case NoSeasonsAvailableError:
             if (entryStamp) {
@@ -534,9 +518,8 @@ class WatchlistSync {
               errorMessage: e.message,
             });
             break;
-          // During watchlist sync, these errors aren't necessarily a problem
-          // with Seerr — the user may simply be at their quota. Leave the
-          // entry untracked so a later sync can retry.
+          // Not necessarily a Seerr problem: the user may be at their quota.
+          // Leave the entry untracked so a later sync retries.
           case RequestPermissionError:
           case QuotaRestrictedError:
             logger.debug('Failed to create media request from watchlist', {
@@ -546,8 +529,7 @@ class WatchlistSync {
               errorMessage: e.message,
             });
             break;
-          // Blocklisted media should be silently ignored during watchlist
-          // sync to avoid spam
+          // Ignore blocklisted media silently to avoid spam.
           case BlocklistedMediaError:
             break;
           default:
@@ -563,13 +545,12 @@ class WatchlistSync {
   }
 
   /**
-   * Plex did not say when this title went on the watchlist, so a re-add
-   * cannot be told from the entry already acted on. Falls back to how this
-   * fork decided before entries were tracked, and records nothing: an entry
-   * needs the time to be of any use.
+   * Plex gave no watchlist-add time, so a re-add can't be told from the handled
+   * entry. Falls back to the fork's pre-tracking logic and records nothing,
+   * since an entry is useless without the time.
    *
-   * Re-downloading something the owner deleted is the worse mistake, so a
-   * title with an entry, or deleted since it was added, is left alone.
+   * Re-downloading what the owner deleted is the worse mistake, so a title with
+   * an entry, or deleted since it was added, is left alone.
    */
   private async syncWithoutTimestamp(
     user: User,
@@ -618,14 +599,13 @@ class WatchlistSync {
   }
 
   /**
-   * Everything on someone's watchlists, Plex's and Trakt's, one entry per
-   * title. Undefined when there is nothing to go on this time.
+   * Everything on a user's Plex and Trakt watchlists, one entry per title;
+   * undefined when there is nothing to go on this time.
    *
-   * Either source may fail on its own and the other still syncs: a title on
-   * both goes by Trakt's time, so Plex being down changes nothing for it.
-   * Trakt being briefly unreachable holds the whole sync until next time
-   * instead, as a title on both would otherwise go by Plex's time once and
-   * look newly added.
+   * Either source may fail and the other still syncs: a title on both uses
+   * Trakt's time, so Plex being down changes nothing for it. Trakt being
+   * briefly unreachable instead holds the whole sync, since a title on both
+   * would otherwise use Plex's time once and look newly added.
    */
   private async watchlistOf(
     user: User
@@ -659,7 +639,7 @@ class WatchlistSync {
     return { items: [...byKey.values()], plexTvApi: plex?.api };
   }
 
-  /** The newest titles on someone's Plex watchlist, if Plex answers. */
+  /** The newest titles on a user's Plex watchlist, if Plex answers. */
   private async plexWatchlist(
     user: User
   ): Promise<{ api: PlexTvAPI; items: WatchItem[] } | undefined> {
@@ -680,15 +660,15 @@ class WatchlistSync {
     const api = new PlexTvAPI(user.plexToken);
     const response = await api.getWatchlist({ size: 20 });
 
-    // A rejected token means nothing here will sync until the user signs in
-    // again, so tell them rather than failing quietly every few minutes.
+    // A rejected token blocks sync until the user signs in again, so tell them
+    // instead of failing quietly every few minutes.
     if (response.authFailed) {
       await markPlexTokenRejected(user);
       return undefined;
     }
 
-    // Plex down or slow: nothing learnt about the token, and nothing to
-    // sync. Clearing the rejected mark here would let an outage between two
+    // Plex down or slow: nothing learned about the token, nothing to sync.
+    // Clearing the rejected mark here would let an outage between two
     // rejections send the "sign in again" notice twice.
     if (response.failed) {
       return undefined;
@@ -710,8 +690,8 @@ class WatchlistSync {
   }
 
   /**
-   * The newest titles on someone's public Trakt watchlist; undefined when
-   * they have none to read, 'later' when Trakt could not be asked just now.
+   * The newest titles on a user's public Trakt watchlist; undefined when there
+   * is none, 'later' when Trakt can't be reached right now.
    */
   private async traktWatchlist(
     user: User
@@ -738,8 +718,8 @@ class WatchlistSync {
       if (problem === 'unreachable' || problem === 'rateLimited') {
         return 'later';
       }
-      // A private watchlist or a wrong name stays so until someone fixes
-      // it: said once an hour, not on every sync.
+      // A private watchlist or wrong name persists until fixed: warn hourly,
+      // not every sync.
       const last = this.traktWarnedAt.get(user.id) ?? 0;
       if (Date.now() - last >= EXPIRED_RETRY_MS) {
         this.traktWarnedAt.set(user.id, Date.now());
@@ -754,11 +734,10 @@ class WatchlistSync {
   }
 
   /**
-   * The seasons of a deleted show that count as already handled: whatever
-   * had aired by the deletion — which is what got deleted — and any season
-   * numbered below one that had, since TMDB occasionally lists an old season
-   * with no date. Anything after is new, and is what the requester is still
-   * waiting for.
+   * Seasons of a deleted show that count as handled: whatever had aired by the
+   * deletion (what got deleted), plus any season numbered below one that had,
+   * since TMDB sometimes lists an old season with no date. Later seasons are
+   * new and still awaited.
    */
   private airedBy(
     seasons: { season_number: number; air_date?: string | null }[],
@@ -769,8 +748,8 @@ class WatchlistSync {
         !!season.air_date &&
         new Date(season.air_date).getTime() <= cutoff.getTime()
     );
-    // A show that was downloaded and deleted had aired. With no dates to go
-    // on, which of its seasons are new cannot be told, so none are.
+    // A downloaded-then-deleted show had aired. With no dates, new seasons
+    // can't be identified, so none are.
     if (!aired.length) {
       return seasons.map((season) => season.season_number);
     }
@@ -812,8 +791,8 @@ class WatchlistSync {
           mediaType,
         });
 
-      // Reuse the persisted rows so re-saving an entry does not collide with
-      // the unique constraint on its seasons.
+      // Reuse persisted rows so re-saving doesn't hit the seasons' unique
+      // constraint.
       const existingSeasons = entry.seasons ?? [];
 
       entry.watchlistedAt = watchlistedAt;
@@ -826,7 +805,7 @@ class WatchlistSync {
 
       await entryRepository.save(entry);
     } catch (e) {
-      // A concurrent run may have written the same entry first
+      // A concurrent run may have written the same entry first.
       logger.warn('Failed to record watchlist entry', {
         label: 'Watchlist Sync',
         userId: user.id,

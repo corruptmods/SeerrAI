@@ -2,7 +2,7 @@ import UserSettings from '@app/components/UserProfile/UserSettings';
 import UserSiriSettings from '@app/components/UserProfile/UserSettings/UserSiriSettings';
 import type { NextPage } from 'next';
 
-// Siri's "Fix this show" shortcut: adding it, and the key it uses.
+// Setup for Siri's "Fix this show" shortcut and its key.
 const UserSiriPage: NextPage = () => {
   return (
     <UserSettings>

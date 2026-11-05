@@ -31,25 +31,21 @@ export type RequestEta =
   | { stage: 'available' }
   | { stage: 'unknown' };
 
-/** Estimates that need no lookups: a title's own download moves quickly. */
+/** While a title downloads, its estimate moves quickly. */
 const DOWNLOADING_MS = 10_000;
-/** Otherwise often enough, without hammering Radarr or Sonarr. */
+/** Otherwise, without hammering Radarr or Sonarr. */
 const SETTLED_MS = 5 * 60 * 1000;
 
 /**
- * How often to ask again: every few seconds while something is downloading,
- * so the line keeps up with the status badge beside it, which reads the same
- * downloads; every few minutes otherwise.
+ * Poll interval: seconds while downloading, to keep pace with the status
+ * badge; minutes otherwise.
  */
 export const etaRefreshInterval = (etas: (RequestEta | undefined)[]): number =>
   etas.some((eta) => eta?.stage === 'downloading')
     ? DOWNLOADING_MS
     : SETTLED_MS;
 
-/**
- * Estimates for several requests in one call — a page of request cards asks
- * once, not once per card.
- */
+/** Estimates for several requests in one call, so a page of cards asks once. */
 const useRequestEtas = (ids: number[]) => {
   const on = useFeature('arrivalEstimates');
   const key =

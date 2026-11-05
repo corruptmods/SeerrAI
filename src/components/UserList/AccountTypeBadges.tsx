@@ -8,7 +8,7 @@ import {
 import type { MediaServerKind } from '@server/constants/server';
 import { useIntl } from 'react-intl';
 
-// Under the user list's names, which are already translated.
+// Kept under the UserList ids, which are already translated.
 const messages = defineMessages('components.UserList', {
   plexuser: 'Plex User',
   localuser: 'Local User',
@@ -26,9 +26,8 @@ interface AccountTypeBadgesProps {
 }
 
 /**
- * What kind of account someone has: a badge for each media server they
- * have an account linked from, their main one first (also while it waits
- * for them to sign in with it for the first time), or Local User.
+ * A badge per linked media server account, main one first (even before its
+ * first sign-in), or Local User.
  */
 const AccountTypeBadges = ({ user }: AccountTypeBadgesProps) => {
   const intl = useIntl();

@@ -17,7 +17,7 @@ import logger from '@server/logger';
 import AsyncLock from '@server/utils/asyncLock';
 import { randomUUID } from 'crypto';
 
-// Default scan rates (can be overidden)
+// Default scan rates; subclasses can override them.
 const BUNDLE_SIZE = 20;
 const UPDATE_RATE = 4 * 1000;
 
@@ -42,10 +42,10 @@ export interface MediaIds {
 interface ProcessOptions {
   is4k?: boolean;
   mediaAddedAt?: Date;
-  /** The media server that listed the title, and its id for it there. */
+  /** The media server that listed the title, and its item id there. */
   mediaServer?: MediaServerKind;
   itemId?: string;
-  /** Plex's id for the title: the same as mediaServer 'plex' and itemId. */
+  /** Plex's id for the title; same as mediaServer 'plex' plus itemId. */
   ratingKey?: string;
   imdbId?: string;
   serviceId?: number;
@@ -66,12 +66,11 @@ export interface ProcessableSeason {
 }
 
 /**
- * A blocklisted title is left exactly as it is.
+ * Scans never change a blocklisted title.
  *
  * Blocklisting removes it from Radarr or Sonarr and deletes its files, but
- * Plex can keep listing a deleted file until its trash is emptied. Without
- * this, the next scan would find that file and mark the title available again,
- * silently undoing the blocklist.
+ * Plex can keep listing a deleted file until its trash is emptied; a scan
+ * would then mark the title available again, silently undoing the blocklist.
  */
 export const isBlocklisted = (media: Media): boolean =>
   media.status === MediaStatus.BLOCKLISTED ||
@@ -90,9 +89,9 @@ const serverItemOf = ({
 };
 
 /**
- * One lock for every scanner: the Plex, Jellyfin, Emby, Radarr and Sonarr
- * scans can each find the same title at the same moment, and two of them
- * creating it at once would leave it in the library twice.
+ * One lock shared by every scanner: Plex, Jellyfin, Emby, Radarr and Sonarr
+ * scans can find the same title at once, and concurrent creates would add
+ * it twice.
  */
 const sharedLock = new AsyncLock();
 
@@ -318,14 +317,12 @@ class BaseScanner<T> {
   }
 
   /**
-   * processShow takes a TMDB ID and an array of ProcessableSeasons, which
-   * should include the total episodes a sesaon has + the total available
-   * episodes that each season currently has. Unlike processMovie, this method
-   * does not take an `is4k` option. We handle both the 4k _and_ non 4k status
-   * in one method.
+   * Processes a show from its seasons' total and available episode counts.
+   * Unlike processMovie there is no `is4k` option: 4K and non-4K status are
+   * handled together.
    *
-   * Note: If 4k is not enable, ProcessableSeasons should combine their episode counts
-   * into the normal episodes properties and avoid using the 4k properties.
+   * With 4K disabled, put all episode counts in the standard fields, not the
+   * 4K ones.
    */
   protected async processShow(
     tmdbId: number,
@@ -378,9 +375,9 @@ class BaseScanner<T> {
           (es) => es.seasonNumber === season.seasonNumber
         );
 
-        // The server's id is set here, as it needs the episode counts. Only
-        // the server that listed the show is written: another server's id,
-        // or Sonarr's scan (which has none), leaves the ids as they are.
+        // Set the server's item id here, where episode counts are known. Only
+        // the listing server's id is written; other servers' ids and Sonarr
+        // scans (which have none) leave ids unchanged.
         if (media && item) {
           const [idColumn, idColumn4k] = MEDIA_ID[item.kind];
           if (season.episodes > 0 && media[idColumn] !== item.id) {
@@ -419,9 +416,8 @@ class BaseScanner<T> {
             );
           }
 
-          // Here we update seasons if they already exist.
-          // If the season is already marked as available, we
-          // force it to stay available (to avoid competing scanners)
+          // An available season stays available, so competing scanners
+          // don't flip it.
           existingSeason.status =
             (season.totalEpisodes === season.episodes && season.episodes > 0) ||
             existingSeason.status === MediaStatus.AVAILABLE
@@ -440,7 +436,7 @@ class BaseScanner<T> {
                     ? MediaStatus.UNKNOWN
                     : existingSeason.status;
 
-          // Same thing here, except we only do updates if 4k is enabled
+          // Same for 4K, only when 4K is enabled.
           existingSeason.status4k =
             (this.enable4kShow &&
               season.episodes4k === season.totalEpisodes &&
@@ -502,8 +498,8 @@ class BaseScanner<T> {
           ) ?? []
         ).length;
 
-        // If at least one new season has become available, update
-        // the lastSeasonChange field so we can trigger notifications
+        // A newly available season updates lastSeasonChange, which triggers
+        // notifications.
         if (newStandardSeasonsAvailable > currentStandardSeasonsAvailable) {
           this.log(
             `Detected ${
@@ -578,8 +574,8 @@ class BaseScanner<T> {
           this.recordStatusReset(media.id, true);
         }
       } else {
-        // For new media, check actual newSeasons objects instead of scanner
-        // input to determine overall availability status
+        // New media: derive overall availability from the new seasons, not
+        // the scanner input.
         const nonSpecialNewSeasons = newSeasons.filter(
           (s) => s.seasonNumber !== 0
         );
@@ -746,8 +742,7 @@ class BaseScanner<T> {
     reason: string
   ): Promise<void> {
     request.status = MediaRequestStatus.DECLINED;
-    // Ensure that the media relation is set so the AfterUpdate
-    // notification hook can resolve it
+    // The AfterUpdate notification hook needs the media relation.
     request.media = media;
     await getRepository(MediaRequest).save(request);
     this.log(
@@ -927,14 +922,8 @@ class BaseScanner<T> {
   }
 
   /**
-   * Call startRun from child class whenever a run is starting to
-   * ensure required values are set
-   *
-   * Returns the session ID which is requried for the cleanup method
-   */
-  /**
-   * The media server lists this title: downloads Radarr or Sonarr imported
-   * for it before this scan began are no longer shown as on their way.
+   * The media server lists this title, so downloads Radarr or Sonarr
+   * imported for it before this scan began stop showing as on their way.
    */
   private listed(
     media: Media | null | undefined,
@@ -959,14 +948,11 @@ class BaseScanner<T> {
   private runStartedAt = 0;
 
   /**
-   * A media server item belongs to one title. When the media server matches
-   * a file to another title than before (Plex first took a new show
-   * "Wrenna" for "The Wrenna Diaries", then was corrected), the title it
-   * left no longer has it: without this, both showed as available, and
-   * the wrong one stayed so. A title the item leaves that Sonarr or Radarr
-   * never had, and no other media server has either, goes back to unknown;
-   * one they have keeps its status for the availability sync to judge from
-   * them.
+   * A media server item belongs to one title. When the server rematches a
+   * file to a different title, the old title loses the item; otherwise both
+   * show as available. An old title that Sonarr or Radarr never had and no
+   * other media server lists goes back to unknown; one they have keeps its
+   * status for the availability sync to judge.
    */
   private async releaseElsewhere(media: Media, is4k: boolean) {
     const statusKey = is4k ? 'status4k' : 'status';
@@ -998,6 +984,10 @@ class BaseScanner<T> {
     }
   }
 
+  /**
+   * Call from a child class when a run starts. Returns the session id that
+   * endRun needs.
+   */
   protected startRun(): string {
     const settings = getSettings();
     const sessionId = randomUUID();
@@ -1029,9 +1019,7 @@ class BaseScanner<T> {
     return sessionId;
   }
 
-  /**
-   * Call at end of run loop to perform cleanup
-   */
+  /** Call at the end of a run to clean up. */
   protected endRun(sessionId: string): void {
     if (this.sessionId === sessionId) {
       this.running = false;

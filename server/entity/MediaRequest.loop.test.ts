@@ -10,13 +10,13 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /**
- * Pins the path behind a live loop: TMDB 226491 requested as a movie with
- * TVDB 497315, which media 336745 already holds. Every three minutes it
- * notified and left no row behind.
+ * Pins the path behind a live loop: TMDB 226491 requested as a movie with TVDB
+ * 497315, which media 336745 already holds, notifying every three minutes and
+ * leaving no row.
  *
- * These pass, which is the point — on SQLite the media row persists and the
- * repeat is refused, so the request logic is sound and the live divergence is
- * elsewhere. They guard the two properties the loop violated.
+ * These pass by design: on SQLite the media row persists and the repeat is
+ * refused, so the request logic is sound. They guard the two properties the
+ * loop violated.
  */
 describe('repeat auto-requests for a colliding title', () => {
   setupTestDb();
@@ -35,13 +35,13 @@ describe('repeat auto-requests for a colliding title', () => {
   beforeEach(async () => {
     stub('getMovie', {
       id: 226491,
-      title: 'Phantom',
+      title: 'Lantern Song',
       release_date: '2022-01-01',
       external_ids: { tvdb_id: 497315 },
     });
     stub('getTvShow', {
       id: 226491,
-      name: 'HOLLOWAY',
+      name: 'Harbour Lights',
       first_air_date: '2022-09-21',
       external_ids: { tvdb_id: 497315 },
       seasons: [{ season_number: 1, episode_count: 10 }],
@@ -108,7 +108,7 @@ describe('repeat auto-requests for a colliding title', () => {
     await attempt();
     const second = await attempt();
 
-    // The second attempt should be refused as a duplicate, not create another.
+    // The second attempt must be refused as a duplicate, not create another.
     assert.ok(second instanceof Error, 'a repeat must be refused');
     assert.equal(await getRepository(MediaRequest).countBy({}), 1);
   });

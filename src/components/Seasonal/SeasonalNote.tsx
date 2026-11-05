@@ -25,12 +25,10 @@ const messages = defineMessages('components.Seasonal.SeasonalNote', {
 });
 
 /**
- * The first time someone sees a season, a note says what it is and until
- * when, with Keep and Turn off. Turn off is for this season only, until it
- * ends; seasonal themes are switched off for good in Appearance settings.
- * Their answer is kept with their account, so no other device asks again.
- * A banner above the page on a computer, a sheet above the bottom bar on a
- * phone. It waits its turn behind other notices (NoticeQueue).
+ * First-sight note for a season, with Keep and Turn off (this season only;
+ * Appearance settings disable seasons for good). The answer is stored on the
+ * account so other devices don't ask. A banner on desktop, a sheet on phones;
+ * queued behind other notices (NoticeQueue).
  */
 const SeasonalNote = () => {
   const intl = useIntl();
@@ -38,7 +36,7 @@ const SeasonalNote = () => {
   const { addToast } = useToasts();
   const { user, revalidate } = useUser();
   const { season, current } = useTheme();
-  // Answered on this page: gone at once, before the account says so.
+  // Hide at once, before the account update arrives.
   const [answered, setAnswered] = useState<string>();
 
   const due =
@@ -60,7 +58,7 @@ const SeasonalNote = () => {
         `/api/v1/user/${user.id}/settings/appearance/season`,
         { season: current.key, choice }
       );
-      // Turning it off takes the season away at once.
+      // Turning off removes the season at once.
       if (user.settings) {
         await revalidate(
           {
@@ -93,9 +91,8 @@ const SeasonalNote = () => {
       enter="motion-safe:transition motion-safe:duration-300"
       enterFrom="motion-safe:translate-y-4 opacity-0"
       enterTo="translate-y-0 opacity-100"
-      // A sheet above the bottom bar on a phone (over Discover's customize
-      // button, which shares the spot), and above safe mode's note when
-      // that is showing there too; in the page from tablets up.
+      // On phones a sheet above the bottom bar (over Discover's customize
+      // button) and above safe mode's note; inline from tablets up.
       className="absolute-bottom-shift fixed inset-x-3 z-[51] sm:static sm:z-auto sm:mb-4 [[data-safe=on]_&]:bottom-[calc(9.5rem+env(safe-area-inset-bottom))]"
     >
       <div className="flex flex-col gap-3 rounded-xl border border-accent bg-surface p-4 shadow-xl sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:rounded-lg sm:bg-accent/10 sm:shadow-none">

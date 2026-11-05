@@ -13,13 +13,7 @@ interface MergedQueryString {
   path: string;
 }
 
-/**
- * Returns a filtered object containing only key/value pairs that don't exist in the current
- * router path.
- *
- * @param router Nextjs router instance
- * @param filters Object containing key value pairs for filter items that should be cleaned
- */
+/** The filters whose keys don't appear in the router pathname (route params). */
 export const filterQueryString = (
   router: NextRouter,
   filters: ParsedUrlQuery
@@ -36,32 +30,11 @@ export const filterQueryString = (
 };
 
 /**
- * Takes a query paramter object and returns a new pathname and path
- * with the new values appended.
+ * The router's pathname and path with `query` merged in. Existing keys are
+ * updated; empty or null values remove the key.
  *
- * - If the value already exists, it is updated.
- * - If a key with the value of null is passed, it will be removed from
- *   the current query paramters
- *
- * ## Example usage:
- *
- * If the current URL is `/foo?bar=test` and you want to add a new query parameter, you
- * can do the following:
- *
- * ```
- * const newRoute = mergeQueryString(router, { newParam: 'value' });
- * ```
- * NewRoute will become
- *
- * ```
- * {
- *  pathName: '/foo?bar=test&newParam=value',
- *   path: '/foo?bar=test&newParam=value'
- * }
- * ```
- *
- * @param router Nextjs router instance
- * @param query Key/value pair object containing query paramters
+ * e.g. on `/foo?bar=test`, `{ newParam: 'value' }` gives
+ * `/foo?bar=test&newParam=value` for both.
  */
 export const mergeQueryString = (
   router: NextRouter,
@@ -73,7 +46,7 @@ export const mergeQueryString = (
 
   const queryArray: string[] = [];
 
-  Object.keys(mergedQuery).map((key) => {
+  Object.keys(mergedQuery).forEach((key) => {
     if (mergedQuery[key]) {
       queryArray.push(`${key}=${mergedQuery[key]}`);
     }
@@ -81,22 +54,15 @@ export const mergeQueryString = (
 
   const pathWithoutQuery = router.asPath.match(/(.*)\?.*/);
   const asPath = pathWithoutQuery ? pathWithoutQuery[1] : router.asPath;
+  const search = queryArray.length > 0 ? `?${queryArray.join('&')}` : '';
 
-  const pathname = `${router.pathname}${
-    queryArray.length > 0 ? `?${queryArray.join('&')}` : ''
-  }`;
-  const path = `${asPath}${
-    queryArray.length > 0 ? `?${queryArray.join('&')}` : ''
-  }`;
+  const pathname = `${router.pathname}${search}`;
+  const path = `${asPath}${search}`;
 
   return { pathname, path };
 };
 
-/**
- * useQueryParams hook is used just to provide a callback with a nextjs
- * router instance attached to it. The returned method can be called with
- * an object of key/value pairs to route the user with the new query paramters
- */
+/** A callback that routes to the current page with the given query params merged in. */
 export const useQueryParams = (): UseQueryParamReturnedFunction => {
   const router = useRouter();
 

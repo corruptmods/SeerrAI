@@ -10,8 +10,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import * as Yup from 'yup';
 
-// The form's words keep the ids they had in Settings → Services' own
-// Prowlarr form, so their translations still apply.
+// Message ids predate this modal, so existing translations still apply.
 const messages = defineMessages('components.Settings.SettingsProwlarr', {
   addProwlarr: 'Add Prowlarr',
   editProwlarr: 'Edit Prowlarr',
@@ -30,7 +29,7 @@ const messages = defineMessages('components.Settings.SettingsProwlarr', {
   validationApiKeyRequired: 'You must provide the API key',
 });
 
-/** Prowlarr's connection as Settings sends it: no key, only that one is set. */
+/** As Settings sends it: no key, only whether one is set. */
 export interface ShownProwlarr {
   hostname: string;
   port: number;
@@ -54,16 +53,12 @@ interface FormValues {
   apiKey: string;
 }
 
-/**
- * Adding or editing Prowlarr, as the other services are: tested before it
- * can be added, and tested again by the server before it is saved.
- */
+/** Adds or edits Prowlarr: tested before adding, retested by the server on save. */
 const ProwlarrModal = ({ prowlarr, onClose, onSave }: ProwlarrModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
-  // Editing starts from a Prowlarr that already worked; a new one must pass
-  // a test before it can be added.
+  // Editing starts from a working Prowlarr; a new one must pass a test first.
   const [isValidated, setIsValidated] = useState(!!prowlarr);
 
   const schema = Yup.object().shape({
@@ -119,8 +114,7 @@ const ProwlarrModal = ({ prowlarr, onClose, onSave }: ProwlarrModalProps) => {
     }
   };
 
-  // Changing where Prowlarr is, or its key, means the earlier test no
-  // longer counts.
+  // A new address or key voids the earlier test.
   const connectionField = (
     setFieldValue: (field: string, value: unknown) => void,
     field: keyof FormValues,

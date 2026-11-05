@@ -31,11 +31,7 @@ enum Direction {
   LEFT,
 }
 
-/**
- * A card's place in the row. It tells the card inside, and its picture,
- * when it comes near the screen along the row, so the next few cards are
- * ready before they are swiped to.
- */
+/** A card slot that tells its card when it nears the screen along the row, so upcoming cards preload. */
 const Slot = ({ children }: { children: ReactNode }) => {
   const { ref, nearness } = useNearObserver();
   return (
@@ -55,8 +51,7 @@ const Slider = ({
 }: SliderProps) => {
   const intl = useIntl();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // The row's cards are measured against the box they scroll in, once the
-  // row itself is near the screen.
+  // Cards are measured against the scroll container once the row is near.
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const setContainer = useCallback((element: HTMLDivElement | null) => {
     containerRef.current = element;
@@ -70,10 +65,9 @@ const Slider = ({
   const row = useMemo(() => ({ root, near: rowNear }), [root, rowNear]);
   const [scrollPos, setScrollPos] = useState({ isStart: true, isEnd: false });
 
-  // The parent builds a new items array every time it renders; only how many
-  // there are (and the loading placeholders) change what the arrows should
-  // show. Measuring the row forces a layout, so it is done when those change,
-  // not on every render.
+  // The parent passes a new items array each render; only the count (and
+  // placeholders) affect the arrows. Measuring forces layout, so only re-measure
+  // when those change.
   const itemCount = items?.length ?? 0;
 
   const handleScroll = useCallback(() => {
@@ -96,8 +90,7 @@ const Slider = ({
       next = { isStart: true, isEnd: false };
     }
 
-    // Keep the same object when nothing changed, so the row does not
-    // re-render for nothing.
+    // Keep the same object when unchanged, to avoid a re-render.
     setScrollPos((current) =>
       current.isStart === next.isStart && current.isEnd === next.isEnd
         ? current
@@ -111,7 +104,7 @@ const Slider = ({
     [handleScroll]
   );
 
-  // A pending measurement must not run after the row is gone.
+  // Cancel a pending measurement on unmount.
   useEffect(() => () => debouncedScroll.cancel(), [debouncedScroll]);
 
   useEffect(() => {
@@ -126,7 +119,7 @@ const Slider = ({
     };
   }, [debouncedScroll]);
 
-  // Loading adds or removes the placeholders, which changes the width too.
+  // Loading toggles placeholders, which changes the width.
   useEffect(() => {
     handleScroll();
   }, [handleScroll, isLoading]);

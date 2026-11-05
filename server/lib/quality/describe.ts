@@ -26,13 +26,13 @@ import type {
 import { getSettings } from '@server/lib/settings';
 
 /*
- * What it does: one preset on one server, laid out for an admin. All but
- * Try a release name and Recent grabs come from the profile as Seerr AI
- * builds it, so it is exact without asking the server; those two ask
- * Radarr or Sonarr.
+ * What it does: one preset on one server, described for an admin.
+ * Everything except Try a release name and Recent grabs comes from the
+ * profile Seerr AI builds, so it is exact without querying the server;
+ * those two query Radarr or Sonarr.
  */
 
-/** Qualities nobody would choose, left out of "not allowed". */
+/** Qualities nobody would pick, omitted from "not allowed". */
 const NEVER_LISTED = new Set([
   'Unknown',
   'WORKPRINT',
@@ -65,18 +65,18 @@ export interface Description {
     name: string;
     goal: boolean;
     lowest: boolean;
-    /** Sonarr v5, MB a minute. */
+    /** Sonarr v5, MB per minute. */
     maxMbMin?: number;
   }[];
   notAllowed: string[];
-  /** Radarr: films over this are a last resort. */
+  /** Radarr: movies over this size are a last resort. */
   sizeCapGb?: number;
   sizesOnProfile: boolean;
   /** Formats that raise a release, best band first. */
   bands: { score: number; formats: DescribedFormat[] }[];
-  /** Formats whose score is 0 because of a choice or the bands. */
+  /** Formats scored 0 by a choice or by the bands. */
   nothing: DescribedFormat[];
-  /** Taken only when nothing else is out. */
+  /** Taken only when nothing else is available. */
   lastResort: DescribedFormat[];
   never: DescribedFormat[];
   bandStep: number;
@@ -84,7 +84,7 @@ export interface Description {
   preferredProtocol?: 'usenet' | 'torrent';
   torrentDelayMinutes?: number;
   minFormatScore: number;
-  /** In Radarr or Sonarr as built here. */
+  /** Applied in Radarr or Sonarr exactly as built here. */
   applied: boolean;
 }
 
@@ -103,10 +103,7 @@ const describeFormat = (format: ScoredFormat): DescribedFormat => ({
   changes: format.changes,
 });
 
-/**
- * Choices on the page not saved yet, which What it does shows as they
- * would be: the saved ones stand for anything left out.
- */
+/** Unsaved page choices for What it does; saved ones fill any gaps. */
 export type DraftChoices = Partial<
   Pick<
     QualityServerSettings,
@@ -114,7 +111,7 @@ export type DraftChoices = Partial<
   >
 >;
 
-/** Builds what a server's preset is, or throws when it isn't one. */
+/** Builds a server's preset profile; throws if unmanaged or preset off. */
 const desiredOf = async (
   ref: QualityServerRef,
   preset: PresetKey,
@@ -177,7 +174,7 @@ export const describe = async (
   const scores = [...new Set(positive.map((f) => f.score))].sort(
     (a, b) => b - a
   );
-  // A film over the size limit is said with the qualities (sizeCapGb).
+  // The size-cap format is reported with the qualities (sizeCapGb), not here.
   const never = profile.formats
     .filter(
       (f) =>
@@ -207,8 +204,8 @@ export const describe = async (
       key: preset,
     },
   });
-  // In Radarr or Sonarr, and as these choices make it (the page's, which
-  // may not be the ones applied).
+  // Present in Radarr or Sonarr, and matching the page's choices when given
+  // (they may differ from the applied ones).
   const applied =
     !!rows.length &&
     ctx.profiles.some((p) => p.id === rows[0].arrId) &&
@@ -263,14 +260,14 @@ export type TryVerdict =
 export interface TryResult {
   quality?: string;
   matched: { name: string; score: number }[];
-  /** Radarr or Sonarr couldn't tell its language from the name. */
+  /** Radarr or Sonarr couldn't detect the language from the name. */
   languageUnknown: boolean;
   result: TryVerdict;
 }
 
 /**
- * Whether this profile would take a name: as it is in Radarr or Sonarr, or
- * as the choices on the page would make it.
+ * Whether this profile would take a release name, as it is in Radarr or
+ * Sonarr or as the page's choices would make it.
  */
 export const tryName = async (
   ref: QualityServerRef,
@@ -309,8 +306,7 @@ export const tryName = async (
   let min: number;
   let reach: number;
   if (choices) {
-    // As the page's choices would make it: the formats Radarr or Sonarr
-    // matched, scored as they would be.
+    // Score the formats Radarr or Sonarr matched as the page's choices would.
     const { profile: wanted } = await desiredOf(ref, preset, choices);
     const byName = new Map(wanted.formats.map((f) => [f.name, f.score]));
     matched = parsed.formats.map((f) => ({
@@ -363,12 +359,12 @@ export interface RecentGrab {
   score: number;
   protocol: 'usenet' | 'torrent' | null;
   quality?: string;
-  /** Seerr AI grabbed it itself, so what it beat is known. */
+  /** Grabbed by Seerr AI itself, so what it beat is known. */
   bySeerr: boolean;
   wonTie: boolean;
 }
 
-/** The latest grabs onto this preset's profile, newest first. */
+/** Latest grabs onto this preset's profile, newest first. */
 export const recentGrabs = async (
   ref: QualityServerRef,
   preset: PresetKey,
@@ -418,7 +414,7 @@ export const serverFormats = async (
 ): Promise<ServerFormat[]> => {
   const config = configFor(ref);
   const ctx = await loadContext(ref);
-  // Without nudges, so a format's own score is what is listed.
+  // Without nudges, so each format lists its own score.
   const desired = desiredFor(
     { ...config, nudges: {} },
     ctx.facts,

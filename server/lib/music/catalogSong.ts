@@ -9,23 +9,21 @@ import { otherTake, splitTitle } from '@server/lib/music/songs';
 import { getSettings } from '@server/lib/settings';
 
 /*
- * A song as the stores list it, looked up on Deezer by its title, artist
- * and length: its ISRC, the code of the very recording, to match it on
- * MusicBrainz by, and the album and track it is found on there, for adding
- * it to MusicBrainz when MusicBrainz has no such song.
+ * Looks up a song on Deezer by title, artist and length, for its ISRC (to
+ * match on MusicBrainz) and its album and track (to add it to MusicBrainz
+ * when missing).
  */
 
-/** Lengths further apart than this are another recording. */
+/** Lengths further apart than this are a different recording. */
 const SAME_LENGTH_MS = 4000;
 
 export interface CatalogSong {
-  /** Deezer's id for the track. */
   deezerId: number;
   title: string;
   artistName: string;
-  /** ISRC, in capitals, when Deezer has one. */
+  /** Uppercase ISRC, when Deezer has one. */
   isrc: string | null;
-  /** Deezer's id for its album, and the album's title. */
+  /** Deezer album id and title. */
   albumId: number;
   album: string;
   trackNumber: number | null;
@@ -36,17 +34,15 @@ export interface CatalogSong {
   length: number;
 }
 
-/** Whether Deezer is asked: on unless turned off in Settings → Music. */
+/** Deezer lookups are on unless turned off in Settings → Music. */
 export const catalogOn = (): boolean => getSettings().music.deezer !== false;
 
 const ISRC = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 /**
- * Which of Deezer's tracks is the song a playlist names: by one of the
- * artists it credits, titled as it is, the same take (never a live or
- * remixed one the title doesn't name), and as long as it is, when its
- * length is known. A track titled in full as the playlist titles it comes
- * first, then the nearest in length, then the best known.
+ * Picks the Deezer track matching a playlist song: a credited artist, same
+ * title and take (no unnamed live or remix), and similar length when known.
+ * Prefers an exact full title, then nearest length, then Deezer's order.
  */
 export const trackFor = (
   tracks: DeezerTrack[],
@@ -84,10 +80,7 @@ export const trackFor = (
     )[0]?.t;
 };
 
-/**
- * The song on Deezer, or null when Deezer has no such track. Throws when
- * Deezer can't be asked.
- */
+/** The song on Deezer, or null if absent. Throws when Deezer fails. */
 export const catalogSong = async (
   title: string,
   artistName: string,
@@ -121,10 +114,7 @@ export const catalogSong = async (
   };
 };
 
-/**
- * Harmony, which fills in MusicBrainz's form for adding a release from a
- * store's listing of it: the way to add a song MusicBrainz doesn't have.
- */
+/** Harmony prefills MusicBrainz's add-release form from a store listing. */
 export const HARMONY_URL = 'https://harmony.pulsewidth.org.uk';
 
 export const addToMusicBrainzUrl = (albumId: number): string =>

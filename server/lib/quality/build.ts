@@ -44,19 +44,19 @@ import type {
 import { PRESET_KEYS } from '@server/lib/quality/types';
 
 /*
- * What one server's quality profiles should be, from its choices: each
- * preset's ladder and the score of every format in it, built the same way
- * every time (base, gaps filled, adjustments, bands, nudges), so it can be
- * shown before it is sent. Nothing here talks to a server.
+ * One server's desired quality profiles from its choices: each preset's
+ * ladder and format scores, built in a fixed order (base, gaps filled,
+ * adjustments, bands, nudges) so it can be previewed before sending.
+ * Nothing here calls a server.
  */
 
-/** TRaSH Guides' AV1 format, which never takes AV1. */
+/** TRaSH Guides' AV1 format, which blocks AV1. */
 const TRASH_AV1: Record<ArrKind, string> = {
   radarr: 'cae4ca30163749b891686f95532519bd',
   sonarr: '15a05bc7c1a36e2b57fd628f8977e2fc',
 };
 
-/** TRaSH Guides' x265 (HD) format, which never takes x265 at 1080p. */
+/** TRaSH Guides' x265 (HD) format, which blocks x265 at 1080p. */
 const TRASH_X265_HD: Record<ArrKind, string> = {
   radarr: 'dc98083864ea246d05a42df0d05f81cc',
   sonarr: '47435ece6b99a0b477caf360e79ba0bb',
@@ -68,7 +68,7 @@ export interface DesiredFormat {
   format: ArrCustomFormat;
 }
 
-/** Why a format's score is not the one its source gives it. */
+/** Why a format's score differs from its source's. */
 export type ScoreChange =
   | { kind: 'rounded'; from: number }
   | { kind: 'nudged'; nudge: Nudge }
@@ -79,14 +79,14 @@ export type ScoreChange =
 
 export interface ScoredFormat {
   key: string;
-  /** As Radarr or Sonarr shows it. */
+  /** Name as shown in Radarr or Sonarr. */
   name: string;
   origin: 'seerr' | 'trash';
   score: number;
   changes: ScoreChange[];
-  /** The TRaSH Guides group it came in with. */
+  /** The TRaSH Guides group that added it. */
   group?: string;
-  /** TRaSH Guides' own score, before anything here changed it. */
+  /** TRaSH Guides' original score, before any changes here. */
   raw?: number;
 }
 
@@ -110,15 +110,15 @@ export interface DesiredProfile {
   cutoffFormatScore: number;
   minUpgradeFormatScore: number;
   formats: ScoredFormat[];
-  /** Sonarr v5: sizes per quality, in MB a minute. */
+  /** Sonarr v5: per-quality sizes in MB per minute. */
   sizes?: QualitySize[];
-  /** Radarr: films over this many GB are a last resort. */
+  /** Radarr: movies over this many GB are a last resort. */
   sizeCapGb?: number;
 }
 
 export interface DesiredDelay {
   preferredProtocol: 'usenet';
-  /** Minutes torrents wait; null leaves the wait as it is. */
+  /** Torrent delay in minutes; null leaves it unchanged. */
   torrentDelay: number | null;
 }
 
@@ -152,8 +152,8 @@ export interface ServerFacts {
 }
 
 /**
- * Names Seerr AI's own formats have, which no TRaSH Guides one may take,
- * in any case (see foldName).
+ * Seerr AI's own format names; no TRaSH Guides format may use one, in any
+ * case (see foldName).
  */
 const SEERR_NAMES = new Set(
   [
@@ -170,9 +170,9 @@ const SEERR_NAMES = new Set(
 );
 
 /**
- * A TRaSH Guides format's name in the app. Names there are unique, so one
- * named like a format of Seerr AI's own (AV1, Upscaled, Wrong Language)
- * says where it is from.
+ * A TRaSH Guides format's name in the app. Names must be unique, so one that
+ * clashes with a Seerr AI format (AV1, Upscaled, Wrong Language) gets a
+ * "(TRaSH Guides)" suffix.
  */
 const trashFormatName = (name: string) => {
   const named = `${NAME_PREFIX}${name}`;
@@ -202,7 +202,7 @@ const seerrScored = (
   },
 });
 
-/** The rules Seerr AI adds to any preset: gaps TRaSH Guides doesn't fill. */
+/** Rules Seerr AI adds to every preset: gaps TRaSH Guides doesn't fill. */
 const gapRules = (
   config: QualityServerSettings,
   preset: PresetKey,
@@ -223,7 +223,7 @@ const gapRules = (
   return out;
 };
 
-/** What any preset gets from the adjustments: language and file size. */
+/** Rules every preset gets from the adjustments: language and file size. */
 const adjustmentRules = (
   config: QualityServerSettings,
   preset: PresetKey,
@@ -232,8 +232,8 @@ const adjustmentRules = (
   const out: { def: DesiredFormat; scored: ScoredFormat }[] = [];
   const lang = languageFormat(config.adjustments.languages);
   if (lang) out.push(seerrScored(lang, NEVER));
-  // Radarr keeps sizes for the whole server, so a film over the preset's
-  // size is turned away by a format instead.
+  // Radarr sizes are server-wide, so a format rejects movies over the
+  // preset's size instead.
   const sizeCapGb =
     facts.kind === 'radarr'
       ? filmCapGb(sizeOf(config, preset), preset)
@@ -249,7 +249,7 @@ const flatQualities = (items: ArrProfileItem[]): ArrProfileItem[] =>
     item.quality ? [item] : flatQualities(item.items ?? [])
   );
 
-/** Sonarr v5: each allowed quality's sizes, capped by the preset's size. */
+/** Sonarr v5: each allowed quality's sizes, capped at the preset's size. */
 const sizesFor = (
   config: QualityServerSettings,
   preset: PresetKey,
@@ -406,8 +406,8 @@ const trashProfile = (
       trashName: source.name,
       ladder,
       upgradeAllowed: source.upgradeAllowed,
-      // TRaSH Guides' own lowest score where it asks for one above zero
-      // (anime: a known release group); otherwise room for last resorts.
+      // TRaSH Guides' minimum when above zero (anime: a known release
+      // group); otherwise leave room for last resorts.
       minFormatScore:
         source.minFormatScore > 0 ? source.minFormatScore : LOWEST_TAKEN,
       cutoffFormatScore: source.cutoffFormatScore,
@@ -420,7 +420,7 @@ const trashProfile = (
   };
 };
 
-/** Bands, then nudges, then TRaSH Guides' conflicts, on one profile. */
+/** Applies bands, nudges, then TRaSH Guides conflicts to one profile. */
 const finish = (
   profile: DesiredProfile,
   config: QualityServerSettings,
@@ -461,7 +461,7 @@ const finish = (
   }
 };
 
-/** Everything one server should have, from its choices. */
+/** One server's full desired state from its choices. */
 export const buildDesired = (
   config: QualityServerSettings,
   facts: ServerFacts,
@@ -516,8 +516,8 @@ export const buildDesired = (
 };
 
 /**
- * A profile as Radarr or Sonarr takes it, laid out on the app's own empty
- * profile: every quality once, lowest first, the preset's own in its order
+ * A profile in the shape Radarr or Sonarr accepts, laid on the app's empty
+ * profile: every quality once, lowest first, with the preset's own in order
  * at the top.
  */
 export const materialize = (
@@ -558,7 +558,7 @@ export const materialize = (
   let nextGroupId = 1000;
   const top: ArrProfileItem[] = [];
   let cutoff: number | undefined;
-  // Lowest first, as the apps keep them.
+  // Lowest first, as the apps store them.
   for (const entry of [...desired.ladder.entries].reverse()) {
     const members =
       entry.items ??

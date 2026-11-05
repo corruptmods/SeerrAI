@@ -11,9 +11,9 @@ import type {
 } from '@server/lib/downloadtracker';
 
 /*
- * Where a Backfill download stands: what its client says it is doing, in
- * words, how far along its chosen files are, and how the download tracker
- * shows it beside Radarr's and Sonarr's own downloads.
+ * A Backfill download's state: the client's activity in words, progress over
+ * the chosen files, and how the download tracker shows it beside Radarr's
+ * and Sonarr's downloads.
  */
 
 const STAGE: Record<string, DownloadStage> = {
@@ -29,8 +29,8 @@ const clock = (seconds: number) =>
     .join(':');
 
 /**
- * A job as the download tracker shows downloads: what it has still to
- * bring, or (imported) what it has brought.
+ * A job as download tracker items: what is still to come, or (imported)
+ * what has arrived.
  */
 const downloadsOf = (
   job: BackfillJob,
@@ -52,7 +52,7 @@ const downloadsOf = (
   };
   if (row.kind === 'album') {
     if (imported && !(job.status === 'done' && job.imported > 0)) return [];
-    // Music is followed by its artist, each download naming its album.
+    // Music is tracked under its artist, each download naming its album.
     if (!row.artistArrId) return [];
     return [
       {
@@ -91,7 +91,7 @@ const downloadsOf = (
       },
     ];
   }
-  // Each episode its own item, its share of what is left.
+  // One item per episode, with its share of what's left.
   const left = job.size ? job.sizeLeft / job.size : 1;
   return job.files
     .filter(
@@ -121,22 +121,21 @@ const downloadsOf = (
     }));
 };
 
-/** A running job as the download tracker shows downloads. */
+/** A running job's download tracker items. */
 export const backfillDownloadsOf = (
   job: BackfillJob,
   now = Date.now()
 ): BackfillDownload[] => downloadsOf(job, false, now);
 
-/** What a job has imported: each episode, or the movie once it is done. */
+/** A job's imports: each episode, or the movie once done. */
 export const backfillImportsOf = (
   job: BackfillJob,
   now = Date.now()
 ): BackfillDownload[] => downloadsOf(job, true, now);
 
 /**
- * What a Usenet download is doing, in words: the client's own status names
- * ("Running", "Extracting") mean little on their own, and after the
- * download its post-processing can take a while.
+ * A Usenet download's activity in words: client status names ("Running",
+ * "Extracting") mean little alone, and post-processing can take a while.
  */
 export const usenetStage = (
   job: { place: string; status: string },
@@ -171,9 +170,9 @@ export const usenetStage = (
 };
 
 /**
- * What a torrent is doing, in words, and whether the client is holding it
- * back (paused, queued behind its own download limit, or checking): time
- * held back is not time without progress.
+ * A torrent's activity in words, and whether the client is holding it
+ * (paused, queued behind its download limit, checking, moving): held time
+ * doesn't count as stalled.
  */
 export const torrentStage = (
   torrent: { state: TorrentState; speed: number },
@@ -196,7 +195,7 @@ export const torrentStage = (
   }
 };
 
-/** The torrent stages above, which a live reading may update. */
+/** The torrent stages above, which a live reading may replace. */
 export const TORRENT_STAGES = new Set([
   'Downloading',
   'Waiting for peers',
@@ -211,18 +210,18 @@ export const TORRENT_STAGES = new Set([
   }),
 ]);
 
-/** Where a download stands, as its page shows it. */
+/** A download's progress, as its page shows it. */
 export interface Progress {
   progress: number;
   size: number;
   sizeLeft: number;
   speed: number;
   secondsLeft: number | null;
-  /** What it is doing, read live: downloading, or waiting for peers. */
+  /** Live activity: downloading, or waiting for peers. */
   stage?: string;
 }
 
-/** A torrent's progress over the chosen files only, not the whole pack. */
+/** A torrent's progress over the chosen files only. */
 export const measureTorrent = (
   job: BackfillJob,
   torrent: { speed: number; secondsLeft?: number },
@@ -241,7 +240,7 @@ export const measureTorrent = (
     sizeLeft,
     progress: size ? Math.floor((have / size) * 100) : 0,
     speed,
-    // The client's own estimate, else what is left at today's speed.
+    // The client's estimate, else what's left at the current speed.
     secondsLeft:
       torrent.secondsLeft ??
       (speed > 0 && sizeLeft > 0 ? Math.round(sizeLeft / speed) : null),

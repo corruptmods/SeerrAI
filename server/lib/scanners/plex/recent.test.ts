@@ -11,10 +11,9 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * The Plex recently added scan: a title Plex added before matching it (or
- * one a lookup failed for) gets another look on later scans, instead of
- * waiting for the nightly full scan; and the window moves on from when it
- * was asked for.
+ * Plex recently added scan: a title added before matching (or whose lookup
+ * failed) is retried on later scans instead of waiting for the nightly full
+ * scan, and the window advances from when it was requested.
  */
 
 const MIN = 60 * 1000;
@@ -43,7 +42,7 @@ describe('another look at what the recently added scan could not place', () => {
     assert.deepEqual(retries.due('1', t0 + 4 * MIN), []);
     assert.equal(retries.due('1', t0 + 5 * MIN).length, 1);
 
-    // Then 10 minutes, 20, 40 … never more than two hours apart.
+    // Then 10, 20, 40 minutes…, capped at two hours apart.
     retries.failed('1', item, 'still', t0 + 5 * MIN);
     assert.deepEqual(retries.due('1', t0 + 14 * MIN), []);
     assert.equal(retries.due('1', t0 + 15 * MIN).length, 1);
@@ -107,8 +106,8 @@ describe('the recently added scan', () => {
       }
     );
     mock.method(PlexAPI.prototype, 'getMetadata', async () => matched);
-    // Placing a title: one Plex has matched works; an unmatched one does
-    // not, as the scanner's own lookup would find no TMDB id.
+    // A matched title places; an unmatched one fails, as the scanner's
+    // lookup finds no TMDB id.
     mock.method(
       Object.getPrototypeOf(plexRecentScanner),
       'processItem',
@@ -139,7 +138,7 @@ describe('the recently added scan', () => {
     assert.equal(plexRecentScanner.retries.count('1'), 1);
     assert.equal(getSettings().plex.libraries[0].lastScan, now);
 
-    // Plex has matched it since; the window has moved past it.
+    // Plex has matched it since, and the window has moved past it.
     added = [];
     matched = movie('plex://movie/abc', {
       Guid: [{ id: 'tmdb://73682' }],
@@ -164,7 +163,7 @@ describe('the recently added scan', () => {
     const libraries: string[] = [];
     mock.method(PlexAPI.prototype, 'getRecentlyAdded', async (id: string) => {
       libraries.push(id);
-      // Switched off in Settings while Movies is being scanned.
+      // Disabled in Settings while Movies is being scanned.
       settings.plex.libraries = settings.plex.libraries.map((l) =>
         l.id === '3' ? { ...l, enabled: false } : l
       );

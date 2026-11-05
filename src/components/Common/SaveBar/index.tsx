@@ -2,28 +2,26 @@ import { FormikContext } from 'formik';
 import { useContext, useEffect, useRef, useState } from 'react';
 
 interface SaveBarProps {
-  /** Whether there are unsaved changes, when the page knows it itself. */
+  /** Unsaved changes, when the page tracks them itself. */
   dirty?: boolean;
   className?: string;
   children: React.ReactNode;
 }
 
 /**
- * A page's Save area. While there are unsaved changes it floats at the
- * bottom of the screen (above the phone's tab bar), wherever the page is
- * scrolled to, so saving never means scrolling to the end; saved, it sits
- * back in its place.
+ * A page's Save area. With unsaved changes it sticks to the bottom of the
+ * screen (above the phone's tab bar); saved, it sits in its place.
  *
- * Unsaved is what the page says (dirty), else what its Formik form says
- * (changed since loaded, and since the last Save), else any change typed
- * or chosen in the form around it since the last click on the bar.
+ * Unsaved comes from `dirty`, else the Formik form (changed since loaded and
+ * since the last Save), else any input in the enclosing form since the last
+ * click on the bar.
  */
 const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
   const formik = useContext(FormikContext);
   const ref = useRef<HTMLDivElement>(null);
   const [touched, setTouched] = useState(false);
-  // Formik forms that don't reload what they saved stay "dirty" after a
-  // Save: the values saved last count as saved.
+  // Formik forms that don't reload after saving stay "dirty", so the last
+  // saved values count as saved.
   const [savedValues, setSavedValues] = useState<string | null>(null);
   const values = formik ? JSON.stringify(formik.values) : null;
   const submitting = !!formik?.isSubmitting;
@@ -38,8 +36,7 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
 
   useEffect(() => {
     if (dirty !== undefined || formik) return;
-    // Its own form, else its own section: a change elsewhere on the page is
-    // another Save's.
+    // Its own form, else section: changes elsewhere belong to another Save.
     const scope =
       ref.current?.closest('form') ??
       ref.current?.closest('section') ??
@@ -62,10 +59,8 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
         ? formik.dirty && values !== savedValues
         : touched;
 
-  // Whether it is held at the bottom of the screen, away from its place.
-  // Where Save is already on screen, as at the end of a short page, or cut
-  // off by an edge of the screen as the page scrolls past it, it looks as
-  // it does saved.
+  // Whether it is stuck to the screen's bottom, away from its place. In its
+  // place on screen, or scrolling past an edge, it looks as when saved.
   const [floating, setFloating] = useState(false);
   useEffect(() => {
     const bar = ref.current;
@@ -76,8 +71,7 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
     let frame = 0;
     const check = () => {
       frame = 0;
-      // Where it is held: its distance from the bottom of the screen, which
-      // changes with the screen's width (the phone's tab bar).
+      // Its sticky offset from the bottom varies with width (phone tab bar).
       const line =
         window.innerHeight - (parseFloat(getComputedStyle(bar).bottom) || 0);
       const box = bar.getBoundingClientRect();
@@ -89,7 +83,7 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
     check();
     window.addEventListener('scroll', soon, { passive: true });
     window.addEventListener('resize', soon);
-    // A page that grows or shrinks moves it without a scroll.
+    // Page resizes move it without a scroll event.
     const observer =
       typeof ResizeObserver === 'undefined'
         ? undefined

@@ -16,9 +16,9 @@ import type { RuleCertification } from '@server/utils/ruleCertification';
 import { parseRuleCertifications } from '@server/utils/ruleCertification';
 
 /**
- * A title's age rating, read as its page reads it: TMDB's rating for the
- * region (for a film, the first of its releases there that has one), or
- * else its US rating. Undefined when it has neither.
+ * A title's age rating as its page reads it: TMDB's rating for the region
+ * (for a film, the first release there with one), else its US rating.
+ * Undefined when neither exists.
  */
 export const titleCertification = (
   tmdbMedia: TmdbMovieDetails | TmdbTvDetails,
@@ -67,7 +67,7 @@ async function overrideRules({
   requestUser: User;
   tags?: number[] | null;
   serviceId?: number;
-  /** The title's own anime setting (Media.animeSetting), if it has one. */
+  /** The title's own anime setting (Media.animeSetting), if set. */
   animeSetting?: boolean | null;
 }): Promise<OverrideRulesResult> {
   const settings = getSettings();
@@ -97,8 +97,8 @@ async function overrideRules({
           where: { [serviceIdField]: serviceId },
         });
 
-  // Anime movies too, once their Radarr server has an anime folder or
-  // profile of its own; until then rules apply to them as to any movie.
+  // Anime movies too, once their Radarr server has its own anime folder or
+  // profile; until then rules treat them as any movie.
   const radarrServer =
     mediaType === MediaType.MOVIE
       ? settings.radarr.find((r) => r.id === serviceId)
@@ -107,22 +107,22 @@ async function overrideRules({
     mediaType === MediaType.TV ||
     !!radarrServer?.activeAnimeDirectory ||
     !!radarrServer?.activeAnimeProfileId;
-  // Whether Seerr takes the title as anime: the request's choice (passed in
-  // as animeSetting), the title's own setting, or else detection.
+  // Whether Seerr treats the title as anime: the request's choice (passed as
+  // animeSetting), the title's own setting, else detection.
   const decidedAnime = animeSetting ?? detectAnime(tmdbMedia);
   const anime = animeSettings && decidedAnime;
 
-  // Read for the server's Discover region, as the title's page reads it for
-  // anyone who has not chosen a region of their own.
+  // Read for the server's Discover region, as the title page does for users
+  // without their own region.
   const certification = rules.some((rule) => rule.certification)
     ? titleCertification(tmdbMedia, settings.main.discoverRegion || 'US')
     : undefined;
 
   const appliedOverrideRules = rules.filter((rule) => {
-    // Anime goes by the anime settings, unless a rule names the anime
-    // keyword to take it over. Anime is told by the request's choice, the
-    // title's own setting, or else the same test as routing (utils/isAnime),
-    // so a title without the keyword is treated alike.
+    // Anime follows the anime settings unless a rule names the anime keyword to
+    // take it over. Anime is decided by the request's choice, the title's
+    // setting, else the routing test (utils/isAnime), so titles without the
+    // keyword are treated the same.
     if (
       anime &&
       (!rule.keywords ||
@@ -156,9 +156,9 @@ async function overrideRules({
       return false;
     }
     // A rule naming TMDB's anime keyword matches exactly the titles Seerr
-    // takes as anime, whether or not TMDB lists the keyword: a title set as
-    // not anime, or left out by country, stays out of it, and Japanese
-    // animation without the keyword (or a title set as anime) is in it.
+    // treats as anime, keyword or not: a title set as not anime, or excluded by
+    // country, stays out, and Japanese animation without the keyword (or a
+    // title set as anime) is in.
     if (
       rule.keywords &&
       !rule.keywords.split(',').some((keywordId) => {
@@ -181,8 +181,8 @@ async function overrideRules({
     ) {
       return false;
     }
-    // A rating is only the same rating in the same country's system: "PG"
-    // in the US is not the British "PG". A title without one never matches.
+    // A rating only equals the same rating in the same country's system: US
+    // "PG" is not British "PG". A title without one never matches.
     if (
       rule.certification &&
       !parseRuleCertifications(rule.certification).some(
@@ -219,7 +219,7 @@ async function overrideRules({
     const bSpecificity = keys.filter((key) =>
       hasSpecificOverrideValue(b, key)
     ).length;
-    // Take the rule with the most specific condition first
+    // Most specific condition first.
     return bSpecificity - aSpecificity;
   })[0];
 

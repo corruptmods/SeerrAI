@@ -1,57 +1,55 @@
 import { sizeOf } from '@server/lib/agent/rules';
 
 /*
- * Watches torrents Backfill downloads (and the songs it takes from albums)
- * for ones that will never finish, or not in any useful time, so they are
- * given up and the next release tried:
+ * Gives up on Backfill torrents (and album songs) that won't finish in useful
+ * time, so the next release is tried:
  * - stalled: nothing gained for the stall time;
- * - incomplete: part of what is wanted is on no peer connected, so it can't
- *   finish however long it runs. The stall clock runs on while that lasts,
- *   even as the rest trickles in; and one whose swarm never had all of it
- *   is given up within its first hour (an indexer's count of seeders is
- *   often old, and no seeder has turned up since);
- * - too slow: at the pace of the last two windows in a row, what is left
- *   would take longer than allowed.
- * Paused, queued or checking time counts for none of them. Kept in memory:
- * a restart gives every torrent a fresh allowance.
+ * - incomplete: part of what's wanted is on no connected peer, so it can't
+ *   finish. The stall clock keeps running meanwhile, even as the rest
+ *   trickles in. A swarm that never had all of it is given up within its
+ *   first hour (indexer seeder counts are often stale);
+ * - too slow: at the pace of two windows in a row, the rest would take
+ *   longer than allowed.
+ * Paused, queued or checking time doesn't count. State is in memory: a
+ * restart gives every torrent a fresh allowance.
  */
 
 const HOUR = 60 * 60_000;
 
-/** How long each measure of a torrent's pace runs. */
+/** Length of each pace window. */
 export const PACE_WINDOW_MS = 2 * HOUR;
-/** Windows in a row too slow before it is given up. */
+/** Consecutive slow windows before giving up. */
 const SLOW_WINDOWS = 2;
-/** How long a swarm that never had all of it gets. */
+/** Grace for a swarm that never had all of it. */
 export const NEVER_WHOLE_MS = HOUR;
 
 export interface TorrentReading {
-  /** Bytes of what is wanted that are in. */
+  /** Wanted bytes downloaded. */
   have: number;
-  /** Bytes of what is wanted still to come. */
+  /** Wanted bytes remaining. */
   left: number;
-  /** Paused, queued or being checked in the client. */
+  /** Paused, queued or checking in the client. */
   held: boolean;
-  /** Part of what is wanted is on no peer connected. */
+  /** Part of what's wanted is on no connected peer. */
   incomplete: boolean;
 }
 
 export interface WatchLimits {
-  /** 0 never gives up on a stall. */
+  /** 0 disables the stall limit. */
   stallHours: number;
-  /** 0 never gives up on a slow one. */
+  /** 0 disables the speed limit. */
   slowHours: number;
 }
 
 const hoursText = (hours: number) => `${hours} hour${hours === 1 ? '' : 's'}`;
 
-/** A download speed, as people read one. */
+/** Human-readable download speed. */
 const speedText = (bytesPerSecond: number): string =>
   bytesPerSecond >= 1024 ** 2
     ? `${(bytesPerSecond / 1024 ** 2).toFixed(1)} MB/s`
     : `${Math.max(1, Math.round(bytesPerSecond / 1024))} KB/s`;
 
-/** Hours, or days once it is over two. */
+/** Hours, or days from 48 hours on. */
 const durationText = (seconds: number): string => {
   const hours = Math.round(seconds / 3600);
   if (hours < 48) return hoursText(Math.max(1, hours));
@@ -59,9 +57,8 @@ const durationText = (seconds: number): string => {
 };
 
 /**
- * What the swarm lacks of the files wanted: true when any of them, not yet
- * in, has pieces no peer connected has, or the client says so for the
- * torrent. Unknown counts as not lacking.
+ * True if the client reports unavailable pieces, or an unfinished chosen
+ * file has pieces on no connected peer. Unknown counts as available.
  */
 export const swarmLacks = (
   torrent: { unavailable?: number },
@@ -76,20 +73,17 @@ export const swarmLacks = (
   );
 
 export class TorrentWatch {
-  /** The bytes each had when it last gained any it could finish with. */
+  /** Bytes each had at its last finishable progress. */
   private gains = new Map<number, { have: number; at: number }>();
-  /** Where each pace window began, and how many in a row were too slow. */
+  /** Start of each pace window, and consecutive slow windows. */
   private paces = new Map<number, { have: number; at: number; slow: number }>();
   /**
-   * Since when each has been meant to download (null while held), and
-   * whether its swarm has had all of it at any point.
+   * When each started downloading (null while held), and whether its swarm
+   * was ever complete.
    */
   private starts = new Map<number, { at: number | null; whole: boolean }>();
 
-  /**
-   * How long it has gained nothing it could finish with, as last checked;
-   * 0 before its first check.
-   */
+  /** Time since its last finishable progress, as of the last check; 0 before. */
   public idleFor(id: number, now = Date.now()): number {
     const seen = this.gains.get(id);
     return seen ? now - seen.at : 0;
@@ -101,7 +95,7 @@ export class TorrentWatch {
     this.starts.delete(id);
   }
 
-  /** Why to give it up now, or null to let it run on. */
+  /** Why to give it up now, or null to keep going. */
   public check(
     id: number,
     reading: TorrentReading,
@@ -154,7 +148,7 @@ export class TorrentWatch {
     }
     if (now - pace.at < PACE_WINDOW_MS) return null;
     const speed = Math.max(0, have - pace.have) / ((now - pace.at) / 1000);
-    // Nothing gained is the stall clock's to judge.
+    // Zero speed is left to the stall check.
     const slow =
       speed > 0 && left / speed > limits.slowHours * 3600 ? pace.slow + 1 : 0;
     this.paces.set(id, { have, at: now, slow });

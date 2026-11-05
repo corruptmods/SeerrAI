@@ -8,11 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
-/*
- * Settings migration 0010: each media server says whether Seerr is
- * connected to it, and Emby gets its own settings, for every kind of
- * existing install.
- */
+// Migration 0010 for each install kind: per-server connected flags, and Emby
+// gets its own block.
 
 const jellyfinBlock = {
   name: 'Den',
@@ -40,7 +37,7 @@ const emptyJellyfin = {
   apiKey: '',
 };
 
-/** settings.json as an install of this kind has it before the migration. */
+/** Pre-migration settings.json for an install of this kind. */
 const install = (
   type: MediaServerType,
   { mediaServerLogin = true }: { mediaServerLogin?: boolean } = {}
@@ -64,7 +61,7 @@ const install = (
     'jellyfin-recently-added-scan': { schedule: '0 */10 * * * *' },
     'jellyfin-full-scan': { schedule: '0 0 2 * * *' },
   },
-  // The migrations that read the database have run on any install this old.
+  // Database-reading migrations have run on any install this old.
   migrations: [
     '0007_migrate_arr_tags',
     '0008_migrate_blacklist_to_blocklist',
@@ -101,7 +98,7 @@ describe('settings migration 0010 (media servers)', () => {
     );
     assert.deepEqual(
       { ...after.jellyfin, connected: undefined, signIn: undefined },
-      // Filled in from a new server's defaults, music libraries included.
+      // New-server defaults, music libraries included.
       {
         ...jellyfinBlock,
         musicLibraries: [],
@@ -170,8 +167,8 @@ describe('settings migration 0010 (media servers)', () => {
       const twice = migrate(once);
       assert.deepEqual(twice, once, MediaServerType[type]);
     }
-    // In particular, an Emby install's settings are not overwritten by the
-    // Jellyfin block it left empty.
+    // An Emby install's settings aren't overwritten by its empty Jellyfin
+    // block.
     const emby = migrate(migrate(install(MediaServerType.EMBY)));
     assert.equal(emby.emby.apiKey, 'the-api-key');
   });
@@ -209,8 +206,8 @@ describe('settings migrations run at startup', () => {
 
   it('gives Emby its settings when JELLYFIN_TYPE made the install Emby', async () => {
     process.env.JELLYFIN_TYPE = 'emby';
-    // An old install recorded Emby as Jellyfin, told apart by JELLYFIN_TYPE
-    // (migration 0003), which runs first.
+    // Old installs stored Emby as Jellyfin plus JELLYFIN_TYPE (migration 0003,
+    // which runs first).
     const { migrated, saved } = await runAll(install(MediaServerType.JELLYFIN));
     assert.equal(migrated.main.mediaServerType, MediaServerType.EMBY);
     assert.equal(migrated.emby.apiKey, 'the-api-key');

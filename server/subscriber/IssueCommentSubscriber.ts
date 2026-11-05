@@ -64,7 +64,7 @@ export class IssueCommentSubscriber implements EntitySubscriberInterface<IssueCo
       const [firstComment] = sortBy(issue.comments, 'id');
 
       if (entity.id !== firstComment.id) {
-        // Send notifications to all issue managers
+        // Notify all issue managers.
         notificationManager.sendNotification(Notification.ISSUE_COMMENT, {
           ...issueEvent(Notification.ISSUE_COMMENT, issue.issueType),
           subject: title,

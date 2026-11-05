@@ -1,5 +1,4 @@
-// Kept apart from the components, with nothing that needs the page around
-// it, so it can be tested on its own.
+// Kept free of page dependencies so it can be tested alone.
 import type {
   RequestServerIssue,
   RequestService,
@@ -30,9 +29,8 @@ const serviceName = (service: RequestService, is4k: boolean) =>
   `${is4k && service !== 'lidarr' ? '4K ' : ''}${SERVICE_NAMES[service]}`;
 
 /**
- * What happened ("Its Radarr server was removed."), and what someone who
- * manages requests can do about it: retry (it goes to the default server),
- * edit it to choose a server, or add one in Settings.
+ * The problem ("Its Radarr server was removed.") and, for request managers,
+ * the fix: retry (uses the default server), edit to pick one, or add one in Settings.
  */
 export const serverIssueParts = (
   intl: IntlShape,
@@ -50,7 +48,7 @@ export const serverIssueParts = (
   };
 };
 
-/** The issue as one text: what to do as well, for a request manager. */
+/** The issue as one string, with the fix for request managers. */
 export const serverIssueText = (
   intl: IntlShape,
   issue: RequestServerIssue,
@@ -62,8 +60,8 @@ export const serverIssueText = (
 };
 
 /**
- * Why a retry was refused, in the person's language when it was for want of
- * a server to send it to; otherwise the server's reason, or the fallback.
+ * Why a retry failed: localised when no server was available, else the
+ * server's reason, else the fallback.
  */
 export const retryErrorMessage = (
   e: unknown,

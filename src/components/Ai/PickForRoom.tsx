@@ -39,8 +39,8 @@ interface Pick {
 }
 
 /**
- * Three titles a group would enjoy together. Everyone listed has watch
- * history and has not turned this off for themselves.
+ * Three picks for a group. Lists only users with watch history who haven't
+ * opted out.
  */
 const PickForRoom = () => {
   const intl = useIntl();

@@ -18,15 +18,15 @@ const messages = defineMessages('components.Discover.RecentRequestsSlider', {
 });
 
 /**
- * The latest requests: films' and series', or with `music` music's, where
- * a playlist import's songs are one card rather than a card each.
+ * Latest video requests, or music ones with `music`, where a playlist import
+ * is one card.
  */
 const RecentRequestsSlider = ({ music = false }: { music?: boolean }) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
   const { data: requests, error: requestError } =
     useSWR<RequestResultsResponse>(
-      // A comma is sent encoded: the API refuses one written plainly.
+      // The API rejects an unencoded comma.
       `/api/v1/request?filter=all&take=10&sort=added&skip=0&${
         music
           ? 'mediaType=music&playlists=group'
@@ -34,9 +34,8 @@ const RecentRequestsSlider = ({ music = false }: { music?: boolean }) => {
       }`,
       {
         revalidateOnMount: true,
-        // A playlist's songs move along in the background: its card is
-        // followed while any are still to come. Each request's own card
-        // follows itself.
+        // Poll while a playlist has songs pending; request cards poll
+        // themselves.
         refreshInterval: (latest) =>
           music &&
           latest?.playlists?.some(
@@ -56,7 +55,6 @@ const RecentRequestsSlider = ({ music = false }: { music?: boolean }) => {
     return null;
   }
 
-  // Radarr and Sonarr have no part in music's.
   const hasServiceErrors =
     !music &&
     requests?.serviceErrors &&

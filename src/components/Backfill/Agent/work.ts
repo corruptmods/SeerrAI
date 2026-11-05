@@ -1,14 +1,11 @@
 import type { AgentAction } from '@server/entity/AgentRun';
 
 /*
- * The agent's work in plain words. Its tools have names made for the model
- * (find_title, search_releases); an admin reading a conversation is told
- * what it did instead: "found the title, searched for releases". The words
- * themselves are in toolMessages.ts and changeMessages.ts; this says which
- * to use.
+ * Maps agent tool names and changes to admin-facing words, which live in
+ * toolMessages.ts and changeMessages.ts.
  */
 
-/** Every tool the agent has, each with its own words. */
+/** Agent tools that have their own words. */
 export const TOOL_WORDS = [
   'find_title',
   'title_status',
@@ -28,13 +25,12 @@ export const TOOL_WORDS = [
 
 export type ToolWords = (typeof TOOL_WORDS)[number] | 'other';
 
-/** Which words a tool is told in; anything new is "did something else". */
+/** A tool's words key; unknown tools map to "did something else". */
 export const toolWords = (tool?: string): ToolWords =>
   (TOOL_WORDS as readonly string[]).includes(tool ?? '')
     ? (tool as ToolWords)
     : 'other';
 
-/** The kinds of change it can make, each with its own icon. */
 export type ChangeIcon =
   | 'download'
   | 'request'
@@ -50,7 +46,7 @@ export type ChangeIcon =
 
 type ActionKind = Pick<AgentAction, 'type' | 'change'>;
 
-/** Which icon a change is shown with: a delete is a bin, not a download. */
+/** A change's icon; deletes get a bin, not a download arrow. */
 export const changeIcon = (action: ActionKind): ChangeIcon => {
   switch (action.type) {
     case 'grab':
@@ -82,7 +78,7 @@ export const changeIcon = (action: ActionKind): ChangeIcon => {
   }
 };
 
-/** Which few words a change is told in where it happened. */
+/** Short label for a change, shown inline in the conversation. */
 export const changeWords = (
   action: ActionKind & Pick<AgentAction, 'extended'>
 ): ChangeIcon | 'addedToDownload' =>
@@ -91,9 +87,8 @@ export const changeWords = (
     : changeIcon(action);
 
 /**
- * The conversation records each change in its own words; this finds the
- * change each one is, in order, so it can be shown with its icon. Two
- * changes in the same words are matched one each.
+ * Returns a matcher from recorded change text to its action; each action
+ * matches once, in order.
  */
 export const matchActions = <T extends Pick<AgentAction, 'detail'>>(
   actions: T[]

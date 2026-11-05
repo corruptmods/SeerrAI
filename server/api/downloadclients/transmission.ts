@@ -14,24 +14,25 @@ import type { AxiosInstance } from 'axios';
 import axios, { isAxiosError } from 'axios';
 
 /*
- * The part of Transmission's RPC Seerr reads: the torrents Radarr and Sonarr
- * sent, by hash, which is how they record a torrent as its download id.
+ * Reads the torrents Radarr and Sonarr sent via Transmission's RPC, by hash
+ * (their download id).
  *
- * Transmission guards its RPC with a session id: the first call is refused
- * with 409 and the id to use, which is kept between passes and renewed
- * whenever Transmission refuses it again. A username and password, when
- * set, are sent with every call.
+ * The RPC needs a session id: the first call gets a 409 carrying the id,
+ * which is kept between passes and renewed whenever refused again. Username
+ * and password, when set, go with every call.
  *
- * For Backfill it also adds, picks the files of, and removes torrents.
- * Backfill's category is a label (Transmission 3.0 and newer). Transmission
- * cannot stop a magnet link once its file list is in, so until Backfill has
- * chosen the files the torrent's download speed is held at 1 KB/s.
+ * For Backfill it also adds torrents, picks their files and removes them.
+ * Backfill's category is a label (Transmission 3.0+). Transmission cannot
+ * stop a magnet once its file list is in, so its download speed is held at
+ * 1 KB/s until Backfill chooses the files.
  */
 
 export interface TransmissionTorrent {
   hashString: string;
-  /** 0 stopped, 1 waiting to check, 2 checking, 3 waiting to download,
-   * 4 downloading, 5 waiting to seed, 6 seeding. */
+  /**
+   * 0 stopped, 1 waiting to check, 2 checking, 3 waiting to download,
+   * 4 downloading, 5 waiting to seed, 6 seeding.
+   */
   status: number;
   sizeWhenDone: number;
   leftUntilDone: number;
@@ -64,8 +65,8 @@ export const transmissionDownload = (
   const base = { size, sizeLeft };
   const done = size > 0 && sizeLeft === 0;
 
-  // A local error (disk full, files gone) needs someone; a tracker's does
-  // not, as long as the torrent can still get the rest from its peers.
+  // A local error (disk full, files gone) needs a person; a tracker error
+  // doesn't while peers can still supply the rest.
   if (torrent.error === 3) {
     return { ...base, stage: done ? 'needsAttention' : 'stalled' };
   }
@@ -74,8 +75,8 @@ export const transmissionDownload = (
   }
   switch (torrent.status) {
     case 0:
-      // Stopped once complete is Transmission's "finished": Radarr's or
-      // Sonarr's to import, as when it seeds.
+      // Stopped and complete is Transmission's "finished": ready for Radarr
+      // or Sonarr to import, as when seeding.
       return { ...base, stage: done ? 'importing' : 'paused' };
     case 1:
     case 2:
@@ -104,14 +105,14 @@ export const transmissionDownload = (
   }
 };
 
-/** What Backfill reads of a torrent. */
+/** The torrent fields Backfill reads. */
 export interface TransmissionTorrentInfo {
   hashString: string;
   name: string;
   status: number;
   error: number;
   errorString?: string;
-  /** 0 to 1, of the files wanted. */
+  /** 0 to 1, of the wanted files. */
   percentDone: number;
   rateDownload: number;
   eta: number;
@@ -120,9 +121,9 @@ export interface TransmissionTorrentInfo {
   addedDate?: number;
   sizeWhenDone: number;
   leftUntilDone: number;
-  /** Bytes still wanted that some peer connected has. */
+  /** Wanted bytes some connected peer has. */
   desiredAvailable?: number;
-  /** Web seeds have everything, though they aren't counted as peers. */
+  /** Web seeds have everything but aren't counted as peers. */
   webseedsSendingToUs?: number;
   metadataPercentComplete?: number;
   labels?: string[];
@@ -194,7 +195,7 @@ export const transmissionTorrent = (
   }
 };
 
-/** Labels came with RPC version 16, Transmission 3.0. */
+/** Labels need RPC version 16 (Transmission 3.0). */
 const LABELS_RPC_VERSION = 16;
 
 interface RpcAnswer<T> {
@@ -202,7 +203,7 @@ interface RpcAnswer<T> {
   arguments?: T;
 }
 
-/** Session ids, by client address, kept between passes. */
+/** Session ids by client address, kept between passes. */
 const sessions = new Map<string, string>();
 
 class TransmissionAPI implements TorrentClient {
@@ -217,8 +218,7 @@ class TransmissionAPI implements TorrentClient {
       'hostname' | 'port' | 'useSsl' | 'urlBase' | 'username' | 'password'
     >
   ) {
-    // Transmission's RPC is "rpc" under its base, "/transmission/" unless
-    // it was changed.
+    // The RPC is "rpc" under its base, "/transmission/" by default.
     const base = clientBaseUrl({
       ...settings,
       urlBase: settings.urlBase || '/transmission',
@@ -295,7 +295,7 @@ class TransmissionAPI implements TorrentClient {
     }
     await this.call('torrent-set', {
       ids: [hash],
-      // Its own ratio limit of 0: it stops as soon as it is complete.
+      // Per-torrent ratio limit 0: it stops as soon as it is complete.
       seedRatioMode: 1,
       seedRatioLimit: 0,
       ...(options.metadataOnly
@@ -308,7 +308,7 @@ class TransmissionAPI implements TorrentClient {
     }).catch(() => undefined); // before 3.0, no labels
   }
 
-  /** A label needs no setting up. */
+  /** Labels need no setup. */
   public async ensureCategory(): Promise<void> {
     return;
   }
@@ -367,7 +367,7 @@ class TransmissionAPI implements TorrentClient {
     });
   }
 
-  /** Starts it, at full speed again if it was added to fetch its files. */
+  /** Starts it, restoring full speed if added to fetch its files. */
   public async startTorrent(hash: string): Promise<void> {
     await this.call('torrent-set', {
       ids: [hash.toLowerCase()],

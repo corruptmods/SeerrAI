@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** The time, once a second while `on`: for a clock that counts up. */
+/** The current time, updated each second while `on`. */
 const useNow = (on: boolean): number => {
   const [now, setNow] = useState(() => Date.now());
 
@@ -16,7 +16,7 @@ const useNow = (on: boolean): number => {
   return now;
 };
 
-/** How long since `since`, as a clock: 4:05, or 1:02:33. */
+/** Time since `since` as a clock: 4:05 or 1:02:33. */
 export const elapsed = (since: string | undefined, now: number): string => {
   const start = Date.parse(since ?? '');
   const seconds = Number.isFinite(start)

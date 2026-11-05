@@ -32,8 +32,8 @@ class OverrideRule {
 
   /**
    * Age ratings the title must have one of, each in its country's system:
-   * "US:G,US:PG". Matched against the rating for the server's Discover
-   * region, or the US one when the title has none there.
+   * "US:G,US:PG". Matched against the rating for the server's Discover region,
+   * or the US one when it has none there.
    */
   @Column({ type: 'varchar', nullable: true })
   public certification?: string | null;

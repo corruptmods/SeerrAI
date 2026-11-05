@@ -10,9 +10,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Each Maintainerr server is asked again once its last attempt is old, not
- * its last answer: one that cannot be reached is retried every so often,
- * not on every page that shows a badge.
+ * Each Maintainerr server is re-asked once its last attempt (not answer) is
+ * old, so an unreachable one is retried periodically, not on every badge.
  */
 
 const MINUTE = 60 * 1000;

@@ -20,12 +20,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
-/*
- * Episode-level monitoring: a request for two episodes should leave Sonarr
- * monitoring exactly those, and removing it should stop monitoring what
- * nobody wants any more. Against a fake Sonarr that records what it is told,
- * and can be made to fail.
- */
+// Episode-level monitoring: a request for two episodes leaves Sonarr monitoring
+// exactly those, and removing it unmonitors what nobody wants. Uses a fake
+// Sonarr that records calls and can be made to fail.
 
 setupTestDb();
 
@@ -163,8 +160,8 @@ beforeEach(async () => {
 const sonarr = () =>
   new SonarrAPI({ apiKey: 'k', url: `http://127.0.0.1:${port}/api/v3` });
 
-// A pending request for season 1, episodes as given. Pending, so saving it
-// does not try to send it anywhere.
+// A pending request for season 1 with the given episodes. Pending, so saving it
+// dispatches nothing.
 const request = (episodeNumbers: number[]) =>
   new MediaRequest({
     type: MediaType.TV,

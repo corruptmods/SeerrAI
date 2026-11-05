@@ -10,7 +10,7 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-/** Open dialogs, most recent last: only the top one answers the keyboard. */
+/** Open dialogs, newest last; only the top one handles keys. */
 const openDialogs: RefObject<HTMLElement | null>[] = [];
 
 const focusableIn = (root: HTMLElement): HTMLElement[] =>
@@ -21,9 +21,8 @@ const focusableIn = (root: HTMLElement): HTMLElement[] =>
   );
 
 /**
- * What a dialog owes keyboard and screen reader users: focus moves into it
- * when it opens, Tab stays within it, Escape closes it, and focus goes back
- * to whatever opened it afterwards.
+ * Dialog focus handling: focus moves in on open, Tab is trapped, Escape
+ * closes, and focus returns to the opener afterwards.
  */
 const useDialogFocus = (
   ref: RefObject<HTMLElement | null>,
@@ -33,7 +32,7 @@ const useDialogFocus = (
   }: {
     /** Closes the dialog. Without it, Escape does nothing. */
     onEscape?: () => void;
-    /** False while the dialog's panel is not shown yet (still loading). */
+    /** False while the panel isn't shown yet (loading). */
     ready?: boolean;
   } = {}
 ): void => {
@@ -56,8 +55,7 @@ const useDialogFocus = (
         return;
       }
 
-      // A menu or picker inside the dialog closes itself on Escape and says
-      // so by preventing the default; only an unclaimed Escape closes this.
+      // Inner menus claim Escape via preventDefault; only an unclaimed one closes this.
       if (event.key === 'Escape' && !event.defaultPrevented) {
         if (escape.current) {
           event.preventDefault();
@@ -107,10 +105,9 @@ const useDialogFocus = (
     };
   }, [ref]);
 
-  // Into the dialog once its panel is there, unless something in it (a
-  // field marked autoFocus) has already taken focus. The dialog itself is
-  // focused rather than its first control, so it is announced by its title
-  // and nothing is pressed or ticked by accident.
+  // Focus the dialog once its panel exists, unless something (autoFocus)
+  // already has it. The dialog itself, not its first control, so its title
+  // is announced and nothing is activated by accident.
   useEffect(() => {
     if (!ready) {
       return;

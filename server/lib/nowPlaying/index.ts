@@ -17,34 +17,33 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * What someone is watching right now, for "Fix this show" from Siri: what
- * each connected server is playing for them, or failing that what they
- * stopped watching in the last half hour (they may have stopped it to
- * report it). Only titles in Seerr's library count, as only those can be
- * reported.
+ * What a user is watching, for Siri's "Fix this show": current sessions on
+ * each connected server, else what they stopped in the last half hour (they
+ * may have stopped it to report it). Only library titles count, since only
+ * those can be reported.
  */
 
-/** How long after a play stops it still counts as what they were watching. */
+/** How long a stopped play still counts as being watched. */
 export const RECENT_MS = 30 * 60 * 1000;
-/** The most titles offered when several are playing or were just played. */
+/** Max titles offered. */
 const MOST = 3;
 
 export interface NowPlaying {
   media: Media;
-  /** The film's name, or the series'. */
+  /** Film or series name. */
   title: string;
   season?: number;
   episode?: number;
-  /** Playing now, or stopped in the last half hour. */
+  /** Playing now, or stopped within RECENT_MS. */
   seen: 'now' | 'recent';
   paused: boolean;
   server?: MediaServerKind;
 }
 
-/** One session, as each server's comes out, before the library is asked. */
+/** A normalised server session, before library lookup. */
 interface Session {
   server: MediaServerKind;
-  /** The server's id for the title: the film, or the episode's series. */
+  /** Server id of the film, or of the episode's series. */
   titleId: string;
   movie: boolean;
   title: string;
@@ -53,13 +52,13 @@ interface Session {
   paused: boolean;
 }
 
-/** Jellyfin writes ids with dashes in some places and not in others. */
+/** Compares ids ignoring dashes, which Jellyfin uses inconsistently. */
 const sameId = (a?: string | null, b?: string | null) =>
   !!a &&
   !!b &&
   a.replace(/-/g, '').toLowerCase() === b.replace(/-/g, '').toLowerCase();
 
-/** The ways one Jellyfin id may be written, to look it up by. */
+/** Dashed and undashed forms of a Jellyfin id, for lookup. */
 const spellings = (id: string): string[] => {
   const bare = id.replace(/-/g, '').toLowerCase();
   const dashed = /^[0-9a-f]{32}$/.test(bare)
@@ -108,8 +107,8 @@ const fromJellyfin = (
 
 class NowPlayingReader {
   /**
-   * What this server is playing for this person. Plex's owner is "1" in
-   * its own sessions, not their plex.tv id.
+   * This user's sessions on a server. Plex sessions list the owner as user
+   * "1", not their plex.tv id.
    */
   public async sessionsOn(
     server: MediaServerKind,
@@ -146,7 +145,7 @@ class NowPlayingReader {
       .flatMap((s) => fromJellyfin(server, s) ?? []);
   }
 
-  /** The library's titles for sessions on one server, by the server's id. */
+  /** Library media matching these server title ids. */
   private async libraryFor(
     server: MediaServerKind,
     titleIds: string[]
@@ -161,7 +160,7 @@ class NowPlayingReader {
     });
   }
 
-  /** What is playing for them on every connected server. */
+  /** The user's current sessions across connected servers. */
   public async now(user: User): Promise<NowPlaying[]> {
     const found: NowPlaying[] = [];
     for (const server of connectedServers()) {
@@ -169,7 +168,7 @@ class NowPlayingReader {
       try {
         sessions = await this.sessionsOn(server, user);
       } catch (e) {
-        // One server down doesn't hide what another is playing.
+        // One server failing mustn't hide the others.
         logger.debug('Could not read what is playing', {
           label: 'Now Playing',
           server,
@@ -201,7 +200,7 @@ class NowPlayingReader {
     return found;
   }
 
-  /** What they stopped watching in the last half hour, newest first. */
+  /** Plays stopped within RECENT_MS, newest first. */
   public async recent(user: User): Promise<NowPlaying[]> {
     const source = watchSource();
     if (!source) return [];
@@ -228,10 +227,9 @@ class NowPlayingReader {
   }
 
   /**
-   * What they are watching: playing before paused, then what they stopped
-   * in the last half hour when nothing is playing. One entry per title, up
-   * to three. `kind` keeps to films or series ("Fix this movie"), unless
-   * nothing of that kind is there.
+   * What the user is watching: playing before paused, else recently
+   * stopped. Deduplicated, up to MOST. `kind` narrows to films or series
+   * ("Fix this movie") unless none match.
    */
   public async playingFor(
     user: User,

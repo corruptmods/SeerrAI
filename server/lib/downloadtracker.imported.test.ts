@@ -13,10 +13,9 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
  * Between Sonarr importing an episode and the media server listing it, the
- * title is no longer in any queue: without this it showed as only
- * "Requested" again. A download that leaves the queue having been imported
- * is shown as being added to the library until the media server's scan
- * lists the title, and that scan runs a minute after the import.
+ * title is in no queue. A download that leaves the queue imported shows as
+ * being added to the library until the media server's scan (a minute after
+ * the import) lists it.
  */
 
 let queue: Record<string, unknown>[] = [];
@@ -268,7 +267,7 @@ describe('a download imported between two reads of the queue', () => {
 
     mock.timers.tick(30_000);
     downloadTracker.forgetImported('series', 0, 1286);
-    // Read again, since history is read a little back of the last look.
+    // Read again: history is read from slightly before the last look.
     await downloadTracker.updateDownloads();
     assert.deepEqual(downloadTracker.getSeriesProgress(0, 1286), []);
   });

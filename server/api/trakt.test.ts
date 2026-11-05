@@ -5,9 +5,8 @@ import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * A stand-in for api.trakt.tv answering as Trakt's API contract describes:
- * pages of at most 250 with X-Pagination headers, items with the film or
- * series nested, ids that may be null.
+ * A stand-in api.trakt.tv per Trakt's API contract: pages of up to 250 with
+ * X-Pagination headers, nested movie or series items, nullable ids.
  */
 let server: http.Server;
 let base = '';
@@ -35,7 +34,7 @@ before(async () => {
     let body: unknown[] = [];
     let pages = 1;
     if (url.pathname === '/users/someone/lists/big-one/items/movie,show') {
-      // 260 entries: a page of 250 and one of 10.
+      // 260 entries: pages of 250 and 10.
       pages = 2;
       const from = (page - 1) * 250 + 1;
       const to = Math.min(page * 250, 260);
@@ -105,7 +104,7 @@ describe('reading Trakt links', () => {
       'https://trakt.tv/users/someone/watchlist/extra',
       'https://trakt.tv/lists/not-a-number',
       'https://trakt.tv/movies/the-mazewright-1999',
-      // Not a name once decoded: refused, not thrown.
+      // Invalid once decoded: rejected, not thrown.
       'https://trakt.tv/users/%E0%A4%A/watchlist',
       'https://trakt.tv/users/someone/lists/%ZZ',
     ]) {
@@ -186,9 +185,8 @@ describe('the Trakt client', () => {
   });
 
   it('never asks for a path made of dots', async () => {
-    // A user or list called "." or ".." would change which address is asked
-    // for, rather than name anyone: a watchlist username comes from a
-    // person's own settings, not only from a parsed link.
+    // "." or ".." would change the requested address. Watchlist usernames
+    // also come from user settings, not only from parsed links.
     const api = new TraktAPI('client-id', base);
     for (const name of ['.', '..', '...']) {
       await assert.rejects(

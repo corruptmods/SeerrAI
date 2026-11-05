@@ -48,6 +48,12 @@ const messages = defineMessages('components.Settings', {
 
 type ProviderStatus = 'ok' | 'not tested' | 'failed';
 
+const mapStatusValue = (status: string): ProviderStatus => {
+  if (status === 'ok') return 'ok';
+  if (status === 'failed') return 'failed';
+  return 'not tested';
+};
+
 interface ProviderResponse {
   tvdb: ProviderStatus;
   tmdb: ProviderStatus;
@@ -122,7 +128,6 @@ const SettingsMetadata = () => {
       return newStatus;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
-        // If we receive an error response with a valid format
         const errorData = error.response.data as {
           success: boolean;
           tests: ProviderResponse;
@@ -139,7 +144,6 @@ const SettingsMetadata = () => {
         }
       }
 
-      // In case of error without usable data
       throw new Error('Failed to test connection', { cause: error });
     }
   };
@@ -161,21 +165,13 @@ const SettingsMetadata = () => {
         anime: values.anime,
       });
 
-      // Update metadata provider status if available
       if (response.data.tests) {
-        const mapStatusValue = (status: string): ProviderStatus => {
-          if (status === 'ok') return 'ok';
-          if (status === 'failed') return 'failed';
-          return 'not tested';
-        };
-
         setProviderStatus({
           tmdb: mapStatusValue(response.data.tests.tmdb),
           tvdb: mapStatusValue(response.data.tests.tvdb),
         });
       }
 
-      // Adapt the response to the format expected by the component
       return {
         metadata: {
           tv: response.data.tv,
@@ -183,7 +179,6 @@ const SettingsMetadata = () => {
         },
       };
     } catch (error) {
-      // Retrieve test data in case of error
       if (axios.isAxiosError(error) && error.response?.data) {
         const errorData = error.response.data as {
           success: boolean;
@@ -193,15 +188,7 @@ const SettingsMetadata = () => {
           };
         };
 
-        // If test data is available in the error response
         if (errorData.tests) {
-          const mapStatusValue = (status: string): ProviderStatus => {
-            if (status === 'ok') return 'ok';
-            if (status === 'failed') return 'failed';
-            return 'not tested';
-          };
-
-          // Update metadata provider status with error data
           setProviderStatus({
             tmdb: mapStatusValue(errorData.tests.tmdb),
             tvdb: mapStatusValue(errorData.tests.tvdb),
@@ -480,7 +467,7 @@ const SettingsMetadata = () => {
           }}
         </Formik>
       </div>
-      {/* Music's sources were here before Settings → Music had them. */}
+      {/* Points to music's sources, which moved to Settings → Music. */}
       {currentSettings.musicReady && (
         <p className="mt-10 text-sm text-gray-400">
           {intl.formatMessage(messages.musicMoved, {

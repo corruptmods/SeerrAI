@@ -39,9 +39,9 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Download Check against a stand-in Sonarr and Radarr: the rules on real
- * release names and real messages from a live server's history, and the
- * engine recording, acting and holding back as its mode says.
+ * Download Check against stand-in Sonarr and Radarr: the rules on release
+ * names and real messages from a live server's history, and the engine
+ * recording, acting and holding back per its mode.
  */
 
 setupTestDb();
@@ -312,7 +312,7 @@ describe('the rules', () => {
   it('says a grab came days before its episode aired', () => {
     const grabbed = Date.parse('2026-10-14T12:00:00Z');
     assert.equal(hoursBeforeAir(grabbed, ['2026-10-21T01:00:00Z']), 157);
-    // Hours early is a real episode turning up early.
+    // Hours early is a real episode arriving early.
     assert.equal(hoursBeforeAir(grabbed, ['2026-10-14T20:00:00Z']), undefined);
     assert.equal(hoursBeforeAir(grabbed, [undefined]), undefined);
   });
@@ -339,7 +339,7 @@ describe('the rules', () => {
       have: 'WEBDL-1080p (860006)',
       offered: 'WEBDL-1080p (-137399)',
     });
-    // The same score is let through, as Sonarr lets it through.
+    // The same score passes, as in Sonarr.
     assert.equal(
       isUpgrade(
         ranks,
@@ -459,7 +459,7 @@ describe('the rules', () => {
   });
 });
 
-/** A Sonarr or Radarr that answers from what a test gives it. */
+/** A fake Sonarr or Radarr answering from test-supplied data. */
 class FakeServer implements CheckServer {
   public queueNow: Grab[] = [];
   public parsed = new Map<string, number>();
@@ -568,7 +568,7 @@ const grab = (over: Partial<Grab>): Grab => ({
   ...over,
 });
 
-/** The setting is read back as a copy: the whole of Backfill's is set. */
+/** Settings return a copy, so the whole Backfill object is set. */
 const setMode = (mode: 'off' | 'report' | 'on') => {
   getSettings().backfill = {
     ...getSettings().backfill,
@@ -783,7 +783,7 @@ describe('Download Check', () => {
     }[] = [];
     t.mock.method(QBittorrentAPI.prototype, 'getFiles', async () => files);
     sonarr.queueNow = [grab({ protocol: 'torrent' })];
-    // No file list yet (a magnet link): nothing said, asked again next time.
+    // No file list yet (a magnet link): no finding; checked again next pass.
     await downloadCheck.run();
     assert.equal((await rows()).length, 0);
     files = [
@@ -928,8 +928,7 @@ describe('Download Check', () => {
   });
 
   describe('a grab whose episode title is another episode', () => {
-    // Sonarr reads names by the scene's numbers: this one is filed as
-    // S01E03, but its title is S02E05's.
+    // Sonarr uses scene numbering: filed as S01E03, but titled as S02E05.
     const NAME = 'Show.S01E03.Atoll.Exile.1080p.WEB-DL-GRP';
     const other = (hasFile: boolean): QueueEpisode => ({
       id: 205,
@@ -980,7 +979,7 @@ describe('Download Check', () => {
     });
 
     it('has Backfill look for the episode it was grabbed as, rather than searching that number again', async () => {
-      // The episode it is is in already; the one it was grabbed as isn't.
+      // The episode it really is has a file; the one it was grabbed as doesn't.
       const title = await getRepository(BackfillSeries).save(
         new BackfillSeries({
           kind: 'series',

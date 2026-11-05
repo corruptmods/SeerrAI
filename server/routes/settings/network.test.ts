@@ -9,8 +9,8 @@ import { beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * Settings → Network: the proxies trusted with Enable Proxy Support on,
- * besides those on this machine, the local network and Tailscale.
+ * Settings → Network: proxies trusted with Enable Proxy Support on, besides
+ * this machine, the local network and Tailscale.
  */
 
 const app = express();
@@ -111,7 +111,7 @@ describe('the trusted proxy settings', () => {
       assert.equal(res.body.invalidProxy, bad);
       assert.match(res.body.message, new RegExp(bad.replace(/\./g, '\\.')));
     }
-    // Nothing from a refused save is kept.
+    // A refused save keeps nothing.
     assert.equal(getSettings().network.trustCloudflare, false);
     assert.deepEqual(getSettings().network.trustedProxies, ['198.51.100.20']);
   });

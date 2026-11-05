@@ -7,10 +7,9 @@ import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 
 /*
- * /list was the only route group mounted without a sign-in check; each list
- * route checked for itself. Through the real top-level router, with nobody
- * signed in, every list path is refused at the group — including one that
- * matches no list route at all, which a route-level check could not cover.
+ * Through the real top-level router with nobody signed in, every /list path is
+ * refused at the group, including one matching no list route, which a
+ * route-level check couldn't cover.
  */
 
 setupTestDb();

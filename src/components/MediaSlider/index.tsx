@@ -49,9 +49,8 @@ const MediaSlider = ({
   const { hasPermission } = useUser();
   const pageUrl = (page: number) =>
     `${url}?page=${page}${extraParams ? `&${extraParams}` : ''}`;
-  // A row is fetched once it comes near the screen, so the rows at the top
-  // of a page (and their posters) aren't kept waiting behind ones further
-  // down. One already fetched, as on going back to the page, shows at once.
+  // Fetch once near the screen, so top rows aren't queued behind lower ones.
+  // Cached rows (e.g. going back) show at once.
   const { ref: rowRef, near } = useNearObserver();
   const { cache } = useSWRConfig();
   const wanted = near || cache.get(pageUrl(1))?.data !== undefined;
@@ -66,22 +65,19 @@ const MediaSlider = ({
 
       return pageUrl(pageIndex + 1);
     },
-    // One page first, so its posters show as soon as it arrives; the next,
-    // for the card that leads to the rest, is asked for then (below). Asked
-    // for together, neither shows until both are in.
+    // One page first so its posters show on arrival; the next (for the
+    // "see more" card) is requested after, below.
     { revalidateFirstPage: false }
   );
 
-  // After a request from one of these cards, reload only the pages that
-  // hold the title, so its badge changes without reloading the whole row.
+  // After a request, reload only the pages holding the title.
   useTitleChanged((title) => {
     if (data?.some((page) => pageHolds(page, title))) {
       mutate(undefined, { revalidate: (page) => pageHolds(page, title) });
     }
   });
 
-  // A page that came back without its list (a damaged copy held on the
-  // device) is passed over rather than taking the row down with it.
+  // Skip pages without results (a damaged cached copy) instead of breaking the row.
   let titles = (data ?? []).reduce(
     (a, v) => (Array.isArray(v?.results) ? [...a, ...v.results] : a),
     [] as (MovieResult | TvResult | PersonResult)[]
@@ -115,7 +111,7 @@ const MediaSlider = ({
   }
 
   useEffect(() => {
-    // One page more at a time, once the last one asked for is in.
+    // One more page at a time, once the last arrived.
     if (
       !!data &&
       data.length >= size &&
@@ -127,14 +123,12 @@ const MediaSlider = ({
     }
 
     if (onNewTitles) {
-      // We aren't reporting all titles. We just want to know if there are any titles
-      // at all for our purposes.
+      // Only whether there are any titles matters.
       onNewTitles(titles.length);
     }
   }, [titles, setSize, size, data, onNewTitles]);
 
-  // Hidden once it's known to be empty: until it has been fetched, the row
-  // is kept, to see when it comes near.
+  // Hide only once known empty; before that the row must render to be observed.
   if (hideWhenEmpty && data && (data[0]?.results ?? []).length === 0) {
     return null;
   }

@@ -22,9 +22,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * The optional-feature switches: an admin's for everyone, each person's for
- * themselves, and what the server stops doing when one is off. Through the
- * real API validator and route guards.
+ * Optional-feature switches (admin-wide and per user) and what the server
+ * stops doing when one is off, via the real API validator and route guards.
  */
 
 Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
@@ -122,7 +121,7 @@ describe('feature switches', () => {
     });
     assert.equal(featureEnabled('deletingSoon'), false);
 
-    // Replaced as a whole: turning one back on removes it from the list.
+    // Replaced whole: turning one back on removes it from the list.
     await call('POST', '/settings/features', { disabled: ['deletingSoon'] });
     assert.equal(featureEnabled('suggestedForYou'), true);
   });

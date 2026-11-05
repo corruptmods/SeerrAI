@@ -1,21 +1,18 @@
 interface FollowDefaultInput {
-  /** Off: a series request always takes every season, with no choice. */
+  /** Off means a series request always takes every season. */
   partialRequestsEnabled: boolean;
-  /** Seasons ticked in the dialog. */
   selected: number[];
-  /** Seasons that could be requested here: not requested or here already. */
+  /** Seasons not already requested or available. */
   requestable: number[];
-  /** Seasons ticked for only some of their episodes. */
+  /** Seasons ticked for only some episodes. */
   partSeasons: number[];
-  /** The newest season that has started airing, or 0 if none has. */
+  /** Newest season that has started airing; 0 if none. */
   latestAired: number;
 }
 
 /**
- * Whether "Also get new seasons" starts ticked. It does when the request
- * already takes everything there is to take, since the next season is the
- * only thing left to want, and when only the newest season is ticked, which
- * is asking for the series from here on. Specials do not count either way.
+ * Whether "Also get new seasons" starts ticked: when the request takes every
+ * season, or only the newest aired one. Specials are ignored.
  */
 const followByDefault = ({
   partialRequestsEnabled,

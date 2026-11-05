@@ -78,25 +78,22 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
 interface FeatureSwitchesProps {
   /** Turned off here. */
   disabled: readonly string[];
-  /** Turned off for everyone, so not up to whoever is looking. */
+  /** Turned off for everyone; not the viewer's to change. */
   lockedOff?: readonly string[];
-  /** A save in flight: one change at a time. */
+  /** A save is in flight; one change at a time. */
   saving?: boolean;
   /** Whether an admin has set up a model for the AI features. */
   aiReady: boolean;
-  /**
-   * Whether music is there to switch: it only exists once an admin has set
-   * up Lidarr, and its switch is left out until then.
-   */
+  /** Whether Lidarr is set up; the music switch is left out until then. */
   musicReady: boolean;
   /**
-   * The admin page lists every feature; someone's own page leaves out the
-   * AI section until a model is set up, and tools they cannot use.
+   * A person's own page: leaves out the AI section until a model is set up,
+   * and tools they cannot use. The admin page lists every feature.
    */
   forPerson?: boolean;
-  /** Features this person has no use for (admin tools, say). */
+  /** Features this person has no use for, such as admin tools. */
   hidden?: readonly Feature[];
-  /** Shown where a hidden feature's switch would be: where it went, say. */
+  /** Shown in place of a hidden feature's switch, such as where it moved. */
   instead?: Partial<Record<Feature, ReactNode>>;
   onChange: (feature: Feature, on: boolean) => void;
 }

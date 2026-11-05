@@ -1,10 +1,9 @@
-/** The furthest page a music list is read to: far past any real one. */
+/** Highest page a music list reads; far past any real one. */
 export const MOST_PAGES = 10_000;
 
 /**
- * The page asked for: a whole number from 1, 1 for anything else, and no
- * further than `most`, so an offset stays a number a database or
- * MusicBrainz takes.
+ * Parses a page number: an integer from 1 (else 1), capped at `most` so the
+ * offset stays valid for the database and MusicBrainz.
  */
 export const pageOf = (value: unknown, most = MOST_PAGES): number => {
   const page = Math.floor(Number(value));

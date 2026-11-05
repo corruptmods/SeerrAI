@@ -166,7 +166,6 @@ const UserList = () => {
   };
 
   const [isDeleting, setDeleting] = useState(false);
-  // The server whose people are being imported.
   const [importFrom, setImportFrom] = useState<MediaServerKind>();
   const importServers = settings.currentSettings.mediaServers.map(
     (server) => server.kind
@@ -275,8 +274,7 @@ const UserList = () => {
   };
 
   useEffect(() => {
-    // Only a search the user typed goes back to page 1. A search restored on
-    // return is not a new one, and would otherwise lose the page they were on.
+    // Only a typed search resets to page 1; a restored one keeps the page.
     if (
       searchTypedRef.current &&
       previousSearchQueryRef.current !== undefined &&
@@ -288,11 +286,8 @@ const UserList = () => {
     previousSearchQueryRef.current = searchQuery;
   }, [searchQuery, page, updateQueryParams]);
 
-  /*
-   * Keep the search across opening a user and coming back, for this browser
-   * tab only, so it survives Back without lingering into a later visit. Sort
-   * and page size were already remembered.
-   */
+  // Session storage keeps the search across Back without carrying it into a
+  // later visit.
   useEffect(() => {
     try {
       const saved = window.sessionStorage.getItem('ul-search');
@@ -300,13 +295,13 @@ const UserList = () => {
         setSearchInput(saved);
       }
     } catch {
-      // Unreadable storage just means an empty search.
+      // Unreadable storage means an empty search.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Skips the save on arrival, which would otherwise write an empty search
-  // over the saved one before the restored value has come through.
+  // Skip the first save, which would overwrite the saved search before it is
+  // restored.
   const skipFirstSearchSave = useRef(true);
   useEffect(() => {
     if (skipFirstSearchSave.current) {
@@ -317,7 +312,7 @@ const UserList = () => {
     try {
       window.sessionStorage.setItem('ul-search', searchQuery);
     } catch {
-      // Storage can be unavailable (private mode); nothing to do.
+      // Storage can be unavailable (private mode).
     }
   }, [searchQuery]);
 
@@ -716,7 +711,6 @@ const UserList = () => {
                 </span>
               </Button>
             ) : importServers.length > 1 ? (
-              // One import for each connected server.
               <div className="flex-grow lg:mr-2">
                 <Dropdown
                   className="w-full justify-center"
@@ -912,7 +906,7 @@ const UserList = () => {
               </Table.TD>
               <Table.TD>
                 <div className="flex items-center">
-                  {/* The name beside it is the same link. */}
+                  {/* Hidden from keyboard and AT: duplicates the name link. */}
                   <Link
                     href={`/users/${user.id}`}
                     className="h-10 w-10 flex-shrink-0"

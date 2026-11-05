@@ -5,9 +5,9 @@ import type { ArrKind } from '@server/lib/quality/types';
 import { MoreThan } from 'typeorm';
 
 /*
- * Notes on the releases Seerr AI grabs through Radarr and Sonarr itself:
- * what each was chosen over. Radarr and Sonarr keep only the release
- * grabbed, so What it does can say a grab won a tie only for these.
+ * Notes on releases Seerr AI grabs itself through Radarr and Sonarr. The
+ * *arrs record only the grabbed release, so What it does can report a tie
+ * win only for these.
  */
 
 const protocolOf = (release: ArrRelease): 'usenet' | 'torrent' | null => {
@@ -19,7 +19,7 @@ const protocolOf = (release: ArrRelease): 'usenet' | 'torrent' | null => {
       : null;
 };
 
-/** Notes a grab, from the releases that were on offer with it. */
+/** Records a grab and whether it won a tie among the offered releases. */
 export const noteGrab = async (
   kind: ArrKind,
   serverId: number,
@@ -51,7 +51,7 @@ export const noteGrab = async (
   );
 };
 
-/** Notes on grabs of these release names in the last few weeks. */
+/** Latest note per release title since `since`. */
 export const notesFor = async (
   kind: ArrKind,
   serverId: number,

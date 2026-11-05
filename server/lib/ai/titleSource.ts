@@ -9,24 +9,23 @@ import { withLibraryStatus } from '@server/lib/ai/context';
 import logger from '@server/logger';
 
 /*
- * A whole franchise, studio, theme or filmography, read from TMDB rather
- * than recalled by a model: complete, current, and the same every time.
- * The model only says which one is meant.
+ * A franchise, studio, theme or filmography read from TMDB rather than
+ * recalled by the model, so it is complete, current and stable. The model
+ * only names which one.
  */
 
 export interface TitleSource {
-  /** What kind of set it is. */
   k: 'collection' | 'keyword' | 'company' | 'person';
-  /** What to search TMDB for: "Milo Thistle", "Halcyon Comics Universe". */
+  /** TMDB search text: "Milo Thistle", "Halcyon Comics Universe". */
   q: string;
   /** For a person: films they directed, or ones they appear in. */
   r?: 'director' | 'cast' | null;
 }
 
-/** As many as a list import takes at once. */
+/** Same cap as one list import. */
 export const SOURCE_LIMIT = IMPORT_LINE_LIMIT;
 
-/** Discover pages read at most, per kind (20 titles a page). */
+/** Max discover pages per kind (20 titles a page). */
 const PAGES = Math.ceil(SOURCE_LIMIT / 20);
 
 type Found = { kind: 'movie' | 'tv'; result: TmdbMovieResult | TmdbTvResult };
@@ -42,7 +41,7 @@ const releaseOf = (f: Found) =>
     ? (f.result as TmdbMovieResult).release_date
     : (f.result as TmdbTvResult).first_air_date) || '9999';
 
-/** Every page of a discover query, up to the limit. */
+/** Every page of a discover query up to PAGES; sets `more.cut` past it. */
 const allPages = async <T>(
   page: (n: number) => Promise<{ results: T[]; total_pages: number }>,
   more: { cut: boolean }
@@ -165,8 +164,8 @@ const fromTmdb = async (
       const picked =
         role === 'director'
           ? credits.crew.filter((c) => c.job === 'Director')
-          : // Appearances as themselves (talk shows, award nights) are not
-            // what "their films" means.
+          : // Appearances as themselves (talk shows, award nights) aren't
+            // "their films".
             credits.cast.filter(
               (c) => !/\b(self|himself|herself|themselves)\b/i.test(c.character)
             );
@@ -192,8 +191,8 @@ const fromTmdb = async (
 };
 
 /**
- * The titles of a set, oldest first, with what the library has of each.
- * Null when TMDB has nothing by that name.
+ * A set's titles, oldest first, with library status. Null when TMDB has
+ * nothing by that name.
  */
 export const titlesFromSource = async (
   user: User,
@@ -213,7 +212,7 @@ export const titlesFromSource = async (
     let found = set.found.filter(
       (f) => !(f.result as { adult?: boolean }).adult
     );
-    // Too many for one list: the best known ones.
+    // Too many for one list: keep the most popular.
     if (found.length > SOURCE_LIMIT) {
       more.cut = true;
       found = [...found]

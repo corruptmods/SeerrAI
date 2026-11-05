@@ -14,10 +14,10 @@ import assert from 'node:assert/strict';
 import { after, beforeEach, describe, it } from 'node:test';
 
 /*
- * Override rules that match on a title's age rating: read from TMDB for the
- * server's Discover region, or the US rating when the title has none there.
- * And rules that name TMDB's anime keyword, which go by whether Seerr
- * decides the title is anime rather than by the keyword itself.
+ * Override rules matching a title's age rating (TMDB's for the server's
+ * Discover region, else the US rating), and rules naming TMDB's anime
+ * keyword, which follow whether Seerr decides the title is anime rather than
+ * the keyword itself.
  */
 
 setupTestDb();
@@ -37,7 +37,9 @@ after(() => {
   settings.main.animeExcludedCountries = saved.leaveOut;
 });
 
-/** A film rated as given, by country; an empty rating is TMDB's "none". */
+/**
+ * A film with the given ratings by country; an empty rating is TMDB's "none".
+ */
 const film = (ratings: Record<string, string[]>) =>
   ({
     id: 1,
@@ -136,7 +138,7 @@ describe('an override rule on age ratings', () => {
       await movieFolder(film({ GB: ['12A'], US: ['PG-13'] })),
       '/teens'
     );
-    // Rated in the region, so its US rating is not looked at.
+    // Rated in the region, so its US rating is ignored.
     assert.equal(await movieFolder(film({ GB: ['15'], US: ['PG-13'] })), null);
   });
 
@@ -160,7 +162,7 @@ describe('an override rule on age ratings', () => {
       rootFolder: '/kids',
     });
 
-    // "PG" in the US is not the British PG.
+    // US "PG" is not British PG.
     assert.equal(await movieFolder(film({ US: ['PG'] })), null);
   });
 

@@ -5,7 +5,7 @@ import type { RadarrSettings } from '@server/lib/settings';
 import type { AnimeSignals } from '@server/utils/isAnime';
 
 export interface RadarrRouting {
-  /** Whether the movie goes to Radarr as anime, and why. */
+  /** Whether the movie goes to Radarr as anime, and why (`decidedBy`). */
   anime: boolean;
   decidedBy: AnimeDecidedBy;
   rootFolder: string;
@@ -14,15 +14,14 @@ export interface RadarrRouting {
 }
 
 /**
- * Where a movie goes in Radarr before anything a request itself overrides
- * (a folder, profile or tags chosen for it). The movie side of
- * lib/sonarrRouting.
+ * Where a movie goes in Radarr before any request-level override (a chosen
+ * folder, profile or tags). The movie side of lib/sonarrRouting.
  *
- * Whether it is anime is decided by decideAnime: 'anime' or 'standard' on
- * the request (ticked by whoever requested it, or set by an override rule),
- * then the title's own setting, then anime detection. Anime gets the server's anime folder, profile and tags,
- * where they are set, and its usual ones where they are not, so a server
- * with no anime settings sends every movie as it always has.
+ * decideAnime decides anime: 'anime' or 'standard' on the request (ticked by
+ * the requester or set by an override rule), then the title's own setting,
+ * then detection. Anime gets the server's anime folder, profile and tags where
+ * set, else the usual ones, so a server without anime settings behaves as
+ * before.
  */
 export const radarrRouting = (
   movie: AnimeSignals,

@@ -17,8 +17,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Seasonal themes: which seasons run, on which days, and which one a
- * person sees today.
+ * Seasonal themes: which seasons run, on which days, and which a user sees
+ * today.
  */
 
 const defaults = seasonCalendar(SEASON_DEFAULTS);
@@ -138,7 +138,7 @@ describe('a season across New Year', () => {
 
 describe('seasons that overlap', () => {
   it('show the one that started most recently', () => {
-    // Holidays stretched to the 31st: New Year takes over on the 29th.
+    // Holidays extended to the 31st: New Year takes over on the 29th.
     const calendar: SeasonCalendar = [
       { id: 'holidays', start: '12-01', end: '12-31' },
       { id: 'newyear', start: '12-29', end: '01-02' },
@@ -204,7 +204,7 @@ describe('Lunar New Year', () => {
   });
 
   it('uses dates an admin set instead, every year', () => {
-    // The table's New Year in 2031 is 23 January.
+    // The table's 2031 New Year is 23 January.
     const calendar: SeasonCalendar = [
       { id: 'lunarnewyear', start: '02-01', end: '02-03' },
     ];
@@ -215,7 +215,7 @@ describe('Lunar New Year', () => {
 
 describe('today, wherever the person is', () => {
   it('is the date on their own calendar', () => {
-    // 03:00 in London on 24 October is still the 23rd in Los Angeles.
+    // 03:00 on 24 October in London is still the 23rd in Los Angeles.
     const now = new Date('2026-10-24T02:00:00Z');
     assert.equal(localDay(now, 'Europe/London'), '2026-10-24');
     assert.equal(localDay(now, 'America/Los_Angeles'), '2026-10-23');
@@ -326,7 +326,7 @@ describe('what an admin can save', () => {
       [],
       'halloween',
       { easter: { enabled: true } },
-      // Seasons there are no longer.
+      // Retired seasons.
       { diwali: { enabled: true } },
       { pride: { enabled: false, start: '06-01', end: '06-30' } },
       { halloween: { enabled: 'yes', start: '10-24', end: '11-01' } },
@@ -408,8 +408,8 @@ describe('the dates shown for a season', () => {
 });
 
 /*
- * Diwali and Pride Month were seasons once. A settings file or an answer
- * to a note saved then still reads, as if they had never been there.
+ * Diwali and Pride Month were once seasons. Settings files and note answers
+ * saved then still load, as if they had never existed.
  */
 describe('a server that ran Diwali or Pride Month', () => {
   const stored = {
@@ -445,7 +445,7 @@ describe('a server that ran Diwali or Pride Month', () => {
         );
       }
     }
-    // Diwali 2027 fell inside Halloween, which now runs all the way.
+    // Diwali 2027 fell inside Halloween, which now runs throughout.
     assert.equal(activeSeason(calendar, '2027-10-28')?.id, 'halloween');
   });
 

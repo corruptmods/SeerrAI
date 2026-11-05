@@ -34,33 +34,31 @@ const messages = defineMessages(
   }
 );
 
-/** What someone allowed the advanced options chose for a music request. */
+/** Advanced options chosen for a music request. */
 export interface MusicOverrides {
   server?: number;
   profile?: number;
   metadataProfile?: number;
   folder?: string;
   tags?: number[];
-  /** The person it is requested for, by id; the signed-in person if unset. */
+  /** Requesting user's id; the signed-in user if unset. */
   userId?: number;
   ignoreQuota?: boolean;
 }
 
 interface MusicAdvancedRequesterProps {
   servers: LidarrServer[];
-  /** The chosen server's profiles, folders and tags, and the artist there. */
+  /** The chosen server's profiles, folders, tags and artist. */
   serverData?: LidarrServerWithDetails;
   value: MusicOverrides;
   onChange: (value: MusicOverrides) => void;
-  /** Bypassing the quota is offered: the person asked for has one. */
+  /** Offer the quota bypass: the requesting user has a quota. */
   quotaLimited: boolean;
 }
 
 /**
- * The advanced options of a music request: which Lidarr, its quality and
- * metadata profiles, root folder and tags, and for managers whom it is for.
- * An artist Lidarr already has keeps its own folder and profiles, so those
- * are shown but cannot be changed.
+ * Advanced options for a music request. An artist already in Lidarr keeps its
+ * folder and profiles, so those are shown read-only.
  */
 const MusicAdvancedRequester = ({
   servers,
@@ -114,7 +112,7 @@ const MusicAdvancedRequester = ({
               id="music-server"
               value={value.server ?? ''}
               onChange={(e) =>
-                // Another server has its own profiles and folders.
+                // Profiles and folders are per server.
                 onChange({
                   ...value,
                   server: Number(e.target.value),

@@ -17,30 +17,30 @@ import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
 /*
- * "Suggested for you": titles like the ones someone has been watching.
+ * "Suggested for you": titles like what the user has been watching.
  *
- * Their recent finished plays come from the server's watch history:
- * Tautulli for Plex, the server itself for Jellyfin and Emby. Each of the
- * latest few titles asks TMDB for its recommendations, and a title several
- * of them point to ranks above one only a single show suggested, with more
- * recent watching counting for more. Anything they have already started is left out.
+ * Recent finished plays come from the server's watch history (Tautulli for
+ * Plex, the server itself for Jellyfin and Emby). Each of the latest few
+ * titles asks TMDB for recommendations; a title several point to outranks one
+ * suggested once, and recent watching weighs more. Anything already started
+ * is excluded.
  *
- * That is a TMDB lookup per title, so the list is built once a day per person
- * and kept in memory; statuses are read fresh on every request.
+ * That is a TMDB lookup per title, so the list is built once a day per user
+ * and cached in memory; statuses are read fresh on every request.
  */
 
 export type SuggestionResult =
   | (TmdbMovieResult & { media_type: 'movie' })
   | (TmdbTvResult & { media_type: 'tv' });
 
-/** Plays read: enough to reach well back past the latest few titles. */
+/** Plays read: enough to reach well past the latest few titles. */
 const HISTORY_LENGTH = 3000;
-/** Titles whose recommendations are asked for. */
+/** Titles whose recommendations are fetched. */
 const SEEDS = 15;
-/** How many suggestions are kept: enough to fill the full page. */
+/** Suggestions kept: enough to fill the full page. */
 const KEEP = 100;
 const REBUILD_MS = 24 * 60 * 60 * 1000;
-/** TMDB lookups at once: well inside its rate limit. */
+/** Concurrent TMDB lookups: well inside its rate limit. */
 const CONCURRENCY = 4;
 
 /**
@@ -66,7 +66,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
     return [];
   }
 
-  // Every title they have started, and the ones they finished, newest first.
+  // Every title they started, and those they finished, newest first.
   const startedIds = new Set<string>();
   // A Set keeps insertion order, so this stays newest first.
   const finishedOrder = new Set<string>();
@@ -78,7 +78,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
     }
   }
 
-  // The server's ids to TMDB ids, through the library Seerr already knows.
+  // Server ids to TMDB ids, via the library Seerr already knows.
   const byTitleId = await source.mediaFor([...startedIds]);
 
   const started = new Set<string>();
@@ -107,7 +107,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
   const scores = new Map<string, { score: number; result: SuggestionResult }>();
 
   await mapWithConcurrency(seeds, CONCURRENCY, async (seed, index) => {
-    // The most recent watch counts fully, the oldest seed half as much.
+    // The latest watch counts fully, the oldest seed half as much.
     const seedWeight = 1 - index / (2 * seeds.length);
     try {
       const results: SuggestionResult[] =
@@ -144,7 +144,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
         });
       });
     } catch (e) {
-      // One title TMDB cannot answer for is not a reason to show nothing.
+      // One failed title is no reason to show nothing.
       logger.debug('Could not read recommendations for a title', {
         label: 'Suggestions',
         tmdbId: seed.tmdbId,
@@ -159,7 +159,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
       (b.result.popularity ?? 0) - (a.result.popularity ?? 0)
   );
 
-  // Blocklisted titles are never suggested, whoever is looking.
+  // Blocklisted titles are never suggested, for anyone.
   const blocklisted = new Set(
     (
       await getRepository(Media).find({
@@ -187,9 +187,9 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
 };
 
 /**
- * Suggestions for one person, best first. Empty when there is no watch
- * history to read (Plex without Tautulli), they have no account on the
- * media server, or they have not finished anything yet.
+ * A user's suggestions, best first. Empty without readable watch history
+ * (Plex without Tautulli), without a media server account, or with nothing
+ * finished yet.
  */
 export const getSuggestions = (user: User): Promise<SuggestionResult[]> => {
   const now = Date.now();

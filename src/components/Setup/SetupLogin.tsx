@@ -39,10 +39,7 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
   );
   const { user, revalidate } = useUser();
 
-  // Effect that is triggered when the `authToken` comes back from the Plex OAuth
-  // We take the token and attempt to login. If we get a success message, we will
-  // ask swr to revalidate the user which _shouid_ come back with a valid user.
-
+  // Sign in with the Plex token once it arrives, then seed the user cache.
   useEffect(() => {
     const login = async () => {
       try {

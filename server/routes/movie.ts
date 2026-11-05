@@ -41,7 +41,8 @@ movieRoutes.get('/:id', async (req, res, next) => {
       onUserWatchlist
     );
 
-    // TMDB issue where it doesnt fallback to English when no overview is available in requested locale.
+    // TMDB doesn't fall back to English when the requested locale has no
+    // overview.
     if (!data.overview) {
       const tvEnglish = await tmdb.getMovie({ movieId: Number(req.params.id) });
       data.overview = tvEnglish.overview;
@@ -153,9 +154,7 @@ movieRoutes.get('/:id/similar', async (req, res, next) => {
   }
 });
 
-/**
- * Endpoint backed by RottenTomatoes
- */
+/** Rotten Tomatoes ratings. */
 movieRoutes.get('/:id/ratings', async (req, res, next) => {
   const tmdb = new TheMovieDb();
   const rtapi = new RottenTomatoes();
@@ -192,8 +191,8 @@ movieRoutes.get('/:id/ratings', async (req, res, next) => {
 });
 
 /**
- * Rotten Tomatoes and IMDb together. Either source can be down or not know
- * the film; the other is still returned.
+ * Rotten Tomatoes and IMDb together. If either source is down or lacks the
+ * film, the other is still returned.
  */
 movieRoutes.get('/:id/ratingscombined', async (req, res, next) => {
   const tmdb = new TheMovieDb();

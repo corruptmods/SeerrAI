@@ -146,7 +146,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   const { locale } = useLocale();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showManager, setShowManager] = useState(false);
-  // A season, or one episode of it, being requested from its own button.
+  // Season or episode being requested from its own button.
   const [requestFor, setRequestFor] = useState<RequestPreselect | null>(null);
   const { mutate: mutateCache } = useSWRConfig();
   const [showIssueModal, setShowIssueModal] = useState(false);
@@ -213,8 +213,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
   const mediaLinks: PlayButtonLink[] = [];
 
-  // A Play button for each server that has the series, the viewer's own
-  // servers first.
+  // One Play button per server with the series, the viewer's own first.
   if (
     hasPermission([Permission.REQUEST, Permission.REQUEST_TV], {
       type: 'or',
@@ -286,7 +285,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     );
   }
 
-  // Does NOT include "Specials"
+  // Excludes Specials.
   const seasonCount = data.seasons.filter(
     (season) => season.seasonNumber !== 0 && season.episodeCount !== 0
   ).length;
@@ -349,7 +348,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     return [...requestedSeasons, ...availableSeasons];
   };
 
-  // Mirrors the season list the request modal offers, so the two agree.
+  // Mirrors the request modal's season list so they agree.
   const requestableSeasons = data.seasons
     .filter(
       (season) =>
@@ -467,7 +466,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           { appearance: 'success', autoDismiss: true }
         );
 
-        // Blocklisted, but a Radarr/Sonarr removal did not go through.
+        // Blocklisted, but a Radarr/Sonarr removal failed.
         const failed = res.data?.failed ?? [];
         if (failed.length) {
           addToast(
@@ -513,13 +512,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   });
 
   /*
-   * Which seasons the per-season and per-episode Request buttons appear on.
-   * The same rule the server applies when creating a request: a season with
-   * any status (partly available, available, processing) or in any request
-   * that is not declined or completed is taken, and would be dropped from a
-   * new one. Offering a button there would look like it worked and do
-   * nothing. Never for a blocklisted title, and not at all while partial
-   * requests are off: a request is then for every season still wanted.
+   * Seasons that get per-season and per-episode Request buttons. Matches the
+   * server: a season with any status or in a request that isn't declined or
+   * completed is taken and would be dropped from a new request, so a button
+   * there would silently do nothing. None for blocklisted titles or while
+   * partial requests are off (a request then covers every wanted season).
    */
   const takenSeasons = new Set<number>([
     ...(data.mediaInfo?.requests ?? [])
@@ -590,7 +587,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           preselect={requestFor}
           onComplete={() => {
             revalidate();
-            // The episode list shows what is requested; refresh it too.
+            // The episode list shows request state; refresh it too.
             mutateCache(
               `/api/v1/tv/${data.id}/season/${requestFor.seasonNumber}`
             );
@@ -720,7 +717,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             </Tooltip>
           )}
           {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            // Someone with Plex keeps their watchlist on Plex.
+            // Plex users keep their watchlist on Plex.
             !hasAccountOn(user, 'plex') && (
               <>
                 {toggleWatchlist ? (
@@ -1202,7 +1199,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                           leave="transition-opacity duration-75 ease-out"
                           leaveFrom="opacity-100"
                           leaveTo="opacity-0"
-                          // Not sure why this transition is adding a margin without this here
+                          // The transition adds a margin otherwise.
                           style={{ margin: '0px' }}
                         >
                           <DisclosurePanel className="w-full rounded-b-md border-b border-l border-r border-subtle px-4 pb-2">

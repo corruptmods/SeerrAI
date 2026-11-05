@@ -11,15 +11,15 @@ export enum ServerType {
 }
 
 /**
- * A media server Seerr can be connected to. There is at most one of each,
- * and each keeps its own settings and its own ids on titles and people.
+ * A media server kind Seerr can connect to. At most one of each, each with its
+ * own settings and its own ids on titles and users.
  */
 export type MediaServerKind = 'plex' | 'jellyfin' | 'emby';
 
 /** Jellyfin and Emby, which share an API (and Seerr's code for it). */
 export type JellyfinFamilyKind = 'jellyfin' | 'emby';
 
-/** Every kind, in the order they are listed after the primary one. */
+/** Every kind, in listing order after the primary. */
 export const MEDIA_SERVER_KINDS: readonly MediaServerKind[] = [
   'plex',
   'jellyfin',
@@ -51,41 +51,41 @@ export const isJellyfinFamily = (
   kind: MediaServerKind | undefined
 ): kind is JellyfinFamilyKind => kind === 'jellyfin' || kind === 'emby';
 
-/** Each server's ids on a title: regular, then 4K. */
+/** Each server's id columns on a title: regular, then 4K. */
 export const MEDIA_ID = {
   plex: ['ratingKey', 'ratingKey4k'],
   jellyfin: ['jellyfinMediaId', 'jellyfinMediaId4k'],
   emby: ['embyMediaId', 'embyMediaId4k'],
 } as const;
 
-/** Each server's id on a music album (MusicAlbum); there is no 4K. */
+/** Each server's id column on a music album (MusicAlbum); no 4K. */
 export const MUSIC_ALBUM_ID = {
   plex: 'ratingKey',
   jellyfin: 'jellyfinItemId',
   emby: 'embyItemId',
 } as const;
 
-/** Each server's account id on a person. */
+/** Each server's account id column on a user. */
 export const USER_ID = {
   plex: 'plexId',
   jellyfin: 'jellyfinUserId',
   emby: 'embyUserId',
 } as const;
 
-/** Each server's account name on a person. */
+/** Each server's account name column on a user. */
 export const USERNAME = {
   plex: 'plexUsername',
   jellyfin: 'jellyfinUsername',
   emby: 'embyUsername',
 } as const;
 
-/** The device Seerr signs in to Jellyfin or Emby as, for a person. */
+/** The device id Seerr signs in to Jellyfin or Emby with, per user. */
 export const DEVICE_ID = {
   jellyfin: 'jellyfinDeviceId',
   emby: 'embyDeviceId',
 } as const;
 
-/** The token Jellyfin or Emby gave a person when they signed in. */
+/** The token Jellyfin or Emby issued a user at sign-in. */
 export const AUTH_TOKEN = {
   jellyfin: 'jellyfinAuthToken',
   emby: 'embyAuthToken',

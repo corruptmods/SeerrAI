@@ -11,8 +11,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Tautulli in settings, against a stand-in that checks its API key and
- * reports a version as the real one does, behind the real OpenAPI validator.
+ * Tautulli settings against a stand-in that checks the API key and reports a
+ * version like the real one, behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -186,7 +186,7 @@ describe('Tautulli in settings', () => {
   });
 
   it('takes over Tautulli as the Plex page saved it', async () => {
-    // As the old form stored it: no useSsl at all, no hasApiKey.
+    // Stored by the old form: no useSsl, no hasApiKey.
     getSettings().tautulli = {
       hostname: '127.0.0.1',
       port: tautulliPort,
@@ -202,7 +202,7 @@ describe('Tautulli in settings', () => {
       ['127.0.0.1', '', true, undefined]
     );
 
-    // Saved again from the new dialog, which sends a blank key.
+    // Resaved from the new dialog, which sends a blank key.
     const saved = await call('POST', '', {
       hostname: '127.0.0.1',
       port: tautulliPort,
@@ -227,7 +227,7 @@ describe('Tautulli in settings', () => {
       ...tautulli('the-key'),
       urlBase: 'tautulli/',
     });
-    // The stand-in answers on any path; what matters is what is saved.
+    // The stand-in answers on any path; only what is saved matters.
     assert.equal(status, 200);
     await call('POST', '', { ...tautulli('the-key'), urlBase: 'tautulli/' });
     assert.equal(getSettings().tautulli.urlBase, '/tautulli');

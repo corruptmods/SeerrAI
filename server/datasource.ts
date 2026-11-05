@@ -215,7 +215,8 @@ const postgresDevConfig: DataSourceOptions = {
   database: process.env.DB_NAME ?? 'seerr',
   ssl: buildSslConfig(),
   poolSize: intFromEnv('DB_POOL_SIZE', 25),
-  // Bounds pool acquisition waits so exhaustion surfaces as errors instead of a silent hang
+  // Bound pool acquisition waits so exhaustion errors instead of hanging
+  // silently.
   connectTimeoutMS: intFromEnv('DB_CONNECT_TIMEOUT_MS', 30000),
   synchronize: false,
   migrationsRun: true,
@@ -236,7 +237,8 @@ const postgresProdConfig: DataSourceOptions = {
   database: process.env.DB_NAME ?? 'seerr',
   ssl: buildSslConfig(),
   poolSize: intFromEnv('DB_POOL_SIZE', 25),
-  // Bounds pool acquisition waits so exhaustion surfaces as errors instead of a silent hang
+  // Bound pool acquisition waits so exhaustion errors instead of hanging
+  // silently.
   connectTimeoutMS: intFromEnv('DB_CONNECT_TIMEOUT_MS', 30000),
   synchronize: false,
   migrationsRun: false,
@@ -246,13 +248,10 @@ const postgresProdConfig: DataSourceOptions = {
   subscribers,
 };
 
-/*
- * Opt-in: DB_TYPE=postgres runs the suite against a real Postgres rather than
- * in-memory SQLite. Production runs Postgres; tests only ever ran SQLite, and
- * that gap let through a datetime column Postgres rejects and a watchlist
- * loop that reproduced cleanly on SQLite. Point DB_HOST and friends at a
- * disposable database — the schema is dropped on every run.
- */
+// Opt-in: DB_TYPE=postgres runs the suite against a real Postgres instead of
+// in-memory SQLite, since production runs Postgres and SQLite-only tests missed
+// Postgres-specific bugs. Point DB_HOST etc. at a disposable database: the
+// schema is dropped every run.
 const postgresTestConfig: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST ?? '127.0.0.1',
@@ -260,11 +259,11 @@ const postgresTestConfig: DataSourceOptions = {
   username: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME ?? 'seerr_test',
-  // No idle reaping. The pool times out idle connections with setTimeout and
-  // cancels that on checkout with clearTimeout; a test that fakes timers can
-  // check a connection out with the fake clearTimeout, leaving the real
-  // timer to close it ten seconds later in the middle of another test. Idle
-  // connections instead just stop holding the test process open.
+  // No idle reaping. The pool expires idle connections with setTimeout and
+  // cancels it on checkout with clearTimeout; a test faking timers can check
+  // out with the fake clearTimeout, leaving the real timer to close the
+  // connection mid-test ten seconds later. Idle connections instead just don't
+  // hold the process open.
   extra: { idleTimeoutMillis: 0, allowExitOnIdle: true },
   synchronize: true,
   dropSchema: true,

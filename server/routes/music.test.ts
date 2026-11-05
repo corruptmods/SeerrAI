@@ -57,9 +57,8 @@ import {
 import sharp from 'sharp';
 
 /*
- * Browsing music: the routes behind the real OpenAPI validator, with
- * MusicBrainz and ListenBrainz stubbed and a fake Lidarr that answers its
- * artist lookup.
+ * Music browsing through the real OpenAPI validator, with MusicBrainz and
+ * ListenBrainz stubbed and a fake Lidarr artist lookup.
  */
 
 setupTestDb();
@@ -69,7 +68,7 @@ const UNKNOWN_ARTIST = '5c72e1b9-4f3d-4a86-b917-d2a8f60c3e51';
 const FANART = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistthumb/glasswing-5.jpg`;
 const BACKDROP = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistbackground/glasswing-6.jpg`;
 
-// The fake Lidarr: its artist lookup, and how often it was asked.
+// Fake Lidarr artist lookup, recording each query.
 let lookups: string[] = [];
 let lookupImages: { coverType: string; remoteUrl?: string }[] = [];
 let lidarrUp = true;
@@ -103,7 +102,8 @@ let app: Server;
 let port = 0;
 let actingAs: User | undefined;
 
-// What the image proxy fetched from fanart.tv, and a session to ask with.
+// Pictures the image proxy fetched from fanart.tv, and a session to request
+// with.
 let fetchedPictures: string[] = [];
 let pictureJpeg: Buffer;
 const PICTURE_CACHE = path.join(__dirname, '../../config/cache/images/fanart');
@@ -190,23 +190,22 @@ const album = (id: string, title: string, date: string): MbReleaseGroup => ({
 });
 
 /*
- * A search for "Moonlurker", shaped like a real MusicBrainz answer observed
- * on 2026-10-19 (release-group search, limit 100): 338 results in all, the
- * first 98 of them exact titles that all score 100, in no useful order,
- * then weaker matches scoring 85. The first five, and the four albums
- * named below (their ids, release counts and places in the list), are as
- * MusicBrainz gave them; the other exact matches stand in for the many
- * small acts' albums and singles it listed (their ids are made up, their
- * release counts 1 or 2 as theirs were). The artists are made up.
+ * A "Moonlurker" search shaped like a real MusicBrainz answer observed
+ * 2026-10-19 (release-group search, limit 100): 338 results, the first 98 exact
+ * titles all scoring 100 in no useful order, then weaker matches at 85. The
+ * first five and the four albums below (ids, release counts, positions) are as
+ * MusicBrainz gave them; the other exact matches stand in for many small acts'
+ * albums and singles (made-up ids, release counts 1 or 2 as theirs were).
+ * Artists are made up.
  */
 const MOONLURKER = {
-  /** Marcus Delray's album: 98th, with 85 releases. */
+  /** Marcus Delray's album: 98th, 85 releases. */
   album: '9d2c7e15-3b84-3f0a-a6d1-2e8b5c4f9037',
-  /** His single: about 82nd, with 7. */
+  /** His single: about 82nd, 7 releases. */
   single: '6b18d4e2-7f05-3c91-b2e7-8a4c1d6f30b9',
-  /** Octavius Ruiz's album: about 56th, with 7. */
+  /** Octavius Ruiz's album: about 56th, 7 releases. */
   ruiz: '2e7d9a41-c63b-4f18-8d25-b1a0f9e3c742',
-  /** Wrecker's album: about 69th, with 4. */
+  /** Wrecker's album: about 69th, 4 releases. */
   wrecker: '8a1f6c37-d290-4b5e-9c73-000e4a2b6f18',
 };
 const MOONLURKER_TOTAL = 338;
@@ -216,7 +215,7 @@ const moonlurkerBand = (n: number) =>
 const madeUp = (n: number) =>
   `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`;
 
-/** Each act a made-up id of its own. */
+/** A made-up id per act. */
 const actIds = new Map<string, string>();
 const credit = (name: string) => {
   if (!actIds.has(name)) {
@@ -247,7 +246,7 @@ const releaseGroup = (
   'artist-credit': credit(artistName),
 });
 
-/** One of the small acts' exact matches, numbered from 0. */
+/** The nth small act's exact match. */
 const smallMatch = (n: number, score = 100) =>
   releaseGroup(madeUp(n), 'Moonlurker', `Small act ${n}`, {
     score,
@@ -255,7 +254,7 @@ const smallMatch = (n: number, score = 100) =>
     type: ['Album', 'Single', 'EP'][n % 3],
   });
 
-/** The first page of the real answer, as above. */
+/** First page of the real answer above. */
 const moonlurkerAlbums = () => {
   const named: Record<number, MbReleaseGroup> = {
     1: releaseGroup(madeUp(9001), 'Moonlurker!', 'Warm Ashes'),
@@ -292,9 +291,9 @@ const moonlurkerAlbums = () => {
 };
 
 /**
- * The same search had there been more exact matches: the first page all
- * ties without Marcus Delray's album, which is 20th on the second page,
- * and that page ends on weaker matches.
+ * The same search with more exact matches: page one all ties without Marcus
+ * Delray's album, which is 20th on page two, and that page ends on weaker
+ * matches.
  */
 const moonlurkerAlbumsAt = (offset: number) => {
   const groups =
@@ -323,8 +322,8 @@ const moonlurkerArtists = () => ({
 });
 
 /**
- * MusicBrainz on a mirror (so nothing waits a second between requests),
- * answering searches as given; what it was asked, by path and offset.
+ * MusicBrainz on a mirror (no one-second wait) answering searches as given;
+ * records each request's path and offset.
  */
 const mirrorAnswering = (
   albumsAt: (offset: number) => unknown,
@@ -528,7 +527,7 @@ describe('search', () => {
     const [query, { wanted, ...page }] = searchArtists.mock.calls[0]
       .arguments as [string, { wanted?: () => boolean }];
     assert.deepEqual([query, page], ['glasswing', { limit: 25, offset: 0 }]);
-    // Each person's newest search is the one wanted.
+    // Each person's newest search is wanted.
     assert.equal(wanted?.(), true);
   });
 
@@ -569,7 +568,7 @@ describe('search', () => {
         get: (header: string) => (header === 'X-Seerr-Tab' ? tab : undefined),
       }) as unknown as express.Request;
     const mine = wantedSearch(asking('mine'), 'lighthouse');
-    // More other tabs than are followed at once.
+    // More other tabs than MOST_TABS.
     for (let i = 0; i < MOST_TABS; i++) {
       wantedSearch(asking(`other-${i}`), 'ferryman');
     }
@@ -577,8 +576,7 @@ describe('search', () => {
   });
 
   it('shows 8 artists and 12 albums, whatever an older version saved', async () => {
-    // Before Settings → Music was trimmed, how many a search showed, and
-    // where music could be searched, were settings.
+    // Legacy settings: result counts and where music could be searched.
     getSettings().music.search = {
       inAll: false,
       musicPage: false,
@@ -597,7 +595,7 @@ describe('search', () => {
       async () => ({ count: 0, offset: 0, 'release-groups': [] })
     );
     assert.equal((await get('/music/search?query=glasswing')).status, 200);
-    // More are asked for than shown, so the best can be picked from them.
+    // More are fetched than shown, so the best can be picked.
     const pageOf = (call: { arguments: unknown[] }) => {
       const { limit, offset } = call.arguments[1] as {
         limit: number;
@@ -624,9 +622,8 @@ describe('search', () => {
       albums: { id: string; artistName: string; primaryType: string }[];
     };
     assert.equal(albums.length, 12);
-    // As ranked from the real answer: Marcus Delray's album (85
-    // releases), Octavius Ruiz's and his single (7 each, the album
-    // first), then Wrecker's (4).
+    // Ranked from the real answer: Marcus Delray's album (85 releases),
+    // Octavius Ruiz's then his single (7 each), then Wrecker's (4).
     assert.deepEqual(
       albums.slice(0, 4).map((a) => [a.id, a.artistName, a.primaryType]),
       [
@@ -636,15 +633,15 @@ describe('search', () => {
         [MOONLURKER.wrecker, 'Wrecker', 'Album'],
       ]
     );
-    // The weaker matches come after every exact one.
+    // Weaker matches come after every exact one.
     assert.ok(!albums.some((a) => [madeUp(9099), madeUp(9100)].includes(a.id)));
-    // The first page ends on weaker matches: nothing more is asked for.
+    // Page one ends on weaker matches, so no more pages are fetched.
     assert.deepEqual(requests().sort(), [
       '/ws/2/artist 25@0',
       '/ws/2/release-group 100@0',
     ]);
     assert.equal(artists.length, 8);
-    // The band with the most tags first, then MusicBrainz's order.
+    // Band with the most tags first, then MusicBrainz order.
     assert.deepEqual(
       artists.slice(0, 3).map((a) => a.id),
       [moonlurkerBand(7), moonlurkerBand(0), moonlurkerBand(1)]
@@ -659,8 +656,8 @@ describe('search', () => {
       (body as { albums: { id: string }[] }).albums[0].id,
       MOONLURKER.album
     );
-    // The second page ends below the top score, so there is no third,
-    // though MusicBrainz has more.
+    // Page two ends below the top score, so no third page, though MusicBrainz
+    // has more.
     assert.deepEqual(
       requests().filter((r) => r.startsWith('/ws/2/release-group')),
       ['/ws/2/release-group 100@0', '/ws/2/release-group 100@100']
@@ -755,7 +752,7 @@ describe('an artist', () => {
     assert.equal(details.name, 'Glasswing');
     assert.equal(details.biography, 'Glasswing are an English rock band.');
     assert.deepEqual(details.genres, ['alternative rock', 'rock']);
-    // Only https links of the kinds people follow.
+    // Only https links of the useful kinds.
     assert.deepEqual(details.links, [
       { kind: 'official homepage', url: 'https://www.glasswing.com/' },
     ]);
@@ -872,8 +869,8 @@ describe('an artist', () => {
 });
 
 describe('an artist’s picture', () => {
-  // TheAudioDB (asked with its free key when no key is set) knows nothing,
-  // unless a test says otherwise.
+  // TheAudioDB (free key when none is set) knows nothing unless a test says
+  // otherwise.
   beforeEach(() => {
     mock.method(TheAudioDb.prototype, 'getArtistPictures', async () => ({
       thumb: null,
@@ -1009,7 +1006,7 @@ describe('an artist’s picture, from the image proxy', () => {
     const res = await picture(IDS.artist);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/jpeg');
-    // Which picture this is can change, so a browser keeps it for a day.
+    // The chosen picture can change, so browsers keep it a day.
     assert.equal(res.headers.get('cache-control'), 'public, max-age=86400');
     assert.equal((await res.arrayBuffer()).byteLength, pictureJpeg.length);
 
@@ -1021,7 +1018,7 @@ describe('an artist’s picture, from the image proxy', () => {
     assert.equal(avif.headers.get('cache-control'), 'public, max-age=86400');
     assert.ok((await avif.arrayBuffer()).byteLength < pictureJpeg.length);
 
-    // Asked again, the browser is told it already has it.
+    // Repeat with the ETag: 304.
     const again = await fetch(
       `http://127.0.0.1:${port}/imageproxy/artist/${IDS.artist}`,
       {
@@ -1163,8 +1160,8 @@ describe('an album', () => {
       plex: { ...settings.plex },
     };
     try {
-      // No music library on anywhere: Lidarr's files decide, and three of
-      // twelve tracks is not here yet.
+      // No music library enabled anywhere: Lidarr's files decide, and 3 of 12
+      // tracks isn't available.
       settings.plex.musicLibraries = [];
       let details = (await get(`/music/album/${IDS.otherAlbum}`)).body as {
         addingToLibrary?: boolean;
@@ -1216,7 +1213,7 @@ describe('an album', () => {
     ]);
     const { status, body } = await get(`/music/album/${IDS.album}/tracks`);
     assert.equal(status, 200);
-    // The album is here: so is each song on it.
+    // Album available, so each song is too.
     assert.deepEqual((body as { tracks: unknown[] }).tracks, [
       { disc: 1, position: 1, number: '1', title: '3 + 3 = 7', length: 199000 },
       {
@@ -1231,7 +1228,7 @@ describe('an album', () => {
       },
     ]);
 
-    // Only partly here: its songs can still be asked for.
+    // Partly available: its songs can still be requested.
     await getRepository(MusicAlbum).update(
       { mbId: IDS.album },
       { status: MediaStatus.PARTIALLY_AVAILABLE }
@@ -1284,7 +1281,7 @@ describe('an album’s tracks without taking songs from albums', () => {
       ],
       releases: types.map(release),
     });
-    // Song 1 has a single; song 2 is only on the album; song 3 isn't known.
+    // Song 1 has a single; song 2 is only on the album; song 3 is unknown.
     mock.method(MusicBrainz.prototype, 'keptRecording', async (id: string) =>
       id === rec(1)
         ? recording(1, ['Single', 'Album'])
@@ -1355,7 +1352,7 @@ describe('Discover’s music rows', () => {
       second.body as { results: { title: string; coverUrl: string }[] }
     ).results;
     assert.equal(last.length, 5);
-    // ListenBrainz's own cover for the release it names.
+    // ListenBrainz's own cover for the named release.
     assert.equal(
       last[4].coverUrl,
       `https://coverartarchive.org/release/${IDS.processingAlbum}/front-500`
@@ -1386,7 +1383,7 @@ describe('Discover’s music rows', () => {
                 artistName: 'Glasswing',
                 releaseDate: '2019-04-01',
               },
-              // Nobody MusicBrainz knows: left out.
+              // Unknown to MusicBrainz: dropped.
               { id: '9003', name: 'Unheard', artistName: 'Nobody At All' },
             ]
           : [
@@ -1475,7 +1472,7 @@ describe('Discover’s music rows', () => {
     }));
 
     type Songs = { results: { title: string; artistId: string }[] };
-    // Nothing is matched yet: the rows fill once it is, behind the scenes.
+    // Nothing matched yet: rows fill once matched in the background.
     const first = (await get('/discover/music/top-songs')).body as Songs;
     assert.deepEqual(first.results, []);
     let songs: Songs = first;
@@ -1515,7 +1512,7 @@ describe('Discover’s music rows', () => {
       [[IDS.artist, 'Glasswing', MediaStatus.PARTIALLY_AVAILABLE]]
     );
 
-    // Matched once, and kept: asked again, MusicBrainz isn't.
+    // Matched once and cached: MusicBrainz isn't asked again.
     await chartsMatched();
     const asked = searchArtists.mock.callCount();
     forgetChartMatches();
@@ -1588,11 +1585,11 @@ describe('Discover’s music rows', () => {
 
   it('show what the media servers added most recently', async () => {
     const { artist } = await seedMusicFixtures();
-    // The artist's name, as the music scans keep it.
+    // Artist name as music scans store it.
     await getRepository(Media).update(artist.id, { foreignTitle: 'Glasswing' });
     const { status, body } = await get('/discover/music/recently-added');
     assert.equal(status, 200);
-    // Only albums that are here and known to MusicBrainz.
+    // Only available albums known to MusicBrainz.
     assert.deepEqual(
       (
         body as {
@@ -1639,7 +1636,7 @@ describe('Discover’s music rows', () => {
     assert.deepEqual(MUSIC_SLIDERS, [25, 26, 27, 28, 29, 30, 31]);
     assert.equal(DiscoverSliderType.MUSIC_RECENTLY_ADDED, 25);
 
-    // A home page from before music.
+    // A home page saved before music existed.
     const repository = getRepository(DiscoverSlider);
     await repository.clear();
     let order = 0;
@@ -1652,7 +1649,7 @@ describe('Discover’s music rows', () => {
     }
     await DiscoverSlider.bootstrapSliders();
     const sliders = await repository.find({ order: { order: 'ASC' } });
-    // The charts' songs before their albums and artists.
+    // Chart songs before chart albums and artists.
     assert.deepEqual(
       sliders.slice(-8).map((s) => [s.type, s.enabled]),
       [

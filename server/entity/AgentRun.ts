@@ -7,25 +7,26 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-/** Asked by an admin; on its own for a requested title; or for a missing
- * title someone reported. */
+/**
+ * Asked by an admin; automatic for a requested title; or for a reported missing
+ * title.
+ */
 export type AgentTrigger = 'ask' | 'auto' | 'report';
 
 /**
- * What a run is for. Work: looking for something, as asked or on its own.
- * Approval: a change asked for on someone's behalf, waiting for an admin.
- * Follow: a replaced season, followed until its new files are in. Retry:
- * work that went on by itself after a download it started failed. An
- * approval or a followed season is not one of the runs it may start in a
- * day, and only work under way holds up another report of the same title.
+ * What a run is for. Work: searching, as asked or automatically. Approval: a
+ * change requested on someone's behalf, awaiting an admin. Follow: a replaced
+ * season, tracked until its new files arrive. Retry: work resumed automatically
+ * after a download it started failed. Approvals and follows don't count towards
+ * the daily run limit, and only in-progress work blocks another report of the
+ * same title.
  */
 export type AgentRunPurpose = 'work' | 'approval' | 'follow' | 'retry';
 
 /**
- * Held: for a report, until Sonarr's or Radarr's search and Backfill's are
- * over, and only then if nothing was found. Waiting: it asked an admin
- * something and goes on once answered. A finished run goes on too when an
- * admin replies to it.
+ * Held: a report waits until Sonarr's or Radarr's search and Backfill's finish,
+ * and proceeds only if nothing was found. Waiting: it asked an admin and
+ * resumes once answered. A finished run also resumes when an admin replies.
  */
 export type AgentRunStatus =
   | 'held'
@@ -36,8 +37,8 @@ export type AgentRunStatus =
   | 'failed';
 
 /**
- * One line of what the agent did: what it said, each tool it used and what
- * that showed, and anything it changed.
+ * One step of the agent's log: what it said, each tool call and its result, and
+ * anything it changed.
  */
 export interface AgentStep {
   at: string;
@@ -60,26 +61,26 @@ export interface AgentStep {
 }
 
 /**
- * Something the agent changed: a download started, a title requested, or a
- * change an admin approved (a group blocked, a file deleted…).
+ * Something the agent changed: a download started, a title requested, or an
+ * admin-approved change (a group blocked, a file deleted…).
  */
 export interface AgentAction {
   at: string;
   type: 'grab' | 'request' | 'stop' | 'relink' | 'change';
-  /** For a change: which kind. */
+  /** For a change: its kind. */
   change?: string;
-  /** For a change: the admin who approved it. */
+  /** For a change: the approving admin. */
   approvedBy?: string;
   title: string;
   detail: string;
   jobId?: number;
   /**
-   * For a grab: files added to a download already under way (started by
+   * For a grab: files added to a download already in progress (started by
    * Backfill, someone else or another conversation), not one it started.
    */
   extended?: boolean;
   requestId?: number;
-  /** The episodes or movie it is for, to keep caps and repeats in check. */
+  /** The episodes or movie it's for, to enforce caps and avoid repeats. */
   episodeIds?: number[];
   release?: string;
 }
@@ -100,11 +101,11 @@ export class AgentRun {
   @Column({ type: 'varchar', default: 'queued' })
   public status: AgentRunStatus;
 
-  /** What an admin first asked, in their words. */
+  /** The admin's original request, verbatim. */
   @Column({ type: 'text', nullable: true })
   public ask: string | null;
 
-  /** The title it was about, once known: series, movie or album, and where. */
+  /** The title's kind once known: series, movie or album. */
   @Column({ type: 'varchar', nullable: true })
   public kind: 'series' | 'movie' | 'album' | null;
 
@@ -118,7 +119,7 @@ export class AgentRun {
   @Column({ type: 'varchar', nullable: true })
   public title: string | null;
 
-  /** Its closing words: what it found and did. */
+  /** Its closing summary: what it found and did. */
   @Column({ type: 'text', nullable: true })
   public summary: string | null;
 
@@ -131,13 +132,13 @@ export class AgentRun {
   @Column({ type: 'text', nullable: true })
   public error: string | null;
 
-  /** What it asked, while it waits for an answer. */
+  /** Its question, while awaiting an answer. */
   @Column({ type: 'text', nullable: true })
   public question: string | null;
 
   /**
-   * The conversation with the model, so it can go on after an answer or a
-   * follow-up, and the releases it had found.
+   * The model conversation, so it can resume after an answer or follow-up, plus
+   * the releases it found.
    */
   @Column({ type: 'simple-json', default: '[]' })
   public conversation: unknown[];

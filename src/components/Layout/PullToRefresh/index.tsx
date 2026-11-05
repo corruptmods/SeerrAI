@@ -9,15 +9,13 @@ const PullToRefresh = () => {
   const [pullChange, setPullChange] = useState(0);
   const refreshDiv = useRef<HTMLDivElement>(null);
 
-  // Various pull down thresholds that determine icon location
   const pullDownInitThreshold = pullChange > 20;
   const pullDownStopThreshold = 120;
   const pullDownReloadThreshold = pullChange > 340;
   const pullDownIconLocation = pullChange / 3;
 
   useEffect(() => {
-    // Reload function that is called when reload threshold has been hit
-    // Add loading class to determine when to add spin animation
+    // The loading class starts the spin animation.
     const forceReload = () => {
       setPullStartPoint(0);
       refreshDiv.current?.classList.add('loading');
@@ -28,19 +26,16 @@ const PullToRefresh = () => {
 
     const html = document.querySelector('html');
 
-    // Determines if we are at the top of the page
-    // Locks or unlocks page when pulling down to refresh
+    // At the top of the page, shows the icon and locks scrolling for the pull.
     const pullStart = (e: TouchEvent) => {
-      // A panel or dialog is open: a pull inside it scrolls it, and must
-      // neither reload the page nor touch the styles holding the page still.
+      // A panel or dialog is open: the pull scrolls it, so neither reload nor
+      // touch the scroll-lock styles.
       if (isBodyScrollLocked(document.body)) {
         setPullStartPoint(0);
         return;
       }
 
       setPullStartPoint(e.targetTouches[0].screenY);
-
-      const html = document.querySelector('html');
 
       if (window.scrollY === 0 && window.scrollX === 0) {
         refreshDiv.current?.classList.add('block');
@@ -57,7 +52,6 @@ const PullToRefresh = () => {
       }
     };
 
-    // Tracks how far we have pulled down the refresh icon
     const pullDown = async (e: TouchEvent) => {
       const screenY = e.targetTouches[0].screenY;
       const pullLength =
@@ -66,8 +60,6 @@ const PullToRefresh = () => {
       setPullChange(pullLength);
     };
 
-    // Will reload the page if we are past the threshold
-    // Otherwise, we reset the pull
     const pullFinish = () => {
       if (pullDownReloadThreshold && pullStartPoint !== 0) {
         forceReload();

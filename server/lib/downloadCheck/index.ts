@@ -55,38 +55,34 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Download Check: looks at every download Sonarr and Radarr have in their
- * queues, twice a minute, for what would keep it from being imported or
- * shows it isn't what it says.
+ * Download Check: twice a minute, checks every download in Sonarr's and
+ * Radarr's queues for anything that would block its import or shows it
+ * isn't what it claims.
  *
- * Before it comes down (or while a delay profile still holds it): a program
- * among its files, nothing but archives or samples, an episode that hadn't
- * aired, another show or version under this one's name, no better than the
- * file there, or a better copy already in the queue. Once it's down and the
- * import is stuck, the server's own reason: imported, with the episodes it
- * really is, when the name shows it's the right title; thrown away and
- * searched again when nothing in it will do; left for an admin when it
- * can't be told.
+ * While downloading (or held by a delay profile): a program among its
+ * files, only archives or samples, an episode not yet aired, another show
+ * or version under this one's name, no better than the existing file, or a
+ * better copy already queued. Once downloaded with the import stuck, it
+ * reads the server's reason: imports with the actual episodes when the name
+ * shows the right title, rejects and searches again when nothing usable is
+ * in it, or leaves it for an admin when undecidable.
  *
- * With Report only, it says what it would do and does nothing. Nothing here
- * uses AI: every decision is a rule over what the servers say.
+ * Report only logs what it would do and acts on nothing. No AI is used:
+ * every decision is a rule over what the servers report.
  */
 
 const LABEL = 'Download Check';
 
-/** A stuck import gets this long to clear by itself before anything's done. */
+/** How long a stuck import gets to clear by itself before acting. */
 export const BLOCKED_FOR_MS = 2 * 60_000;
 
-/** How long an import is followed before it's taken as started, not done. */
+/** How long to poll an import before treating it as started but unfinished. */
 const IMPORT_WAIT_MS = 90_000;
 const IMPORT_POLL_MS = 3_000;
-/**
- * How long after a Backfill search of a title a grab numbered another way
- * doesn't start another: one that recent has looked already.
- */
+/** Min gap between Backfill searches a renumbered grab can start for a title. */
 const LOOK_AGAIN_MS = 6 * 60 * 60 * 1000;
 
-/** States a download is in before it's down. */
+/** Download states before completion. */
 const DOWNLOADING = [
   'delay',
   'queued',
@@ -100,7 +96,7 @@ export interface Decision {
   finding: CheckFinding;
   action: CheckAction;
   params?: Record<string, unknown>;
-  /** The server's words, for a stuck import. */
+  /** The server's message, for a stuck import. */
   detail?: string;
 }
 
@@ -109,7 +105,7 @@ export interface ServerRef {
   settings: SonarrSettings | RadarrSettings;
 }
 
-/** Whether a download is still coming down, or done and stuck. */
+/** Whether a download is still downloading, or done and stuck. */
 export const stageOf = (grab: Grab): CheckStage | undefined => {
   if (
     grab.state === 'importblocked' ||
@@ -150,7 +146,7 @@ export const episodesLabel = (episodes: QueueEpisode[]): string => {
     : `S${pad(seasons[0])}–S${pad(seasons[seasons.length - 1])} (${sorted.length})`;
 };
 
-/** What's asked of each server in one pass, asked once. */
+/** Per-pass cache so each server is asked each question once. */
 export class Pass {
   private factsOf = new Map<number, Promise<ItemFacts>>();
   private episodesOf = new Map<number, Promise<QueueEpisode[]>>();
@@ -164,7 +160,7 @@ export class Pass {
     if (!value) {
       value = load();
       map.set(key, value);
-      // A failure isn't kept: the next look asks again.
+      // Failures aren't cached; the next call asks again.
       value.catch(() => map.delete(key));
     }
     return value;
@@ -193,11 +189,11 @@ export class Pass {
   }
 }
 
-/** What's known of a download between passes, kept in memory. */
+/** In-memory state of a download between passes. */
 interface Seen {
-  /** Its name, timing and quality have been looked at. */
+  /** Its name, timing and quality have been checked. */
   named?: boolean;
-  /** Its files have been looked at (torrents, once the client lists them). */
+  /** Its files have been checked (torrents, once the client lists them). */
   filesLooked?: boolean;
   /** When its import was first seen stuck. */
   blockedSince?: number;
@@ -227,9 +223,9 @@ class DownloadCheckEngine {
   /** How long a stuck import is left to clear by itself (shorter in tests). */
   public blockedForMs = BLOCKED_FOR_MS;
   private seen = new Map<string, Seen>();
-  /** Rows being acted on now, by the pass or by an admin. */
+  /** Rows being acted on, by the pass or an admin. */
   private busy = new Set<number>();
-  /** Which torrent client has which torrent, so it's asked once. */
+  /** Torrent hash → client holding it, so each is looked up once. */
   private holder = new Map<string, number>();
   private unreachable = new Set<string>();
 
@@ -237,7 +233,7 @@ class DownloadCheckEngine {
     return { running: this.running };
   }
 
-  /** Forgets what it saw of every download (tests start clean). */
+  /** Clears all download state (tests start clean). */
   public forget() {
     this.seen.clear();
     this.holder.clear();
@@ -248,7 +244,7 @@ class DownloadCheckEngine {
     return getSettings().backfill.downloadCheck?.mode ?? 'off';
   }
 
-  /** Every Sonarr and Radarr, each address once. */
+  /** Every Sonarr and Radarr, deduplicated by address. */
   private servers(): ServerRef[] {
     const settings = getSettings();
     const seen = new Set<string>();
@@ -266,20 +262,20 @@ class DownloadCheckEngine {
     return out;
   }
 
-  /** The server's API; a stand-in in tests. */
+  /** The server's API; replaced in tests. */
   public apiFor(ref: ServerRef): CheckServer {
     return ref.app === 'sonarr'
       ? CheckSonarr.forServer(ref.settings as SonarrSettings)
       : CheckRadarr.forServer(ref.settings as RadarrSettings);
   }
 
-  /** One look at every queue. Does nothing while Download Check is off. */
+  /** One pass over every queue. Does nothing while Download Check is off. */
   public async run(): Promise<void> {
     const mode = this.mode();
     if (mode === 'off' || this.running) return;
     this.running = true;
     try {
-      // Every download in a queue this pass, by its key.
+      // Keys of every download queued this pass.
       const queued = new Set<string>();
       for (const ref of this.servers()) {
         const name = `${appName(ref.app)} ${ref.settings.name}`;
@@ -289,7 +285,7 @@ class DownloadCheckEngine {
             logger.info(`${name} is answering again`, { label: LABEL });
           }
         } catch (e) {
-          // Said once, not every pass, while a server is down.
+          // Logged once while a server is down, not every pass.
           if (!this.unreachable.has(name)) {
             this.unreachable.add(name);
             logger.warn(`Could not check ${name}'s queue`, {
@@ -304,7 +300,7 @@ class DownloadCheckEngine {
       for (const [key, seen] of this.seen) {
         if (seen.lastSeen < cutoff) this.seen.delete(key);
       }
-      // Which client holds a torrent, once it is in no queue.
+      // Drop client lookups for torrents no longer queued.
       for (const hash of this.holder.keys()) {
         if (!queued.has(hash)) this.holder.delete(hash);
       }
@@ -343,7 +339,7 @@ class DownloadCheckEngine {
         },
       });
       if (row) {
-        // Found with Report only, and now on: done now, if it still applies.
+        // Found under Report only and now on: act if it still applies.
         if (row.status === 'would' && mode === 'on') {
           await this.act(server, row, grab);
         }
@@ -383,8 +379,8 @@ class DownloadCheckEngine {
       }
     }
 
-    // Left the queue (imported, removed in Sonarr, cleaned up by another
-    // tool) before anything was done.
+    // Mark rows gone whose download left the queue (imported, removed in
+    // Sonarr, cleaned up by another tool) before anything was done.
     const open = await getRepository(DownloadCheck).find({
       where: {
         app: ref.app,
@@ -401,7 +397,7 @@ class DownloadCheckEngine {
     }
   }
 
-  /** Before it's down: its name, timing, quality, place in the queue, files. */
+  /** While downloading: checks name, timing, quality, queue and files. */
   public async checkGrab(
     pass: Pass,
     grab: Grab,
@@ -410,13 +406,12 @@ class DownloadCheckEngine {
   ): Promise<Decision | undefined> {
     if (!seen.named) {
       const named = await this.checkName(pass, grab, queue);
-      // Looked at once it's been answered: a server not answering means
-      // another look next time.
+      // Marked only after the server answered; otherwise retried next pass.
       seen.named = true;
       if (named) return named;
     }
-    // A Usenet job's files aren't listed before it's down. A torrent's are
-    // once its client has its file list: looked at then, and only then.
+    // Usenet files aren't listed until downloaded. Torrent files are checked
+    // once, when the client first lists them.
     if (!seen.filesLooked) {
       if (grab.protocol !== 'torrent') {
         seen.filesLooked = true;
@@ -437,14 +432,14 @@ class DownloadCheckEngine {
     return undefined;
   }
 
-  /** Checks needing only the name and what the server has: done once. */
+  /** One-time checks needing only the name and the server's data. */
   private async checkName(
     pass: Pass,
     grab: Grab,
     queue: Grab[]
   ): Promise<Decision | undefined> {
     const server = pass.server;
-    // An episode that hadn't aired: a fake named after it.
+    // Grabbed before the episode aired: a fake named after it.
     if (server.app === 'sonarr' && grab.added) {
       const hours = hoursBeforeAir(
         new Date(grab.added).getTime(),
@@ -455,7 +450,7 @@ class DownloadCheckEngine {
       }
     }
 
-    // Grabbed on the indexer's id, under a name that isn't this title's.
+    // Grabbed by indexer id under a name that isn't this title's.
     const parsed = await server.parsedItem(grab.title);
     if (parsed !== grab.itemId) {
       const evidence = await this.judge(pass, grab);
@@ -467,7 +462,7 @@ class DownloadCheckEngine {
         };
       }
       if (evidence.verdict === 'renumbered' && evidence.episode?.hasFile) {
-        // Another episode, one there's a file for already.
+        // Another episode that already has a file.
         return {
           finding: 'renumbered',
           action: 'reject',
@@ -476,9 +471,9 @@ class DownloadCheckEngine {
       }
     }
 
-    // Read as this series, but its episode title is another episode's:
-    // Sonarr reads names by the scene's numbers (TheXEM), or the group
-    // numbered it its own way. Left alone it goes in as the wrong episode.
+    // Parsed as this series but titled as another episode: Sonarr uses scene
+    // numbering (TheXEM), or the group numbered it its own way. Left alone
+    // it imports as the wrong episode.
     if (parsed === grab.itemId && server.app === 'sonarr') {
       const other = await this.titledAs(pass, grab);
       if (other) {
@@ -500,7 +495,7 @@ class DownloadCheckEngine {
       }
     }
 
-    // No better than what's there: the import would refuse it.
+    // No better than the existing file: the import would refuse it.
     const facts = await pass.facts(grab.itemId);
     const quality = grab.quality;
     if (quality) {
@@ -514,7 +509,7 @@ class DownloadCheckEngine {
           const held = grab.episodes.map((e) =>
             e.episodeFileId ? files.get(e.episodeFileId) : undefined
           );
-          // The file there holds an episode this one doesn't.
+          // The existing file holds an episode this one doesn't.
           const wider = grab.episodes.flatMap((e) =>
             all.filter(
               (o) =>
@@ -549,9 +544,8 @@ class DownloadCheckEngine {
         }
       }
 
-      // A better copy of the same, further along: once it's in, this one
-      // would be refused. (One that comes in first is replaced by the
-      // better one after, which is no harm.)
+      // A better copy further along would make the import refuse this one.
+      // (If this one lands first, the better one replaces it; no harm.)
       if (grab.sizeLeft > 0) {
         const mine = new Set(grab.episodes.map((e) => e.id));
         const better = queue.find(
@@ -588,10 +582,10 @@ class DownloadCheckEngine {
   }
 
   /**
-   * The other library episode a single-episode grab's title is, exactly,
-   * when the name has one that isn't the episode it was filed as. Nothing
-   * while that episode has no title yet ("TBA", as at air time), as the
-   * name can't then be told from it.
+   * The other library episode whose title exactly matches a single-episode
+   * grab's episode title, if it isn't the one it was filed as. Undefined
+   * while the filed episode is untitled ("TBA" at air time), since the name
+   * can't be told from it.
    */
   private async titledAs(
     pass: Pass,
@@ -624,7 +618,7 @@ class DownloadCheckEngine {
     return judgeName(release, facts, grab.episodes, all);
   }
 
-  /** A torrent's files, once its client lists them; undefined before. */
+  /** A torrent's files once its client lists them; undefined before. */
   private async torrentFiles(
     grab: Grab
   ): Promise<{ name: string; size: number }[] | undefined> {
@@ -653,7 +647,7 @@ class DownloadCheckEngine {
     return undefined;
   }
 
-  /** Once it's down and the import is stuck: what the server's reasons mean. */
+  /** Downloaded with a stuck import: decides from the server's reasons. */
   public async checkImport(pass: Pass, grab: Grab): Promise<Decision> {
     const problems = grab.messages.map(importProblemOf);
     const detail = grab.messages.join('\n').slice(0, 2000);
@@ -719,11 +713,11 @@ class DownloadCheckEngine {
   }
 
   /**
-   * The files to import and what each one is. Sonarr's own reading of each
-   * file first; a single episode's one real video is that episode; a file
-   * read as an episode it wasn't grabbed for, or a file nobody can place,
-   * stops it. A file no better than the one there is left out, as an import
-   * that's told what a file is goes ahead even when it's worse.
+   * The files to import and what each is. Uses Sonarr's parse of each file
+   * first; a single-episode grab's one real video is that episode. A file
+   * parsed as an episode it wasn't grabbed for, or one nobody can place,
+   * stops it. Files no better than the existing one are left out, since an
+   * import told what a file is proceeds even when it's worse.
    */
   public async importFiles(
     pass: Pass,
@@ -792,7 +786,7 @@ class DownloadCheckEngine {
       });
     }
 
-    // Left out where the episode's file is better already.
+    // Skip episodes whose existing file is already better.
     const files = await pass.files(grab.itemId);
     const all = await pass.episodes(grab.itemId);
     const kept = placed.filter((f) =>
@@ -839,7 +833,7 @@ class DownloadCheckEngine {
       poster: facts?.poster ?? null,
       finding: decision.finding,
       action: decision.action,
-      // 'would' until it's done: with Report only on, for good.
+      // 'would' until acted on; permanent under Report only.
       status: decision.action === 'review' ? 'waiting' : 'would',
       params: JSON.stringify(decision.params ?? {}),
       detail: decision.detail ?? '',
@@ -849,12 +843,12 @@ class DownloadCheckEngine {
     try {
       return await getRepository(DownloadCheck).save(row);
     } catch {
-      // Recorded already, by an admin's action at the same moment.
+      // Already recorded by a concurrent admin action.
       return undefined;
     }
   }
 
-  /** Does what a row says, now. Answers the row as it ends up. */
+  /** Carries out a row's action now. Returns the updated row. */
   public async act(
     server: CheckServer,
     row: DownloadCheck,
@@ -868,19 +862,19 @@ class DownloadCheckEngine {
       const pass = new Pass(server);
       if (action === 'reject') {
         const missing = await this.anyMissing(pass, grab);
-        // A release numbered another way comes back to a search by that
-        // number, from another indexer or another post of it: Backfill,
-        // which reads names by their episode titles, looks instead.
+        // A search by number would find the renumbered release again (from
+        // another indexer or post), so Backfill, which matches episode
+        // titles, searches instead.
         const renumbered =
           server.app === 'sonarr' && row.finding === 'renumbered';
         await server.remove(grab.queueIds, {
           removeFromClient: true,
           blocklist: true,
-          // Searched again only for what's still missing: a download that
-          // was no better than the file there needs no replacement.
+          // Search only for what's still missing; a download no better than
+          // the existing file needs no replacement.
           skipRedownload: renumbered || !missing,
         });
-        // The reject is done whatever becomes of this.
+        // The reject stands even if this fails.
         const looking =
           renumbered &&
           (await this.lookByTitle(row, missing).catch((e: unknown) => {
@@ -913,7 +907,7 @@ class DownloadCheckEngine {
           blocklist: false,
           skipRedownload: true,
         });
-        // What it was meant to bring and didn't, searched for.
+        // Search for what it was meant to bring and didn't.
         if (server.app === 'sonarr') {
           await server.search(
             grab.itemId,
@@ -966,10 +960,10 @@ class DownloadCheckEngine {
   }
 
   /**
-   * A release turned down for being another episode: Backfill looks for
-   * what's still missing (the episode it was grabbed as, or the one it
-   * is), as it reads names by their episode titles where Sonarr can't.
-   * Answers whether Backfill looks, now or lately.
+   * After rejecting a release for being another episode, has Backfill search
+   * for what's still missing (the episode it was grabbed as, or the one it
+   * is), since Backfill matches episode titles where Sonarr can't. Returns
+   * whether Backfill searches now or did recently.
    */
   private async lookByTitle(
     row: DownloadCheck,
@@ -986,7 +980,7 @@ class DownloadCheckEngine {
       where: { kind: 'series', serverId: row.serverId, arrId: row.itemId },
     });
     if (!title || title.status === 'ignored') return false;
-    // Once in a while, however many such grabs a title gets.
+    // At most once per LOOK_AGAIN_MS, however many such grabs a title gets.
     if (
       title.lastSearchedAt &&
       Date.now() - title.lastSearchedAt.getTime() < LOOK_AGAIN_MS
@@ -1012,7 +1006,7 @@ class DownloadCheckEngine {
     return last;
   }
 
-  /** The grab's episodes still without a file, as the server has them now. */
+  /** The grab's episodes still without a file on the server. */
   private async missingEpisodes(pass: Pass, grab: Grab): Promise<number[]> {
     if (pass.server.app !== 'sonarr' || !grab.episodes.length) return [];
     const ids = new Set(grab.episodes.map((e) => e.id));
@@ -1029,8 +1023,8 @@ class DownloadCheckEngine {
   }
 
   /**
-   * An admin's choice for a row: do what it says, import or reject it
-   * instead, or leave it alone. Acting needs the download still queued.
+   * An admin's choice for a row: carry out its action, import or reject
+   * instead, or leave it. Acting requires the download to still be queued.
    */
   public async decide(
     id: number,
@@ -1076,7 +1070,7 @@ const importProblemText = (problem: string): string =>
     'another episode': 'A file in it is an episode it wasn’t grabbed for.',
   })[problem] ?? problem;
 
-/** What a judgement shows: what the name says, and what decided it. */
+/** A verdict's evidence for display: what the name says and what decided it. */
 const evidenceParams = (evidence: Evidence): Record<string, unknown> => ({
   reason: evidence.reason,
   named: evidence.named,

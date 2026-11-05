@@ -12,11 +12,9 @@ import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-/**
- * A user whose Plex token is rejected stops syncing their watchlist, and
- * nothing told them. On the live instance one user had been silently offline
- * for days. They should be told once, and the flag should clear as soon as
- * Plex accepts them again.
+/*
+ * A rejected Plex token silently stops watchlist sync. The user is told once,
+ * and the flag clears as soon as Plex accepts them again.
  */
 
 let rejected = false;
@@ -169,7 +167,7 @@ describe('the sign-in notice cannot be switched off', () => {
       notificationTypes: { [NotificationAgentKey.WEBPUSH]: 0 },
     } as never);
 
-    // A deliberate empty mask would otherwise block everything.
+    // Otherwise a deliberately empty mask would block everything.
     const onlyAvailable = new User({ id: 8 } as never);
     onlyAvailable.settings = new UserSettings({
       notificationTypes: {

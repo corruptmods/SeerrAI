@@ -6,15 +6,11 @@ import { defineMessages } from '@server/i18n';
 import { Notification } from '.';
 
 /*
- * The line above a notification's title ("Movie Request Approved"), in words
- * each channel can put in its own language: the person's for a notification
- * to one person, the channel's or the server's for a shared channel. The
- * same line in English stays on the notification as `event`, which is what
- * webhooks are sent, so anything reading a webhook sees what it always has.
+ * Localizable event lines ("Movie Request Approved"). The English copy stays
+ * on the payload as `event`, which webhooks receive unchanged.
  *
- * Music has lines of its own rather than another choice in the media ones:
- * a language not yet translated for it would fall back to their "other"
- * choice and call an album a series.
+ * Music has separate messages, not a select option: an untranslated locale
+ * would fall back to "other" and call an album a series.
  */
 const messages = defineMessages('notifications.events', {
   mediaPending:
@@ -59,24 +55,19 @@ const messages = defineMessages('notifications.events', {
 type Intl = ReturnType<typeof getIntl>;
 type Message = (typeof messages)[keyof typeof messages];
 
-/** An event line, kept as words to be put in a language when sent. */
+/** An event line, localized at send time. */
 export interface EventTitle {
   message: { id: string; defaultMessage: string };
   values?: Record<string, string>;
 }
 
-/** What a notification carries about its event line. */
 export interface NotificationEvent {
-  /** In English, for webhooks and anything else that reads it as data. */
+  /** English, for webhooks and other data consumers. */
   event: string;
   eventTitle?: EventTitle;
 }
 
-/*
- * English straight from the messages above, without the server's locale
- * files: the English line is wanted wherever a notification is made,
- * including before the translations are loaded.
- */
+// Built from defaultMessage, so it works before locale files load.
 const english = createIntl(
   {
     locale: 'en',
@@ -135,7 +126,7 @@ export const mediaEvent = (
     : undefined;
 };
 
-/** "Movie Request Now Available", as said when a request completes. */
+/** Event for a completed request ("Movie Request Now Available"). */
 export const requestAvailableEvent = (
   mediaType: MediaType,
   is4k: boolean
@@ -144,7 +135,7 @@ export const requestAvailableEvent = (
     ? titled(messages.musicRequestAvailable)
     : titled(messages.requestAvailable, { kind: kindOf(mediaType, is4k) });
 
-/** An ongoing series that has caught up with what has aired. */
+/** An ongoing series has caught up with what has aired. */
 export const seriesReadyToWatchEvent = (): NotificationEvent =>
   titled(messages.seriesReadyToWatch);
 
@@ -181,9 +172,8 @@ export const adminAgentEvent = (): NotificationEvent =>
   titled(messages.adminAgent);
 
 /**
- * The event line to show, in the language of `intl`: the one the channel has
- * already chosen for the rest of the notification. A line given as plain
- * text (an override, or a list's name) is shown as written.
+ * The event line in `intl`'s language; a plain-text `event` (override, list
+ * name) is shown as is.
  */
 export const eventText = (
   payload: { event?: string; eventTitle?: EventTitle },

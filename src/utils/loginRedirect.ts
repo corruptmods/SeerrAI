@@ -1,5 +1,2 @@
-/*
- * Where to go after signing in: the server's rules, so a sign-in through a
- * single sign-on provider comes back by the same ones.
- */
+/* Post-sign-in redirects use the server's rules, so SSO sign-ins follow the same ones. */
 export { loginUrl, safeRedirect } from '@server/utils/safeRedirect';

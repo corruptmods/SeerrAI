@@ -16,11 +16,7 @@ import {
 import { LIGHT, OTHER_DARK_STATUS, STATUS } from './palette';
 import { SEASON_LOOKS } from './seasons';
 
-/*
- * What a seasonal theme does to a look: its accent, a night-time
- * background in dark mode, and a colour for the mark by the logo, on top
- * of the person's own choices.
- */
+/* Seasons override the accent, the dark background and the logo mark colour. */
 
 const classic = appearanceFromDefaults(SERVER_THEME_DEFAULTS);
 const look = (changes: Partial<Appearance>): Appearance => ({
@@ -46,15 +42,14 @@ describe('every season', () => {
         assert.ok(contrastRatio(n.textDefault, surface) >= 4.5, `${id} text`);
         assert.ok(contrastRatio(n.textMuted, surface) >= 4.5, `${id} muted`);
         for (const [name, status] of Object.entries(STATUS.dark)) {
-          // As in every dark background: danger and info keep today's
-          // colours, which reach 3:1.
+          // As in every dark background, danger and info keep Classic's 3:1 colours.
           const kept = name === 'danger' || name === 'info';
           assert.ok(
             contrastRatio(status.text, surface) >= (kept ? 3 : 4.5),
             `${id} ${name}`
           );
         }
-        // On top of True black, Slate or Warm.
+        // Over True black, Slate or Warm.
         for (const [name, status] of Object.entries(OTHER_DARK_STATUS)) {
           assert.ok(
             contrastRatio(status.text, surface) >= 4.5,
@@ -119,7 +114,7 @@ describe('every season', () => {
         id
       );
     }
-    // Holidays: an evergreen accent with a gold star.
+    // Holidays: evergreen accent, gold star.
     assert.equal(SEASON_LOOKS.holidays.mark.dark, '#fbbf24');
   });
 });
@@ -138,12 +133,11 @@ describe('a look with a season on top', () => {
   });
 
   it('reads over its fills as the other dark backgrounds do', () => {
-    // The status colours of True black, Slate and Warm, not Classic's.
+    // True black/Slate/Warm status colours, not Classic's.
     const vars = themeVariables(classic, 'dark', 'halloween');
     assert.equal(vars.success, '21 128 61');
     assert.equal(vars['warning-text'], '234 179 8');
-    // Its dark button text needs solid fills: over a dark page, a
-    // see-through orange is too dark for it.
+    // Dark button text needs solid fills; translucent orange over a dark page is too dark.
     for (const id of SEASON_IDS) {
       const darkInk = SEASON_LOOKS[id].accent.inkIsDark;
       const vars = themeVariables(classic, 'dark', id);

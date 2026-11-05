@@ -12,36 +12,31 @@ export const getRequestDownloadStatus = (
   }
 
   /*
-   * Keep anything that belongs to a requested season, and anything Sonarr
-   * could not attribute to an episode at all.
-   *
-   * A season pack is queued as one item with no episode data, so filtering on
-   * `item.episode` alone dropped it: the series downloaded with no progress
-   * bar and the card sat on its pre-download status. Only discard an item we
-   * can positively place in a season nobody asked for.
+   * Keep items in a requested season, and items Sonarr can't attribute to an
+   * episode: a season pack is one item with no episode data. Only drop items
+   * placed in a season nobody asked for.
    */
   return items.filter(
     (item) => !item.episode || seasonNumbers.includes(item.episode.seasonNumber)
   );
 };
 
-/** While something is downloading: progress moves in seconds. */
+/** While downloading: progress moves in seconds. */
 const DOWNLOADING_MS = 5_000;
-/** Requested and on its way: soon enough to see a download start. */
+/** Requested, not yet downloading: soon enough to see a download start. */
 const WAITING_MS = 30_000;
 
 interface Watched {
   downloadStatus?: DownloadingItem[];
   downloadStatus4k?: DownloadingItem[];
-  /** On its way but not downloading yet: checked less often. */
+  /** Expected but not downloading yet: polled less often. */
   waiting?: boolean;
 }
 
 /**
- * What to watch on a title: its downloads, and whether one may start any
- * moment. Requested and not here yet, or here in part (Backfill fills
- * what is missing from those), so a download that starts after the page
- * loaded, Radarr's, Sonarr's or Backfill's, shows up on its own.
+ * What to poll on a title: its downloads, and whether one may start (requested
+ * or partly available, which Backfill fills), so a later Radarr, Sonarr or
+ * Backfill download appears on its own.
  */
 export const watchMedia = (
   media:
@@ -66,10 +61,8 @@ export const watchMedia = (
     : undefined;
 
 /**
- * What to watch on a music page (an album, an artist): its downloads, and
- * whether one may start any moment, as `watchMedia` for a film or series.
- * `downloads` are the page's own (an album's of the artist's); `onItsWay`
- * covers what only the page knows (an album being added to the library).
+ * `watchMedia` for a music page (album or artist). `onItsWay` covers what only
+ * the page knows (e.g. an album being added to the library).
  */
 export const watchMusic = ({
   status,
@@ -88,12 +81,10 @@ export const watchMusic = ({
 });
 
 /**
- * What to watch on a request card: its title, as `watchMedia`, until the
- * request itself is finished with. A completed request (everything it asked
- * for is here) or a declined one has nothing more coming, however the title
- * stands: a series stays partly available for good when only some of its
- * seasons were ever asked for, and waiting on that would check every half
- * minute for as long as the card is open. A download still shows.
+ * `watchMedia` for a request card, until the request is done. Completed or
+ * declined requests stop waiting even if the title stays partly available
+ * (only some seasons requested), which would otherwise poll forever. Active
+ * downloads still show.
  */
 export const watchRequest = (request: {
   status: MediaRequestStatus;
@@ -111,14 +102,12 @@ export const watchRequest = (request: {
 };
 
 /**
- * How often SWR asks again, worked out from the latest answer rather than
- * the first, so progress keeps moving after the page has loaded and a
- * download that starts later still shows up.
+ * SWR refreshInterval computed from the latest data, so polling adapts as
+ * downloads start and progress.
  *
- * `initial` is the answer the page arrived with (SWR's fallbackData). SWR
- * passes only what it has fetched itself, nothing at first, and sets the
- * first timer then; without `initial` a page that loaded mid-download only
- * started checking again if something else made it redraw.
+ * `initial` is SWR's fallbackData. SWR passes nothing before its own first
+ * fetch, when it sets the first timer; without `initial` a page loaded
+ * mid-download would not poll.
  */
 export const refreshIntervalHelper =
   <T>(watch: (data: T) => Watched | undefined, initial?: T) =>

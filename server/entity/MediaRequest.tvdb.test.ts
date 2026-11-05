@@ -11,8 +11,8 @@ import { beforeEach, describe, it } from 'node:test';
 
 /**
  * `media.tvdbId` is unique across the table, but media is looked up by
- * `tmdbId`. Plex sometimes maps two TMDB entries onto one TVDB id — a remake
- * and its original — and the insert then fails, losing the request.
+ * `tmdbId`. Plex sometimes maps two TMDB entries (a remake and its original) to
+ * one TVDB id, and the insert then failed, losing the request.
  */
 describe('request creation with a conflicting TVDB ID', () => {
   setupTestDb();

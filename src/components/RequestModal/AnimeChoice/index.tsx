@@ -11,20 +11,20 @@ const messages = defineMessages('components.RequestModal.AnimeChoice', {
 });
 
 /**
- * Whether a request goes as anime: what the requester ticked, or else what
- * Seerr would decide (lib/animeDecision): the request's own type when it is
- * an edit, the title's setting, a matching override rule, then detection.
+ * Whether a request goes as anime: the requester's tick, else as
+ * lib/animeDecision decides (edited request's type, title setting, matching
+ * rule, detection).
  */
 export const useAnimeChoice = ({
   detected,
   animeSetting,
   requestSeriesType,
 }: {
-  /** What anime detection says. */
+  /** Anime detection's verdict. */
   detected: boolean;
-  /** The title's own setting, set on its page. */
+  /** The title's anime setting. */
   animeSetting?: boolean | null;
-  /** The type already on the request being edited. */
+  /** Series type of the request being edited. */
   requestSeriesType?: SeriesType | null;
 }) => {
   const [choice, setChoice] = useState<boolean | null>(null);
@@ -36,11 +36,11 @@ export const useAnimeChoice = ({
 
   return {
     anime: choice ?? automatic,
-    /** The requester's own tick, or null while they have left it be. */
+    /** The requester's tick; null while untouched. */
     choice,
     setAnime: (value: boolean) => setChoice(value === automatic ? null : value),
     setRuleSeriesType,
-    /** For the request: left out unless the requester changed it. */
+    /** Sent only when the requester changed it. */
     seriesType: (choice === null
       ? undefined
       : choice
@@ -54,7 +54,7 @@ interface AnimeChoiceProps {
   onChange: (checked: boolean) => void;
 }
 
-/** In the request dialog, for everyone: whether the title goes as anime. */
+/** Anime tick in the request dialog, shown to everyone. */
 const AnimeChoice = ({ checked, onChange }: AnimeChoiceProps) => {
   const intl = useIntl();
 

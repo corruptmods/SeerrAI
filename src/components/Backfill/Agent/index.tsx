@@ -32,13 +32,13 @@ const pageMessages = defineMessages('components.Backfill.Agent.List', {
 
 const PAGE = 25;
 
-/** Every run of the admin agent, newest first, and asking it. */
+/** All admin agent runs, newest first, with the ask box. */
 const AgentList = () => {
   const intl = useIntl();
   const [page, setPage] = useState(0);
   const { data, error, mutate } = useAgent(page);
   const [clearProblem, setClearProblem] = useState<string>();
-  // Counted on every page, so it can be cleared from any of them.
+  // Counted across all pages, so it can be cleared from any.
   const finished = !!data?.finished;
   const clear = async () => {
     setClearProblem(undefined);

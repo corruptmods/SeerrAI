@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Wrong passwords are counted per account and address together, the
- * account however it was typed.
+ * Wrong passwords count per account and address together, however the account
+ * is typed.
  */
 
 const from = (ip: string) => ({ ip }) as Request;
@@ -20,7 +20,8 @@ describe('the sign-in limiter', () => {
       );
       limiter.count(from('10.0.0.1'), 'Someone@Example.test');
     }
-    // The same account however it is typed; not from elsewhere, nor another.
+    // Same account however typed; not from another address, nor another
+    // account.
     assert.ok(
       limiter.retryAfter(from('10.0.0.1'), ' someone@example.test ') > 0
     );

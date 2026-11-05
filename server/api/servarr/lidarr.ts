@@ -2,9 +2,8 @@ import { isAxiosError } from 'axios';
 import ServarrBase from './base';
 
 /*
- * Lidarr, for music. Its API is /api/v1, Lidarr 2 included. An artist holds
- * the root folder, quality and metadata profiles and tags; its albums are
- * only monitored or not.
+ * Lidarr uses /api/v1, Lidarr 2 included. The artist holds the root folder,
+ * profiles and tags; albums are only monitored or not.
  */
 
 export interface LidarrImage {
@@ -25,7 +24,7 @@ export interface LidarrStatistics {
 export interface LidarrArtist {
   id: number;
   artistName: string;
-  /** The artist's MusicBrainz id. */
+  /** MusicBrainz artist id. */
   foreignArtistId: string;
   monitored: boolean;
   monitorNewItems?: 'all' | 'none' | 'new';
@@ -42,7 +41,7 @@ export interface LidarrArtist {
 export interface LidarrRelease {
   id: number;
   albumId: number;
-  /** The release's MusicBrainz id. */
+  /** MusicBrainz release id. */
   foreignReleaseId: string;
   title: string;
   monitored: boolean;
@@ -54,14 +53,14 @@ export interface LidarrRelease {
   country?: string[];
 }
 
-/** A track of an album in Lidarr, of the release Lidarr chose. */
+/** A track of the album release Lidarr chose. */
 export interface LidarrTrack {
   id: number;
   albumId: number;
   title: string;
-  /** The track's MusicBrainz recording id. */
+  /** MusicBrainz recording id. */
   foreignRecordingId?: string;
-  /** Its length, in milliseconds. */
+  /** In milliseconds. */
   duration?: number;
   hasFile: boolean;
   trackFileId?: number;
@@ -73,11 +72,11 @@ export interface LidarrManualImportItem {
   name?: string;
   size?: number;
   quality?: LidarrQualityModel;
-  /** What the file's own tags say: its title, and its length ("00:03:41.5"). */
+  /** From the file's tags; duration like "00:03:41.5". */
   audioTags?: { title?: string; duration?: string };
 }
 
-/** A length as Lidarr writes it ("00:03:41.5", "1.02:03:04"), in ms. */
+/** Parses a Lidarr duration ("00:03:41.5", "1.02:03:04") to ms. */
 export const lidarrDuration = (text: string | undefined): number | null => {
   const parts = text?.match(/^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/);
   if (!parts) return null;
@@ -89,7 +88,7 @@ export const lidarrDuration = (text: string | undefined): number | null => {
   );
 };
 
-/** Which protocol Lidarr prefers, for the artists with its tags. */
+/** Lidarr's preferred protocol for artists with these tags. */
 export interface LidarrDelayProfile {
   id: number;
   enableUsenet: boolean;
@@ -99,13 +98,13 @@ export interface LidarrDelayProfile {
   tags: number[];
 }
 
-/** A quality as Lidarr writes it on a file. */
+/** A file's quality as Lidarr records it. */
 export interface LidarrQualityModel {
   quality: { id: number; name: string };
   revision?: { version: number; real: number; isRepack?: boolean };
 }
 
-/** One file for Lidarr's manual import, and the tracks it is. */
+/** One file for Lidarr's manual import, with its tracks. */
 export interface LidarrManualImportFile {
   path: string;
   artistId: number;
@@ -115,14 +114,14 @@ export interface LidarrManualImportFile {
   quality: LidarrQualityModel;
   indexerFlags: 0;
   disableReleaseSwitching: boolean;
-  /** The queue item it comes from, which the import then finishes. */
+  /** The source queue item, which the import completes. */
   downloadId?: string;
 }
 
 export interface LidarrAlbum {
   id: number;
   title: string;
-  /** The album's MusicBrainz release-group id. */
+  /** MusicBrainz release-group id. */
   foreignAlbumId: string;
   artistId: number;
   monitored: boolean;
@@ -136,7 +135,7 @@ export interface LidarrAlbum {
   artist?: LidarrArtist;
 }
 
-/** Which kinds of release a metadata profile lets Lidarr list. */
+/** Which release kinds a metadata profile lets Lidarr list. */
 export interface LidarrMetadataProfile {
   id: number;
   name: string;
@@ -154,7 +153,7 @@ export interface LidarrMetadataProfile {
   }[];
 }
 
-/** How an artist added to Lidarr is set up; Lidarr's own words. */
+/** Setup for an artist added to Lidarr, in Lidarr's field names. */
 export interface LidarrArtistOptions {
   qualityProfileId: number;
   metadataProfileId: number;
@@ -175,8 +174,8 @@ export interface LidarrAddArtistOptions extends LidarrArtistOptions {
       | 'first'
       | 'none';
     /**
-     * Release-group ids to monitor. Lidarr then unmonitors every other
-     * album of the artist: only for an artist being added.
+     * Release-group ids to monitor; Lidarr unmonitors the artist's other
+     * albums. Only for an artist being added.
      */
     albumsToMonitor?: string[];
     searchForMissingAlbums: boolean;
@@ -186,17 +185,17 @@ export interface LidarrAddArtistOptions extends LidarrArtistOptions {
 export interface LidarrQueueAppend {
   artistId: number;
   albumId: number;
-  /** Where the finished download is, in Lidarr's own paths. */
+  /** The finished download, in Lidarr's own paths. */
   outputPath?: string;
-  /** Why Lidarr hasn't imported it, file by file. */
+  /** Per file, why Lidarr hasn't imported it. */
   statusMessages?: { title: string; messages: string[] }[];
   artist?: Pick<LidarrArtist, 'id' | 'artistName' | 'foreignArtistId'>;
   album?: Pick<LidarrAlbum, 'id' | 'title' | 'foreignAlbumId'>;
 }
 
 /**
- * Why Lidarr refused, in its words: the validation errors it answers a
- * 400 with ("This album has already been added"), or its message.
+ * Lidarr's refusal text: its 400 validation errors ("This album has already
+ * been added"), or its message.
  */
 export const lidarrSaid = (e: unknown): string | undefined => {
   const data = isAxiosError(e) ? e.response?.data : undefined;
@@ -230,7 +229,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     );
   }
 
-  /** An artist as Lidarr's metadata service knows it, to add. */
+  /** An artist from Lidarr's metadata service, ready to add. */
   public lookupArtist = async (
     artistMbid: string
   ): Promise<LidarrArtist | undefined> => {
@@ -244,7 +243,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** An album as Lidarr's metadata service knows it, to add. */
+  /** An album from Lidarr's metadata service, ready to add. */
   public lookupAlbum = async (
     albumMbid: string
   ): Promise<LidarrAlbum | undefined> => {
@@ -258,7 +257,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** The artist in this Lidarr, if it has it. */
+  /** The artist in this Lidarr, if present. */
   public getArtistByMbid = async (
     artistMbid: string
   ): Promise<LidarrArtist | undefined> => {
@@ -280,10 +279,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /**
-   * One artist's albums, or every album in Lidarr (with their releases)
-   * when no artist is given.
-   */
+  /** One artist's albums, or every album (with releases) without an artist. */
   public getAlbums = async ({ artistId }: { artistId?: number } = {}): Promise<
     LidarrAlbum[]
   > => {
@@ -298,8 +294,8 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * The album Lidarr has with this MusicBrainz id, under whichever of its
-   * artists (a duet is kept under the artist credited first).
+   * The album with this MusicBrainz id under any artist (a duet is filed
+   * under the first credited artist).
    */
   public findAlbum = async (
     albumMbid: string
@@ -314,7 +310,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** One album, with its releases and artist. */
+  /** One album with its releases and artist. */
   public getAlbum = async (id: number): Promise<LidarrAlbum> => {
     try {
       return (await this.axios.get<LidarrAlbum>(`/album/${id}`)).data;
@@ -323,10 +319,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /**
-   * An album's tracks, of the release Lidarr monitors, and which of them
-   * have a file.
-   */
+  /** Tracks of the album's monitored release, with which have a file. */
   public getTracks = async (albumId: number): Promise<LidarrTrack[]> => {
     try {
       return (
@@ -337,7 +330,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** The tracks of one release of an album, monitored or not. */
+  /** Tracks of one release, monitored or not. */
   public getReleaseTracks = async (
     albumReleaseId: number
   ): Promise<LidarrTrack[]> => {
@@ -353,8 +346,8 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * What Lidarr's manual import makes of the files in a folder (paths as
-   * Lidarr sees them): each file's quality, and what it takes it to be.
+   * Lidarr's manual-import reading of a folder's files (Lidarr's paths):
+   * each file's quality and matched tracks.
    */
   public getManualImport = async (
     folder: string,
@@ -372,12 +365,9 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * Imports files into the tracks given, as Lidarr's manual import does;
-   * answers the command's id. Copies, so the download can be removed after.
-   */
-  /**
-   * Imports these files: copied (a torrent still seeding), moved (nothing
-   * left to keep), or as Lidarr decides for a download of its own.
+   * Manual-imports files into the given tracks; returns the command id. Copy
+   * for a torrent still seeding, move when nothing is kept, auto for
+   * Lidarr's own download.
    */
   public manualImport = async (
     importMode: 'copy' | 'move' | 'auto',
@@ -395,7 +385,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** A command Lidarr was given, and how far it is. */
+  /** A Lidarr command and its progress. */
   public getCommand = async (
     id: number
   ): Promise<{ id: number; status: string; message?: string }> => {
@@ -410,7 +400,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** Where a download client's folders are, as Lidarr sees them. */
+  /** Download client folders mapped to Lidarr's paths. */
   public getRemotePathMappings = async (): Promise<
     { host: string; remotePath: string; localPath: string }[]
   > => {
@@ -426,8 +416,8 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * Whether Lidarr sees this folder: it is among its parent's. (Lidarr's
-   * file browser answers a missing folder with an empty one.)
+   * Whether Lidarr sees this folder, checked via its parent's listing:
+   * Lidarr's file browser returns a missing folder as empty.
    */
   public folderExists = async (path: string): Promise<boolean> => {
     const folder = path.replace(/[\\/]+$/, '');
@@ -457,7 +447,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** An album's track files: where it sits on disk. */
+  /** An album's track files on disk. */
   public getTrackFiles = async (
     albumId: number
   ): Promise<{ id: number; path?: string }[]> => {
@@ -472,7 +462,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** Adds an artist from a lookup, set up as given. */
+  /** Adds an artist from a lookup with the given setup. */
   public addArtist = async (
     artist: LidarrArtist,
     options: LidarrAddArtistOptions
@@ -489,11 +479,10 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * Adds one album from a lookup. With an artist Lidarr does not have yet,
-   * `artist` carries how to set it up and Lidarr adds it too; for one it
-   * has, it is the artist as Lidarr gave it (Lidarr refuses an album whose
-   * artist lacks its id, profiles and folder). Monitored unless `monitored`
-   * is false, as for an album only one song is taken from.
+   * Adds one album from a lookup. For a new artist, `artist` carries its
+   * setup and Lidarr adds it too; for an existing one, pass the artist as
+   * Lidarr returned it (Lidarr refuses an album whose artist lacks id,
+   * profiles and folder). `monitored: false` suits taking one song.
    */
   public addAlbum = async (
     album: LidarrAlbum,
@@ -522,8 +511,8 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   };
 
   /**
-   * Changes an artist Lidarr has. Callers send the artist as Lidarr gave it
-   * with only what they mean to change.
+   * Updates an artist. Send the artist as Lidarr returned it, changing only
+   * the intended fields.
    */
   public updateArtist = async (artist: LidarrArtist): Promise<LidarrArtist> => {
     try {
@@ -552,7 +541,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** Has Lidarr search for these albums; answers the command's id. */
+  /** Starts an album search; returns the command id. */
   public startAlbumSearch = async (albumIds: number[]): Promise<number> => {
     try {
       return (
@@ -607,7 +596,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** What Lidarr is downloading, with each item's album and artist. */
+  /** Lidarr's queue with each item's album and artist. */
   public getMusicQueue = () =>
     this.getQueue({ includeArtist: true, includeAlbum: true });
 }

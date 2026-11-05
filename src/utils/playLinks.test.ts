@@ -29,7 +29,7 @@ const emby: PlayLink = {
   url4k: 'https://emby/emby-4k',
 };
 
-// As the server sends them: the primary server's first.
+// Server order: primary first.
 const links = [plex, jellyfin, emby];
 
 const mediaServers = [

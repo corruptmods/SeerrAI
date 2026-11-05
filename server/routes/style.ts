@@ -7,11 +7,10 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 
 /*
- * The custom stylesheets pages load (see server/constants/customCss.ts):
- * the admin's Server CSS, for everyone and the sign-in page, and the
- * signed-in person's own CSS while an admin lets people add their own.
- * Pages ask for them by version (?v=), so a browser keeps each until it
- * changes; any other address is never kept.
+ * The custom stylesheets pages load (see server/constants/customCss.ts): the
+ * admin's Server CSS for everyone including the sign-in page, and the signed-in
+ * person's own CSS while personal CSS is allowed. Pages request them by version
+ * (?v=) so browsers cache each until it changes; other URLs are never cached.
  */
 
 const styleRoutes = Router();
@@ -46,7 +45,7 @@ styleRoutes.get('/personal.css', async (req, res, next) => {
     const settings = await getRepository(UserSettings).findOne({
       where: { user: { id: req.user.id } },
     });
-    // Checked again: what was kept may predate a stricter check.
+    // Rechecked: stored CSS may predate a stricter check.
     const checked = checkPersonalCss(settings?.customCss ?? '');
     return sendCss(req, res, 'css' in checked ? checked.css : '', 'private');
   } catch (e) {

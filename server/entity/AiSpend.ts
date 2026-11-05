@@ -1,8 +1,8 @@
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 /**
- * What Seerr's own AI requests used, per model per day: the tokens the
- * provider bills for, to estimate spending without an admin key.
+ * Tokens used by Seerr's own AI requests, per model per day, as billed by the
+ * provider, to estimate spending without an admin key.
  */
 @Entity()
 @Unique(['day', 'model'])
@@ -23,7 +23,7 @@ export class AiSpend {
   @Column({ default: 0 })
   public inputTokens: number;
 
-  /** Thinking included: it is billed as output. */
+  /** Includes thinking, which is billed as output. */
   @Column({ default: 0 })
   public outputTokens: number;
 

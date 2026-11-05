@@ -17,10 +17,10 @@ import path from 'node:path';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 
 /*
- * Upstream's override-rules preview (seerr-team/seerr#2164) needed the
- * /overrideRule mount loosened from admin-only to any signed-in user. That is
- * only safe if every rule-management route still guards itself, so these run
- * through the real validator and check who can reach what.
+ * Upstream's override-rules preview (seerr-team/seerr#2164) loosened the
+ * /overrideRule mount from admin-only to any signed-in user. That's only safe
+ * if every rule-management route guards itself, so these run through the real
+ * validator and check who can reach what.
  */
 
 setupTestDb();
@@ -277,7 +277,7 @@ describe('the request window’s rule preview', () => {
       (await previewBody({ serviceId: 1 })).rootFolder ?? null,
       null
     );
-    // ...until the request is ticked as anime, as it will be sent.
+    // ...until the request is ticked anime, as it will be sent.
     assert.equal(
       (await previewBody({ serviceId: 1, seriesType: 'anime' })).rootFolder,
       '/anime/movies'

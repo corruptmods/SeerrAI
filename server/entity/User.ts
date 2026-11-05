@@ -36,8 +36,8 @@ import { UserPushSubscription } from './UserPushSubscription';
 import { UserSettings } from './UserSettings';
 
 /**
- * When a quota of so many days began: requests made after it count towards
- * it. Undefined for a quota with no window, which counts every request.
+ * Start of a quota window of `days`; requests after it count. Undefined when
+ * there's no window, so every request counts.
  */
 export const quotaWindowStart = (days?: number | null): Date | undefined => {
   if (!days) {
@@ -48,7 +48,7 @@ export const quotaWindowStart = (days?: number | null): Date | undefined => {
   return start;
 };
 
-/** Whether a request made then counts towards a quota of so many days. */
+/** Whether a request made at `createdAt` counts towards a quota of `days`. */
 export const countsTowardsQuota = (
   createdAt: Date,
   days?: number | null
@@ -77,13 +77,13 @@ export class User {
     'embyAuthToken',
     'plexToken',
     'settings',
-    // Whether someone's Plex sign-in lapsed is their business (and admins').
+    // Whether someone's Plex sign-in lapsed is only for them and admins.
     'plexTokenExpiredAt',
   ];
 
   public displayName: string;
 
-  /** The media servers this person has an account linked from. */
+  /** Media servers this user has a linked account from. */
   public linkedServers?: MediaServerKind[];
 
   @PrimaryGeneratedColumn()
@@ -147,9 +147,8 @@ export class User {
   public plexToken?: string | null;
 
   /**
-   * A bigint: Auto-Approve Music is 2^31, past what an integer column
-   * holds. Postgres hands bigints back as text, so they are read back as
-   * numbers.
+   * A bigint: Auto-Approve Music is 2^31, beyond an integer column. Postgres
+   * returns bigints as text, so the transformer converts them to numbers.
    */
   @Column({ type: 'bigint', default: 0, transformer: bigNumber })
   public permissions = 0;
@@ -166,17 +165,16 @@ export class User {
   /**
    * When Plex last rejected this user's token during watchlist sync.
    *
-   * A rejected token silently stops the user's watchlist from syncing, and
-   * nothing told them. This latches on the first rejection so they are
-   * notified once, not every sync, and clears as soon as a fresh token is
+   * A rejected token silently stops their watchlist sync. Set on the first
+   * rejection so they're notified once, and cleared once a fresh token is
    * stored or Plex accepts the old one again.
    */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public plexTokenExpiredAt?: Date | null;
 
   /**
-   * Request count, filled in by `attachRequestCounts` where it is displayed.
-   * See the note on MediaRequest.seasonCount for why not @RelationCount.
+   * Request count, filled by `attachRequestCounts` where shown. Not
+   * @RelationCount: see MediaRequest.seasonCount.
    */
   public requestCount = 0;
 
@@ -198,7 +196,7 @@ export class User {
   @Column({ nullable: true })
   public tvQuotaDays?: number;
 
-  /** Albums, counted as seasons are for series. */
+  /** Albums, counted like seasons for series. */
   @Column({ type: 'int', nullable: true })
   public musicQuotaLimit?: number | null;
 
@@ -233,19 +231,18 @@ export class User {
     Object.assign(this, init);
   }
 
-  /*
-   * Someone's own settings hold their notification credentials (Pushbullet
-   * and Pushover tokens, Telegram chat, PGP key). The relation is loaded
-   * with every user, so it rode along wherever a user is embedded: a
-   * request's requester, an issue comment's author, a watchlist's owner.
-   * Never sent as part of a user; a route that needs some of them sends
-   * those explicitly. (Upstream GHSA-8j73-j6rc-q8xh.)
-   */
   /**
-   * Left out whenever a user is sent as part of something else: the
-   * requester or approver on a request, an issue's reporter, a comment's
-   * author. Seeing someone's email, Plex id or Plex sign-in state takes
-   * Manage Users (User.filter); /auth/me adds back the signed-in user's own.
+   * Excluded whenever a user is embedded in something else (a request's
+   * requester or approver, an issue's reporter, a comment's author, a
+   * watchlist's owner).
+   *
+   * `settings` holds notification credentials (Pushbullet and Pushover tokens,
+   * Telegram chat, PGP key) and is loaded with every user, so it's never sent
+   * as part of a user; routes that need some of it send it explicitly (upstream
+   * GHSA-8j73-j6rc-q8xh).
+   *
+   * Email, Plex id and Plex sign-in state require Manage Users (User.filter);
+   * /auth/me adds back the signed-in user's own.
    */
   static readonly serializationExcludedFields: string[] = [
     'settings',
@@ -329,19 +326,18 @@ export class User {
   }
 
   /**
-   * A new password reset link, good for a day. Stored by the caller, then
-   * sent with sendResetPasswordEmail.
+   * Creates a password reset link valid for a day. The caller stores it, then
+   * calls sendResetPasswordEmail.
    */
   public newResetPasswordLink(): void {
     this.resetPasswordGuid = randomUUID();
 
-    // 24 hours into the future
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 1);
     this.recoveryLinkExpirationDate = targetDate;
   }
 
-  /** Emails the reset link; never fails, a failure is logged. */
+  /** Emails the reset link; never throws, failures are logged. */
   public async sendResetPasswordEmail(): Promise<void> {
     const { applicationTitle, applicationUrl } = getSettings().main;
     const resetPasswordLink = `${applicationUrl}/resetpassword/${this.resetPasswordGuid}`;
@@ -373,10 +369,8 @@ export class User {
     }
   }
 
-  /*
-   * The name shown for someone wherever they appear, to anyone. Never their
-   * email: that is only for themselves and whoever manages users.
-   */
+  // The name shown for this user everywhere, to anyone. Never their email:
+  // that's only for themselves and user managers.
   @AfterLoad()
   public setDisplayName(): void {
     this.displayName =
@@ -408,7 +402,6 @@ export class User {
       : 0;
     const movieQuotaDays = this.movieQuotaDays ?? defaultQuotas.movie.quotaDays;
 
-    // Count movie requests made during quota period
     const movieDate = quotaWindowStart(movieQuotaDays);
 
     const movieQuotaUsed = movieQuotaLimit
@@ -430,7 +423,6 @@ export class User {
       : 0;
     const tvQuotaDays = this.tvQuotaDays ?? defaultQuotas.tv.quotaDays;
 
-    // Count tv season requests made during quota period
     const tvDate = quotaWindowStart(tvQuotaDays);
     const tvQuotaUsedQuery = requestRepository
       .createQueryBuilder('request')
@@ -445,9 +437,9 @@ export class User {
         declinedStatus: MediaRequestStatus.DECLINED,
       });
 
-    // Passed as a Date, so the database driver writes it as it stores dates.
-    // As text ('…T…Z'), SQLite compared it as a string against its own
-    // 'YYYY-MM-DD HH:MM:SS' and left out the window's whole first day.
+    // Pass a Date so the driver writes it in its stored date format. As ISO
+    // text, SQLite compared it as a string against 'YYYY-MM-DD HH:MM:SS' and
+    // dropped the window's first day.
     if (tvDate) {
       tvQuotaUsedQuery.andWhere('request.createdAt > :date', { date: tvDate });
     }
@@ -472,15 +464,15 @@ export class User {
     const musicQuotaDays =
       this.musicQuotaDays ?? defaultQuotas.music?.quotaDays;
 
-    // Songs count as music, one each, unless Settings → Music gives them a
-    // limit of their own.
+    // Songs count as music, one each, unless Settings → Music gives them their
+    // own limit.
     const songQuota = getSettings().music.songQuota;
     const songsApart = !!songQuota?.quotaLimit;
     const songQuotaLimit = songsApart && !canBypass ? songQuota.quotaLimit : 0;
     const songQuotaDays = songsApart ? songQuota.quotaDays : undefined;
 
-    // The albums, or songs, in music requests made during the quota period,
-    // as seasons are counted for series.
+    // Albums or songs in music requests within the quota window, counted like
+    // seasons for series.
     const countMusic = async (
       kind: 'albums' | 'songs',
       days: number | undefined

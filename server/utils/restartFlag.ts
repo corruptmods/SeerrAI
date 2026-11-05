@@ -18,7 +18,7 @@ class RestartFlag {
     return (
       this.networkSettings.csrfProtection !== networkSettings.csrfProtection ||
       this.networkSettings.trustProxy !== networkSettings.trustProxy ||
-      // Which proxies are trusted is also set once, at start.
+      // Trusted proxies are also only set at startup.
       this.networkSettings.trustCloudflare !==
         networkSettings.trustCloudflare ||
       this.networkSettings.trustedProxies.join() !==

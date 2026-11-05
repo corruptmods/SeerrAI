@@ -79,7 +79,6 @@ const isMovie = (movie: MovieDetails | TvDetails): movie is MovieDetails => {
 };
 
 interface ManageSlideOverProps {
-  // mediaType: 'movie' | 'tv';
   show?: boolean;
   onClose: () => void;
   revalidate: () => void;
@@ -107,7 +106,7 @@ const ManageSlideOver = ({
   const { addToast } = useToasts();
   const settings = useSettings();
   const { data: watchData } = useSWR<MediaWatchDataResponse>(
-    // Plays come from Tautulli, which only knows Plex.
+    // Plays come from Tautulli, which is Plex-only.
     settings.currentSettings.mediaServers.some(
       (server) => server.kind === 'plex'
     ) &&

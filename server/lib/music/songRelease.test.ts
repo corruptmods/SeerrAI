@@ -4,9 +4,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Which release of an album songs are taken into, from the editions as
- * Lidarr lists them. Shaped on a real album and single: Lidarr's own pick
- * for the album was a 49-track bootleg box.
+ * Picking the release songs are imported into from Lidarr's editions.
+ * Modelled on a real case where Lidarr picked a 49-track bootleg box.
  */
 
 let nextId = 1;

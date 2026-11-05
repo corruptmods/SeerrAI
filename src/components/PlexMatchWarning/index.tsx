@@ -49,7 +49,7 @@ const messages = defineMessages('components.PlexMatchWarning', {
 const named = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
 
-/** One server's problem with this title, as a warning. */
+/** A warning for one server's mismatch. */
 const MatchProblem = ({
   problem,
   tmdbId,
@@ -61,14 +61,12 @@ const MatchProblem = ({
 }) => {
   const intl = useIntl();
   const mediaServer = problem.mediaServer ?? 'Plex';
-  // This page is the title the server wrongly matched the folder to, rather
-  // than the one Sonarr or Radarr has in it. It was found by one of the
-  // servers' ids for this title, not necessarily the one this page passed.
+  // This page is the title the server wrongly matched, not the Sonarr/Radarr
+  // one; found by any of the server's ids, not necessarily this page's.
   const isServerSide =
     problem.expected.tmdbId !== tmdbId &&
     (!tvdbId || problem.expected.tvdbId !== tvdbId);
-  // The ids the two sides were told apart by, so a server with only an
-  // IMDb id shows it; the IMDb id is offered as a second search then.
+  // The ids that differed, so an IMDb-only server shows it (offered as a second search).
   const { want: shown, got } = comparedIds(
     problem.kind,
     problem.expected,
@@ -100,8 +98,7 @@ const MatchProblem = ({
     film: problem.expected.runtime ?? '',
     name: problem.expected.file ?? '',
   };
-  // A film whose file is far off its length: likely another film, which
-  // fixing the match would only hide.
+  // A file far off the film's runtime is likely another film; fixing the match would hide that.
   const film = problem.kind === 'movie' && problem.reason !== 'differentId';
   const wrongFile = film && !isServerSide && fileLooksWrong(problem.expected);
   const misnamed = film && !wrongFile && fileMisnamed(problem.expected);
@@ -157,10 +154,8 @@ const MatchProblem = ({
 };
 
 /**
- * On a title's page, for admins: the last Match Check found that a media
- * server's match for this title's folder disagrees with Sonarr's or
- * Radarr's. With several servers connected, each one that has it wrong
- * gets its own warning.
+ * Admin warning on a title page when the last Match Check found a media
+ * server's match disagreeing with Sonarr/Radarr. One warning per server.
  */
 const PlexMatchWarning = ({
   mediaType,
@@ -171,7 +166,7 @@ const PlexMatchWarning = ({
   mediaType: 'movie' | 'tv';
   tmdbId: number;
   tvdbId?: number | null;
-  /** A media server's id for this title. */
+  /** The media server's id for this title. */
   itemKey?: string | null;
 }) => {
   const query = new URLSearchParams({ mediaType, tmdbId: String(tmdbId) });

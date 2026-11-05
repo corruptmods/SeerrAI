@@ -16,7 +16,7 @@ import { In, MoreThanOrEqual, Not, Raw } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * Backfill, for admins only (mounted with Permission.ADMIN). Reading works
+ * Backfill routes, admin only (mounted with Permission.ADMIN). Reads work
  * whether or not Backfill is set up; searching and approving need it on.
  */
 const backfillRoutes = Router();
@@ -53,7 +53,7 @@ const requireReady = (res: Response, next: NextFunction): boolean => {
   return true;
 };
 
-/** What a page needs of a plan entry; the import paths stay here. */
+/** Plan entry for the client; import paths stay server-side. */
 const entryView = (entry: PlanEntry) => ({
   index: entry.index,
   name: entry.path.split('/').pop(),
@@ -72,7 +72,7 @@ const entryView = (entry: PlanEntry) => ({
   why: entry.why,
 });
 
-/** A candidate without its Prowlarr links, which carry Prowlarr's key. */
+/** Candidate without its Prowlarr links, which carry Prowlarr's API key. */
 const candidateView = (c: BackfillCandidate, withPlan = false) => ({
   id: c.id,
   seriesId: c.seriesId,
@@ -108,7 +108,7 @@ const jobView = (job: BackfillJob, withDetail = false) => ({
   rejected: job.rejected,
   fileCount: job.files.length,
   error: job.error,
-  // When a job waiting on its indexer's download limit is tried again.
+  // When a job waiting on its indexer's download limit is retried.
   retryAt:
     job.status === 'queued' &&
     job.indexerWait &&
@@ -116,8 +116,8 @@ const jobView = (job: BackfillJob, withDetail = false) => ({
       ? job.indexerWait.until
       : null,
   approvedByName: job.approvedByName,
-  // Once failed, what became of it: the download that replaced it, or the
-  // admin agent's conversation looking for one.
+  // After failure: the replacing download, or the admin agent conversation
+  // looking for one.
   followUp: job.followUp,
   replacedById: job.replacedById,
   agentRunId: job.agentRunId,
@@ -141,7 +141,7 @@ const seriesView = (row: BackfillSeries) => ({
   arrId: row.arrId,
   tvdbId: row.tvdbId,
   tmdbId: row.tmdbId,
-  /** An album's MusicBrainz id, for its page. */
+  /** Album MusicBrainz id, for linking. */
   foreignId: row.foreignId,
   artistName: row.artistName,
   title: row.title,
@@ -166,8 +166,7 @@ const FILTERS: Record<string, BackfillSeries['status'][]> = {
 };
 
 /**
- * A title search, as typed: any part of the name, upper or lower case. The
- * LIKE wildcards in it are taken literally.
+ * Case-insensitive substring title search; LIKE wildcards are taken literally.
  */
 const titleSearch = (raw: unknown) => {
   const q = String(raw ?? '')
@@ -233,8 +232,8 @@ backfillRoutes.get('/', async (req, res, next) => {
         })
       ).map((row) => [row.id, row])
     );
-    // A title already being backfilled is not waiting on anyone, whatever
-    // other packs its search found.
+    // A title already being backfilled isn't waiting, whatever other packs its
+    // search found.
     const waiting = all.filter(
       (row) =>
         row.status === 'found' &&
@@ -242,8 +241,7 @@ backfillRoutes.get('/', async (req, res, next) => {
         !backfill.isSearching(row.id)
     );
     const awaiting = waiting.length;
-    // While searching, each tab counts what matches, so the tab a title is
-    // on shows at a glance.
+    // While searching, each tab shows its match count.
     const matches = search?.matches ?? (() => true);
     const counts = {
       all: all.filter(matches).length,
@@ -304,8 +302,8 @@ backfillRoutes.get('/', async (req, res, next) => {
 });
 
 /**
- * Searches every stuck title, one at a time with a pause between; the
- * overview follows its progress. DELETE stops it after the current title.
+ * Search every stuck title sequentially with a pause between; the overview
+ * tracks progress. DELETE stops after the current title.
  */
 backfillRoutes.post('/search-all', (req, res, next) => {
   if (!requireReady(res, next)) return;
@@ -334,12 +332,12 @@ backfillRoutes.post('/scan', (_req, res, next) => {
   return res.status(202).json({ started: true });
 });
 
-/** Where an album is in Lidarr, for its page to start a search from. */
+/** An album's Lidarr state, to start a search from its page. */
 backfillRoutes.get<{ mbId: string }>('/album/:mbId', async (req, res, next) => {
   if (!/^[0-9a-f-]{36}$/i.test(req.params.mbId)) {
     return next({ status: 400, message: 'Bad request.' });
   }
-  // Nothing to start from while Backfill leaves music alone.
+  // Nothing to start from while Backfill skips music.
   if (!backfill.readiness().music) {
     return next({ status: 404, message: 'Backfill does not look for music.' });
   }
@@ -356,8 +354,8 @@ backfillRoutes.get<{ mbId: string }>('/album/:mbId', async (req, res, next) => {
 });
 
 /**
- * Every series Sonarr has and movie Radarr has, and while Backfill does
- * music every album Lidarr monitors, for starting by hand.
+ * Every Sonarr series and Radarr movie, plus every monitored Lidarr album while
+ * Backfill handles music, for starting by hand.
  */
 backfillRoutes.get('/library', async (_req, res, next) => {
   try {
@@ -369,11 +367,11 @@ backfillRoutes.get('/library', async (_req, res, next) => {
       arrId: number;
       title: string;
       year: number;
-      /** An album's artist. */
+      /** Album artist. */
       artist?: string;
     }[] = [];
     const seen = new Set<string>();
-    // A server that is down leaves its titles out rather than the list.
+    // A server that's down drops its titles, not the whole list.
     const orNothing = <T>(name: string, load: () => Promise<T[]>) =>
       load().catch((e): T[] => {
         logger.warn('Backfill could not list a server', {
@@ -426,7 +424,7 @@ backfillRoutes.get('/library', async (_req, res, next) => {
         ]);
         const artistOf = new Map(artists.map((a) => [a.id, a.artistName]));
         for (const album of albums) {
-          // Lidarr only fetches what it monitors; Backfill does the same.
+          // Lidarr only fetches monitored albums; Backfill matches.
           if (!album.monitored || seen.has(`album:${album.foreignAlbumId}`)) {
             continue;
           }
@@ -459,7 +457,7 @@ const trackBody = z.object({
   arrId: z.number().int(),
 });
 
-/** Follows a series, movie or album (from its page, or picked by hand). */
+/** Follow a series, movie or album (from its page, or picked by hand). */
 backfillRoutes.post('/series', async (req, res, next) => {
   const parsed = trackBody.safeParse(req.body);
   if (!parsed.success) return next({ status: 400, message: 'Bad request.' });
@@ -481,13 +479,13 @@ backfillRoutes.post('/series', async (req, res, next) => {
 });
 
 /**
- * Backfill's state for a title, for its page and the requests list: each
- * title Backfill follows, with every download it has running. Complete
- * titles only with `all`, for a title's page to link to.
+ * Backfill state per title for its page and the requests list: each followed
+ * title with its running downloads. Complete titles only with `all`, for
+ * title-page links.
  */
 backfillRoutes.get('/lookup', async (req, res, next) => {
   try {
-    // The validator hands a comma-separated list over as an array.
+    // The validator turns a comma-separated list into an array.
     const list = (raw: unknown): string[] =>
       (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
         .map((v) => String(v).trim())
@@ -496,7 +494,7 @@ backfillRoutes.get('/lookup', async (req, res, next) => {
     const tmdbIds = list(req.query.tmdbIds)
       .map(Number)
       .filter((n) => Number.isInteger(n) && n > 0);
-    // Albums go by their MusicBrainz id: they have no TMDB id.
+    // Albums are keyed by MusicBrainz id; they have no TMDB id.
     const mbIds = list(req.query.mbIds).filter((id) =>
       /^[0-9a-f-]{36}$/i.test(id)
     );
@@ -589,7 +587,7 @@ interface AlbumOnDisk {
   }[];
 }
 
-/** An album's tracks as Lidarr has them, for its page. */
+/** An album's tracks as Lidarr has them. */
 const albumOnDisk = async (row: BackfillSeries): Promise<AlbumOnDisk> => {
   const ctx = await backfill.albumContext(row);
   const files = new Map(ctx.files.map((f) => [f.id, f]));
@@ -617,7 +615,7 @@ const albumOnDisk = async (row: BackfillSeries): Promise<AlbumOnDisk> => {
   };
 };
 
-/** A series' episodes as Sonarr has them, for its page. */
+/** A series' episodes as Sonarr has them. */
 const seriesOnDisk = async (row: BackfillSeries): Promise<SeriesOnDisk> => {
   const ctx = await backfill.context(row);
   const files = new Map(ctx.files.map((f) => [f.id, f]));
@@ -659,7 +657,7 @@ const seriesOnDisk = async (row: BackfillSeries): Promise<SeriesOnDisk> => {
   };
 };
 
-/** A movie and its file as Radarr has them, for its page. */
+/** A movie and its file as Radarr has them. */
 const movieOnDisk = async (row: BackfillSeries): Promise<MovieOnDisk> => {
   const ctx = await backfill.movieContext(row);
   return {
@@ -782,7 +780,7 @@ backfillRoutes.post('/series/:id/search', async (req, res, next) => {
     if (row.status === 'ignored') {
       await repo.update(id, { status: 'stuck' });
     }
-    // Searched by hand: an album stays followed, requested or not.
+    // Searched by hand: the album stays followed, requested or not.
     if (!row.byHand) await repo.update(id, { byHand: true });
     backfill.startSearch(id, req.user, { ai: true });
     return res.status(202).json({ started: true });
@@ -794,7 +792,7 @@ backfillRoutes.post('/series/:id/search', async (req, res, next) => {
 const approveBody = z.object({
   mode: z.enum(['missing', 'all']),
   confirm: z.string().optional(),
-  /** Leave out the files only the AI second opinion placed. */
+  /** Exclude files placed only by the AI second opinion. */
   includeAi: z.boolean().optional(),
 });
 
@@ -810,8 +808,8 @@ backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
     const row = await getRepository(BackfillSeries).findOneOrFail({
       where: { id: candidate.seriesId },
     });
-    // Replacing files deletes the old ones for good: typing the title
-    // confirms it, on the server as well as in the page.
+    // Replacing permanently deletes the old files, so typing the title confirms
+    // it, checked server-side too.
     const replaces = selectEntries(
       candidate.plan,
       parsed.data.mode,
@@ -827,9 +825,9 @@ backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
         message: `This replaces ${replaces} file${replaces === 1 ? '' : 's'} on disk. Type the title to confirm.`,
       });
     }
-    // A call made with the API key acts as an account (the owner's, unless
-    // it names another) but was made by whatever holds the key: the job
-    // says so, rather than that the person approved it.
+    // An API key acts as an account (the owner's unless it names another) but
+    // the caller is whatever holds the key, so the job records that rather than
+    // claiming the person approved it.
     const viaApiKey =
       !!req.user &&
       !!getSettings().main.apiKey &&

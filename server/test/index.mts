@@ -43,7 +43,7 @@ program
     'How many test files run at once (1 for a shared database, as Postgres is)',
     (v) => Number(v)
   )
-  // ignore additional options passed by vscode test runner
+  // Ignore extra options passed by the VS Code test runner.
   .addOption(new Option('--test').hideHelp())
   .parse();
 
@@ -73,7 +73,7 @@ if (positionals.length > 0) {
 
 // @ts-ignore
 process.env.NODE_ENV = 'test';
-// configure ts
+// Configure ts-node.
 process.env.TS_NODE_PROJECT = resolveImport('../tsconfig.json');
 process.env.TS_NODE_FILES = 'true';
 
@@ -97,13 +97,13 @@ const stream = run({
   ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
 });
 
-// run() reports failures but leaves the exit code alone: without this a run
-// with failing tests exits 0, and CI would pass it.
+// run() reports failures but leaves the exit code alone; without this a failing
+// run exits 0 and CI passes.
 stream.on('test:fail', () => {
   process.exitCode = 1;
 });
 
-// In CI, write a JUnit report to a file for use by GitHub
+// In CI, write a JUnit report for GitHub.
 if (process.env.CI) {
   const reportStream = createWriteStream(join(BASE_DIR, 'report.xml'));
   stream.compose(reporters.junit).pipe(reportStream);
@@ -112,7 +112,7 @@ if (process.env.CI) {
 if (opts.testReporter.length > 0) {
   for (let i = 0; i < opts.testReporter.length; i++) {
     const reporterName = opts.testReporter[i];
-    // check built-in reporters, otherwise import
+    // Built-in reporter, else import it.
     const reporter =
       reporterName in reporters
         ? reporters[reporterName as keyof typeof reporters]

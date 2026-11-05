@@ -4,20 +4,17 @@ interface Lockable {
 
 interface LockState {
   holders: number;
-  /** The page's own styles, from before the first lock. */
+  /** The page's styles before the first lock. */
   saved: { overflow: string; touchAction: string };
 }
 
 const states = new WeakMap<Lockable, LockState>();
 
 /**
- * Stops the page behind a panel or dialog scrolling, and gives back the
- * function that lets it go. Locks are counted: the page's own styles are
- * kept by the first and put back only when the last is released, in
- * whatever order that happens. Each lock used to put back what it saw when
- * it locked, so two that overlapped (a dialog still fading out as the AI
- * panel opened, say) left the page unable to scroll once both were gone;
- * on an iPhone the bottom bar then sat part-way up the screen.
+ * Locks page scroll behind a panel or dialog; returns the release function.
+ * Locks are counted: the first saves the page's styles and the last release
+ * restores them, in any order, so overlapping locks can't leave the page
+ * stuck unscrollable.
  */
 export const lockBodyScroll = (body: Lockable): (() => void) => {
   let state = states.get(body);
@@ -50,6 +47,6 @@ export const lockBodyScroll = (body: Lockable): (() => void) => {
   };
 };
 
-/** Whether a panel or dialog is holding the page still. */
+/** Whether any scroll lock is held. */
 export const isBodyScrollLocked = (body: Lockable): boolean =>
   (states.get(body)?.holders ?? 0) > 0;

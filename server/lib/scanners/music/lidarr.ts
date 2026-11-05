@@ -27,16 +27,15 @@ import { In, IsNull, Not } from 'typeorm';
 /*
  * Lidarr's part of the music scans.
  *
- * Requests under way: each artist's albums as Lidarr has them (so their
- * files are counted), and requested albums Lidarr did not have when the
- * request was sent. Those are added once Lidarr's metadata knows them, or
- * monitored and searched for once it lists them; after a week of Lidarr
- * not knowing one, the request fails with a reason and can be retried.
- * Nothing is ever unmonitored, and an artist's own settings are never
- * changed.
+ * In-flight requests: reads each artist's albums from Lidarr (to count
+ * files), and handles requested albums Lidarr lacked when the request was
+ * sent: added once Lidarr's metadata knows them, or monitored and searched
+ * once listed. If Lidarr still doesn't know one after a week, the request
+ * fails with a reason and can be retried. Nothing is ever unmonitored, and
+ * an artist's own settings are never changed.
  *
- * With "Scan" on for a Lidarr (syncEnabled), the full scan also brings in
- * its library: every artist with an album Lidarr monitors or has files for.
+ * With "Scan" on for a Lidarr (syncEnabled), the full scan also imports its
+ * library: every artist with an album Lidarr monitors or has files for.
  */
 
 const LABEL = 'Music Scan';
@@ -44,13 +43,13 @@ const LABEL = 'Music Scan';
 /** How long a requested album may wait for Lidarr's metadata to know it. */
 export const LOOKUP_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Albums and songs asked for that are still to be fetched. */
+/** Request statuses of albums and songs not yet fetched. */
 const OPEN = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];
 
 const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : String(e);
 
-/** The artists whose requests Lidarr is working on. */
+/** Artists with requests Lidarr is working on. */
 const artistsUnderWay = async (): Promise<Media[]> => {
   const ids = new Set<number>();
   const media = getRepository(Media);
@@ -101,8 +100,8 @@ const artistsUnderWay = async (): Promise<Media[]> => {
 };
 
 /**
- * Lidarr's progress on music requests (see above). Returns the artists
- * whose albums were looked at.
+ * Advances Lidarr's work on music requests (see above). Returns the artists
+ * whose albums were checked.
  */
 export const lidarrInFlight = async (
   index: LidarrIndex
@@ -144,9 +143,9 @@ export const lidarrInFlight = async (
     const api = lidarrApi(server);
 
     for (const request of requests) {
-      // Albums added for an earlier request count for this one.
+      // Re-read so albums added for an earlier request count for this one.
       albums = index.loadedAlbumsOf(server.id, artist.foreignId);
-      // Its albums still to come, and the singles its songs come on.
+      // Open albums, plus the singles its requested songs are on.
       const open = lidarrTargets(request, OPEN);
       const unmonitored: number[] = [];
       const missing: typeof open = [];
@@ -178,7 +177,7 @@ export const lidarrInFlight = async (
       }
 
       const unknown: string[] = [];
-      // The artist as Lidarr has it, which Lidarr needs to add an album.
+      // Lidarr needs its own artist record to add an album.
       let lidarrArtist: LidarrArtist | undefined;
       for (const album of missing) {
         try {
@@ -227,11 +226,11 @@ export const lidarrInFlight = async (
 };
 
 /**
- * Brings in the library of every Lidarr with Scan on: its artists with an
- * album it monitors or has files for, and those albums. An album Lidarr
- * monitors or has files for but no media server lists yet is processing;
- * with no music library switched on anywhere (`decide`), Lidarr's files
- * make it available. Needs a full index. Returns the artists touched.
+ * Imports the library of every Lidarr with Scan on: artists with an album
+ * it monitors or has files for, and those albums. Such an album no media
+ * server lists yet is processing; with no music library enabled anywhere
+ * (`decide`), Lidarr's files make it available. Needs a full index.
+ * Returns the artists touched.
  */
 export const importLidarrLibrary = async (
   index: LidarrIndex,

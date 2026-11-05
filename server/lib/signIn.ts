@@ -19,10 +19,9 @@ import type { Request } from 'express';
 import { In, Like } from 'typeorm';
 
 /**
- * Signs someone in on a brand-new session. Whatever session the browser
- * brought is thrown away first: a session id that existed before signing in
- * (a passkey sign-in that was started and abandoned, or one planted by
- * someone else) must never become a signed-in one.
+ * Signs a user in on a brand-new session. The browser's existing session is
+ * discarded first: a pre-sign-in session id (an abandoned passkey attempt, or
+ * one planted by someone else) must never become a signed-in one.
  */
 export const startSession = (req: Request, userId: number): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -42,28 +41,26 @@ export const startSession = (req: Request, userId: number): Promise<void> =>
     });
   });
 
-/** How long a stored session lasts: a month signed in, minutes otherwise. */
+/** Stored session lifetime: a month signed in, minutes otherwise. */
 export const sessionTtlSeconds = (session: { userId?: number }): number =>
   session.userId ? 60 * 60 * 24 * 30 : 60 * 10;
 
 /**
- * Whether this person may still sign in. A Plex account the server owner
- * has stopped sharing with is refused, so is a Jellyfin or Emby account
- * that has been deleted or switched off there: neither a passkey nor a
- * password is a way around the media server's own decision.
+ * Whether this user may still sign in. A Plex account the owner stopped
+ * sharing with is refused, as is a Jellyfin or Emby account deleted or
+ * disabled there: neither a passkey nor a password overrides the media
+ * server's decision.
  *
- * Someone with accounts on several connected servers may sign in while any
- * one of them still lets them in. A server Seerr is no longer connected to
- * has no say: someone whose only accounts are there signs in as a password
- * account does.
+ * With accounts on several connected servers, any one still allowing them is
+ * enough. Disconnected servers have no say: a user whose only accounts are
+ * there signs in like a password account.
  *
- * A passkey stands in for signing in with the media server, so it also
- * follows each server's sign-in switch. A password has its own switch,
- * checked where it is typed, and the owner can always sign in with theirs.
- * On an account with no media server, a passkey stands in for its
- * password, so it follows the password switch, unless the account has a
- * single sign-on link: a passkey is proof of its own, and people who sign
- * in with a provider keep theirs when passwords are switched off.
+ * A passkey stands in for media server sign-in, so it follows each server's
+ * sign-in switch. Passwords have their own switch, checked where typed, and
+ * the owner can always use theirs. On an account with no media server a
+ * passkey stands in for the password and follows the password switch, unless
+ * the account has an SSO link: then the passkey is proof on its own, and SSO
+ * users keep it when passwords are off.
  */
 export const maySignIn = async (
   user: Pick<
@@ -105,7 +102,7 @@ export const maySignIn = async (
     return true;
   }
 
-  // Each server answers yes, no, or could not be asked (undefined).
+  // Each server answers yes, no, or unreachable (undefined).
   let unknown = false;
   let failure: unknown;
   for (const kind of servers) {
@@ -126,8 +123,8 @@ export const maySignIn = async (
     }
   }
 
-  // A password is the way in while a media server is down, so a server
-  // that could not be asked does not keep anyone out who typed one.
+  // A password is the way in while a media server is down, so an unreachable
+  // server doesn't lock out someone who typed one.
   if (how === 'password') {
     return unknown;
   }
@@ -137,7 +134,7 @@ export const maySignIn = async (
   return false;
 };
 
-/** Whether the server owner still shares their Plex server with them. */
+/** Whether the owner still shares their Plex server with the user. */
 const plexLetsIn = async (
   user: Pick<User, 'plexId'>,
   how: 'passkey' | 'password'
@@ -155,14 +152,14 @@ const plexLetsIn = async (
   if (how === 'passkey') {
     return new PlexTvAPI(owner.plexToken ?? '').checkUserAccess(user.plexId);
   }
-  // Refused only when Plex answers that the server is no longer shared
-  // with them: Plex down, or the owner's Plex sign-in lapsed, is no answer.
+  // Refuse only when Plex says the server is no longer shared: Plex down, or
+  // the owner's Plex sign-in lapsed, is no answer.
   return stillSharedOnPlex(owner.plexToken ?? '', user.plexId);
 };
 
 /**
- * Whether their Jellyfin or Emby account still exists there and is not
- * switched off. Throws when the server could not be asked.
+ * Whether their Jellyfin or Emby account still exists and is enabled. Throws
+ * when the server is unreachable.
  */
 const jellyfinLetsIn = async (
   user: Pick<User, 'jellyfinUserId' | 'embyUserId'>,
@@ -183,8 +180,8 @@ const jellyfinLetsIn = async (
 };
 
 /**
- * Whether the server is still shared with this Plex account: true or false
- * when Plex answered, undefined when it could not be asked.
+ * Whether the server is still shared with this Plex account; undefined when
+ * Plex is unreachable.
  */
 const stillSharedOnPlex = async (
   ownerToken: string,
@@ -207,21 +204,19 @@ const stillSharedOnPlex = async (
 };
 
 /**
- * Signs someone out everywhere, after their password changed or one of
- * their passkeys was removed: whoever knew the old password or held the
- * device must not stay signed in. `keep` is the session the change was made
- * from, when it was their own.
+ * Signs a user out everywhere after a password change or passkey removal:
+ * whoever knew the old password or held the device must not stay signed in.
+ * `keep` is the session the change came from, when it was their own.
  *
- * Sessions are ended the way the session store ends them (marked
- * destroyed, not deleted), so a request already under way on one of them
- * cannot write it back.
+ * Sessions are ended as the session store does (marked destroyed, not
+ * deleted), so an in-flight request on one can't write it back.
  */
 export const endSessions = async (
   userId: number,
   keep?: string
 ): Promise<void> => {
   const repository = getRepository(Session);
-  // Narrowed in the database, then read exactly: user 1's pattern also
+  // Narrowed in the database, then matched exactly: user 1's pattern also
   // matches user 12's sessions.
   const candidates = await repository.find({
     select: { id: true, json: true },

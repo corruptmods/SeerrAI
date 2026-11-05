@@ -14,8 +14,8 @@ const messages = defineMessages('components.Login', {
 });
 
 /**
- * Why signing in to Seerr with Plex did not work, in plain words: getting
- * the Plex token, or Seerr's answer to it (the sign-in page and setup).
+ * Message for a failed Plex sign-in: either the Plex token step or Seerr's
+ * response to it.
  */
 export const plexLoginFailure = (intl: IntlShape, e: unknown): string => {
   if (e instanceof PlexSignInError) {

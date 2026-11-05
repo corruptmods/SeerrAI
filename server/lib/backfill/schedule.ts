@@ -6,25 +6,25 @@ import type { BackfillKind } from '@server/entity/BackfillSeries';
 import { MediaRequest } from '@server/entity/MediaRequest';
 
 /*
- * Which titles a scan searches, and in what order: titles someone asked
- * for go first, oldest request first.
+ * Picks which titles a scan searches, and in what order: requested titles
+ * first, oldest request first.
  */
 
-/** A date from a raw query: SQLite gives UTC text with no zone on it. */
+/** A date from a raw query; SQLite returns UTC text with no zone. */
 const utcDate = (value: string | Date) =>
   value instanceof Date
     ? value
     : new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`);
 
 /**
- * How long a title whose last search failed (Prowlarr down, say) waits
- * before it is tried again, so it never holds a place in every scan.
+ * Wait before retrying a title whose last search failed (e.g. Prowlarr
+ * down), so it doesn't take a slot in every scan.
  */
 const RETRY_FAILED_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
- * When each album was first asked for, by MusicBrainz id: its oldest
- * approved request still open. Albums nobody asked for are absent.
+ * First-requested date by album MusicBrainz id: its oldest open approved
+ * request. Unrequested albums are absent.
  */
 export const albumsAskedSince = async (
   mbids: string[]
@@ -40,7 +40,7 @@ export const albumsAskedSince = async (
       .where('request.status = :status', {
         status: MediaRequestStatus.APPROVED,
       })
-      // An album already here, in a request still open for others, is not.
+      // An album already available doesn't count, even if its request is open.
       .andWhere('album.status = :albumStatus', {
         albumStatus: MediaRequestStatus.APPROVED,
       })
@@ -55,8 +55,8 @@ export const albumsAskedSince = async (
 };
 
 /**
- * When each title someone asked for was first asked for: the oldest request
- * approved and still open, by TMDB id. Titles nobody asked for are absent.
+ * First-requested date by row id: the oldest open approved request.
+ * Unrequested titles are absent.
  */
 export const requestedSince = async (
   rows: BackfillSeries[]
@@ -66,7 +66,6 @@ export const requestedSince = async (
     rows
       .filter((row) => row.kind === kind && row.tmdbId)
       .map((row) => row.tmdbId!);
-  // Albums asked for, by their MusicBrainz ids.
   const albums = rows.filter((row) => row.kind === 'album' && row.foreignId);
   const firstByMbid = await albumsAskedSince(
     albums.map((row) => row.foreignId!)
@@ -106,16 +105,14 @@ export const requestedSince = async (
 };
 
 /**
- * Which titles this scan searches, at most `searchesPerScan`. A title is
- * due when Backfill has never searched for it; when its last search failed
- * a day ago or more; or when nothing was found and `researchAfterDays` have
- * passed. Every search, found or not, restarts that wait, so the same few
- * titles never take every scan: each in turn goes to the back.
+ * The titles this scan searches, at most `searchesPerScan`. A title is due
+ * if never searched, if its last search failed a day or more ago, or if
+ * nothing was found and `researchAfterDays` have passed. Every search
+ * restarts the wait, so each title in turn goes to the back.
  *
- * Of those due, titles never searched come first, then ones searched
- * before. Within each, a title someone asked for goes ahead of one nobody
- * did (the oldest request first); then, of titles never searched, the one
- * missing most, and of the rest, the one that has waited longest.
+ * Never-searched titles come first. Within each group, requested titles go
+ * first (oldest request first); then never-searched ones by most missing,
+ * the rest by longest wait.
  */
 export const pickSearches = (
   due: BackfillSeries[],
@@ -147,8 +144,8 @@ export const pickSearches = (
 };
 
 /**
- * The films and series asked for since `since`, approved and still open,
- * by TMDB id: those to search right after their arr finds nothing.
+ * TMDB ids of movies and series requested since `since`, approved and still
+ * open: searched right after their arr finds nothing.
  */
 export const freshRequests = async (
   since: number

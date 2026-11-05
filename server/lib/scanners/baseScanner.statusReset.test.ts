@@ -54,7 +54,7 @@ class HarnessScanner extends BaseScanner<unknown> {
     });
   }
 
-  // Most permissive resolver possible, so a survivor means nothing was recorded.
+  // Most permissive resolver, so a survivor means nothing was recorded.
   public resolve(): Promise<void> {
     return this.resolveStatusResets(() => true);
   }
@@ -96,8 +96,8 @@ async function seedInFlightShow(
     })
   );
 
-  // sendToSonarr runs on insert and only bails when no server is configured,
-  // so leftover settings from another test would reach TMDB and fail the request.
+  // sendToSonarr runs on insert and bails only with no server configured,
+  // so leftover settings from another test would reach TMDB and fail.
   const settings = getSettings();
   settings.radarr = [];
   settings.sonarr = [];
@@ -135,8 +135,8 @@ async function seedInFlightMovie(tmdbId: number): Promise<MediaRequest> {
     })
   );
 
-  // sendToRadarr runs on insert and only bails when no server is configured,
-  // so leftover settings from another test would reach TMDB and fail the request.
+  // sendToRadarr runs on insert and bails only with no server configured,
+  // so leftover settings from another test would reach TMDB and fail.
   const settings = getSettings();
   settings.radarr = [];
   settings.sonarr = [];

@@ -1,7 +1,6 @@
 /**
- * Also Trust These Proxies on Settings → Network is one line of text, with
- * entries separated by commas, spaces or both; the setting is a list. The
- * entries themselves are checked by the server when saving.
+ * Also Trust These Proxies is one line of text, entries separated by commas,
+ * spaces or both; the setting is a list. The server checks entries on save.
  */
 export const proxyListFromText = (text: string | undefined): string[] =>
   (text ?? '').split(/[\s,]+/).filter((entry) => entry !== '');
@@ -26,8 +25,8 @@ const isIpv6 = (address: string): boolean => {
   }
 };
 
-// An IPv4 netmask such as 255.255.0.0: ones, then only zeros. All zeros
-// would mean every address; Express refuses it, like a prefix of 0.
+// An IPv4 netmask such as 255.255.0.0: ones, then zeros. All zeros would
+// mean every address; Express refuses it, like a prefix of 0.
 const isNetmask = (mask: string): boolean => {
   if (!IPV4.test(mask)) {
     return false;
@@ -59,9 +58,9 @@ const isAddressOrRange = (entry: string): boolean => {
 };
 
 /**
- * The first entry in Also Trust These Proxies that is not an IPv4 or IPv6
- * address, with or without a range, so the page can say which one before
- * saving. The server checks again, exactly as it will read them.
+ * The first entry that isn't an IPv4 or IPv6 address (with or without a
+ * range), so the page can name it before saving. The server checks again,
+ * exactly as it will read them.
  */
 export const firstNonAddress = (text: string | undefined): string | undefined =>
   proxyListFromText(text).find((entry) => !isAddressOrRange(entry));

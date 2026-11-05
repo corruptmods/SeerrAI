@@ -15,8 +15,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Notification settings pages, behind the real OpenAPI validator, saving
- * and testing as the pages do.
+ * Notification settings, saved and tested as the pages do, behind the real
+ * OpenAPI validator.
  */
 
 setupTestDb();
@@ -36,7 +36,7 @@ before(async () => {
       servers.push(server);
     });
 
-  // A stand-in Gotify server: takes any message and keeps it.
+  // Stand-in Gotify server: accepts and keeps any message.
   gotifyPort = await listen((req, res) => {
     let raw = '';
     req.on('data', (chunk) => (raw += chunk));
@@ -50,7 +50,7 @@ before(async () => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    // The person testing: test notifications go to them.
+    // Test notifications go to this user.
     req.user = {
       id: 1,
       email: 'admin@seerr.dev',
@@ -151,8 +151,7 @@ describe('Gotify priority', () => {
   });
 
   it('is refused as anything else, on saving and on testing', async () => {
-    // What the old page sent for "high": Number("high") is NaN, which
-    // reaches the server as null.
+    // The old page sent "high" as Number("high"), NaN, which arrives as null.
     for (const priority of [null, 'high', '5', 11, -1, 2.5]) {
       const saved = await call('POST', '/gotify', gotify(priority));
       assert.equal(saved.status, 400, `saved ${JSON.stringify(priority)}`);

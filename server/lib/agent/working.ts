@@ -12,9 +12,8 @@ const keyOf = (title: WorkedTitle) =>
   `${title.kind}:${title.serverId}:${title.arrId}`;
 
 /**
- * The admin agent's run working on each of these titles right now (queued
- * or under way), the newest when there are several. Waiting for an admin's
- * answer is not working.
+ * Maps each title's key to the newest queued or running admin-agent run on
+ * it. Runs waiting on an admin's answer don't count.
  */
 export const agentWorkingOn = async (
   titles: WorkedTitle[]

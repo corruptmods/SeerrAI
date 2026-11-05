@@ -4,11 +4,8 @@ import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
-/*
- * The password emails are sent from the account rather than through the
- * email notification agent, and never had the logo: they showed the
- * application's name in its place.
- */
+// Password emails are sent from the account, not the email notification agent,
+// and must include the logo rather than the application's name in its place.
 
 const sent: { template: string; locals: Record<string, unknown> }[] = [];
 

@@ -29,8 +29,8 @@ const messages = defineMessages('components.Settings.SettingsTrakt', {
 });
 
 /*
- * Trakt, laid out like the other services: its tile with Edit and Delete
- * once a Client ID is saved, a dashed tile to add one before.
+ * Trakt, laid out like the other services: its tile with Edit and Delete once
+ * a Client ID is saved, else a dashed tile to add one.
  */
 const SettingsTrakt = () => {
   const intl = useIntl();

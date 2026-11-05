@@ -1,9 +1,7 @@
 /**
- * Which of the fader's images are in the page: the one showing, the one
- * fading out and the one coming next. Mounting every one made the browser
- * download them all at once, twenty large backdrops on the sign-in page
- * before anyone had seen the second. Nothing fades out before the first
- * change, so until then the one before the first is left out too.
+ * Which images to mount: the one showing, the one fading out and the next.
+ * Mounting all of them downloads every backdrop at once. Before the first
+ * change nothing is fading out, so the previous one is left out too.
  */
 export const mountedImages = (
   activeIndex: number,

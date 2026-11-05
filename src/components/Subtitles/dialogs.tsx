@@ -8,8 +8,8 @@ import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 /*
- * The search and transcribe dialogs load only when opened: they matter to
- * the few who manage subtitles, on a page everyone opens.
+ * The search and transcribe dialogs load on open: only subtitle managers use
+ * them, on a page everyone opens.
  */
 
 const messages = defineMessages('components.Subtitles.dialogs', {

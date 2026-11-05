@@ -4,9 +4,8 @@ import type { Feature } from '@server/constants/features';
 import { featureOn } from '@server/constants/features';
 
 /**
- * A check for any of the fork's optional features, for whoever is signed in:
- * on unless an admin turned it off for everyone, or they did for themselves.
- * Music also needs Lidarr set up: until then there is no music to show.
+ * Checks the fork's optional features for the signed-in user: on unless
+ * disabled globally or by the user. Music also needs Lidarr set up.
  */
 export const useFeatureCheck = (): ((feature: Feature) => boolean) => {
   const { currentSettings } = useSettings();
@@ -20,7 +19,7 @@ export const useFeatureCheck = (): ((feature: Feature) => boolean) => {
     );
 };
 
-/** Whether one optional feature is on for whoever is signed in. */
+/** Whether an optional feature is on for the signed-in user. */
 const useFeature = (feature: Feature): boolean => useFeatureCheck()(feature);
 
 export default useFeature;

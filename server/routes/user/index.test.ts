@@ -26,8 +26,7 @@ import session from 'express-session';
 import request from 'supertest';
 import userRoutes from '.';
 
-// Everyone signing in here with a password is on the owner's Plex share
-// list.
+// Every password sign-in here is on the owner's Plex share list.
 mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => true);
 
 let app: Express;
@@ -51,7 +50,7 @@ before(() => {
       err: { status?: number; message?: string },
       _req: express.Request,
       res: express.Response,
-      // Express knows an error handler by its four parameters.
+      // Express detects an error handler by its four parameters.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: express.NextFunction
     ) => {
@@ -74,8 +73,8 @@ const permissionsOf = async (id: number) =>
   (await getRepository(User).findOneByOrFail({ id })).permissions;
 
 /*
- * The seeded friend becomes someone who manages users without being an
- * admin; beside them, a second admin and an ordinary user.
+ * Makes the seeded friend a non-admin user manager, and adds a second admin
+ * and an ordinary user.
  */
 const people = async () => {
   const users = getRepository(User);
@@ -136,7 +135,7 @@ describe('changing permissions from the user list', () => {
     assert.equal(bulk.status, 200);
     assert.equal(await permissionsOf(admin.id), Permission.ADMIN);
     assert.equal(await permissionsOf(1), Permission.ADMIN);
-    // Everyone else chosen is changed as before.
+    // The other selected users are still changed.
     assert.equal(await permissionsOf(regular.id), Permission.AUTO_APPROVE);
     assert.deepEqual(
       (bulk.body as { id: number }[]).map((user) => user.id),
@@ -268,7 +267,7 @@ describe('importing Plex users', () => {
   it('brings email and picture from Plex only as signing in with Plex does', async () => {
     getSettings().main.mediaServerType = MediaServerType.PLEX;
     const users = getRepository(User);
-    // Signs in with Jellyfin, and has linked Plex too.
+    // Signs in with Jellyfin and has Plex linked.
     const jellyfinMain = await users.save(
       new User({
         email: 'jelly@seerr.dev',
@@ -280,7 +279,7 @@ describe('importing Plex users', () => {
         plexId: 9301,
       })
     );
-    // A Plex account whose Plex email is now someone else's here.
+    // A Plex account whose Plex email belongs to another user here.
     const plexMain = await users.save(
       new User({
         email: 'plexmain@seerr.dev',
@@ -322,12 +321,12 @@ describe('importing Plex users', () => {
       getUsers.mock.restore();
     }
 
-    // Their Jellyfin email (what they sign in with) and picture stay.
+    // Their Jellyfin email (used to sign in) and avatar are kept.
     const jelly = await users.findOneByOrFail({ id: jellyfinMain.id });
     assert.equal(jelly.email, 'jelly@seerr.dev');
     assert.equal(jelly.avatar, '/avatarproxy/jf');
     assert.equal(jelly.plexUsername, 'jellyonplex');
-    // A new picture, but never another account's email.
+    // A new avatar, but never another account's email.
     const plex = await users.findOneByOrFail({ id: plexMain.id });
     assert.equal(plex.email, 'plexmain@seerr.dev');
     assert.equal(plex.avatar, 'https://plex.tv/plexmain');
@@ -336,7 +335,7 @@ describe('importing Plex users', () => {
   it('ties an account waiting for its Plex account to it', async () => {
     getSettings().main.mediaServerType = MediaServerType.PLEX;
     const users = getRepository(User);
-    // Made by an admin for a Plex friend, before they ever signed in.
+    // Created by an admin for a Plex friend who has never signed in.
     const waiting = await users.save(
       new User({
         email: 'waiting@seerr.dev',
@@ -371,7 +370,7 @@ describe('importing Plex users', () => {
       getUsers.mock.restore();
     }
 
-    // Found by the Plex account from now on, as signing in would leave it.
+    // Now matched by Plex account, as a sign-in would leave it.
     const after = await users.findOneByOrFail({ id: waiting.id });
     assert.equal(after.plexId, 9401);
     assert.equal(after.plexUsername, 'waitingonplex');
@@ -379,9 +378,8 @@ describe('importing Plex users', () => {
 });
 
 describe('importing Jellyfin users', () => {
-  // Two people on the Jellyfin server: one already brought in (stored the
-  // way older imports and Emby kept ids, with dashes and capitals) who has
-  // since been renamed there, and one who is new.
+  // Two Jellyfin users: one already imported (id stored with dashes and
+  // capitals, as older imports and Emby did) and since renamed, and one new.
   const known = '0123456789abcdef0123456789abcdef';
   const fresh = 'fedcba9876543210fedcba9876543210';
 
@@ -399,7 +397,7 @@ describe('importing Jellyfin users', () => {
         ],
       })
     );
-    // Avatars are looked up on the Jellyfin server; there is none here.
+    // Avatars come from the Jellyfin server, which tests don't have.
     const head = mock.method(axios, 'head', async () => {
       throw new Error('no Jellyfin server in tests');
     });
@@ -441,8 +439,7 @@ describe('importing Jellyfin users', () => {
       assert.equal(kept.length, 2, 'the imported person was not duplicated');
       const refreshed = kept.find((u) => u.email === 'old-name');
       assert.equal(refreshed?.jellyfinUsername, 'Renamed On Jellyfin');
-      // The account itself is left as it was: only what comes from Jellyfin
-      // is brought up to date.
+      // Only Jellyfin-sourced fields are refreshed; the account is unchanged.
       assert.equal(refreshed?.permissions, Permission.REQUEST);
     }));
 
@@ -529,8 +526,8 @@ describe('watchlist sync for new people', () => {
     withDefaults(false, true, async () => {
       getSettings().main.mediaServerType = MediaServerType.PLEX;
       const users = getRepository(User);
-      // The seeded friend shares the owner's Plex id; give them their own,
-      // so the import refreshes them as someone already here.
+      // The seeded friend shares the owner's Plex id; give them their own so
+      // the import refreshes them as an existing user.
       const friend = await users.findOneByOrFail({ email: 'friend@seerr.dev' });
       await users.update(friend.id, { plexId: 9200 });
       const getUsers = mock.method(

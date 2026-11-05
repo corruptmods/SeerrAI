@@ -23,9 +23,8 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Closing the loop on music: a request is done once every album it asked
- * for is here, and whoever asked hears about it exactly once, whether the
- * scan or the catch-up pass gets there first.
+ * A music request completes once every album is available, and notifies
+ * exactly once whether the scan or the catch-up pass runs first.
  */
 
 setupTestDb();
@@ -38,7 +37,7 @@ const sent: { type: Notification; payload: NotificationPayload }[] = [];
 const ofType = (type: Notification) =>
   sent.filter((s) => s.type === type).map((s) => s.payload);
 
-/** The artist, as the music scans keep them, with albums in these states. */
+/** Seeds an artist as the music scans store it, with these albums. */
 const seedArtist = async (
   albums: { mbId: string; title: string; status: MediaStatus }[],
   status = MediaStatus.PROCESSING
@@ -67,7 +66,7 @@ const seedArtist = async (
   return media;
 };
 
-/** A request for these albums, saved as it would be, without its hooks. */
+/** Seeds a request for these albums, bypassing entity hooks. */
 const seedRequest = async (
   media: Media,
   albums: { mbId: string; title: string; status?: MediaRequestStatus }[],
@@ -139,7 +138,7 @@ describe('completing music requests', () => {
       { mbId: FOG_B, title: 'Fog B' },
     ]);
 
-    // One of two here: that album is done, the request is not.
+    // One of two available: that album completes, the request doesn't.
     assert.deepEqual(await completeMusicRequests([media.id]), []);
     assert.equal(await statusOf(request.id), MediaRequestStatus.APPROVED);
     assert.deepEqual(await albumStatuses(request.id), {
@@ -160,8 +159,8 @@ describe('completing music requests', () => {
     assert.equal(available[0].notifySystem, true);
     assert.equal(available[0].notifyAdmin, false);
 
-    // Nothing says it twice: not another scan, not the hook's own call,
-    // not the catch-up pass.
+    // No second notification from another scan, the hook or the catch-up
+    // pass.
     assert.deepEqual(await completeMusicRequests([media.id]), []);
     await notifyAvailableMusic(
       await getRepository(MediaRequest).findOneByOrFail({ id: request.id })
@@ -231,7 +230,7 @@ describe('completing music requests', () => {
       [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.PENDING
     );
-    // Fog B was taken off: only Static Garden counts.
+    // Fog B was removed: only Static Garden counts.
     const trimmed = await seedRequest(media, [
       { mbId: STATIC_GARDEN, title: 'Static Garden' },
       {

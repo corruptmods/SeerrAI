@@ -74,7 +74,7 @@ type SingleVal = {
 };
 
 type BaseSelectorMultiProps = {
-  /** The id of the text box, for a label to point at. */
+  /** Text box id for a label's htmlFor. */
   inputId?: string;
   defaultValue?: string;
   isMulti: true;
@@ -83,7 +83,7 @@ type BaseSelectorMultiProps = {
 };
 
 type BaseSelectorSingleProps = {
-  /** The id of the text box, for a label to point at. */
+  /** Text box id for a label's htmlFor. */
   inputId?: string;
   defaultValue?: string;
   isMulti?: false;
@@ -403,18 +403,17 @@ export const KeywordSelector = ({
 type WatchProviderSelectorProps = {
   type: 'movie' | 'tv';
   region?: string;
-  /** Services to show only what is on. */
+  /** Show only titles on these services. */
   activeProviders?: number[];
-  /** Services to leave out. */
+  /** Exclude titles on these services. */
   excludedProviders?: number[];
   onChange: (region: string, on: number[], notOn: number[]) => void;
 };
 
 /*
- * Each service is shown only, left out, or neither: picking it moves it
- * along. The legend says so up front, every tile says which it is (with a
- * mark, not only a colour), and what is chosen is listed above the logos,
- * so a choice in the hidden "Show More" part is never out of sight.
+ * Each service is on, not on, or neither; a click advances it. Tiles mark
+ * their state with an icon, not only colour, and choices are listed above
+ * the logos so ones hidden under "Show More" stay visible.
  */
 export const WatchProviderSelector = ({
   type,
@@ -430,11 +429,7 @@ export const WatchProviderSelector = ({
   const { currentSettings } = useSettings();
   const [showMore, setShowMore] = useState(false);
   const [watchRegion, setWatchRegion] = useState(
-    region
-      ? region
-      : currentSettings.discoverRegion
-        ? currentSettings.discoverRegion
-        : 'US'
+    region || currentSettings.discoverRegion || 'US'
   );
   const [services, setServices] = useState<ChosenServices>(() => {
     const on = activeProviders ?? [];
@@ -443,7 +438,7 @@ export const WatchProviderSelector = ({
       notOn: (excludedProviders ?? []).filter((id) => !on.includes(id)),
     };
   });
-  // Said to screen readers after each choice.
+  // Screen reader announcement after each choice.
   const [announcement, setAnnouncement] = useState('');
   const { data, isLoading } = useSWR<WatchProviderDetails[]>(
     `/api/v1/watchproviders/${
@@ -453,7 +448,7 @@ export const WatchProviderSelector = ({
 
   useEffect(() => {
     onChange(watchRegion, services.on, services.notOn);
-    // removed onChange as a dependency as we only need to call it when the value(s) change
+    // onChange is omitted so it only fires when the values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services, watchRegion]);
 
@@ -728,8 +723,8 @@ export const UserSelector = ({
 export { default as USCertificationSelector } from './USCertificationSelector';
 
 /**
- * A streaming services row's services, by name, as its card shows them
- * while Discover is being customized: those shown only and those left out.
+ * Named on and not-on services of a streaming row, for its card while
+ * customizing Discover.
  */
 export const WatchProviderTags = ({
   type,

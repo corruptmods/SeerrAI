@@ -18,18 +18,15 @@ export class NoArrServerError extends Error {
 /**
  * Removes a title from Radarr or Sonarr and deletes its files.
  *
- * Shared by the manage panel's "remove file" action and by blocklisting, so
- * there is one path that decides which server holds a title. Status changes
- * are left to the caller: removing a file marks media DELETED, while a
- * blocklist keeps it BLOCKLISTED.
+ * Shared by "remove file" and blocklisting. The caller sets the status
+ * (DELETED or BLOCKLISTED).
  */
 export const removeFromArr = async (
   media: Media,
   is4k: boolean,
   { addImportExclusion = false }: { addImportExclusion?: boolean } = {}
 ): Promise<void> => {
-  // A music title's server ids are Lidarr's, and must never be read as a
-  // Radarr or Sonarr id.
+  // Music titles hold Lidarr ids; never read them as Radarr/Sonarr ids.
   if (!isVideo(media.mediaType)) {
     throw new NoArrServerError('Radarr or Sonarr');
   }
@@ -37,8 +34,7 @@ export const removeFromArr = async (
   const isMovie = media.mediaType === MediaType.MOVIE;
   const servers: DVRSettings[] = isMovie ? settings.radarr : settings.sonarr;
 
-  // The server it was sent to, or else the default one. The first server
-  // added has id 0, a server like any other.
+  // The server it was sent to, else the default. Id 0 is a valid server.
   const specificServiceId = is4k ? media.serviceId4k : media.serviceId;
   const serviceSettings =
     specificServiceId != null && specificServiceId >= 0

@@ -24,12 +24,10 @@ import http from 'node:http';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Watch history from Jellyfin and Emby, against a stand-in that answers
- * /Items, /Users and /System/Info the way a real Jellyfin 12 and Emby 4.10
- * did when tried by hand: each person's items carry their own UserData
- * (Played, PlayCount, PlaybackPositionTicks, PlayedPercentage,
- * LastPlayedDate), filtered by IsPlayed or IsResumable and sorted by
- * DatePlayed.
+ * Against a fake /Items, /Users and /System/Info modeled on real Jellyfin 12
+ * and Emby 4.10: per-user UserData (Played, PlayCount, PlaybackPositionTicks,
+ * PlayedPercentage, LastPlayedDate), IsPlayed/IsResumable filters, DatePlayed
+ * sort.
  */
 
 setupTestDb();
@@ -51,7 +49,7 @@ interface FakeItem {
   ProviderIds?: Record<string, string>;
 }
 
-/** Items on the server, and what each account has done with them. */
+/** Server items and each account's UserData for them. */
 let items: FakeItem[] = [];
 let userData: Record<string, Record<string, Record<string, unknown>>> = {};
 let accounts: { Id: string; Name: string; Policy: Record<string, unknown> }[] =
@@ -161,7 +159,7 @@ beforeEach(async () => {
       ParentIndexNumber: 1,
       IndexNumber: n,
     })),
-    // Seen on a real server mid-scan: an episode not placed in a series.
+    // Seen mid-scan on a real server: an episode with no series.
     { Id: 'x9', Name: 'Show - S02E24 - The Beginning', Type: 'Episode' },
   ];
   userData = {
@@ -172,7 +170,7 @@ beforeEach(async () => {
       e3: {
         Played: false,
         PlaybackPositionTicks: 6_000_000_000,
-        // Past the end, as a real server reported for a short special.
+        // Over 100%, as a real server reported for a short special.
         PlayedPercentage: 612.1,
         LastPlayedDate: iso(1),
       },
@@ -235,8 +233,7 @@ describe('watch history from Jellyfin and Emby', () => {
     );
     assert.equal(plays[3].year, 2019);
     assert.equal(plays[0].viewerId, 'a1');
-    // Finished and part-watched are asked apart, as the server's filters
-    // must all match when given together.
+    // Separate queries: combined Filters must all match.
     assert.ok(asked.some((a) => a.includes('Filters=IsPlayed')));
     assert.ok(asked.some((a) => a.includes('Filters=IsResumable')));
   });
@@ -313,7 +310,7 @@ describe('watch history from Jellyfin and Emby', () => {
   });
 
   it('counts a title marked watched by hand, which Emby keeps no date for', async () => {
-    // As seen on a real Emby server: Played, but no LastPlayedDate.
+    // Real Emby behavior: Played with no LastPlayedDate.
     userData.j2.e2 = { Played: true, PlayCount: 1 };
     const series = await saveMedia({
       tmdbId: 331677,
@@ -332,8 +329,7 @@ describe('watch history from Jellyfin and Emby', () => {
       'kept, after the dated plays'
     );
 
-    // Since the beginning, it counts; since a moment, it cannot be shown to
-    // be after it.
+    // Undated plays count from epoch 0, not after a real cutoff.
     assert.deepEqual(
       (await source().playsSince(jordan, series, new Date(0))).map(
         (p) => p.episode
@@ -351,8 +347,7 @@ describe('watch history from Jellyfin and Emby', () => {
       [1]
     );
 
-    // The same on an Emby server, which keeps its own settings, and its
-    // own ids on people and titles.
+    // Same on Emby, with its own settings and user/title ids.
     await getRepository(User).update(jordan.id, {
       jellyfinUserId: null,
       embyUserId: 'j2',
@@ -405,7 +400,7 @@ describe('watch history from Jellyfin and Emby', () => {
     assert.equal(found.get('m-4k')?.id, film.id);
     assert.equal(found.has('nope'), false);
     assert.deepEqual(source().titleIdsOf(film), ['m-reg', 'm-4k']);
-    // Regular and 4K as one item: its plays are read, and counted, once.
+    // Regular and 4K as one item: read and counted once.
     assert.deepEqual(
       source().titleIdsOf(
         new Media({ jellyfinMediaId: 'm-both', jellyfinMediaId4k: 'm-both' })
@@ -418,7 +413,7 @@ describe('watch history from Jellyfin and Emby', () => {
   });
 
   it('works out where someone is in a series', async () => {
-    // On an Emby server, people's and titles' ids are Emby's own.
+    // Emby uses its own user and title ids.
     await getRepository(User).update(alex.id, {
       jellyfinUserId: null,
       embyUserId: 'a1',

@@ -58,17 +58,17 @@ const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
 type LinkedAccount = {
   kind: MediaServerKind;
   username: string;
-  /** Seerr is connected to this server; the account is used to sign in. */
+  /** Seerr is connected to this server, so the account can sign in. */
   connected: boolean;
 };
 
-/** An account on a single sign-on provider, linked here. */
+/** A linked single sign-on account. */
 type ProviderLink = {
   provider: string;
   name: string;
   logoUrl: string;
   username: string | null;
-  /** The provider is switched on: the link can be used to sign in. */
+  /** The provider is enabled, so the link can sign in. */
   available: boolean;
 };
 
@@ -97,7 +97,7 @@ const UserLinkedAccountsSettings = () => {
 
   const applicationName = settings.currentSettings.applicationTitle;
   const oidcProviders = settings.currentSettings.oidcProviders;
-  // Back from a single sign-on provider: how linking went.
+  // Linking outcome after returning from a provider.
   const providerOutcome = singleSignOnOutcome(
     intl,
     router.query,
@@ -107,8 +107,7 @@ const UserLinkedAccountsSettings = () => {
   const mediaServers = settings.currentSettings.mediaServers;
   const primary = mediaServers.find((server) => server.primary)?.kind;
 
-  // Every account they have linked, their main one first, including any on
-  // a server Seerr is no longer connected to.
+  // Linked accounts, primary first, including servers no longer connected.
   const accounts: LinkedAccount[] = useMemo(() => {
     if (!user) return [];
     const usernames: Record<MediaServerKind, string | null | undefined> = {
@@ -123,9 +122,8 @@ const UserLinkedAccountsSettings = () => {
     }));
   }, [user, mediaServers]);
 
-  // Linking Plex: signing in to Plex (in a window, or in this tab, coming
-  // back here), then linking the account it gave once this page knows
-  // whose settings these are.
+  // Plex sign-in (popup or redirect) yields a token, linked once the user is
+  // known.
   const [plexToken, setPlexToken] = useState<string>();
   const plexLogin = usePlexLogin({
     purpose: 'link',
@@ -166,9 +164,7 @@ const UserLinkedAccountsSettings = () => {
     link();
   }, [plexToken, userId, revalidateUser, intl]);
 
-  // Each connected server, and each single sign-on provider, they have no
-  // account linked from yet. A provider is linked by signing in there, by
-  // way of the Application URL it sends people back to.
+  // Connected servers and providers not linked yet.
   const linkable = [
     ...mediaServers
       .filter((server) => !accounts.some((a) => a.kind === server.kind))
@@ -190,9 +186,8 @@ const UserLinkedAccountsSettings = () => {
         key: `oidc-${p.id}`,
         name: p.name,
         action: () => {
-          // Not a page here but a route the server answers by sending the
-          // browser on to the provider, by way of the Application URL it
-          // comes back to: a full page load, which the router can't do.
+          // A server route that redirects to the provider via the
+          // Application URL, so it needs a full page load, not the router.
           const start = `${oidcApplicationUrl(
             settings.currentSettings.applicationUrl
           )}/api/v1/auth/oidc/${encodeURIComponent(p.id)}/link`;
@@ -207,11 +202,10 @@ const UserLinkedAccountsSettings = () => {
   );
 
   /*
-   * Whether an account can be unlinked, as the server decides: never the
-   * owner's account on the primary server, nor the owner's Plex account
-   * while Plex is connected (Seerr reaches Plex with it), and only while a
-   * password, another account on a connected server, or a single sign-on
-   * provider that is switched on still lets them in.
+   * Mirrors the server: never the owner's primary-server account, nor the
+   * owner's Plex account while Plex is connected (Seerr uses it), and only
+   * while a password, another connected account or an enabled provider
+   * still lets them sign in.
    */
   const mayUnlink = (account: LinkedAccount) =>
     !(
@@ -224,7 +218,7 @@ const UserLinkedAccountsSettings = () => {
       usableProviderLinks.length > 0 ||
       accounts.some((other) => other.kind !== account.kind && other.connected));
 
-  /** The same for a provider link; one that can't be used can always go. */
+  /** Same for a provider link; an unusable one can always go. */
   const mayUnlinkProvider = (link: ProviderLink) =>
     !link.available ||
     !!passwordInfo?.hasPassword ||
@@ -376,7 +370,7 @@ const UserLinkedAccountsSettings = () => {
                 }`}
               >
                 {link.logoUrl ? (
-                  // A picture the admin chose, from wherever it is kept.
+                  // Admin-supplied URL from any host.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={link.logoUrl}

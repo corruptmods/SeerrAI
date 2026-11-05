@@ -9,8 +9,8 @@ import {
 } from './networks';
 
 /*
- * The Networks row as the page reads it: the admin's list when it is a good
- * one, the default list otherwise, and an empty list kept as empty.
+ * A valid custom list is used, anything else falls back to the default, and
+ * an empty list stays empty.
  */
 
 describe('the Networks row’s list', () => {
@@ -18,7 +18,7 @@ describe('the Networks row’s list', () => {
     for (const data of [undefined, null, '', 'not json', '{}', '[{"id":1}]']) {
       assert.equal(parseDiscoverNetworks(data), defaultDiscoverNetworks);
     }
-    // Over the limit is no good either.
+    // Over the limit is invalid too.
     const tooMany = Array.from({ length: 51 }, (_, i) => ({
       id: i + 1,
       name: `N${i + 1}`,

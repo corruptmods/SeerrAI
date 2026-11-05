@@ -19,7 +19,7 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * "Suggested for you": a fake Tautulli's history and stubbed TMDB
+ * "Suggested for you": a fake Tautulli history and stubbed TMDB
  * recommendations, behind the real API validator.
  */
 
@@ -38,7 +38,7 @@ const fake = http.createServer((_req, res) => {
   );
 });
 
-// TMDB recommendations, by the title asked about.
+// TMDB recommendations by source title.
 let movieRecs: Record<number, { id: number; adult?: boolean }[]> = {};
 let tvRecs: Record<number, { id: number }[]> = {};
 let tmdbAsks = 0;
@@ -93,7 +93,7 @@ stub('getTvRecommendations', async ({ tvId }: { tvId: number }) => {
 let app: Server;
 let port: number;
 let actingAs: User;
-// Suggestions are kept a day per Plex account, so each test uses its own.
+// Suggestions are cached a day per Plex account, so each test uses its own.
 let nextPlexId = 1000;
 
 before(async () => {
@@ -193,7 +193,7 @@ const ids = (results: { id: number; mediaType: string }[]) =>
 
 describe('GET /discover/suggested', () => {
   it('is empty, not an error, without Tautulli', async () => {
-    // The setter merges, so each field is cleared.
+    // The setter merges, so clear each field.
     getSettings().tautulli = {
       hostname: '',
       port: undefined,
@@ -222,8 +222,8 @@ describe('GET /discover/suggested', () => {
     await library(20, MediaType.TV, '220');
     // The series counts through its episode, by the show's rating key.
     history = [moviePlay(110), episodePlay(220, 2201), moviePlay(111)];
-    // 500 is recommended by both films, so it outranks what only one points
-    // to, even the most recent watch's first pick.
+    // 500 is recommended by both films, so it outranks single recommendations,
+    // even the latest watch's top pick.
     movieRecs = { 10: [{ id: 400 }, { id: 500 }], 11: [{ id: 500 }] };
     tvRecs = { 20: [{ id: 600 }] };
 
@@ -239,7 +239,7 @@ describe('GET /discover/suggested', () => {
   it('leaves out anything already started, finished or not', async () => {
     await library(10, MediaType.MOVIE, '110');
     await library(11, MediaType.MOVIE, '111');
-    // 11 was started and abandoned: never a seed, and never suggested.
+    // 11 was started and abandoned: never a seed, never suggested.
     history = [moviePlay(110), moviePlay(111, 0)];
     movieRecs = { 10: [{ id: 11 }, { id: 12 }], 11: [{ id: 99 }] };
 
@@ -349,7 +349,7 @@ describe('the Suggested for You row', () => {
   it('goes straight after the watchlist when added to an existing home page', async () => {
     const repository = getRepository(DiscoverSlider);
     await repository.clear();
-    // The home page as it was before this row existed, with a custom row.
+    // The home page from before this row existed, with a custom row.
     let order = 0;
     for (const slider of defaultSliders) {
       if (slider.type !== DiscoverSliderType.SUGGESTED) {
@@ -389,8 +389,8 @@ describe('the Suggested for You row', () => {
 
 describe('the Anime row', () => {
   it('keeps a number of its own, past those Seerr uses', () => {
-    // Saved in the database: a number already taken would turn existing
-    // rows into this one.
+    // Stored in the database: reusing a taken number would turn existing rows
+    // into this one.
     assert.equal(DiscoverSliderType.ANIME, 24);
   });
 

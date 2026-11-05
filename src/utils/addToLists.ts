@@ -3,16 +3,13 @@ import axios from 'axios';
 import type { ScopedMutator } from 'swr';
 
 /**
- * Adds a title to several lists at once, used when requesting.
+ * Adds a title to several lists when requesting; returns how many succeeded.
  *
- * Failures are swallowed deliberately: the request itself has already
- * succeeded by this point, and a list that could not be updated should not
- * make the request look like it failed. Returns how many landed.
+ * Failures are swallowed: the request already succeeded and shouldn't look
+ * failed.
  *
- * Takes the mutator from `useSWRConfig` rather than importing `mutate` from
- * swr directly — the app supplies a custom cache provider, and the imported
- * global mutate addresses swr's default cache instead, so it silently does
- * nothing here.
+ * Takes `mutate` from `useSWRConfig`: the app uses a custom cache provider,
+ * and swr's global `mutate` targets the default cache, silently doing nothing.
  */
 export const addToLists = async (
   listIds: number[],
@@ -27,7 +24,7 @@ export const addToLists = async (
       await axios.post(`/api/v1/list/${listId}/item`, { tmdbId, mediaType });
       added++;
     } catch {
-      // Reported through the count, not as a request failure.
+      // Reflected in the count.
     }
   }
 

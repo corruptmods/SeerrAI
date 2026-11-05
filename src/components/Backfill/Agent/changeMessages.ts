@@ -2,7 +2,7 @@ import type { ChangeIcon } from '@app/components/Backfill/Agent/work';
 import defineMessages from '@app/utils/defineMessages';
 import type { MessageDescriptor } from 'react-intl';
 
-/** Each kind of change in a few words (see work.ts). */
+/** Short labels per change kind (see work.ts). */
 export const changeMessages: Record<
   ChangeIcon | 'addedToDownload',
   MessageDescriptor

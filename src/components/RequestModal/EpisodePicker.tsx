@@ -15,14 +15,10 @@ const messages = defineMessages('components.RequestModal.EpisodePicker', {
 interface EpisodePickerProps {
   tvId: number;
   seasonNumber: number;
-  /** Whether the season toggle is currently on. */
   seasonSelected: boolean;
-  /**
-   * Partial selection for this season. Undefined while the season is toggled
-   * on means the whole season; undefined while it is off means nothing.
-   */
+  /** Partial selection; undefined means all if the season is on, else none. */
   selected?: number[];
-  /** Reports the full set now wanted, plus the season's episode count. */
+  /** Receives the full wanted set and the season's episode count. */
   onChange: (episodeNumbers: number[], totalEpisodes: number) => void;
 }
 
@@ -56,9 +52,7 @@ const EpisodePicker = ({
 
   const allNumbers = data.episodes.map((episode) => episode.episodeNumber);
 
-  // What the user currently has checked, as an explicit list. A season that
-  // is toggled on with no partial list is every episode; one that is off is
-  // none of them. Nothing is checked by default.
+  // On with no partial list is every episode; off is none.
   const checked: number[] = seasonSelected
     ? selected && selected.length > 0
       ? selected

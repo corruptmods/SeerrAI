@@ -9,7 +9,8 @@ interface DeprecationOptions {
 }
 
 /**
- * Mark an API route as deprecated.
+ * Marks an API route as deprecated.
+ *
  * @see https://datatracker.ietf.org/doc/html/rfc8594
  */
 export const deprecatedRoute = ({

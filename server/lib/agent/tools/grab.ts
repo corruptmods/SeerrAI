@@ -48,8 +48,8 @@ import { In } from 'typeorm';
 import { z } from 'zod';
 
 /*
- * Starting a download of the files chosen, through Backfill, or putting
- * a replacement to an admin; and stopping a download it started.
+ * Starting a download of the chosen files through Backfill, or proposing a
+ * replacement to an admin; and stopping a download it started.
  */
 
 const grabInput = z.object({
@@ -87,11 +87,11 @@ const ACTIVE_JOB: BackfillJob['status'][] = [
 ];
 
 /**
- * What became of this release for this title before. One an admin turned
- * down, or that failed to download, is not taken again. One downloaded
- * before may be taken again for other episodes (a full-series pack used
- * for one season, then another): a download of it still under way takes
- * the new files on, and episodes it did not import before are refused.
+ * What became of this release for this title before. One an admin declined
+ * or that failed is refused. One downloaded before may be reused for other
+ * episodes (a full-series pack used season by season): a running download
+ * of it takes the new files on, and episodes it failed to import are
+ * refused.
  */
 const earlierUse = async (seriesId: number, known: KnownRelease) => {
   const earlier = (
@@ -102,7 +102,7 @@ const earlierUse = async (seriesId: number, known: KnownRelease) => {
     (c) =>
       c.guid === known.guid ||
       (!!known.infoHash && c.infoHash === known.infoHash.toLowerCase()) ||
-      // The same post found again on another indexer failed the same way.
+      // The same post on another indexer fails the same way.
       (c.status === 'dead' && sameRelease(c, known))
   );
   if (earlier.some((c) => c.status === 'skipped')) {
@@ -151,9 +151,8 @@ const hasFileRefusal = (state: AgentState) =>
     : 'The movie already has a file; it is never replaced.';
 
 /**
- * A movie is only downloaded while Radarr is monitoring it, as episodes are
- * only while Sonarr is: one not monitored is not wanted. Replacing the file
- * of one an admin asked about is the exception, as for episodes.
+ * A movie is wanted only while Radarr monitors it, as episodes are in
+ * Sonarr. Replacing its existing file is the exception, as for episodes.
  */
 const wantedMovie = (
   movie: RadarrMovieDetail,
@@ -175,18 +174,17 @@ interface PreparedGrab {
   targets: string[];
   /** What could make it wrong, for an admin to judge. */
   doubts: string[];
-  /** A download of this same release under way, to take these files on. */
+  /** A running download of this release, to add these files to. */
   extend?: BackfillJob;
 }
 
 /**
- * A Usenet post packed in archives or with scrambled names, taken whole:
- * what is inside is only known once the Usenet client has it, so its name
- * has to be the proof. Sonarr (or Radarr) must read the name as exactly
- * this one missing episode (or this movie), in a language that is wanted;
- * its one video is imported as that episode. For a series Sonarr numbers by
- * scene numbering, a name numbered the library's way counts too, when it
- * carries the episode's own title.
+ * A Usenet post in archives or with scrambled names, taken whole. Its
+ * contents are only known once downloaded, so its name is the proof:
+ * Sonarr (or Radarr) must read it as exactly this one missing episode (or
+ * this movie) in a wanted language, and its one video is imported as that.
+ * On a scene-numbered series, a name in library numbering also counts if
+ * it carries the episode's title.
  */
 const prepareWhole = async (
   state: AgentState,
@@ -278,9 +276,9 @@ const prepareWhole = async (
         }. Only a release that is exactly one episode can be taken unopened; for more, choose a release that can be opened.`
       );
     }
-    // The episode it is: Sonarr's reading, unless Sonarr reads the name by
-    // scene numbering and the name, numbered the library's way, carries the
-    // wanted episode's title. The title must not say another episode.
+    // Sonarr's reading, unless Sonarr reads it by scene numbering and the
+    // name, in library numbering, carries the wanted episode's title. The
+    // title must not name another episode.
     const mapped = read[0];
     const wantedEp = seriesCtx.episodes.find(
       (ep) =>
@@ -322,8 +320,8 @@ const prepareWhole = async (
         .getSeriesQueueEpisodes(series.id)
         .catch(() => [] as number[])
     );
-    // The same checks as for an opened release, the post standing in for
-    // its one file.
+    // The same checks as for an opened release, with the post as its one
+    // file.
     const { problems } = checkMapping(
       [
         {
@@ -380,11 +378,10 @@ const prepareWhole = async (
 };
 
 /**
- * An album's release: Backfill matches its files to the album's tracks,
- * in the edition Lidarr imports into, as it does for packs it finds
- * itself. What fills a missing track is taken (and, when replacing was
- * asked for, what Lidarr's profile prefers to a track on disk); the files
- * chosen, when any are given, narrow that.
+ * An album's release. Backfill matches its files to the tracks of the
+ * edition Lidarr imports into, as for packs it finds itself, taking what
+ * fills a missing track (and, when replacing, what Lidarr's profile
+ * prefers to a track on disk). Chosen files, if given, narrow that.
  */
 const prepareAlbum = async (
   state: AgentState,
@@ -476,9 +473,9 @@ const prepareAlbum = async (
 
 /**
  * Checks a download against every rule and builds what Backfill needs,
- * without starting anything. Throws why it cannot be done at all; lists
- * what makes it doubtful, which the model is told to look at again before
- * it may say it is certain (and which an admin sees in a replacement).
+ * without starting anything. Throws if it cannot be done; lists doubts the
+ * model must recheck before claiming certainty (and an admin sees in a
+ * replacement).
  */
 const prepareGrab = async (
   state: AgentState,
@@ -516,15 +513,15 @@ const prepareGrab = async (
     );
   }
   const files = await filesOf(state, known);
-  // What an admin asked for is theirs to keep in Backfill.
+  // A title an admin asked about stays tracked in Backfill.
   const row = await backfill.track(
     title.kind,
     title.serverId,
     title.arrId,
     adminPresent(state.run)
   );
-  // Downloads already under way for the title: another can run beside
-  // them, for other episodes.
+  // Running downloads for the title; another can run beside them for other
+  // episodes.
   const running = await getRepository(BackfillJob).find({
     where: {
       seriesId: row.id,
@@ -623,8 +620,8 @@ const prepareGrab = async (
       path: file.path,
       size: file.size,
       judgedAs,
-      // The movie's id, as Backfill's own plans carry it: what is on disk
-      // is checked by it before the download starts.
+      // The movie's id, as in Backfill's own plans: it is used to check
+      // what is on disk before the download starts.
       episodeIds: [ctx.movie.id],
       quality: parsed?.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
       languages: parsed?.languages ?? [],
@@ -673,7 +670,7 @@ const prepareGrab = async (
       const full = episodes.map((e) => ctx.episodes.find((x) => x.id === e.id));
       const own = fileNumbers(fileName);
       const ownLast = own.through ?? own.episode;
-      // A file named as several episodes is imported as all of them, or
+      // A file named as several episodes must be given all of them, or
       // Sonarr names it as the first and the rest stay missing.
       if (
         own.season === season &&
@@ -690,8 +687,8 @@ const prepareGrab = async (
         );
       }
       // A name carrying another episode's title is that episode, whatever
-      // its number says: releases number seasons their own way (a special
-      // counted as episode 1, scene seasons), and the title does not lie.
+      // its number: releases number their own way (a special counted as
+      // episode 1, scene seasons), but the title is reliable.
       const titled = episodeByTitle(fileName, ctx.episodes);
       if (titled && !episodes.some((e) => e.id === titled.id)) {
         throw new ToolError(
@@ -743,7 +740,7 @@ const prepareGrab = async (
       const parsed = await ctx.sonarr.parse(judgedAs).catch(() => null);
       const problem = languageProblem(parsed?.languages, original);
       if (problem) {
-        // One file of a pack: the rest may be fine.
+        // Only this file; the rest of the pack may be fine.
         throw new ToolError(`File #${file.index}: ${problem}`);
       }
       plan.push({
@@ -855,7 +852,7 @@ const commitGrab = async (
       reason: null,
       plan,
       summary: summarize(plan),
-      // Taken at once: nobody needs telling it is waiting.
+      // Approved at once, so no waiting notification is needed.
       notifiedAt: new Date(),
     })
   );
@@ -864,7 +861,7 @@ const commitGrab = async (
     mode: replaces ? 'all' : 'missing',
     includeAi: true,
     by,
-    // Should it fail, the conversation is told, to look for another.
+    // If it fails, the conversation is told so it can look for another.
     agentRunId: state.run.id,
   });
   state.grabsToday += 1;
@@ -898,8 +895,8 @@ const commitGrab = async (
 };
 
 /**
- * A replacing grab, for an admin to approve: what goes and what comes. On
- * approval it is checked again from scratch and started.
+ * A replacing grab for an admin to approve: what goes and what comes. On
+ * approval it is rechecked from scratch and started.
  */
 const replaceProposal = (
   prepared: PreparedGrab,
@@ -938,9 +935,9 @@ const replaceProposal = (
 };
 
 /**
- * A grab outside Sonarr's or Radarr's size limits, the best the agent
- * found, for an admin to take or turn down. On approval it is checked
- * again from scratch and started.
+ * The agent's best grab outside Sonarr's or Radarr's size limits, for an
+ * admin to approve or decline. On approval it is rechecked from scratch and
+ * started.
  */
 const oversizeProposal = (
   prepared: PreparedGrab,
@@ -1029,8 +1026,8 @@ export const grab: AgentTool = {
         `Not started. Look again: ${prepared.doubts.slice(0, 8).join(' ')} Check the file names against the episode titles (and the release against the show). If you are sure it is right, call grab again with certain: true; if not, choose another release, or ask the admin.`
       );
     }
-    // Sonarr's and Radarr's size limits hold: outside them is the admin's
-    // call. Limits that cannot be read are no reason not to go on.
+    // Outside Sonarr's or Radarr's size limits is the admin's call. Limits
+    // that cannot be read don't block.
     const outside = await backfill
       .sizeProblemsFor(prepared.title, prepared.plan)
       .catch(() => []);
@@ -1058,8 +1055,8 @@ export const grab: AgentTool = {
 };
 
 /**
- * Starts a replacing grab an admin approved: everything is checked again
- * as it is now, and the files taken only if it all still holds.
+ * Starts a grab an admin approved, rechecking everything against the
+ * current state; files are taken only if it all still holds.
  */
 export const startApprovedGrab = async (
   state: AgentState,
@@ -1090,8 +1087,8 @@ export const stopDownload: AgentTool = {
         reason: z.string().trim().min(3).max(600),
       })
       .parse(input);
-    // Only a download it started: one it added files to was someone
-    // else's, and ending it would take their files with it.
+    // Only a download it started: one it only added files to is someone
+    // else's, and stopping it would remove their files too.
     const grabs = state.run.actions.filter(
       (a) => a.type === 'grab' && a.jobId === id
     );

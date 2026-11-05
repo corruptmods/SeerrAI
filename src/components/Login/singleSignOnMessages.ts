@@ -2,10 +2,7 @@ import defineMessages from '@app/utils/defineMessages';
 import type { OidcOutcome } from '@server/constants/oidc';
 import type { IntlShape } from 'react-intl';
 
-/*
- * What the sign-in page and Linked Accounts say when someone comes back
- * from a single sign-on provider (`?sso=` and `?provider=` in the address).
- */
+/* Messages for returning from an SSO provider (`?sso=` and `?provider=`). */
 const messages = defineMessages('components.Login.SingleSignOn', {
   signInWith: 'Sign in with {provider}',
   unavailable: 'Signing in with {provider} is not available.',
@@ -41,9 +38,8 @@ const OUTCOME_MESSAGES: Record<OidcOutcome, keyof typeof messages> = {
 };
 
 /**
- * What to tell someone back from a provider, from the address they came
- * back to; undefined when they did not come back from one. The provider is
- * named as the sign-in page knows it, else by its id.
+ * Outcome and message for the SSO query params, or undefined without them.
+ * Names the provider by its configured name, else its id.
  */
 export const singleSignOnOutcome = (
   intl: IntlShape,

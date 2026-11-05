@@ -51,7 +51,7 @@ const IssueList = () => {
     }&filter=${currentFilter}&sort=${currentSort}`
   );
 
-  // Restore last set filter values on component mount
+  // Restore saved filters on mount.
   useEffect(() => {
     const filterString = window.localStorage.getItem('il-filter-settings');
 
@@ -63,13 +63,13 @@ const IssueList = () => {
       setCurrentPageSize(filterSettings.currentPageSize);
     }
 
-    // If filter value is provided in query, use that instead
+    // A filter in the query takes precedence.
     if (Object.values(Filter).includes(router.query.filter as Filter)) {
       setCurrentFilter(router.query.filter as Filter);
     }
   }, [router.query.filter]);
 
-  // Set filter values to local storage any time they are changed
+  // Persist filters on change.
   useEffect(() => {
     window.localStorage.setItem(
       'il-filter-settings',

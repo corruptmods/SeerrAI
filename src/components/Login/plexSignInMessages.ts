@@ -5,10 +5,8 @@ import { plexSignInProblemOf } from '@app/utils/plex';
 import type { IntlShape } from 'react-intl';
 
 /*
- * What every page that signs in with Plex (the sign-in page, setup, Linked
- * Accounts, connecting Plex in Settings) says when it doesn't work. Where
- * single sign-on already says the same thing about a provider, Plex is
- * named in its words.
+ * Plex sign-in failure messages for every page that signs in with Plex.
+ * Reuses the single sign-on wording where it already fits.
  */
 const messages = defineMessages('components.Login.PlexSignIn', {
   popup:
@@ -30,16 +28,16 @@ const PROBLEM_MESSAGES: Record<
   failed: singleSignOnMessages.provider,
 };
 
-/** Why getting a Plex token did not work, in plain words. */
+/** Message for a failed Plex token request. */
 export const plexSignInMessage = (intl: IntlShape, e: unknown): string =>
   intl.formatMessage(PROBLEM_MESSAGES[plexSignInProblemOf(e)], {
     provider: 'Plex',
   });
 
-/** Plex turned someone away: no access to the server, or not let in here. */
+/** Message for a Plex user without access to the server or not allowed here. */
 export const plexNotAllowedMessage = (intl: IntlShape): string =>
   intl.formatMessage(singleSignOnMessages.notAllowed, { provider: 'Plex' });
 
-/** Signing in with Plex went wrong some other way. */
+/** Message for any other Plex sign-in failure. */
 export const plexFailedMessage = (intl: IntlShape): string =>
   intl.formatMessage(singleSignOnMessages.provider, { provider: 'Plex' });

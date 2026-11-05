@@ -79,8 +79,7 @@ const defaultPayload = {
   '{{extra}}': [],
 };
 
-// Seerr AI's own guide: Seerr's lacks the variables added here, such as
-// Emby's ids and music's albums.
+// Seerr AI's guide: Seerr's lacks variables added here (Emby ids, albums).
 const TEMPLATE_VARIABLES_URL = `${PROJECT_URL}/blob/${PROJECT_BRANCH}/docs/using-seerr/notifications/webhook.md#template-variables`;
 
 const messages = defineMessages(
@@ -425,7 +424,7 @@ const NotificationsWebhook = () => {
               </div>
             </div>
             <div className="form-row">
-              {/* Names the group of headers below: there may be none yet. */}
+              {/* Labels the header group below, which may be empty. */}
               <label id="customHeadersLabel" className="text-label">
                 {intl.formatMessage(messages.customHeaders)}
                 <span className="label-tip">

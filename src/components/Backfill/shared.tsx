@@ -62,7 +62,7 @@ const messages = defineMessages('components.Backfill', {
 export const appName = (kind: TitleKind) =>
   kind === 'album' ? 'Lidarr' : kind === 'movie' ? 'Radarr' : 'Sonarr';
 
-/** A title's own page in Seerr AI, when it has one. */
+/** The title's media page, when it has one. */
 export const titleHref = (title: {
   kind: TitleKind;
   tmdbId: number | null;
@@ -93,7 +93,7 @@ export const formatDuration = (
 ): string => {
   if (!seconds || seconds <= 0) return '';
   const { hours, minutes } = durationParts(seconds);
-  // Days once it's over two: "31 d 2 h", not "746 h 0 min".
+  // Over two days: "31 d 2 h", not "746 h 0 min".
   if (hours >= 48) {
     return intl.formatMessage(messages.daysHours, {
       days: Math.floor(hours / 24),
@@ -105,10 +105,7 @@ export const formatDuration = (
     : intl.formatMessage(messages.minutes, { minutes });
 };
 
-/**
- * Where a job is, in words; one waiting out its indexer's download limit
- * says when it is tried again, in the viewer's own time.
- */
+/** A job's stage as text; a rate-limited job shows its local retry time. */
 export const jobStage = (
   intl: IntlShape,
   job: Pick<JobView, 'stage' | 'retryAt'>
@@ -137,10 +134,7 @@ export const episodeLabel = (e: {
     : se;
 };
 
-/**
- * The admin agent (an AI) is looking for a title right now: opens its
- * conversation, for admins (with `runId`).
- */
+/** Badge for an agent run in progress; links to the run when given `runId`. */
 export const AiSearchingBadge = ({
   runId,
   className,
@@ -183,10 +177,8 @@ export const SeriesStatusBadge = ({ status }: { status: SeriesStatus }) => {
 };
 
 /**
- * A download's status pill. With its progress and its title's kind it says
- * more than the stored status: a download at 100% that is still
- * "downloading" is the client unpacking or running its script, and an
- * import is Sonarr's or Radarr's work, not Backfill's.
+ * Download status pill. Uses progress and kind: 100% while "downloading" means
+ * the client is unpacking or scripting; importing is the *arr's work.
  */
 export const JobStatusBadge = ({
   status,
@@ -226,9 +218,8 @@ export const JobStatusBadge = ({
 };
 
 /**
- * What became of a failed download, linked to where it went on: the
- * download that replaced it, the admin agent's conversation, or the
- * title's page with the pack offered.
+ * A failed download's follow-up, linked to its replacement, the agent run, or
+ * the title's offered pack.
  */
 export const JobFollowUpNote = ({
   job,
@@ -339,10 +330,7 @@ const SIZES = {
   lg: 'h-[180px] w-[120px]',
 } as const;
 
-/**
- * A list that scrolls inside its section once it is long, so a page of
- * several lists stays one screen to move around in.
- */
+/** Long lists scroll inside their section. */
 export const SCROLL_LIST =
   'max-h-[min(60vh,40rem)] overflow-y-auto overscroll-contain';
 
@@ -404,8 +392,8 @@ export const ProgressBar = ({
   </div>
 );
 
-/** The Backfill page's header buttons: equal and level, however long. */
+/** Equal-size header buttons regardless of label length. */
 export const HEADER_BUTTON =
   'h-full w-full !whitespace-normal !px-1.5 text-center !text-[13px] !leading-tight sm:!px-4 sm:!text-sm lg:w-auto';
-/** On a phone the names alone fit the row; the icons come back wider. */
+/** Header icons are hidden on phones so labels fit. */
 export const HEADER_ICON = 'hidden sm:block';

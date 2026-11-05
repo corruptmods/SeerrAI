@@ -1,17 +1,15 @@
 /**
- * Clears what one person's session leaves on a device that the next person
- * could see: search text typed into page filters (kept for the tab), the
- * service worker's copy of their home page rows, and their notifications and
- * app badge. Used both when someone signs out and when a session ends on its
- * own. Every part is best effort, and the whole is bounded in time so it can
- * never hold up getting to the sign-in page.
+ * Clears session data the next user on the device could see: tab-stored
+ * filter text, the service worker's Discover rows, notifications and the app
+ * badge. Used on sign-out and on session expiry. Best effort and time-bounded
+ * so it never delays reaching sign-in.
  */
 const forgetSession = async (): Promise<void> => {
   const work = async () => {
     try {
       sessionStorage.clear();
     } catch {
-      // Storage unavailable: nothing was kept.
+      // Storage unavailable: nothing stored.
     }
 
     try {

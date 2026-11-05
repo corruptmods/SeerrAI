@@ -4,8 +4,8 @@ import type { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 
 /**
- * Whether an optional feature is on: for everyone, or, given a user, for
- * them. Off everywhere wins over anyone's own choice.
+ * Whether a feature is on globally or, given a user, for them. Off globally
+ * wins.
  */
 export const featureEnabled = (feature: Feature, user?: User | null) =>
   featureOn(
@@ -14,7 +14,7 @@ export const featureEnabled = (feature: Feature, user?: User | null) =>
     user?.settings?.disabledFeatures
   );
 
-/** Only names this fork knows, each once, in a stable order. */
+/** Known feature names only, each once, in a stable order. */
 export const cleanFeatureList = (value: unknown): Feature[] | undefined =>
   Array.isArray(value)
     ? FEATURES.filter((feature) => value.includes(feature))

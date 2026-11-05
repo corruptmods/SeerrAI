@@ -3,12 +3,11 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 
 /**
- * Fills in `requestCount` for a set of users.
+ * Fills in `requestCount` for a set of users with one grouped query.
  *
- * This used to come from a `@RelationCount` decorator, which made TypeORM run
- * a parallel batch of count queries on a single connection — the source of
- * pg's "client is already executing a query" deprecation warning. One grouped
- * query does the same job without the warning, and without a query per user.
+ * Not `@RelationCount`: it runs parallel count queries on one connection
+ * (pg's "client is already executing a query" deprecation warning), one per
+ * user.
  */
 export const attachRequestCounts = async (users: User[]): Promise<void> => {
   if (!users.length) {
@@ -34,7 +33,7 @@ export const attachRequestCounts = async (users: User[]): Promise<void> => {
   }
 };
 
-/** Convenience for a single user. */
+/** Single-user form of attachRequestCounts. */
 export const attachRequestCount = async (user: User): Promise<void> =>
   attachRequestCounts([user]);
 

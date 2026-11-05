@@ -335,9 +335,8 @@ class DiscordAgent
         allowedRoleIds.push(settings.options.webhookRoleId);
       }
 
-      // Discord webhooks go to a channel, not per-user,
-      // so if use user locale is set, we'll use the locale of the user being notified
-      // if not, we'll use the default locale set in the notification settings
+      // Webhooks post to a channel, so pick the notified user's locale or the
+      // agent default.
       const locale = settings.options.useUserLocale
         ? (payload.notifyUser?.settings?.locale as AvailableLocale)
         : (settings.options.locale as AvailableLocale);

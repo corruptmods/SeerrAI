@@ -35,9 +35,8 @@ const stubTmdb = () => {
 };
 
 /**
- * Quota accounting counts *seasons* for series, not requests — asking for four
- * seasons uses four of the allowance. This is the behaviour the UI and the
- * request path both depend on, and it had no coverage.
+ * Quotas count seasons for series, not requests: requesting four seasons uses
+ * four of the allowance. The UI and the request path both depend on this.
  */
 describe('user request quotas', () => {
   setupTestDb();
@@ -168,7 +167,7 @@ describe('user request quotas', () => {
     assert.equal(quota.tv.used, 0);
   });
 
-  // Asked for while a pending request, so nothing is sent to Lidarr.
+  // Requested while pending, so nothing is sent to Lidarr.
   const addMusicRequest = async (albums: number) => {
     const media = await getRepository(Media).save(
       new Media({

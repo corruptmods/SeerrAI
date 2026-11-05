@@ -4,10 +4,9 @@ import { isCompletedPlay } from '@server/lib/watchHistory';
 export { isCompletedPlay };
 
 /**
- * Whether a movie counts as watched: any completed play after the title was
- * added to the list. Plays from before it was added are deliberately ignored
- * — adding something you watched years ago means you intend to watch it
- * again, so it should only clear once you actually do.
+ * Whether a movie counts as watched: any completed play after it was added to
+ * the list. Earlier plays are ignored on purpose: adding something watched
+ * years ago means you intend to rewatch it, so it clears only once you do.
  */
 export const hasWatchedMovie = (plays: Play[], addedAt: Date): boolean => {
   const cutoff = Math.floor(addedAt.getTime() / 1000);
@@ -18,12 +17,12 @@ export const hasWatchedMovie = (plays: Play[], addedAt: Date): boolean => {
 };
 
 /**
- * Whether a series counts as watched: every episode available in the library
- * has a completed play after the title was added.
+ * Whether a series counts as watched: every available episode has a completed
+ * play after the title was added.
  *
- * `available` is the set of episodes Seerr knows exist, as "season:episode".
- * A series with nothing available is never "watched" — otherwise a show that
- * has not aired yet would clear itself the moment it was added.
+ * `available` holds the episodes Seerr knows exist, as "season:episode". A
+ * series with nothing available is never watched, or an unaired show would
+ * clear itself the moment it was added.
  */
 export const hasWatchedSeries = (
   plays: Play[],
@@ -59,8 +58,8 @@ export const hasWatchedSeries = (
 };
 
 /**
- * A shared list only suggests removal once *everyone* on it has finished the
- * title — one person watching it does not mean the household is done with it.
+ * A shared list suggests removal only once *everyone* has finished the title:
+ * one viewer doesn't mean the household is done.
  */
 export const everyoneHasWatched = (perUser: boolean[]): boolean =>
   perUser.length > 0 && perUser.every(Boolean);

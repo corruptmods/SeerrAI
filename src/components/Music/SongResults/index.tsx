@@ -33,7 +33,7 @@ const messages = defineMessages('components.Music.SongResults', {
     'Not released on its own, so it can’t be requested by itself. Request its album instead.',
 });
 
-/** Versions shown before the rest are asked for. */
+/** Versions shown before "show more". */
 const SHOWN = 3;
 
 const Version = ({
@@ -54,7 +54,7 @@ const Version = ({
   const from = version.from
     ? intl.formatMessage(messages.from, { release: version.from.title })
     : undefined;
-  // A version with no name of its own is named by where it is from.
+  // An unnamed version is named by its release.
   const details = [
     version.version ? from : undefined,
     length,
@@ -179,11 +179,9 @@ const Song = ({
 };
 
 /**
- * Songs found for a search, once songs can be asked for one at a time:
- * each with its versions (the radio edit, the club mix…), and a Request on
- * each that is not already here or on its way. Asked for apart from the
- * artists and albums, which are not kept waiting for it; nothing found
- * shows nothing.
+ * Song search results with their versions (radio edit, club mix…), each
+ * requestable unless here or in progress. Fetched apart from artists and
+ * albums so they don't wait; renders nothing when empty.
  */
 const SongResults = ({ query }: { query: string }) => {
   const intl = useIntl();

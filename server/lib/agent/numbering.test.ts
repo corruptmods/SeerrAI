@@ -11,10 +11,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Which library episode a release is, for a made-up series numbered as a
- * real one was on a live server: TVDB numbering in the library, the
- * scene's (TheXEM) for searches and names, releases named either way, a
- * special counted as episode 1, and two episodes sharing a title.
+ * Which library episode a release is, for an invented series numbered like
+ * one seen on a live server: TVDB numbering in the library, scene (TheXEM)
+ * numbering for searches and names, releases named either way, a special
+ * counted as episode 1, and two episodes sharing a title.
  */
 
 const ep = (
@@ -128,7 +128,7 @@ describe('Release numbering', () => {
       )?.id,
       863
     );
-    // A title held in a longer one: the longer is it.
+    // A title contained in a longer one: the longer one wins.
     const trails = [
       ep(1, 0, 2, 'Long Trail', false),
       ep(2, 0, 3, 'Long Trail Revisited', false),

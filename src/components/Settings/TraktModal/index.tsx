@@ -8,8 +8,7 @@ import axios, { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
-// The form's words keep the ids they had in Settings → Services' own Trakt
-// form, so their translations still apply.
+// Message ids predate this modal, so existing translations still apply.
 const messages = defineMessages('components.Settings.SettingsTrakt', {
   addTrakt: 'Add Trakt',
   editTrakt: 'Edit Trakt',
@@ -33,9 +32,8 @@ interface TraktModalProps {
 }
 
 /**
- * Adding or replacing the Client ID of the admin's own Trakt app, as the
- * other services are added: Trakt is asked whether it takes it before it
- * is saved, and it is never shown again once it is.
+ * Adds or replaces the Client ID of the admin's own Trakt app: Trakt must
+ * accept it before it is saved, and it is never shown again after.
  */
 const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
   const intl = useIntl();

@@ -87,7 +87,7 @@ const messages = defineMessages('components.RequestModal.MusicRequestModal', {
 interface MusicRequestModalProps {
   /** The artist's MusicBrainz id. */
   artistMbid: string;
-  /** Opens with only this album ticked: from an album's page or card. */
+  /** Open with only this album ticked. */
   albumMbid?: string;
   editRequest?: NonFunctionProperties<MediaRequest>;
   onCancel?: () => void;
@@ -101,10 +101,8 @@ const errorMessage = (e: unknown): string | undefined =>
     : undefined;
 
 /**
- * Requesting music: the artist's releases in groups, with what the Lidarr
- * metadata profile lists ticked to begin with (or the one album asked from
- * its page), the albums left in the quota, and the advanced options. One
- * request, approved once, whether for an album or a whole discography.
+ * Music request dialog: one request covers one album or a whole discography.
+ * Starts with the Lidarr metadata profile's albums ticked, or just `albumMbid`.
  */
 const MusicRequestModal = ({
   artistMbid,
@@ -127,8 +125,7 @@ const MusicRequestModal = ({
         ? [albumMbid]
         : null
   );
-  // A request whose Lidarr was removed starts from the default server and
-  // that server's own settings, as a new request would.
+  // Server removed: start from the default server, like a new request.
   const kept = editRequest?.serverIssue ? undefined : editRequest;
   const [overrides, setOverrides] = useState<MusicOverrides>({
     server: kept?.serverId ?? undefined,
@@ -138,7 +135,7 @@ const MusicRequestModal = ({
     tags: kept?.tags ?? undefined,
     userId: editRequest?.requestedBy.id,
   });
-  // A failed request is changed by a request manager and then retried.
+  // A failed request is edited by a manager and then retried.
   const isFailed = editRequest?.status === MediaRequestStatus.FAILED;
   const advanced = hasPermission(
     [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
@@ -161,8 +158,7 @@ const MusicRequestModal = ({
         ? null
         : `/api/v1/music/artist/${artistMbid}/albums?page=${index + 1}`
   );
-  // The album asked for from its page, in case it is not among the first
-  // hundred of a long discography.
+  // Fetched separately: it may be past the first hundred albums.
   const { data: askedAlbum } = useSWR<MusicAlbumDetails>(
     albumMbid ? `/api/v1/music/album/${albumMbid}` : null
   );
@@ -188,7 +184,7 @@ const MusicRequestModal = ({
     onUpdating?.(isUpdating);
   }, [isUpdating, onUpdating]);
 
-  // The server's own choices fill in what the advanced options start at.
+  // Seed the advanced options from the server's defaults.
   useEffect(() => {
     if (!serverData) {
       return;
@@ -212,7 +208,7 @@ const MusicRequestModal = ({
     return listed.sort(byNewest);
   }, [pages, askedAlbum]);
 
-  // An artist Lidarr has lists what its own metadata profile allows.
+  // An artist already in Lidarr uses its own metadata profile.
   const kinds = serverData?.metadataProfiles.find(
     (profile) =>
       profile.id ===
@@ -226,7 +222,7 @@ const MusicRequestModal = ({
     !variousArtists &&
     (requestable(album.status) || !!inThisRequest?.includes(album.id));
 
-  // From an artist's page, what Lidarr would list for them starts ticked.
+  // Tick what the metadata profile allows, once.
   useEffect(() => {
     if (selected !== null || !pages) {
       return;
@@ -567,7 +563,7 @@ const MusicRequestModal = ({
         )}
         subTitle={artist?.name}
         onOk={() => updateRequest(manages)}
-        // A request for songs alone holds no albums, and is still saved.
+        // A songs-only request has no albums and is still valid.
         okDisabled={
           isUpdating || (!chosen.length && !editRequest.songs?.length)
         }

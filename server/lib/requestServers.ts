@@ -7,39 +7,37 @@ import type {
 import { getSettings } from '@server/lib/settings';
 
 /*
- * Which Radarr, Sonarr or Lidarr server a request goes to, and why it cannot
- * go anywhere when the server it was meant for has been removed from
- * Settings, Services. Nothing here looks at the database, so the request
- * entity can say it of itself when it is loaded.
+ * Which Radarr, Sonarr or Lidarr server a request goes to, and why it can't
+ * when its server was removed from Settings → Services. No database access,
+ * so the request entity can compute it on load.
  *
- * Having no server of a kind at all is not a problem: some servers run
- * without Radarr, Sonarr or Lidarr on purpose and fulfil those requests by
- * hand, so an approved request then stays approved, as it always has.
+ * Having no server of a kind is fine: some setups run without one on purpose
+ * and fulfil those requests by hand, so an approved request stays approved.
  */
 
 export type RequestService = 'radarr' | 'sonarr' | 'lidarr';
 
 export interface RequestServerIssue {
   /**
-   * - `removed`: the server chosen for it no longer exists.
-   * - `noDefault`: none was chosen, and none of its kind is the default.
-   * - `none`: a 4K request, with Radarr or Sonarr servers set up but no 4K
-   *   one. (With no server of its kind at all, there is no issue.)
+   * - `removed`: its chosen server no longer exists.
+   * - `noDefault`: none chosen, and no default of its kind.
+   * - `none`: a 4K request with Radarr or Sonarr servers but no 4K one. (No
+   *   server of its kind at all is no issue.)
    */
   reason: 'removed' | 'noDefault' | 'none';
   service: RequestService;
-  /** Retrying sends it to the default server of its kind instead. */
+  /** Retrying sends it to its kind's default server instead. */
   usesDefault: boolean;
 }
 
-/** What a request has to say which server it goes to. */
+/** The request fields that decide its server. */
 interface RoutedRequest {
   type: MediaType;
   serverId?: number | null;
   is4k?: boolean;
 }
 
-/** The servers of each kind, as the settings hold them. */
+/** Servers of each kind, from settings. */
 type Settings = Pick<AllSettings, 'radarr' | 'sonarr' | 'lidarr'>;
 
 const SERVICE_NAMES: Record<RequestService, string> = {
@@ -62,7 +60,7 @@ const serversFor = (
   settings: Settings
 ): (DVRSettings | LidarrSettings)[] => settings[service];
 
-/** Whether a server of this kind could take a 4K request or not. Lidarr has no 4K. */
+/** Whether a server matches the request's 4K tier. Lidarr has no 4K. */
 const sameTier = (
   service: RequestService,
   server: DVRSettings | LidarrSettings,
@@ -76,7 +74,7 @@ const chosenServer = (request: RoutedRequest) =>
     ? request.serverId
     : undefined;
 
-/** The default server a request of this kind (and 4K or not) goes to. */
+/** The default server for this kind of request (4K or not). */
 export const defaultServerFor = (
   request: RoutedRequest,
   settings: Settings = getSettings()
@@ -91,11 +89,10 @@ export const defaultServerFor = (
 };
 
 /**
- * Whether a server can be chosen for a request: why not, or nothing when it
- * can. It must be one of the request's kind and take its kind of request: a
- * 4K Radarr or Sonarr only 4K ones, and the others none, so choosing a
- * server never gets anyone round the 4K permissions. With no server of the
- * kind at all, the id means nothing and anything goes (see above).
+ * Why a server can't be chosen for a request, or nothing if it can. It must be
+ * the request's kind and tier: 4K Radarr/Sonarr only for 4K requests and the
+ * others never, so choosing a server can't bypass 4K permissions. With no
+ * server of the kind at all, the id is meaningless and anything goes.
  */
 export const chosenServerProblem = (
   request: RoutedRequest,
@@ -120,7 +117,7 @@ export const chosenServerProblem = (
   return request.is4k ? 'not4k' : 'only4k';
 };
 
-/** What the person choosing a server is told when it can't be chosen. */
+/** Messages shown when a chosen server is rejected. */
 export const CHOSEN_SERVER_MESSAGES: Record<
   NonNullable<ReturnType<typeof chosenServerProblem>>,
   string
@@ -131,8 +128,8 @@ export const CHOSEN_SERVER_MESSAGES: Record<
 };
 
 /**
- * The server chosen for a request, when it is one the request can go to:
- * of its kind, and 4K if the request is (see chosenServerProblem).
+ * The request's chosen server, when valid for it: its kind, and 4K if the
+ * request is (see chosenServerProblem).
  */
 export const chosenServerFor = (
   request: RoutedRequest,
@@ -149,11 +146,10 @@ export const chosenServerFor = (
 };
 
 /**
- * Why a request has no server to go to, or nothing when it has one: the one
- * chosen for it, else the default of its kind. As the request is sent:
- * either must match 4K, so a chosen server of the other kind counts as gone
- * (only a request made before that was checked can have one). Nothing
- * either when there is no server of its kind at all (see above).
+ * Why a request has no server, or nothing when it has one: the chosen one,
+ * else its kind's default. Either must match its 4K tier, as when sent, so a
+ * chosen server of the other tier counts as gone (only requests from before
+ * that check can have one). Nothing when there is no server of its kind.
  */
 export const requestServerIssue = (
   request: RoutedRequest,

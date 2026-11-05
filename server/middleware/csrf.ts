@@ -3,14 +3,14 @@ import { unlessApiKey } from '@server/middleware/auth';
 import type { RequestHandler } from 'express';
 
 /**
- * Settings → Network → CSRF Protection: every request that changes
- * something must carry the token the browser was given in the XSRF-TOKEN
- * cookie, so another site can't make a signed-in browser act for it.
+ * Settings → Network → CSRF Protection: every mutating request must carry the
+ * token from the XSRF-TOKEN cookie, so other sites can't make a signed-in
+ * browser act for them.
  *
- * Requests made with an API key are let through without one: they never
- * use the session cookie (checkUser refuses a wrong key rather than fall
- * back to it, and the session isn't even loaded for them), and another
- * site can't make a browser send an X-Api-Key header.
+ * API key requests skip it: they never use the session cookie (checkUser
+ * rejects a wrong key rather than falling back, and the session isn't even
+ * loaded for them), and other sites can't make a browser send an X-Api-Key
+ * header.
  */
 export const csrfProtection = (secure: boolean): RequestHandler[] => [
   unlessApiKey(

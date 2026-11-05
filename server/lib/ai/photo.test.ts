@@ -10,8 +10,8 @@ import { crc32, deflateSync } from 'node:zlib';
 import sharp from 'sharp';
 
 /*
- * A photo shrunk to what the model is paid to read, whatever size it came
- * in: the cost of a look stays about the same.
+ * Photos are shrunk to a fixed budget, so the cost stays about the same
+ * whatever size is sent.
  */
 
 const picture = async (
@@ -52,8 +52,8 @@ const picture = async (
 };
 
 /**
- * A white PNG at one bit a pixel, written by hand: a few kilobytes to send
- * however many pixels it says it has.
+ * A hand-written 1-bit white PNG: a few kilobytes however many pixels it
+ * claims.
  */
 const blankPng = (width: number, height: number) => {
   const chunk = (type: string, data: Buffer) => {
@@ -67,7 +67,7 @@ const blankPng = (width: number, height: number) => {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
-  header[8] = 1; // bits a pixel
+  header[8] = 1; // bit depth
   header[9] = 0; // greyscale
   const row = Buffer.alloc(1 + Math.ceil(width / 8), 0xff);
   row[0] = 0; // no filter
@@ -117,7 +117,7 @@ describe('a photo for the model', () => {
   });
 
   it('turns a phone photo the right way up, and drops what the camera wrote', async () => {
-    // Stored sideways, with the camera saying to turn it.
+    // Stored sideways, with an EXIF orientation to rotate it.
     const out = await preparePhoto(await picture(400, 300, { orientation: 6 }));
     const meta = await sizeOf(out.data);
     assert.deepEqual([meta.width, meta.height], [300, 400]);
@@ -125,8 +125,8 @@ describe('a photo for the model', () => {
   });
 
   it('refuses a picture too large to open, without opening it', async () => {
-    // 16000 × 16000: well under the 5 MB the app accepts, and 256 million
-    // pixels, which took a server many seconds to read and cut borders from.
+    // 16000 × 16000: well under the app's 5 MB limit, but 256 million
+    // pixels, which takes many seconds to decode and trim.
     const bomb = blankPng(16000, 16000);
     assert.ok(Buffer.from(bomb.data, 'base64').length < 100_000);
     const started = Date.now();

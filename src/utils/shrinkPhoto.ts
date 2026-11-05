@@ -1,20 +1,18 @@
 /*
- * A photo made small enough to send quickly: a JPEG no longer than this on
- * its longest side. A phone photo of several megabytes becomes a few hundred
- * kilobytes, and its location and camera details are left behind with the
- * original. The server shrinks it further, to what the model is paid to
- * read, so this only needs to keep it legible.
+ * Shrinks a photo to a JPEG capped on its longest side: a few hundred KB, with
+ * location and camera metadata stripped. The server shrinks it further for
+ * the model, so this only needs to stay legible.
  */
 
 const LONGEST_SIDE = 1600;
-/** Kept with the conversation so the photo shows beside what was asked. */
+/** Thumbnail kept in the conversation beside the question. */
 const THUMBNAIL_SIDE = 240;
 
 export interface ShrunkPhoto {
   type: 'image/jpeg';
-  /** The JPEG's bytes as base64, to send. */
+  /** JPEG bytes as base64. */
   data: string;
-  /** A small copy to show in the conversation, as a data URL. */
+  /** Thumbnail data URL for the conversation. */
   thumbnail: string;
 }
 
@@ -35,7 +33,7 @@ const load = (file: Blob): Promise<HTMLImageElement> =>
     image.src = url;
   });
 
-/** The picture drawn no larger than `side` on its longest edge, as JPEG. */
+/** The image as JPEG, at most `side` on its longest edge. */
 const draw = (image: HTMLImageElement, side: number, quality: number) => {
   const scale = Math.min(
     1,

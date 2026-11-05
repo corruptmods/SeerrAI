@@ -31,13 +31,13 @@ export enum Permission {
   REQUEST_MUSIC = 536870912,
   VIEW_BLOCKLIST = 1073741824,
   /**
-   * 2^31: past what a 32-bit `&` reads, so permissions are tested with
-   * arithmetic rather than bitwise operators, and stored as a bigint.
+   * 2^31: beyond a 32-bit `&`, so permissions are tested arithmetically, not
+   * bitwise, and stored as a bigint.
    */
   AUTO_APPROVE_MUSIC = 2147483648,
 }
 
-/** The single bits a permission value is made of. */
+/** The single bits making up a permission value. */
 const bitsOf = (value: number): number[] => {
   const bits: number[] = [];
   let rest = value;
@@ -51,10 +51,9 @@ const bitsOf = (value: number): number[] => {
 };
 
 /**
- * Whether a permission is set in a permission value; for a permission of
- * several bits, whether any of them is. Arithmetic, not `&`: JavaScript's
- * bitwise operators work on 32 bits, which loses 2^31 and above (and with
- * them Auto-Approve Music).
+ * Whether a permission (any of its bits, for a multi-bit one) is set in a
+ * value. Arithmetic, not `&`: JavaScript's bitwise operators are 32-bit and
+ * lose 2^31 and above (and with them Auto-Approve Music).
  */
 const holds = (value: number, permission: number): boolean =>
   bitsOf(permission).some((bit) => Math.floor(value / bit) % 2 === 1);
@@ -64,13 +63,10 @@ export interface PermissionCheckOptions {
 }
 
 /**
- * Takes a Permission and the users permission value and determines
- * if the user has access to the permission provided. If the user has
- * the admin permission, true will always be returned from this check!
+ * Whether a permission value grants the given permission(s). Admin always
+ * passes.
  *
- * @param permissions Single permission or array of permissions
- * @param value users current permission value
- * @param options Extra options to control permission check behavior (mainly for arrays)
+ * @param options 'and' (default) or 'or' for arrays
  */
 export const hasPermission = (
   permissions: Permission | Permission[],
@@ -79,7 +75,6 @@ export const hasPermission = (
 ): boolean => {
   let total = 0;
 
-  // If we are not checking any permissions, bail out and return true
   if (permissions === 0) {
     return true;
   }

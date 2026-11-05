@@ -23,46 +23,47 @@ import {
 import { bestRelease } from '@server/lib/music/songRelease';
 
 /*
- * An album's release, judged as Lidarr would import it: which of its files
- * is each track of the album, in which edition of it (Lidarr imports into
- * the tracks of one release), at what quality, and whether each fills a
- * missing track or would replace one Lidarr keeps. The plan's own rules
- * (the profile's order of qualities, then the custom format score) decide.
+ * Judges an album release as Lidarr would import it: which file is each
+ * track, in which edition (Lidarr imports into one release's tracks), at
+ * what quality, and whether each fills a missing track or would replace one
+ * Lidarr keeps. The plan's rules decide (profile quality order, then custom
+ * format score).
  */
 
 export interface AlbumContext {
   album: LidarrAlbum;
   artist: LidarrArtist;
-  /** The tracks of the release Lidarr monitors. */
+  /** Tracks of the monitored release. */
   tracks: AlbumTrack[];
   /** The album's files on disk. */
   files: AlbumTrackFile[];
   profile: SonarrQualityProfile;
-  /** What the album goes by in searches: "Artist Album", "Album". */
+  /** Search names for the album: "Artist Album", "Album". */
   names: string[];
   lidarr: BackfillLidarr;
-  /** Another edition's tracks, asked for once each. */
+  /** Another edition's tracks, fetched once per edition. */
   editionTracks: (releaseId: number) => Promise<AlbumTrack[]>;
 }
 
-/** Below this a file is a sample or a skit's stub, not a track. */
+/** Below this a file is a sample or stub, not a track. */
 const MIN_TRACK_BYTES = 200 * 1024;
 
-/** A box set's worth of files is the most read from one release. */
+/** Max files read from one release: a box set's worth. */
 const MAX_PACK_FILES = 400;
 
 /** Editions tried for a release with no files on disk yet. */
 const MAX_EDITIONS = 4;
 
-/** Lidarr's quality, in the shape the plan judges qualities in. */
+/** Lidarr's quality in the plan's shape. */
 export const asQuality = (model: LidarrQualityModel): SonarrQuality => ({
   quality: model.quality,
   revision: model.revision ?? { version: 1, real: 0 },
 });
 
 /**
- * A file's place by its name: "03 - Song.flac" is track 3, "1-03 Song.flac"
- * and "103 Song.flac" track 3 of disc 1. The disc only when the name says.
+ * A file's position from its name: "03 - Song.flac" is track 3; "1-03
+ * Song.flac" and "103 Song.flac" are disc 1 track 3. Disc only when the name
+ * gives one.
  */
 const fileNumber = (
   path: string
@@ -72,13 +73,12 @@ const fileNumber = (
   if (!match) return undefined;
   const n = Number(match[2]);
   if (match[1] !== undefined) return { disc: Number(match[1]), track: n };
-  // "103" is track 3 of disc 1.
   return n > 100 && n < 1000
     ? { disc: Math.floor(n / 100), track: n % 100 }
     : { track: n };
 };
 
-/** Each track's file in the release: by its title, else by its number. */
+/** Each track's file in the release: by title, else by number. */
 export const mapTracks = (
   audio: PackFile[],
   tracks: AlbumTrack[],
@@ -97,9 +97,9 @@ export const mapTracks = (
       used.add(file.index);
     }
   }
-  // Untitled files ("Track 03.flac"), or titles spelt otherwise: by number,
-  // when the release has one file for each track. On an edition of several
-  // discs, only a name that says its disc places it.
+  // Untitled ("Track 03.flac") or differently spelt files go by number, only
+  // when there is one file per track. On multi-disc editions the name must
+  // give the disc.
   if (audio.length === tracks.length) {
     const discs = new Set(tracks.map((t) => t.mediumNumber ?? 1)).size;
     for (const track of tracks) {
@@ -125,9 +125,9 @@ export const mapTracks = (
 };
 
 /**
- * The edition to import a release into. An album with files keeps its
- * edition: another would leave them behind. Otherwise the one whose tracks
- * the release's files are most of, the likeliest first.
+ * The edition to import into. An album with files keeps its edition, or
+ * they'd be left behind. Otherwise the edition the files cover most,
+ * likeliest first.
  */
 const chooseEdition = async (
   audio: PackFile[],
@@ -140,8 +140,8 @@ const chooseEdition = async (
       ? { releaseId: monitored.id, tracks: ctx.tracks }
       : undefined;
   }
-  // The likeliest editions: as many tracks as the release has files, the
-  // usual official ones first, Lidarr's own pick before others alike.
+  // Likeliest editions: track count equal to the file count, usual official
+  // ones first, Lidarr's pick before equal others.
   const ofSize = releases.filter((r) => r.trackCount === audio.length);
   const likely: LidarrRelease[] = [];
   const pool = ofSize.length ? ofSize : releases;
@@ -171,7 +171,7 @@ const chooseEdition = async (
   return best && { releaseId: best.releaseId, tracks: best.tracks };
 };
 
-/** A release's files, judged against the album, and what they add up to. */
+/** Judges a release's files against the album, with a summary. */
 export const judgeAlbumPack = async (
   files: PackFile[],
   packTitle: string,
@@ -194,8 +194,8 @@ export const judgeAlbumPack = async (
     if (file) trackOf.set(file.index, track);
   }
 
-  // The release's quality, from its name; a file's own, from its type,
-  // when the name says nothing ("Unknown").
+  // Quality from the release name; if it gives none ("Unknown"), from each
+  // file's type.
   const packQuality = pack.parsedAlbumInfo?.quality;
   const byType = new Map<string, LidarrQualityModel | undefined>();
   const qualityOf = async (path: string) => {
@@ -210,8 +210,8 @@ export const judgeAlbumPack = async (
     return byType.get(type) ?? packQuality;
   };
 
-  // What Lidarr has now, in the shapes the plan judges episodes in. An
-  // edition other than the one on disk has nothing of its own yet.
+  // Lidarr's current state as episode shapes for the plan. An edition other
+  // than the one on disk has no files yet.
   const sameEdition =
     edition &&
     edition.releaseId ===
@@ -273,8 +273,8 @@ export const judgeAlbumPack = async (
       continue;
     }
     const quality = await qualityOf(file.path);
-    plan.push({
-      ...decide(
+    plan.push(
+      decide(
         {
           ...base,
           episode: track.absoluteTrackNumber,
@@ -284,8 +284,8 @@ export const judgeAlbumPack = async (
         ctx.profile,
         episodes,
         onDisk
-      ),
-    });
+      )
+    );
   }
   const sorted = dedupe(plan, ctx.profile).sort(
     (a, b) =>

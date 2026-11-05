@@ -1,22 +1,19 @@
 import { isAxiosError } from 'axios';
 
 /*
- * Indexers limit how much they may be asked: so many searches, or so many
- * downloads of a .torrent or .nzb, a day. Once the limit is reached they
- * (or Prowlarr, for its own limits) answer 429 "Too Many Requests", or 503
- * with a Retry-After. That is not a failure: nothing is wrong with the
- * release, and asking again before the limit resets only spends another
- * request and keeps the limit reached. So every call Backfill and the admin
- * agent make to an indexer or Prowlarr goes through here: a limit is
- * remembered for that indexer, and nobody asks it again until it has had
- * time to reset.
+ * Indexers cap daily searches and .torrent/.nzb downloads. Past the cap they
+ * (or Prowlarr, for its own limits) answer 429, or 503 with Retry-After.
+ * That isn't a release failure, and asking again before the reset only
+ * spends another request. So every Backfill and admin agent call to an
+ * indexer or Prowlarr goes through here: a limit is remembered per indexer,
+ * and it isn't asked again until it has had time to reset.
  */
 
-/** Waits after each limit in a row, when the indexer does not say how long. */
+/** Backoff bounds for consecutive limits when the indexer gives no wait. */
 const FIRST_WAIT_MS = 15 * 60_000;
 const LONGEST_WAIT_MS = 6 * 60 * 60_000;
 
-/** How long to wait after the `strikes`th limit in a row: 15 min, 30, 1 h… 6 h. */
+/** Wait after the `strikes`th consecutive limit: 15 min, 30, 1 h… 6 h. */
 export const backoffMs = (strikes: number): number =>
   Math.min(FIRST_WAIT_MS * 2 ** Math.max(0, strikes - 1), LONGEST_WAIT_MS);
 
@@ -26,17 +23,16 @@ export interface IndexerRef {
   name: string;
 }
 
-/** What is asked of it: a search, or a release's .torrent or .nzb. */
+/** A search, or fetching a release's .torrent or .nzb. */
 export type IndexerUse = 'search' | 'download';
 
 /**
- * The longest wait a Retry-After is taken at: limits reset daily. Longer
- * would keep an indexer, or every search through Prowlarr, waiting for
- * good on one wrong answer.
+ * Cap on Retry-After, since limits reset daily. Longer would block an
+ * indexer, or every Prowlarr search, indefinitely on one bad answer.
  */
 const LONGEST_RETRY_AFTER_MS = 24 * 60 * 60_000;
 
-/** The time a Retry-After header gives, in seconds or as an HTTP date. */
+/** The time a Retry-After header gives (seconds or HTTP date), capped. */
 export const retryAfterOf = (
   header: unknown,
   now = Date.now()
@@ -53,9 +49,8 @@ export const retryAfterOf = (
 };
 
 /**
- * Whether an error is an indexer's limit being reached, and until when it
- * says to wait, if it says. Sonarr's and Radarr's own calls wrap what went
- * wrong as the cause, so that is looked into too.
+ * Whether an error is an indexer limit, with its Retry-After if given.
+ * Searches wrapped causes, as Sonarr and Radarr API wrappers use them.
  */
 export const limitOf = (
   e: unknown,
@@ -71,8 +66,7 @@ export const limitOf = (
         : headers?.['retry-after'];
     const until = retryAfterOf(header, now);
     if (status === 429) return { until };
-    // A 503 is a limit only when it says when to come back; without that
-    // it is the indexer (or a proxy in front of it) being down.
+    // A 503 without Retry-After is the indexer (or its proxy) being down.
     if (status === 503 && until !== undefined) return { until };
     return null;
   }
@@ -84,9 +78,9 @@ export const limitMessage = (name: string, use: IndexerUse): string =>
   `${name} has reached its ${use} limit`;
 
 /**
- * Asked of an indexer that has reached its limit and not yet reset.
- * `asked` is whether it was asked this time (and answered with its limit),
- * rather than left alone because it is still waiting.
+ * An indexer is at its limit and not yet reset. `asked` is true if it was
+ * asked this time and answered with the limit, false if skipped while
+ * waiting.
  */
 export class IndexerLimitReached extends Error {
   constructor(
@@ -105,7 +99,7 @@ interface Wait {
   name: string;
   use: IndexerUse;
   until: number;
-  /** Limits in a row, for the next wait to be longer. */
+  /** Consecutive limits, to lengthen the next wait. */
   strikes: number;
 }
 
@@ -113,14 +107,14 @@ class IndexerLimits {
   private waits = new Map<string, Wait>();
 
   /*
-   * By name: a release found through Sonarr's or Radarr's own search
-   * carries their number for the indexer, not Prowlarr's, but the same name.
+   * Keyed by name: releases from Sonarr's or Radarr's search carry their
+   * indexer id, not Prowlarr's, but the same name.
    */
   private key(ref: IndexerRef): string {
     return ref.name.trim().toLowerCase();
   }
 
-  /** The limit an indexer is waiting out, if it is still waiting. */
+  /** The limit an indexer is still waiting out, if any. */
   public waiting(
     ref: IndexerRef,
     now = Date.now()
@@ -137,8 +131,8 @@ class IndexerLimits {
   }
 
   /**
-   * Records an indexer's limit: until the time it gave, or else a little
-   * longer for each limit in a row. Answers what was recorded.
+   * Records a limit until the given time, else with growing backoff.
+   * Returns what was recorded.
    */
   public hit(
     ref: IndexerRef,
@@ -165,8 +159,8 @@ class IndexerLimits {
   }
 
   /**
-   * Takes back a wait remembered elsewhere (a job's, after Seerr restarted),
-   * unless a later one is known already.
+   * Restores a wait saved elsewhere (a job's, after a restart) unless a
+   * later one is known.
    */
   public restore(
     ref: IndexerRef,
@@ -179,14 +173,14 @@ class IndexerLimits {
     this.waits.set(this.key(ref), { name: ref.name, use, until, strikes });
   }
 
-  /** The indexer answered: its next limit starts the waits afresh. */
+  /** The indexer answered: its next limit restarts the backoff. */
   public clear(ref: IndexerRef): void {
     this.waits.delete(this.key(ref));
   }
 
   /**
-   * Asks an indexer something, unless it is waiting out a limit; a limit
-   * in the answer is recorded. Either way an IndexerLimitReached is thrown.
+   * Calls the indexer unless it is waiting out a limit; a limit in the
+   * answer is recorded. Either way throws IndexerLimitReached.
    */
   public async guard<T>(
     ref: IndexerRef,
@@ -212,12 +206,12 @@ class IndexerLimits {
   }
 }
 
-/** Every indexer's wait, shared by Backfill and the admin agent. */
+/** Indexer waits shared by Backfill and the admin agent. */
 export const indexerLimits = new IndexerLimits();
 
 /**
- * A limit in words, with how long until it may be asked again: "Prowlarr
- * has reached its search limit; it can be asked again in about 20 minutes".
+ * A limit in words with time until reset: "Prowlarr has reached its search
+ * limit; it can be asked again in about 20 minutes".
  */
 export const limitHint = (
   limit: IndexerLimitReached,
@@ -233,5 +227,5 @@ export const limitHint = (
   }`;
 };
 
-/** Prowlarr itself, for its searches across every indexer. */
+/** Prowlarr itself, for its searches across all indexers. */
 export const PROWLARR: IndexerRef = { name: 'Prowlarr' };

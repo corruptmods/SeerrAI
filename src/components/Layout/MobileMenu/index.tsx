@@ -64,7 +64,7 @@ interface MobileMenuProps {
 }
 
 interface MenuLink {
-  /** Its name in each person's own order (server/constants/navigation). */
+  /** Its id in each person's saved order (server/constants/navigation). */
   id: NavItem;
   href: string;
   svgIcon: JSX.Element;
@@ -92,7 +92,7 @@ const MobileMenu = ({
   const featureIsOn = useFeatureCheck();
   const router = useRouter();
   const { draft, setDraft, order, hidden } = useNavLayout();
-  // Discover loads it as customizing starts, and says so if it can't.
+  // Discover loads it when customizing starts and reports a failure.
   const NavEditor = useLazyModule(loadNavEditor, !!draft, () => undefined);
   const editing = !!draft;
   useClickOutside(ref, () => {
@@ -150,7 +150,7 @@ const MobileMenu = ({
       id: 'music',
       href: '/discover/music',
       content: intl.formatMessage(menuMessages.music),
-      // Only once Lidarr is set up, and for people with music on.
+      // Only once Lidarr is set up, for people with music on.
       feature: 'music',
       svgIcon: <MusicalNoteIcon className="h-6 w-6" />,
       svgIconSelected: <FilledMusicalNoteIcon className="h-6 w-6" />,
@@ -226,9 +226,8 @@ const MobileMenu = ({
     },
   ];
 
-  // The same order as the sidebar, and as the menu editor lists it: the
-  // person's own, or the usual one. Items they cannot use are left out
-  // whatever they chose.
+  // Same order as the sidebar and menu editor: the person's own, or the
+  // default. Items they cannot use are left out regardless.
   const usableLinks = sortByNavOrder(menuLinks, order).filter(
     (link) =>
       (!link.feature || featureIsOn(link.feature)) &&
@@ -238,13 +237,12 @@ const MobileMenu = ({
         }))
   );
   const filteredLinks = withoutHiddenNav(usableLinks, hidden);
-  // The first ones shown go on the bar, and the menu button is there when
-  // more are shown than fit on it.
+  // The first shown go on the bar; the menu button appears for the rest.
   const [barPart, menuPart] = splitAtNavBar(usableLinks, hidden);
   const barLinks = withoutHiddenNav(barPart, hidden);
   const hasMenu = menuPart.length > 0;
 
-  // Customizing ends (saved or not): the editor closes with it.
+  // Close the menu when customizing starts or ends.
   useEffect(() => {
     setIsOpen(false);
   }, [editing]);
@@ -265,7 +263,7 @@ const MobileMenu = ({
   ]);
 
   return (
-    // Above Discover's Save bar while the menu is being arranged.
+    // Above Discover's Save bar while arranging the menu.
     <div
       className={`fixed bottom-0 left-0 right-0 ${
         editing && isOpen ? 'z-[60]' : 'z-50'
@@ -355,7 +353,7 @@ const MobileMenu = ({
               <Link
                 key={`mobile-menu-link-${link.href}`}
                 href={link.href}
-                // Icons only on the bar, so the name is given here.
+                // The bar shows icons only.
                 aria-label={
                   typeof link.content === 'string' ? link.content : undefined
                 }

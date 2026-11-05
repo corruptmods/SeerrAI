@@ -11,10 +11,9 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * A Radarr, Sonarr or Lidarr that stops answering is asked for its queue
- * every few seconds all the same. Saying so as an error on every pass
- * filled the logs all day: it is said once, as a warning with the reason,
- * quietly while it stays down, and once more when it answers again.
+ * A Radarr, Sonarr or Lidarr that stops answering is still polled every few
+ * seconds. It is logged once as a warning with the reason, silent while
+ * down, and once more on recovery.
  */
 
 const server = (name: string, port: number) => ({
@@ -80,7 +79,7 @@ beforeEach(async () => {
       return logger;
     });
   }
-  // Each test starts with every server answering, whatever the last left.
+  // Each test starts with every server up.
   await downloadTracker.updateDownloads();
   logged = [];
 });

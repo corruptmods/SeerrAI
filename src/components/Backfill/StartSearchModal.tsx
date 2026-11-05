@@ -44,16 +44,16 @@ export interface LibraryTitle {
 interface LibraryOption extends LibraryTitle {
   serverName: string;
   year: number;
-  /** An album's artist. */
+  /** Album artist. */
   artist?: string;
 }
 
 interface StartSearchModalProps {
   show: boolean;
   onClose: () => void;
-  /** A title Backfill already follows. */
+  /** Id of a title Backfill already follows. */
   seriesId?: number;
-  /** A series or movie to start following (from a title page). */
+  /** A title to start following, from its page. */
   target?: LibraryTitle;
   /** Names Sonarr already knows, shown for reference. */
   knownNames?: string[];
@@ -80,7 +80,7 @@ const StartSearchModal = ({
   const { data: options } = useSWR<LibraryOption[]>(
     show && needsPick ? '/api/v1/backfill/library' : null
   );
-  // Albums are listed while Backfill does music.
+  // List albums only while Backfill handles music.
   const music = useMemo(
     () => (options ?? []).some((o) => o.kind === 'album'),
     [options]

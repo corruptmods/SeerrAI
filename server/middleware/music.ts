@@ -2,11 +2,8 @@ import { featureEnabled } from '@server/lib/features';
 import { musicReady } from '@server/lib/music/access';
 import type { NextFunction, Request, Response } from 'express';
 
-/*
- * The usual refusals for music: off (403) for anyone with the Music switch
- * off, for everyone or for themselves, and not found (404) before an admin
- * has added a default Lidarr.
- */
+// Standard music rejections: 403 when the Music switch is off (globally or for
+// the user), 404 before an admin adds a default Lidarr.
 
 export const MUSIC_OFF = { status: 403, message: 'Music is turned off.' };
 export const MUSIC_NOT_SET_UP = {
@@ -14,7 +11,7 @@ export const MUSIC_NOT_SET_UP = {
   message: 'Music is not set up.',
 };
 
-/** For the routes people browse music with. */
+/** For music browsing routes. */
 export const requireMusic = (
   req: Request,
   _res: Response,
@@ -30,9 +27,9 @@ export const requireMusic = (
 };
 
 /**
- * For music's settings (Lidarr, Settings → Music): there while music is on
- * for everyone, even before a Lidarr is added, since adding one is how it
- * starts. An admin who turned music off for themselves still manages it.
+ * For music settings (Lidarr, Settings → Music): available while music is on
+ * globally, even before a Lidarr is added, since adding one is how it starts.
+ * An admin who turned music off for themselves still manages it.
  */
 export const requireMusicSettings = (
   _req: Request,

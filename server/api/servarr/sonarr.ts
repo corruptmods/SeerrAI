@@ -229,7 +229,7 @@ class SonarrAPI extends ServarrBase<{
     try {
       const series = await this.getSeriesByTvdbId(options.tvdbid);
 
-      // If the series already exists, we will simply just update it
+      // Existing series: update it.
       if (series.id) {
         series.monitored = options.monitored ?? series.monitored;
         series.tags = options.tags
@@ -306,7 +306,7 @@ class SonarrAPI extends ServarrBase<{
             options.seasons,
             series.seasons.map((season) => ({
               seasonNumber: season.seasonNumber,
-              // We force all seasons to false if its the first request
+              // First request: start with every season unmonitored.
               monitored: false,
             }))
           ),
@@ -350,9 +350,9 @@ class SonarrAPI extends ServarrBase<{
   }
 
   /**
-   * Changes a series' root folder, quality profile or series type with
-   * Sonarr's series editor. A new root folder moves its files there; Sonarr
-   * does the move itself, in the background.
+   * Changes a series' root folder, quality profile or type via Sonarr's
+   * series editor. A new root folder moves the files; Sonarr does it in the
+   * background.
    */
   public async editSeries(
     seriesId: number,
@@ -418,9 +418,8 @@ class SonarrAPI extends ServarrBase<{
   }
 
   /**
-   * Searches for one season — Sonarr looks for a season pack first — and
-   * reports failure. One indexer query rather than one per episode, which is
-   * why a whole missing season is searched this way.
+   * Searches one season (Sonarr tries a season pack first) and throws on
+   * failure. One indexer query instead of one per episode.
    */
   public async searchSeason(
     seriesId: number,
@@ -429,10 +428,7 @@ class SonarrAPI extends ServarrBase<{
     await this.runCommand('SeasonSearch', { seriesId, seasonNumber });
   }
 
-  /**
-   * Monitored episodes airing in the range, each with its series, from
-   * Sonarr's calendar.
-   */
+  /** Monitored episodes airing in the range, with their series. */
   public async getCalendar(
     start: Date,
     end: Date
@@ -551,8 +547,8 @@ class SonarrAPI extends ServarrBase<{
       addImportExclusion = false,
     }: {
       /**
-       * Also stop the *arr's own import lists from adding it back. Used when
-       * a title is blocklisted; plain file removal leaves it off.
+       * Also stop the *arr's import lists re-adding it. Set when blocklisting;
+       * plain file removal leaves it off.
        */
       addImportExclusion?: boolean;
     } = {}

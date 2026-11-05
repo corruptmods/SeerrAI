@@ -27,7 +27,7 @@ describe('a change it made', () => {
     assert.equal(changeIcon({ type: 'request' }), 'request');
     assert.equal(changeIcon({ type: 'stop' }), 'stop');
     assert.equal(changeIcon({ type: 'relink' }), 'link');
-    // A delete was shown with a download arrow.
+    // A delete gets a bin, not a download arrow.
     assert.equal(
       changeIcon({ type: 'change', change: 'deleteFiles' }),
       'delete'

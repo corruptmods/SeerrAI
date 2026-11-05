@@ -77,7 +77,7 @@ beforeEach(() => {
 
 setupTestDb();
 
-/** A seeded user's id, by email. */
+/** A seeded user's id by email. */
 const userIdOf = async (email: string) =>
   (await getRepository(User).findOneByOrFail({ email })).id;
 

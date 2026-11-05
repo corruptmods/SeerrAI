@@ -14,9 +14,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Settings → Emby: the same settings pages and calls as Jellyfin's, for
- * Emby's own settings, against stand-ins that answer as the servers do,
- * behind the real OpenAPI validator.
+ * Settings → Emby: Jellyfin's pages and calls for Emby's own settings,
+ * against stand-in servers, behind the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -145,7 +144,7 @@ describe('Settings → Emby', () => {
     assert.equal(read.status, 200);
     assert.equal((await read.json()).port, embyPort);
 
-    // Whether Emby is connected is not changed from here.
+    // This route can't change whether Emby is connected.
     const disconnect = await api('/emby', {
       method: 'POST',
       body: JSON.stringify({ connected: false }),
@@ -198,7 +197,7 @@ describe('Settings → Emby', () => {
 
   it('lists the Emby people not yet imported', async () => {
     await getRepository(User).update(1, { embyUserId: EMBY_USER });
-    // The same id on Jellyfin is another server's account.
+    // The same id on Jellyfin belongs to another server.
     await getRepository(User).update(2, { jellyfinUserId: OTHER_USER });
 
     const res = await api('/emby/users');

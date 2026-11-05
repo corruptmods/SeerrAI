@@ -14,23 +14,21 @@ import type { MusicSongStatus } from '@server/models/Music';
 import { In, Not } from 'typeorm';
 
 /*
- * What a music request needs to know about the songs asked for: each
- * version's title, what names it, and the albums and singles it is on,
- * kept on the request so cards and notifications never ask MusicBrainz.
- * And whether each is already here or on its way: asked for already, or
- * on an album that is.
+ * Song details (title, credits, albums and singles) are stored on the
+ * request so cards and notifications don't query MusicBrainz. Also works out
+ * whether a song is already requested or on a requested album.
  */
 
-/** A song asked for that MusicBrainz does not credit to the artist. */
+/** Requested song that MusicBrainz doesn't credit to the artist. */
 export class NotTheArtistsSongError extends Error {}
 
-/** A song only on unofficial copies, or only a part of a DJ mix. */
+/** Song only on unofficial releases or only part of a DJ mix. */
 export class UnrequestableSongError extends Error {}
 
 /**
- * An album's status that means it, and every song on it, is coming. One
- * only partly here may not have the song (one taken from it has only that
- * song), unless the song came on it.
+ * Album statuses that cover every song on it. Partly available albums may
+ * lack the song (a song taken from it brings only that one), so they count
+ * only for a song that came on that album.
  */
 const COVERING = [
   MediaStatus.PENDING,
@@ -40,14 +38,14 @@ const COVERING = [
 const CAME_ON = [...COVERING, MediaStatus.PARTIALLY_AVAILABLE];
 
 /**
- * A song request's status that means the song is on its way. One done is
- * as here as the single it came on, which the albums below say.
+ * Song request statuses that cover the song. Completed ones are judged by
+ * the album or single they came on.
  */
 const ASKED = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];
 
 /**
- * The versions asked for, in the order asked. Each must credit the
- * artist, and be on at least one release that can be fetched.
+ * The requested versions, in order. Each must credit the artist and be on
+ * a fetchable release.
  */
 export const resolveRequestSongs = async (
   artistMbid: string,
@@ -80,20 +78,19 @@ export const resolveRequestSongs = async (
   return songs;
 };
 
-/** Why a song cannot be asked for: already asked for, or its album is. */
+/** Why a song can't be requested: it or its album already is. */
 export type SongCovered =
   | { by: 'request'; status: MediaRequestStatus }
   | { by: 'album'; albumMbid: string; albumTitle: string; status: MediaStatus };
 
-/** A song as covering needs it: its id and the albums it is on. */
 type CoverableSong = Pick<SongVersion, 'mbId'> & {
   releaseGroups: Pick<SongRelease, 'mbId' | 'title'>[];
 };
 
 /**
- * For each version, whatever already brings it: a request for it that is
- * not declined, or an album or single it is on that is here or on its way
- * (a single it was fetched through, too).
+ * What already covers each version: a non-declined request for it, or an
+ * album or single it's on (including one it was fetched through) that is
+ * available or on its way.
  */
 export const songsCovered = async (
   versions: CoverableSong[]
@@ -117,15 +114,15 @@ export const songsCovered = async (
   });
   for (const song of asked) {
     const known = covered.get(song.recordingMbid);
-    // One approved outranks one only waiting for approval.
+    // Approved outranks pending.
     if (!known || song.status === MediaRequestStatus.APPROVED) {
       covered.set(song.recordingMbid, { by: 'request', status: song.status });
     }
   }
 
-  // The singles and albums songs asked for before came on, as albums each
-  // is on: a track list does not say which singles hold its songs, and an
-  // album a song was taken from holds it even though partly here.
+  // Treat the single or album a completed song came on as one of its
+  // albums: track lists don't say which singles hold a song, and an album a
+  // song was taken from has it even when only partly available.
   const done = await getRepository(SongRequest).find({
     select: {
       id: true,
@@ -184,7 +181,7 @@ export const songsCovered = async (
     if (covered.has(version.mbId)) {
       continue;
     }
-    // The one furthest along; among those, the best known.
+    // Most advanced status; ties keep MusicBrainz's order.
     const on = groupsOf(version)
       .filter((group) =>
         (group.came ? CAME_ON : COVERING).includes(
@@ -202,7 +199,7 @@ export const songsCovered = async (
         by: 'album',
         albumMbid: on.mbId,
         albumTitle: on.title,
-        // Taken from an album only partly here: the song itself is here.
+        // Taken from a partly available album: the song itself is here.
         status:
           on.came && status === MediaStatus.PARTIALLY_AVAILABLE
             ? MediaStatus.AVAILABLE
@@ -211,8 +208,8 @@ export const songsCovered = async (
     }
   }
 
-  // An album asked for whole brings every song on it, though its row may
-  // still say partly here (a song of it was taken before).
+  // A requested album covers all its songs, even if its row says partly
+  // available from an earlier song fetch.
   const open = versions.filter((version) => !covered.has(version.mbId));
   const openGroups = [
     ...new Set(
@@ -229,7 +226,7 @@ export const songsCovered = async (
         status: In(ASKED),
         request: {
           type: MediaType.MUSIC,
-          status: In([MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED]),
+          status: In(ASKED),
         },
       },
       relations: { request: true },
@@ -256,15 +253,15 @@ export const songsCovered = async (
   return covered;
 };
 
-/** A request's status, as a song's status here. */
+/** Song status shown for each covering request status. */
 const REQUEST_STANDING: Partial<Record<MediaRequestStatus, MediaStatus>> = {
   [MediaRequestStatus.PENDING]: MediaStatus.PENDING,
   [MediaRequestStatus.APPROVED]: MediaStatus.PROCESSING,
 };
 
 /**
- * Where each version stands, as pages show it: its own request's status,
- * or the album bringing it, by recording id.
+ * Display status per recording id: from its own request, or the album that
+ * covers it.
  */
 export const songStandings = async (
   versions: CoverableSong[]

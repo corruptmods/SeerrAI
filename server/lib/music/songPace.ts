@@ -15,8 +15,7 @@ import { getSettings, soulseekOf } from '@server/lib/settings';
 import { In } from 'typeorm';
 
 /*
- * How fast songs move, for Settings → Music: each limit songs are held to,
- * beside how much of it is in use right now.
+ * Song pipeline limits and current usage, for Settings → Music.
  */
 
 const HOUR_MS = 60 * 60_000;
@@ -27,9 +26,9 @@ export interface SongPace {
   albums: {
     searching: number;
     waitingToSearchAgain: number;
-    /** When the next of those is looked for again. */
+    /** When the next waiting album is searched again. */
     nextSearchAt: string | null;
-    /** Hours waited after each search that found nothing, in turn. */
+    /** Hours waited after each empty search, in order. */
     searchAgainHours: number[];
     releasesOpened: number;
     packsRead: number;
@@ -55,7 +54,6 @@ export const songPace = async (now = new Date()): Promise<SongPace> => {
       where: { status: In(['searching', 'downloading', 'importing']) },
     }),
   ]);
-  // Found, but every download slot is taken.
   const waitingForSlot = fetches.filter((f) => f.stage === WAITING_FOR_SLOT);
   const searching = fetches.filter(
     (f) => f.status === 'searching' && f.stage !== WAITING_FOR_SLOT

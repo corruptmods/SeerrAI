@@ -30,8 +30,8 @@ import { beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 /*
- * Which media servers Seerr is connected to, and where each keeps its
- * settings and ids.
+ * Which media servers Seerr is connected to, and where each keeps its settings
+ * and ids.
  */
 
 const reset = () => {
@@ -42,7 +42,7 @@ const reset = () => {
   settings.plex.signIn = true;
   settings.jellyfin = { ...jellyfinDefaults() };
   settings.emby = { ...jellyfinDefaults() };
-  // Setting a server's settings keeps what is not given.
+  // Setting a server's settings keeps fields not given.
   delete settings.jellyfin.adminUserId;
   delete settings.emby.adminUserId;
 };
@@ -95,7 +95,7 @@ describe('which servers are connected', () => {
     settings.jellyfin.signIn = false;
     assert.equal(signInAllowed('jellyfin'), false);
 
-    // The old single switch only follows the servers' own.
+    // The legacy single switch only mirrors the per-server ones.
     settings.jellyfin.signIn = true;
     settings.main.mediaServerLogin = false;
     assert.equal(signInAllowed('jellyfin'), true, "the server's own switch");

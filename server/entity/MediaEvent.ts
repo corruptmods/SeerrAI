@@ -12,36 +12,36 @@ export enum MediaEventType {
   AVAILABLE = 'available',
   /** Seerr marked it gone from the library. */
   REMOVED = 'removed',
-  /** Files deleted through Radarr or Sonarr, from Seerr. */
+  /** Files deleted via Radarr or Sonarr, from Seerr. */
   FILES_REMOVED = 'files_removed',
   BLOCKLISTED = 'blocklisted',
   UNBLOCKLISTED = 'unblocklisted',
   /** Kept from a Maintainerr deletion. */
   KEPT = 'kept',
-  /** Radarr or Sonarr asked to search for what it was missing. */
+  /** Radarr or Sonarr told to search for what's missing. */
   SEARCHED = 'searched',
   /**
-   * Sonarr's episode monitoring could not be brought in line with the
-   * requests: it may download more than was asked for, or keep watching
-   * episodes nobody wants any more.
+   * Sonarr's episode monitoring couldn't be reconciled with the requests: it
+   * may download more than asked, or keep monitoring unwanted episodes.
    */
   MONITORING_FAILED = 'monitoring_failed',
-  /** The admin agent looked for what it was missing; the detail says how it went. */
+  /**
+   * The admin agent searched for what was missing; the detail has the outcome.
+   */
   AGENT = 'agent',
   /**
-   * No longer recorded. The first history backfill wrote these from a date
-   * that is not really when a title reached the library; a later migration
-   * removes them.
+   * Not recorded. The first history backfill wrote these with dates that aren't
+   * when titles reached the library; a migration removes them.
    */
   ADDED = 'added',
 }
 
 /**
- * One thing that happened to a title, for its history in the manage panel.
+ * One event in a title's history, for the manage panel.
  *
- * Keyed by title rather than by Media row, as MediaDeletion is: rows get
- * deleted, and a title's history has to outlive them. The user is stored as
- * an id without a foreign key for the same reason.
+ * Keyed by title, not Media row (like MediaDeletion): rows get deleted and
+ * history must outlive them. The user is stored as an id without a foreign key
+ * for the same reason.
  */
 @Entity()
 @Index(['mediaType', 'tmdbId'])
@@ -69,7 +69,7 @@ export class MediaEvent {
   @Column({ type: 'integer', nullable: true })
   public userId?: number | null;
 
-  /** A reason, or what else happened with it. */
+  /** A reason, or other details. */
   @Column({ type: 'varchar', nullable: true })
   public detail?: string | null;
 

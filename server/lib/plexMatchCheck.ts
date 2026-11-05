@@ -21,24 +21,23 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 /*
- * Match Check: which folders each connected media server (Plex, Jellyfin,
- * Emby) has matched to a different title than Sonarr or Radarr has in
- * them, or not matched at all. One report covers every server; each
- * problem says which server it is on.
+ * Match Check: folders each connected media server (Plex, Jellyfin, Emby) has
+ * matched to a different title than Sonarr or Radarr has there, or not matched
+ * at all. One report covers every server; each problem names its server.
  *
- * The media server matches by folder and file names, Sonarr and Radarr by
- * their own ids, and when the two disagree nothing says so: "Wrenna" (2026)
- * matched to "The Wrenna Diaries" made the wrong title available in Seerr,
- * left the right one without check marks, and showed the other show's
- * subtitles. Each item's folder is looked up in Sonarr or Radarr by its
- * name, and their ids compared. Report only: nothing is changed; the fix
- * is "Fix Match" in Plex, or "Identify" in Jellyfin and Emby.
+ * The server matches by folder and file names, the *arrs by their own ids,
+ * and nothing flags a disagreement: "Wrenna" (2026) matched to "The Wrenna
+ * Diaries" made the wrong title available in Seerr, left the right one
+ * unchecked, and showed the other show's subtitles. Each item's folder is
+ * looked up in Sonarr or Radarr by name and the ids compared. Report only:
+ * nothing is changed; the fix is "Fix Match" in Plex or "Identify" in
+ * Jellyfin and Emby.
  */
 
 export type MediaServerName = 'Plex' | 'Jellyfin' | 'Emby';
 
 export interface PlexMatchProblem {
-  /** Music only from the check of new requests (lib/matchWatch). */
+  /** Music comes only from the new-request check (lib/matchWatch). */
   kind: MatchKind;
   /** The folder both sides point at. */
   folder: string;
@@ -50,20 +49,21 @@ export interface PlexMatchProblem {
     tvdbId?: number;
     imdbId?: string;
     server: string;
-    /** Radarr's film, in minutes. */
+    /** Radarr's film runtime, in minutes. */
     runtime?: number;
-    /** The file's own length, in minutes (Radarr's reading, else the server's). */
+    /**
+     * The file's own length in minutes (Radarr's reading, else the server's).
+     */
     fileRuntime?: number;
-    /** The file's name in the folder, as Radarr has it. */
+    /** The file name in the folder, per Radarr. */
     file?: string;
     /** Music: the album's MusicBrainz release group, and its artist. */
     mbid?: string;
     artist?: string;
     artistMbid?: string;
   };
-  /** The media server it was checked on. */
   mediaServer: MediaServerName;
-  /** What the media server matched it to, and its id for the item. */
+  /** What the server matched it to, and the server's item id. */
   matched: {
     title: string;
     year?: number;
@@ -71,23 +71,22 @@ export interface PlexMatchProblem {
     tmdbId?: number;
     tvdbId?: number;
     imdbId?: string;
-    /** How long the server says it runs, in minutes. */
+    /** Server-reported runtime, in minutes. */
     duration?: number;
-    /** Music: the server's MusicBrainz id for the album, and its artist. */
+    /** Music: the server's MusicBrainz album id, and its artist. */
     mbid?: string;
     artist?: string;
   };
   /**
-   * - other: matched to another title (whatever its name: two films can
-   *   share a name and a year).
-   * - differentId: the same title by another id (IMDb), but the media
-   *   server and Sonarr or Radarr use different TMDB or TVDB entries for
-   *   it, so Seerr marks the server's entry available and not the one that
-   *   was requested.
+   * - other: matched to another title (whatever its name: two films can share
+   *   a name and year).
+   * - differentId: same title by another id (IMDb), but the server and the *arr
+   *   use different TMDB or TVDB entries, so Seerr marks the server's entry
+   *   available instead of the requested one.
    * - unmatched: not matched to anything.
    */
   reason: 'other' | 'differentId' | 'unmatched';
-  /** Fixed in Plex by Seerr AI on its own: what it is matched to now. */
+  /** Auto-fixed in Plex by Seerr AI: what it is matched to now. */
   fixed?: { title: string; year?: number };
 }
 
@@ -96,7 +95,7 @@ export interface PlexMatchReport {
   running: boolean;
   /** Items whose folder Sonarr or Radarr has. */
   checked: number;
-  /** Items that could not be compared: no folder, or no shared id. */
+  /** Items that couldn't be compared: no folder, or no shared id. */
   notChecked: number;
   problems: PlexMatchProblem[];
   error?: string;
@@ -107,9 +106,9 @@ export const REPORT_PATH = process.env.CONFIG_DIRECTORY
   : path.join(__dirname, '../../config/plex-match-check.json');
 
 /**
- * The same problem, whoever found it: the server, the title Radarr, Sonarr
- * or Lidarr has, and what the server matched it to (its ids, not its own
- * item id, which a rescan changes).
+ * Identity of a problem regardless of who found it: server, the *arr's title,
+ * and the matched title's ids (not the server's item id, which a rescan
+ * changes).
  */
 export const problemKey = (p: PlexMatchProblem): string => {
   const e = p.expected;
@@ -136,23 +135,23 @@ export const problemKey = (p: PlexMatchProblem): string => {
   return [p.mediaServer ?? 'Plex', p.kind, title, to].join('|');
 };
 
-/** Items read from the media server at a time. */
+/** Items fetched from the media server per page. */
 const PAGE_SIZE = 200;
 
-/** The last part of a path, whichever way its slashes lean. */
+/** The last path segment, with either slash style. */
 export const folderName = (full: string): string =>
   full
     .replace(/[\\/]+$/, '')
     .split(/[\\/]/)
     .pop() ?? '';
 
-/** The folder a movie's file sits in. */
+/** The folder a movie file is in. */
 const parentFolder = (file: string): string => {
   const parts = file.split(/[\\/]/);
   return parts.length > 1 ? (parts[parts.length - 2] ?? '') : '';
 };
 
-/** Folders are looked up whatever their case. */
+/** Case-insensitive folder key. */
 const key = (folder: string) => folder.toLowerCase();
 
 interface Ids {
@@ -161,7 +160,7 @@ interface Ids {
   imdbId?: string;
 }
 
-/** The ids Plex gives an item, by its new agents or the legacy ones. */
+/** An item's ids from Plex's new or legacy agents. */
 export const plexIds = (item: PlexLibraryItem): Ids => {
   const ids: Ids = {};
   const refs = [...(item.Guid ?? []).map((g) => g.id), item.guid ?? ''];
@@ -176,11 +175,11 @@ export const plexIds = (item: PlexLibraryItem): Ids => {
   return ids;
 };
 
-/** The ids Jellyfin or Emby gives an item. */
+/** An item's ids from Jellyfin or Emby. */
 export const jellyfinIds = (item: JellyfinUserItem): Ids => {
   const ids: Ids = {};
   const providers = (item.ProviderIds ?? {}) as Record<string, string>;
-  // Keys differ in case between servers and versions: "Tmdb", "TMDB".
+  // Key case varies by server and version: "Tmdb", "TMDB".
   const read = (name: string) =>
     Object.entries(providers).find(
       ([key, value]) => key.toLowerCase() === name && !!value
@@ -195,9 +194,9 @@ export const jellyfinIds = (item: JellyfinUserItem): Ids => {
 };
 
 /**
- * Whether the server's ids say the same title as Sonarr's or Radarr's: by the
- * id each side names first (TVDB for series, TMDB for movies), then the
- * others. Undefined when they share no id to compare.
+ * Whether the server's ids name the *arr's title: by each side's primary id
+ * (TVDB for series, TMDB for movies), then the others. Undefined when no id
+ * is shared.
  */
 export const sameTitle = (
   kind: 'movie' | 'series',
@@ -229,24 +228,22 @@ export interface Expected extends Ids {
   file?: string;
 }
 
-/** One item on the media server, as the check needs it. */
+/** One media server item, as the check needs it. */
 export interface MatchItem {
   title: string;
   year?: number;
   /** The server's id for it. */
   key: string;
-  /** The folders it is in: a series' own, a movie's file's. */
+  /** Its folders: a series' own, or a movie file's. */
   folders: string[];
   ids: Ids;
-  /** How long it runs, in minutes, when the server says. */
+  /** Runtime in minutes, if the server gives one. */
   duration?: number;
 }
 
-/** Minutes from milliseconds. */
 const msToMinutes = (ms?: number): number | undefined =>
   ms && ms > 0 ? Math.round(ms / 60_000) : undefined;
 
-/** A Plex item, for the check. */
 export const plexMatchItem = (
   kind: 'movie' | 'series',
   item: PlexLibraryItem
@@ -265,7 +262,6 @@ export const plexMatchItem = (
     kind === 'movie' ? msToMinutes(item.Media?.[0]?.duration) : undefined,
 });
 
-/** A Jellyfin or Emby item, for the check. */
 export const jellyfinMatchItem = (
   kind: 'movie' | 'series',
   item: JellyfinUserItem
@@ -277,7 +273,7 @@ export const jellyfinMatchItem = (
     ? [kind === 'series' ? folderName(item.Path) : parentFolder(item.Path)]
     : [],
   ids: jellyfinIds(item),
-  // Ticks are a ten-millionth of a second.
+  // Ticks are 100 ns.
   duration:
     kind === 'movie' && item.RunTimeTicks
       ? msToMinutes(item.RunTimeTicks / 10_000)
@@ -285,8 +281,8 @@ export const jellyfinMatchItem = (
 });
 
 /**
- * What Radarr knows that tells whose mistake a wrong match is: the film's
- * length, the file's own, and the file's name.
+ * Radarr facts that show whose mistake a wrong match is: the film's runtime,
+ * the file's, and the file name.
  */
 export const radarrFileFacts = (
   movie: Pick<RadarrMovie, 'runtime' | 'movieFile'>
@@ -319,8 +315,7 @@ export const compareMatch = (
     ...ids,
     ...(item.duration ? { duration: item.duration } : {}),
   };
-  // The server measured the same file: its length stands in for Radarr's
-  // reading of it when Radarr has none.
+  // The server measured the same file: use its length when Radarr has none.
   const withFile = (e: Expected): Expected =>
     kind === 'movie' && !e.fileRuntime && item.duration
       ? { ...e, fileRuntime: item.duration }
@@ -374,9 +369,8 @@ class PlexMatchCheck {
   ) => Promise<void> | void;
 
   /**
-   * What to do when a full run is kept: the check of new requests clears
-   * what it found that this run found right. `unread` names the servers
-   * that could not be read this run.
+   * Callback after a full run is saved: the new-request check resolves what it
+   * found that this run found right. `unread` lists servers not read this run.
    */
   public whenFinished(
     run: (
@@ -395,7 +389,7 @@ class PlexMatchCheck {
     this.cancelled = true;
   }
 
-  /** Takes problems put right (a fix) off the last report, and keeps it. */
+  /** Removes fixed problems from the last report and saves it. */
   public async forget(keys: string[]): Promise<void> {
     const report = await this.lastReport();
     const gone = new Set(keys);
@@ -412,15 +406,15 @@ class PlexMatchCheck {
       );
   }
 
-  /** The last report, from memory or from the file it was kept in. */
+  /** The last report, from memory or its saved file. */
   public async lastReport(): Promise<PlexMatchReport> {
     if (!this.report) {
       try {
         const kept = JSON.parse(
           await fs.readFile(REPORT_PATH, 'utf-8')
         ) as PlexMatchReport;
-        // Reports kept before Jellyfin and Emby were checked name Plex's
-        // side "plex", with its id as "ratingKey".
+        // Reports saved before Jellyfin and Emby support call Plex's side
+        // "plex", with its id as "ratingKey".
         kept.problems = (kept.problems ?? []).map((p) => {
           const old = p as PlexMatchProblem & {
             plex?: Omit<PlexMatchProblem['matched'], 'key'> & {
@@ -450,11 +444,10 @@ class PlexMatchCheck {
   }
 
   /**
-   * The problems the last report found for one title: one per server at
-   * most, as each server matches it on its own. `keys` are the title's ids,
-   * each with the server it is on; `key` alone is a Plex rating key, as
-   * Emby's ids and Plex's look alike and would find another title's
-   * problem on the other server.
+   * The last report's problems for one title, at most one per server since
+   * each matches independently. `keys` are the title's ids per server; `key`
+   * alone is a Plex rating key, since Emby and Plex ids look alike and would
+   * find another title's problem on the other server.
    */
   public async problemFor(
     kind: MatchKind,
@@ -469,10 +462,10 @@ class PlexMatchCheck {
     return report.problems.filter(
       (p) =>
         p.kind === kind &&
-        // The title Sonarr or Radarr has, which the server matched wrongly...
+        // The *arr's title, which the server matched wrongly...
         ((ids.tmdbId && p.expected.tmdbId === ids.tmdbId) ||
           (ids.tvdbId && p.expected.tvdbId === ids.tvdbId) ||
-          // ...or the title it matched it to, wrongly shown as available.
+          // ...or the title it was matched to, wrongly shown as available.
           (ids.key &&
             p.matched.key === ids.key &&
             (p.mediaServer ?? 'Plex') === 'Plex') ||
@@ -484,8 +477,7 @@ class PlexMatchCheck {
   }
 
   /**
-   * Forgets what the last report found on a server Seerr is no longer
-   * connected to; the rest of the report stays.
+   * Drops the last report's findings for a disconnected server; the rest stays.
    */
   public async dropServer(mediaServer: MediaServerName): Promise<void> {
     const report = await this.lastReport();
@@ -637,8 +629,7 @@ class PlexMatchCheck {
       notChecked: 0,
       problems: [],
     };
-    // Servers whose findings this run can't speak for: not read, or not
-    // reached at all.
+    // Servers this run can't speak for: not read, or not reached.
     let unread: MediaServerName[] = connectedServers().map(
       (server) => serverName(server) as MediaServerName
     );
@@ -648,8 +639,8 @@ class PlexMatchCheck {
         throw new Error('No media server is set up.');
       }
       const { series, movies } = await this.expectedFolders();
-      // Every connected server, each on its own: one that cannot be read
-      // leaves the others' findings, and the report says which it was.
+      // Each connected server separately: one unreadable server leaves the
+      // others' findings, and the report names it.
       const failed: { server: MediaServerName; message: string }[] = [];
       for (const server of servers) {
         if (this.cancelled) break;
@@ -670,8 +661,8 @@ class PlexMatchCheck {
           });
         }
       }
-      // A server removed while the check ran has had its findings dropped
-      // (dropServer); this report must not bring them back.
+      // A server removed mid-run already had its findings dropped (dropServer);
+      // this report must not restore them.
       const stillConnected = connectedServers().map(serverName);
       report.problems = report.problems.filter((p) =>
         stillConnected.includes(p.mediaServer ?? 'Plex')
@@ -704,9 +695,9 @@ class PlexMatchCheck {
     } finally {
       this.running = false;
 
-      // A cancelled run only got part of the way through the libraries, so
-      // its counts and problems would read as a whole check that found less.
-      // The last full report stays instead.
+      // A cancelled run covered only part of the libraries, so its counts and
+      // problems would look like a full check that found less. Keep the last
+      // full report instead.
       if (this.cancelled) {
         logger.info('Match Check cancelled; the last report is kept', {
           label: 'Match Check',

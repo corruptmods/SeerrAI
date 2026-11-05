@@ -59,7 +59,7 @@ class GotifyAgent
     const intl = getIntl(settings.options.locale);
     const { applicationUrl, applicationTitle } = getSettings().main;
     const embedPoster = settings.embedPoster;
-    // The old settings page could save text here, which was kept as nothing.
+    // Older settings may have no saved priority.
     const priority = settings.options.priority ?? GOTIFY_DEFAULT_PRIORITY;
 
     const event = eventText(payload, intl);

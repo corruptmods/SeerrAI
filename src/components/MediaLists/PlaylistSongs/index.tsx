@@ -77,7 +77,7 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   progressImporting: 'Importing from “{release}”',
 });
 
-/** The badge a song on its way shows instead of Requested. */
+/** The badge an in-progress song shows instead of Requested. */
 const STEP_LABEL = {
   single: 'stepSearching',
   preparing: 'stepSearching',
@@ -119,9 +119,8 @@ const SERVICE_NAMES: Record<string, string> = {
 };
 
 /**
- * A playlist's songs, each with where its request is, and its link to
- * Spotify or Apple Music. Songs MusicBrainz doesn't know are set apart at
- * the end: they can't be requested until it does.
+ * A playlist's songs with request status and Spotify or Apple Music links.
+ * Songs unknown to MusicBrainz go last: they can't be requested yet.
  */
 const PlaylistSongs = ({
   playlist,
@@ -138,7 +137,7 @@ const PlaylistSongs = ({
   const count = (states: PlaylistSongShown[]) =>
     playlist.songs.filter((s) => states.includes(s.state)).length;
 
-  /** Where a song on its way is, in words. */
+  /** An in-progress song's step, in words. */
   const progressText = (progress: SongProgress): string => {
     const release = progress.release;
     switch (progress.step) {
@@ -243,7 +242,7 @@ const PlaylistSongs = ({
               </a>
             </Tooltip>
           )}
-          {/* Why, in words: a tooltip can't be read on a phone. */}
+          {/* Shown inline: tooltips don't work on a phone. */}
           {(song.state === 'failed' || song.state === 'notGot') && tip && (
             <div className="mt-0.5 break-words text-xs text-red-300 light:text-danger-text">
               {tip}
@@ -300,7 +299,7 @@ const PlaylistSongs = ({
     );
   };
 
-  // The songs on their way, by step: their share of the bar, and its key.
+  // In-progress songs by step: each step's share of the bar, and its key.
   const way = [
     {
       key: 'downloading',

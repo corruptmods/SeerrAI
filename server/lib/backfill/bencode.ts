@@ -1,15 +1,14 @@
 import { createHash } from 'node:crypto';
 
 /*
- * Just enough of BitTorrent's bencoding to read a .torrent file: its files,
- * their sizes, and its info hash (the SHA-1 of the raw "info" dictionary),
- * which is the torrent's id in qBittorrent.
+ * Minimal bencode reader for .torrent files: files, sizes, and the info hash
+ * (SHA-1 of the raw "info" dictionary, qBittorrent's torrent id).
  */
 
 export interface TorrentFile {
-  /** Position in the torrent, which is qBittorrent's file index. */
+  /** Position in the torrent; qBittorrent's file index. */
   index: number;
-  /** Path inside the torrent, with "/" between parts. */
+  /** Path inside the torrent, "/"-separated. */
   path: string;
   size: number;
 }
@@ -113,12 +112,11 @@ export const parseTorrent = (data: Buffer): TorrentMeta => {
           ? file['path.utf-8']
           : file.path) as Value[]
       ).map(text);
-      // Padding (BEP 47) is no file to qBittorrent, which leaves it out of
-      // its numbering.
+      // qBittorrent leaves BEP 47 padding files out of its numbering.
       if (text(file.attr).includes('p') || parts[0] === '.pad') continue;
       files.push({
         index: files.length,
-        // qBittorrent names files with the torrent's folder in front.
+        // qBittorrent prefixes paths with the torrent's folder.
         path: [name, ...parts].join('/'),
         size: Number(file.length) || 0,
       });

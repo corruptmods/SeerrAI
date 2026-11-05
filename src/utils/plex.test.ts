@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import PlexOAuth, { PlexSignInError, plexSignInProblemOf } from './plex';
 
 /*
- * Signing in with Plex when the browser won't open the Plex window: the
- * page must go to Plex in the same tab, or say why it can't, and never
- * just stop. The browser is stood in for by the parts this touches.
+ * Plex sign-in without a popup: the page must go to Plex in the same tab or
+ * say why not, never just stop. Browser APIs are faked.
  */
 
 const PAGE = 'https://seerr.example/login?redirect=%2Fmovie%2F12';
@@ -90,7 +89,7 @@ describe('signing in with Plex when the window is blocked', () => {
       params.get('forwardUrl'),
       'https://seerr.example/login?redirect=%2Fmovie%2F12&plexPin=4242'
     );
-    // The PIN waits in this tab, for the return.
+    // The PIN is stored in this tab for the return.
     const kept = JSON.parse(fake.storage.get('seerr-plex-sign-in') ?? '{}');
     assert.equal(kept.id, 4242);
     assert.equal(kept.code, 'abc123');
@@ -183,7 +182,7 @@ describe('finishing a same-tab sign-in', () => {
       await problemOf(new PlexOAuth().finishSameTab('client-1', pending)),
       'notSignedIn'
     );
-    // A few looks, not a long wait.
+    // A few retries, not a long wait.
     assert.equal(get.mock.callCount(), 3);
   });
 

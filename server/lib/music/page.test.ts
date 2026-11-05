@@ -2,10 +2,6 @@ import { MOST_PAGES, pageOf } from '@server/lib/music/page';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * The page a music list is asked for, as a page that can be read.
- */
-
 describe('the page asked for', () => {
   it('is a whole number from 1', () => {
     assert.equal(pageOf('3'), 3);

@@ -15,8 +15,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Settings → AI. The API key is write-only: once saved it is never sent back
- * to a browser, and leaving the field empty keeps the saved one.
+ * Settings → AI. The API key is write-only: never sent back to a browser;
+ * an empty field keeps the saved one.
  */
 const aiSettingsRoutes = Router();
 
@@ -47,7 +47,7 @@ const body = z.object({
   dailyLimit: z.number().int().min(0).max(10_000),
 });
 
-/** What the browser sees: everything but the key. */
+/** Settings as the browser sees them: all but the key. */
 const visible = (ai: AiSettings) => ({
   ...ai,
   apiKey: '',
@@ -55,9 +55,8 @@ const visible = (ai: AiSettings) => ({
 });
 
 /**
- * The settings as they would be saved. The saved key is only reused for the
- * same provider at the same address: switching either needs the key typed
- * again, so a key is never sent somewhere it was not meant for.
+ * The settings to save. The saved key is reused only for the same provider
+ * and address, so a key is never sent somewhere it wasn't meant for.
  */
 const candidate = (input: z.infer<typeof body>): AiSettings => {
   const saved = getSettings().ai;
@@ -77,13 +76,13 @@ const candidate = (input: z.infer<typeof body>): AiSettings => {
   };
 };
 
-/** Claude and OpenAI itself need a key; a server at home may not. */
+/** Anthropic and OpenAI itself need a key; a self-hosted server may not. */
 const missingKey = (ai: AiSettings) =>
   !ai.apiKey && (ai.provider === 'anthropic' || !ai.baseUrl)
     ? 'Enter the API key for this provider.'
     : undefined;
 
-/** A tiny request: working means an answer came back, not just no error. */
+/** Sends a tiny request; success needs an answer, not just no error. */
 const testConnection = async (ai: AiSettings, model = ai.model) => {
   const answer = await complete(ai, {
     model,
@@ -114,8 +113,8 @@ aiSettingsRoutes.post('/', async (req, res, next) => {
   const next_ = candidate(parsed.data);
   const saved = settings.ai;
 
-  // Checked with a tiny request before it is turned on or the connection
-  // changes, so a typo cannot leave every AI button failing.
+  // Test before enabling or changing the connection, so a typo can't break
+  // every AI button.
   const connectionChanged =
     next_.provider !== saved.provider ||
     next_.apiKey !== saved.apiKey ||
@@ -130,8 +129,8 @@ aiSettingsRoutes.post('/', async (req, res, next) => {
     if (noKey) {
       return next({ status: 400, message: noKey });
     }
-    // The main model when the connection changes, and any feature's own
-    // model that is new or changed.
+    // Test the main model if the connection changed, plus any new or changed
+    // feature model.
     const toTest = new Set<string>(connectionChanged ? [next_.model] : []);
     for (const [feature, model] of Object.entries(next_.featureModels)) {
       if (
@@ -151,8 +150,8 @@ aiSettingsRoutes.post('/', async (req, res, next) => {
     }
   }
 
-  // The balance, admin key and credit state belong to one account: another
-  // provider, or another server, starts again.
+  // Balance, admin key and credit state belong to one account: reset them
+  // for another provider or server.
   if (billedBy(next_) !== billedBy(saved)) {
     settings.aiCredit = {
       ...settings.aiCredit,
@@ -165,7 +164,7 @@ aiSettingsRoutes.post('/', async (req, res, next) => {
   }
   settings.ai = next_;
   await settings.save();
-  // Answers from a different model or provider are not reused.
+  // Don't reuse answers from another model or provider.
   clearAiCache();
   logger.info('AI settings saved', {
     label: 'AI',
@@ -176,7 +175,7 @@ aiSettingsRoutes.post('/', async (req, res, next) => {
   return res.status(200).json(visible(next_));
 });
 
-/** A tiny request to the model: whether the key and model work. */
+/** Tests the key and model with a tiny request. */
 aiSettingsRoutes.post('/test', async (req, res, next) => {
   const parsed = body.safeParse(req.body);
   if (!parsed.success) {
@@ -207,7 +206,7 @@ aiSettingsRoutes.post('/test', async (req, res, next) => {
   }
 });
 
-/** The models this key can use, for the model picker. */
+/** Models this key can use, for the model picker. */
 aiSettingsRoutes.post('/models', async (req, res, next) => {
   const parsed = body.safeParse(req.body);
   if (!parsed.success) {
@@ -231,7 +230,7 @@ const creditBody = z.object({
   /** Empty keeps the saved one. */
   adminKey: z.string().trim().max(500).optional(),
   removeAdminKey: z.boolean().optional(),
-  /** US dollars on the account now; null forgets the balance. */
+  /** Current balance in US dollars; null clears it. */
   balance: z.number().min(0).max(1_000_000).nullable().optional(),
   /** US dollars per million tokens, by model. */
   prices: z
@@ -248,7 +247,7 @@ const creditBody = z.object({
     .optional(),
 });
 
-/** What the AI account has spent and has left. */
+/** The AI account's spend and remaining credit. */
 aiSettingsRoutes.get('/credit', async (_req, res, next) => {
   try {
     return res.status(200).json(await creditReport());
@@ -279,7 +278,7 @@ aiSettingsRoutes.post('/credit', async (req, res, next) => {
   if (input.removeAdminKey) {
     credit.adminKey = '';
   } else if (input.adminKey) {
-    // Saved only once it has read the account's spending.
+    // Saved only once it can read the account's spending.
     try {
       await providerSpend(provider, input.adminKey, new Date());
     } catch (e) {

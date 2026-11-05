@@ -386,7 +386,7 @@ const SettingsServices = () => {
         )}
       </div>
       <SettingsLidarr />
-      {/* Every service, one after another, before the rules that use them. */}
+      {/* All services first, then the rules that use them. */}
       <SettingsMaintainerr />
       <SettingsProwlarr />
       <SettingsDownloadClients />
@@ -394,8 +394,7 @@ const SettingsServices = () => {
       {settings.currentSettings.musicReady && <SettingsSoulseek />}
       <SettingsBazarr />
       <SettingsTrakt />
-      {/* Tautulli reads Plex's watch history, so it is offered while Plex is
-          connected. */}
+      {/* Tautulli reads Plex's watch history: offered only with Plex connected. */}
       {settings.currentSettings.mediaServers.some(
         (server) => server.kind === 'plex'
       ) && <SettingsTautulli />}
@@ -439,8 +438,8 @@ const SettingsServices = () => {
           </li>
         </ul>
       </div>
-      {/* Anime in a section of its own: what counts as anime, then the
-          check of Sonarr and Radarr against it. */}
+      {/* Anime in its own section: what counts as anime, then the check of
+          Sonarr and Radarr against it. */}
       <div className="mt-10 max-w-6xl rounded-lg p-4 ring-1 ring-gray-700 sm:p-6 [&>*:first-child]:mt-0">
         <AnimeSettings />
         {!!sonarrData?.length && <AnimeCheck />}

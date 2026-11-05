@@ -17,8 +17,6 @@ import {
   yearOf,
 } from './musicHelpers';
 
-/* What the music pages show: pictures, album groups, dates and lengths. */
-
 const album = (
   primaryType: string | undefined,
   secondaryTypes: string[] = [],
@@ -58,7 +56,7 @@ describe('music pictures', () => {
       musicImageSrc(artistImageUrl(ID, 'backdrop'), true),
       `/imageproxy/artist/${ID}/backdrop`
     );
-    // Not cached: the server sends the browser to the picture's own host.
+    // Not cached: the server redirects to the picture's host.
     assert.equal(musicImageSrc(artistImageUrl(ID), false), artistImageUrl(ID));
     assert.equal(
       musicImageSrc('/api/v1/music/artist/not-an-id/image', true),
@@ -147,7 +145,7 @@ describe('what the request window ticks to begin with', () => {
     assert.equal(requestable(undefined), true);
     assert.equal(requestable(MediaStatus.UNKNOWN), true);
     assert.equal(requestable(MediaStatus.DELETED), true);
-    // The rest of an album only partly here can be asked for.
+    // The rest of a partly available album can be requested.
     assert.equal(requestable(MediaStatus.PARTIALLY_AVAILABLE), true);
     assert.equal(requestable(MediaStatus.PENDING), false);
     assert.equal(requestable(MediaStatus.PROCESSING), false);

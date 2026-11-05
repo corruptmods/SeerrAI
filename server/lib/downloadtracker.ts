@@ -20,8 +20,8 @@ interface EpisodeNumberResult {
 export type { DownloadStage, DownloadStep } from '@server/constants/downloads';
 
 /**
- * A download Backfill (or the admin agent through it) runs itself, outside
- * Radarr's and Sonarr's queues, for the title it is for.
+ * A download Backfill (or the admin agent through it) runs outside Radarr's and
+ * Sonarr's queues.
  */
 export interface BackfillDownload {
   kind: 'movie' | 'series' | 'album';
@@ -39,10 +39,10 @@ export interface DownloadingItem {
   externalId: number;
   size: number;
   sizeLeft: number;
-  /** Radarr's or Sonarr's own word for it, as sent. */
+  /** Radarr's or Sonarr's raw status. */
   status: string;
   stage: DownloadStage;
-  /** What the download client is doing within the stage, when read directly. */
+  /** The download client's step within the stage, when read directly. */
   step?: DownloadStep;
   timeLeft: string;
   /** Only while there is something left to download. */
@@ -53,13 +53,12 @@ export interface DownloadingItem {
   /** Music: the album it is for. `externalId` is then Lidarr's artist. */
   album?: { id: number; title: string; foreignAlbumId: string };
   /**
-   * Songs taken from an album (Song Fetch): the recordings it brings, by
-   * MusicBrainz id. Only those songs come; the rest of the album does not.
+   * Song Fetch: MusicBrainz ids of the only recordings taken from the album.
    */
   songs?: string[];
   /**
-   * Imported, but this media server matched it to another title (or none)
-   * and has yet to be put right: the title waits for it (lib/matchWatch).
+   * Imported, but this media server matched it wrongly (or not at all) and
+   * it awaits correction (lib/matchWatch).
    */
   matching?: string;
 }
@@ -83,9 +82,8 @@ export const downloadStageOf = (item: QueueFields): DownloadStage => {
   if (state === 'failedpending' || state === 'failed' || status === 'failed') {
     return 'failed';
   }
-  // The client itself reporting a problem part-way through: for a torrent,
-  // stalled with no one to download from, or stopped on an error. It isn't
-  // downloading, which is what can be said for certain.
+  // The client reports a problem mid-download (a stalled or errored
+  // torrent): all that is certain is it isn't downloading.
   if (status === 'warning' && !allIn && state !== 'importblocked') {
     return 'stalled';
   }
@@ -123,10 +121,9 @@ export const downloadStageOf = (item: QueueFields): DownloadStage => {
 };
 
 /**
- * When it should finish, only while bytes are still arriving or queued to.
- * Radarr and Sonarr report "now" for everything after that, which would read
- * as an estimate that has already passed, and for a delay-profile hold the
- * time the hold ends, which is not when anything finishes.
+ * Finish estimate, only while bytes are arriving or queued. After that
+ * Radarr and Sonarr report "now" (an already-passed estimate), and for a
+ * delay-profile hold they report when the hold ends.
  */
 const estimateOf = (
   item: QueueFields,
@@ -173,14 +170,12 @@ const trackedItem = (
   };
 };
 
-/** How stale progress may get while someone is looking at it. */
 /**
- * Sonarr's queue, without the episodes a pack can't hold yet. Until its
- * torrent's file list is in, Sonarr lists a season pack under every episode
- * of the season, those still to air (or with no air date) too, so the season
- * would show ten episodes downloading when four have aired. A single
- * episode's own download is kept whatever its date, as is a pack none of
- * whose episodes has aired.
+ * Sonarr's queue without episodes a pack can't hold yet. Until a torrent's
+ * file list is in, Sonarr lists a season pack under every episode, unaired
+ * ones too, so ten would show downloading when four have aired. A single
+ * episode's download is kept whatever its date, as is a pack with no aired
+ * episodes.
  */
 export const airedEpisodesOf = <
   T extends {
@@ -221,10 +216,9 @@ export const airedEpisodesOf = <
 const LIVE_REFRESH_MS = 5_000;
 
 /**
- * A Radarr or Sonarr queue item, brought up to date by what its download
- * client says now. Radarr or Sonarr still has the last word on a delay hold,
- * the import (pending, in progress or blocked) and a failure; the client on
- * how far along the download is, how long is left and what it is doing.
+ * A queue item updated from its download client. Radarr or Sonarr decides
+ * delay holds, imports and failures; the client decides progress, time left
+ * and current step.
  */
 export const withLiveProgress = (
   item: DownloadingItem,
@@ -238,8 +232,8 @@ export const withLiveProgress = (
     item.stage === 'waiting' ||
     item.stage === 'importing' ||
     item.stage === 'failed' ||
-    // Unless the trouble is only that Radarr or Sonarr can't reach the
-    // client, which Seerr just did.
+    // Unless the only trouble is Radarr or Sonarr can't reach the client,
+    // which Seerr just did.
     (item.stage === 'needsAttention' &&
       item.status.toLowerCase() !== 'downloadclientunavailable');
   const stage = arrDecides ? item.stage : live.stage;
@@ -257,31 +251,30 @@ export const withLiveProgress = (
   };
 };
 
-/** How often Radarr's and Sonarr's queues are read while someone watches. */
+/** Queue read interval while someone watches, with download clients linked. */
 const QUEUE_REFRESH_WITH_CLIENTS_MS = 30_000;
 
 /**
- * How long a download is still shown once Radarr or Sonarr imported it,
- * at most: until the media server lists it, which is usually within a
- * minute or two.
+ * Max time an imported download stays shown, awaiting the media server (usually
+ * a minute or two).
  */
 export const IMPORTED_HOLD_MS = 30 * 60_000;
 
 /**
- * How soon after imports the media server's recently added scan runs, so
- * a title shows as available in a minute rather than at the next scan.
+ * Delay before the post-import recently added scan, so titles show available
+ * within a minute.
  */
 export const IMPORTED_SCAN_DELAY_MS = 60_000;
 
 /**
- * How many times that scan runs, a minute apart, while the media server
- * has yet to list something imported. The regular scan takes it from there.
+ * Tries of that scan, a minute apart, while an import is still unlisted.
+ * The regular scan takes over after.
  */
 export const IMPORTED_SCAN_TRIES = 4;
 
 /**
- * A title imported that a media server matched wrongly, still to be put
- * right: for Lidarr, `externalId` is the artist and `albumId` the album.
+ * An imported title a media server mismatched, awaiting correction. For
+ * Lidarr, `externalId` is the artist and `albumId` the album.
  */
 export interface MatchWait {
   kind: ImportedDownload['kind'];
@@ -293,16 +286,15 @@ export interface MatchWait {
 }
 
 /**
- * How far back of the last look Radarr's and Sonarr's history is read for
- * imports, so one recorded just as it was read isn't missed. Imports seen
- * already are told apart by their history id.
+ * How far before the last look history is read for imports, so one recorded
+ * mid-read isn't missed. Seen imports are deduplicated by history id.
  */
 const IMPORT_OVERLAP_MS = 60_000;
 
 /** Stages from which leaving the queue means it was imported. */
 const DONE_STAGES: DownloadStage[] = ['importing', 'finishing'];
 
-/** A download that left the queue because it was imported, held a while. */
+/** A download that left the queue imported, held a while. */
 export interface ImportedDownload {
   kind: 'movie' | 'series' | 'music';
   serverId: number;
@@ -315,14 +307,13 @@ const itemKey = (item: DownloadingItem) =>
     item.externalId
   }`;
 
-/** Servers that are one and the same: the same address. */
+/** Same address means same server. */
 const sameServer = (a: DVRSettings, b: DVRSettings) =>
   a.hostname === b.hostname && a.port === b.port && a.baseUrl === b.baseUrl;
 
 /**
- * Whether a download that left the queue was imported rather than removed:
- * it was being imported or readied for import, or had nothing left to
- * download and had not failed.
+ * Whether a download that left the queue was imported, not removed: it was
+ * importing or finishing, or had nothing left and hadn't failed.
  */
 export const leftImported = (item: DownloadingItem): boolean =>
   DONE_STAGES.includes(item.stage) ||
@@ -342,8 +333,8 @@ class DownloadTracker {
   private matchWaits: MatchWait[] = [];
 
   /**
-   * What to do with each import as soon as it is seen (the check of new
-   * requests' matches). Set again, it replaces what was set.
+   * Callback for each import as soon as it is seen (new request match check).
+   * Replaces any previous one.
    */
   public onEachImport(
     run: (imported: ImportedDownload[]) => Promise<void> | void
@@ -351,14 +342,14 @@ class DownloadTracker {
     this.onImported = run;
   }
 
-  /** Titles a media server has yet to match rightly (lib/matchWatch). */
+  /** Titles a media server has yet to match correctly (lib/matchWatch). */
   public setMatchWaits(waits: MatchWait[]) {
     this.matchWaits = waits;
   }
 
   /**
-   * A title imported but matched wrongly, once its import is no longer
-   * shown: still being added to the library, waiting for the server.
+   * A mismatched import, once the import itself is no longer shown: still
+   * being added to the library, awaiting the server.
    */
   private waitingFor(
     kind: ImportedDownload['kind'],
@@ -380,7 +371,7 @@ class DownloadTracker {
               ? MediaType.MUSIC
               : MediaType.TV,
         externalId,
-        // All in: what is left is the server's part.
+        // Fully downloaded: the rest is the server's part.
         size: 1,
         sizeLeft: 0,
         status: 'imported',
@@ -402,8 +393,7 @@ class DownloadTracker {
     externalId: number
   ): DownloadingItem[] {
     const imported = this.importedFor(kind, serverId, externalId);
-    // The import itself is shown for as long as it is held; an album only
-    // gives way to its own import, not to another album's.
+    // The held import shows instead; an album yields only to its own import.
     const waiting = this.waitingFor(kind, serverId, externalId).filter(
       (w) =>
         !imported.some((i) => kind !== 'music' || i.album?.id === w.album?.id)
@@ -412,17 +402,16 @@ class DownloadTracker {
   }
 
   /**
-   * What to do a minute after downloads are imported (the media server's
-   * recently added scan), and again a minute later while the media server
-   * has yet to list some of it. Set again, it replaces what was set.
+   * Callback a minute after imports (the recently added scan), repeated each
+   * minute while some is unlisted. Replaces any previous one.
    */
   public whenImported(run: () => Promise<void> | void) {
     this.onImport = run;
   }
 
   /**
-   * Notes what left a server's queue having been imported, for every
-   * server entry that shares that queue.
+   * Records queue items that left imported, for every server entry sharing that
+   * queue.
    */
   private noteImported(
     kind: ImportedDownload['kind'],
@@ -442,15 +431,14 @@ class DownloadTracker {
     if (imported.length) this.importedNow(imported);
   }
 
-  /** Where each Radarr's and Sonarr's history was last read for imports. */
+  /** Where each Radarr's and Sonarr's history was last read to. */
   private importMarks = new Map<string, { at: number; lastId: number }>();
 
   /**
-   * Imports Radarr or Sonarr made since the last look, from its history.
-   * A fast download can be grabbed, downloaded and imported between two
-   * reads of the queue, and never be seen leaving it as imported; each is
-   * held as being added to the library all the same. Imports by hand (no
-   * download id) are left out: Backfill holds its own.
+   * Imports since the last look, from history. A fast download can be
+   * grabbed and imported between queue reads without being seen leaving;
+   * these are held too. Manual imports (no download id) are skipped:
+   * Backfill holds its own.
    */
   private async noteImportedFromHistory(
     kind: 'movie' | 'series',
@@ -462,7 +450,7 @@ class DownloadTracker {
     const startedAt = Date.now();
     const mark = this.importMarks.get(markKey);
     if (!mark) {
-      // The first look only marks where to read from.
+      // The first look only sets the mark.
       this.importMarks.set(markKey, { at: startedAt, lastId: 0 });
       return;
     }
@@ -473,7 +461,7 @@ class DownloadTracker {
         new Date(mark.at - IMPORT_OVERLAP_MS)
       );
     } catch (e) {
-      // Read from the same mark next time.
+      // Retry from the same mark next time.
       logger.debug('Could not read imports from history', {
         label: 'Download Tracker',
         server: markKey,
@@ -516,7 +504,7 @@ class DownloadTracker {
             }
           : {}),
       };
-      // Still in the queue, or seen leaving it: shown as that already.
+      // Still queued, or already seen leaving.
       if (inQueue.has(itemKey(item))) continue;
       for (const serverId of serverIds) {
         if (!this.imported.has(`${kind}:${serverId}:${itemKey(item)}`)) {
@@ -527,7 +515,7 @@ class DownloadTracker {
     if (held.length) this.importedNow(held);
   }
 
-  /** Shows a download as being added to the library, until it is listed. */
+  /** Shows a download as being added to the library until it is listed. */
   private hold(
     kind: ImportedDownload['kind'],
     serverId: number,
@@ -575,7 +563,7 @@ class DownloadTracker {
       } catch {
         // The regular scan still runs.
       }
-      // The media server hadn't listed all of it yet: look again shortly.
+      // Not all listed yet: retry shortly.
       if (
         attempt < IMPORTED_SCAN_TRIES &&
         !this.importTimer &&
@@ -587,7 +575,7 @@ class DownloadTracker {
     this.importTimer.unref?.();
   }
 
-  /** Whether an imported download is still shown, waiting to be listed. */
+  /** Whether any imported download is still awaiting listing. */
   private isHoldingImports(now = Date.now()): boolean {
     for (const [key, held] of this.imported) {
       if (now - held.at > IMPORTED_HOLD_MS) {
@@ -620,7 +608,7 @@ class DownloadTracker {
     return found;
   }
 
-  /** Music downloads Lidarr imported, still shown: by Lidarr and album. */
+  /** Held Lidarr imports, by Lidarr and album. */
   public heldMusicImports(now = Date.now()): {
     serverId: number;
     albumId: number;
@@ -634,8 +622,8 @@ class DownloadTracker {
   }
 
   /**
-   * An album Lidarr imported is here now: its downloads are no longer
-   * shown. Those imported after the scan began stay until the next one.
+   * An imported album is now listed: stop showing its downloads. Those
+   * imported after the scan began stay until the next one.
    */
   public forgetImportedAlbum(
     serverId: number,
@@ -655,8 +643,8 @@ class DownloadTracker {
   }
 
   /**
-   * The media server listed a title: its imported downloads are no longer
-   * shown. Those imported after the scan began stay until the next one.
+   * The media server listed a title: stop showing its imported downloads.
+   * Those imported after the scan began stay until the next one.
    */
   public forgetImported(
     kind: ImportedDownload['kind'],
@@ -675,19 +663,18 @@ class DownloadTracker {
       }
     }
   }
-  /** What the download clients said last, by download id in lower case. */
+  /** Latest download client state, by lower-cased download id. */
   private live = new Map<string, LiveDownload>();
 
-  /** Backfill's own downloads, as Backfill last told. */
+  /** Backfill's own downloads, as last reported. */
   private backfill: BackfillDownload[] = [];
 
-  /** Song Fetch's downloads, each for a Lidarr's artist, as it last told. */
+  /** Song Fetch's downloads, each for a Lidarr artist, as last reported. */
   private songs: { serverId: number; item: DownloadingItem }[] = [];
 
   /**
-   * What Song Fetch is downloading or importing: songs taken from albums,
-   * downloaded outside Lidarr's queue. Their progress is Song Fetch's own,
-   * from the songs' files rather than the whole release.
+   * Song Fetch's downloads and imports, outside Lidarr's queue. Progress is
+   * from the songs' files, not the whole release.
    */
   public setSongDownloads(
     downloads: { serverId: number; item: DownloadingItem }[]
@@ -696,10 +683,9 @@ class DownloadTracker {
   }
 
   /**
-   * What Backfill is downloading, and what it has imported of late. What
-   * was shown downloading and is now imported is shown as being added to
-   * the library, as Radarr's and Sonarr's imports are, until the media
-   * server lists it.
+   * Backfill's current downloads and recent imports. A download that becomes
+   * imported shows as being added to the library, as Radarr's and Sonarr's
+   * do, until the media server lists it.
    */
   public setBackfillDownloads(
     downloads: BackfillDownload[],
@@ -770,8 +756,8 @@ class DownloadTracker {
   }
 
   /**
-   * An artist's downloads in Lidarr, each saying which album it is for;
-   * only one album's, given its Lidarr id.
+   * An artist's Lidarr downloads, each tagged with its album; one album's only,
+   * given its id.
    */
   public getMusicProgress(
     serverId: number,
@@ -800,8 +786,8 @@ class DownloadTracker {
   }
 
   /**
-   * A release's download, by its MusicBrainz release group: Lidarr's,
-   * Song Fetch's or Backfill's, whichever has it.
+   * A release group's download from Lidarr, Song Fetch or Backfill, whichever
+   * has it.
    */
   public getAlbumDownload(foreignAlbumId: string): DownloadingItem | undefined {
     const forIt = (item: DownloadingItem) =>
@@ -826,7 +812,7 @@ class DownloadTracker {
     this.imported = new Map();
     this.importMarks = new Map();
     this.queueDown = new Set();
-    // Nothing is held any more, so there is nothing to scan for.
+    // Nothing held: nothing to scan for.
     if (this.importTimer) {
       clearTimeout(this.importTimer);
       this.importTimer = undefined;
@@ -837,8 +823,8 @@ class DownloadTracker {
   private lastUpdate = 0;
 
   /**
-   * Asks every Radarr, Sonarr and Lidarr server for its queue, then the
-   * download clients for the latest on what is in it; one pass at a time.
+   * Reads every Radarr, Sonarr and Lidarr queue, then the download clients; one
+   * pass at a time.
    */
   public updateDownloads(): Promise<void> {
     if (!this.updating) {
@@ -861,9 +847,8 @@ class DownloadTracker {
   private unreachable = new Set<number>();
 
   /**
-   * Asks each download client Seerr is linked to about the downloads in the
-   * queues. A client that doesn't answer leaves its downloads as Radarr or
-   * Sonarr last described them.
+   * Asks each linked download client about queued downloads. An unanswering
+   * client's downloads stay as Radarr or Sonarr last described them.
    */
   public updateLive(): Promise<void> {
     if (!this.liveUpdating) {
@@ -906,7 +891,7 @@ class DownloadTracker {
           }
           return found;
         } catch (e) {
-          // Said once, not on every pass while it stays down.
+          // Logged once, not every pass while down.
           if (!this.unreachable.has(client.id)) {
             this.unreachable.add(client.id);
             logger.warn(`Could not read downloads from ${client.name}`, {
@@ -923,12 +908,10 @@ class DownloadTracker {
   }
 
   /**
-   * Someone is looking at something downloading: check again now if the
-   * last check is more than a few seconds old, so progress moves while they
-   * watch rather than on the scheduled job's pace. With download clients
-   * linked, those are asked every few seconds and the queues less often,
-   * since the clients are where progress changes. What is sent now is what
-   * is known; the next look gets the fresher numbers.
+   * Someone is watching a download: refresh if the last check is more than a
+   * few seconds old, so progress moves faster than the scheduled job. With
+   * download clients linked, they are asked every few seconds and queues less
+   * often. This response has current data; the next gets fresher numbers.
    */
   public keepFresh() {
     const now = Date.now();
@@ -943,14 +926,13 @@ class DownloadTracker {
     }
   }
 
-  /** Servers whose queue could not be read last time, as "Sonarr:2". */
+  /** Servers whose last queue read failed, as "Sonarr:2". */
   private queueDown = new Set<string>();
 
   /**
-   * A queue that could not be read. Said once, as a warning with the
-   * reason, when the server stops answering; while it stays down it is
-   * asked every pass all the same, and only mentioned at debug level, so
-   * a server switched off for the day does not fill the logs.
+   * A failed queue read. Warns once with the reason when the server stops
+   * answering, then logs at debug while it stays down (still polled every
+   * pass), so a server off for the day doesn't fill the logs.
    */
   private queueFailed(
     kind: 'Radarr' | 'Sonarr' | 'Lidarr',
@@ -973,7 +955,7 @@ class DownloadTracker {
     );
   }
 
-  /** A queue read: if the server had stopped answering, say it is back. */
+  /** A successful queue read: logs recovery if the server was down. */
   private queueAnswered(
     kind: 'Radarr' | 'Sonarr' | 'Lidarr',
     server: { id: number; name: string }
@@ -988,7 +970,6 @@ class DownloadTracker {
   private async updateRadarrDownloads() {
     const settings = getSettings();
 
-    // Remove duplicate servers
     const filteredServers = uniqWith(settings.radarr, (radarrA, radarrB) => {
       return (
         radarrA.hostname === radarrB.hostname &&
@@ -997,7 +978,6 @@ class DownloadTracker {
       );
     });
 
-    // Load downloads from Radarr servers
     await Promise.all(
       filteredServers.map(async (server) => {
         if (server.syncEnabled) {
@@ -1049,7 +1029,7 @@ class DownloadTracker {
             this.queueFailed('Radarr', server, e);
           }
 
-          // Duplicate this data to matching servers
+          // Copy to entries sharing this address.
           const matchingServers = settings.radarr.filter(
             (rs) =>
               rs.hostname === server.hostname &&
@@ -1078,7 +1058,6 @@ class DownloadTracker {
   private async updateSonarrDownloads() {
     const settings = getSettings();
 
-    // Remove duplicate servers
     const filteredServers = uniqWith(settings.sonarr, (sonarrA, sonarrB) => {
       return (
         sonarrA.hostname === sonarrB.hostname &&
@@ -1087,7 +1066,6 @@ class DownloadTracker {
       );
     });
 
-    // Load downloads from Sonarr servers
     await Promise.all(
       filteredServers.map(async (server) => {
         if (server.syncEnabled) {
@@ -1140,7 +1118,7 @@ class DownloadTracker {
             this.queueFailed('Sonarr', server, e);
           }
 
-          // Duplicate this data to matching servers
+          // Copy to entries sharing this address.
           const matchingServers = settings.sonarr.filter(
             (ss) =>
               ss.hostname === server.hostname &&
@@ -1167,10 +1145,9 @@ class DownloadTracker {
   }
 
   /**
-   * Every Lidarr's queue, while music is set up and on. Read whether or
-   * not the Lidarr scans its library into Seerr: every music request goes
-   * through one, and its progress is all there is to show for it. A
-   * Lidarr listed twice (the same address) is asked once.
+   * Every Lidarr queue, while music is on. Read even if the Lidarr's library
+   * isn't scanned: every music request goes through one. A Lidarr listed
+   * twice (same address) is asked once.
    */
   private async updateLidarrDownloads() {
     if (!musicReady()) {

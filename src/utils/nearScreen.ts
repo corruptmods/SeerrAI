@@ -1,36 +1,23 @@
 /*
- * Getting things ready before they are scrolled to. Cards, their pictures and
- * the rows of the request list start loading once they are "near the screen"
- * rather than once they are on it: a phone (Safari above all) only starts a
- * lazily loaded picture when it is about to be drawn, so scrolling showed
- * blank cards that filled in as you looked at them.
+ * Load cards, images and request rows when near the screen, not on it:
+ * mobile Safari starts lazy images only when about to draw them, so cards
+ * scrolled in blank.
  */
 
-/**
- * How far ahead of the screen, down a page: about two screens above and
- * below. A page of cards loads ahead by as much (see useVerticalScroll).
- */
+/** Vertical lookahead: about two screens each way (matches useVerticalScroll). */
 export const SCREENS_AHEAD = '200% 0px';
 
-/**
- * How far ahead along a row of cards, measured against the row itself: about
- * a row's width either side, two or three cards on a phone. Only for a row
- * that is itself near the screen.
- */
+/** Horizontal lookahead within a row: one row width each side. Only for rows already near. */
 export const ROW_AHEAD = '0px 100%';
 
 /** Whether something is near the screen, and whether it was on it then. */
 export interface Nearness {
   near: boolean;
-  /**
-   * On the screen itself when it came near: the first cards of a page, or
-   * ones scrolled to faster than they could load. Their pictures are fetched
-   * before others.
-   */
+  /** On screen when it came near (first cards, or fast scrolls); its images load first. */
   onScreen: boolean;
 }
 
-/** Whether a box (from getBoundingClientRect) shows on a screen this size. */
+/** Whether a getBoundingClientRect box is visible on a screen this size. */
 export const isOnScreen = (
   box: { top: number; bottom: number; left: number; right: number },
   width: number,
@@ -38,11 +25,9 @@ export const isOnScreen = (
 ) => box.bottom > 0 && box.top < height && box.right > 0 && box.left < width;
 
 /**
- * How a picture inside something near the screen (or not yet) loads. One
- * the page needs at once (`urgent`) always loads straight away and first.
- * Otherwise, near the screen it loads now, and first if it was on the
- * screen; not yet near, it is left to the browser to load as it scrolls
- * into view. A picture outside any such card keeps what it asked for.
+ * Loading behaviour for an image. `urgent` loads now and first. Otherwise:
+ * near loads now (first if on screen); not near is left lazy. Outside any
+ * near context it keeps its own setting.
  */
 export const pictureLoading = (
   nearness: Nearness | null,

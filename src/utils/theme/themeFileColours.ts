@@ -1,7 +1,6 @@
 /*
- * A theme file's colours in place of a look's (the format is in
- * server/constants/themeFile.ts). Used by neutralsFor and accentColours, so
- * everything that reads a look's colours gets the file's.
+ * Overrides a look's colours with a theme file's (format in
+ * server/constants/themeFile.ts). Used by neutralsFor and accentColours.
  */
 import type {
   ThemeFileAccent,
@@ -11,7 +10,7 @@ import type { AccentColours, Scale } from './colour';
 import { accentFromColour } from './colour';
 import type { Neutrals } from './palette';
 
-/** A look's colours for one mode, with a theme file's in their place. */
+/** A look's colours for one mode, overridden by the theme file. */
 export const neutralsWithThemeFile = (
   neutrals: Neutrals,
   part: ThemeFileMode | undefined
@@ -28,9 +27,8 @@ export const neutralsWithThemeFile = (
 };
 
 /**
- * A look's accent with a theme file's in its place. A file's fill makes a
- * whole accent, as a custom colour does; anything else it gives is used
- * as it is.
+ * A look's accent overridden by the theme file. Its fill builds a whole
+ * accent like a custom colour; other values are used as given.
  */
 export const accentWithThemeFile = (
   accent: AccentColours,

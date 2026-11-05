@@ -3,10 +3,9 @@ import { useFormikContext } from 'formik';
 import { useEffect, useRef } from 'react';
 
 /**
- * In a look's form: a theme file stops being used once someone picks
- * another accent by hand, or another dark background when the file has
- * its own dark colours, as the file's colours would otherwise hide the
- * choice. Importing a file, which sets them together with it, keeps it.
+ * Clears the theme file when the accent, or the background of a file with
+ * dark colours, is changed by hand, since the file would hide the choice.
+ * Importing sets them together and keeps it.
  */
 export const useDropThemeFileOnChange = (): void => {
   const { values, setFieldValue } = useFormikContext<ThemeDefaults>();

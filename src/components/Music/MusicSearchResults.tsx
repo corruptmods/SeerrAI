@@ -20,12 +20,10 @@ const messages = defineMessages('components.Music.MusicSearchResults', {
 });
 
 /**
- * Music found for a search: artists and albums from MusicBrainz, after a
- * longer pause in typing than films and series, as MusicBrainz answers one
- * request a second for the whole server. Shown where music is asked for
- * (Search's Music, the Music page) as a page of cards, or, with `rows`, as
- * an Artists row and an Albums row below the films and series in All. Once
- * songs can be asked for one at a time, their songs come after.
+ * MusicBrainz artist and album results, with a longer debounce than films as
+ * MusicBrainz allows one request a second per server. A card grid, or with
+ * `rows`, Artists and Albums rows under the films in All. Songs follow when
+ * song requests are on.
  */
 const MusicSearchResults = ({
   query,
@@ -57,13 +55,13 @@ const MusicSearchResults = ({
     return null;
   }
 
-  // Turned off since the page loaded: there is no music to show.
+  // Music was turned off since the page loaded.
   if (error?.response?.status === 403) {
     return null;
   }
 
-  // Replaced by a newer search of this person's (another tab): asked
-  // again, and meanwhile waited on.
+  // Superseded by this person's newer search (another tab): retried, and
+  // shown as waiting meanwhile.
   const replaced = error?.response?.status === 409;
 
   if (error && !replaced) {
@@ -77,15 +75,15 @@ const MusicSearchResults = ({
   }
 
   const waiting = !data && (isLoading || replaced || settled !== query.trim());
-  // Asked for alongside the artists and albums: the server shares their
-  // search, and asks MusicBrainz for the songs right after it.
+  // Fetched alongside: the server shares the search and queries MusicBrainz
+  // for songs right after.
   const songs = currentSettings.musicSongs &&
     settled &&
     settled === query.trim() && <SongResults query={settled} />;
 
   if (rows) {
-    // Below the films and series: a row with nothing in it is left out.
-    // Nothing found says so only when there were no films or series either.
+    // Empty rows are left out; "nothing found" only when there were no films
+    // or series either.
     if (
       nothingAbove &&
       !waiting &&

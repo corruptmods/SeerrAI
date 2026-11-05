@@ -26,10 +26,9 @@ export class NotificationDelivery {
   public userId: number;
 
   /**
-   * Distinguishes per-episode notifications, e.g. "S02E05". Empty for
-   * whole-media notifications. Not nullable: Postgres treats NULLs as
-   * distinct in a UNIQUE constraint, which would silently defeat the
-   * de-duplication this table exists for.
+   * Distinguishes per-episode notifications, e.g. "S02E05"; empty for
+   * whole-media ones. Not nullable: Postgres treats NULLs as distinct in a
+   * UNIQUE constraint, which would silently defeat this table's de-duplication.
    */
   @Column({ default: '' })
   public episodeKey: string;

@@ -16,47 +16,42 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Lidarr won't import a download missing some of its edition's tracks: a
- * single's download often has only the song, while every edition of the
- * single also has a radio edit or an instrumental. Nor one whose tags it
- * finds too far from the edition ("album match is not close enough": a
- * featured artist in the tags, another year or country). When such a
- * download, named as the single, has a song someone asked for, it is the
- * song that was wanted: Seerr AI has Lidarr import just that song into its
- * track, and the download is done. A file is only taken as the song when
- * it is named as it, and, when its tags say, is titled as the same take
- * and as long as the track. What it can't match stays in Lidarr's queue,
- * and the Health page lists it (lib/health).
+ * Lidarr blocks imports missing edition tracks (a single's download often
+ * lacks the radio edit or instrumental) or whose tags don't match closely
+ * ("album match is not close enough"). When such a download is named as
+ * the single and has a requested song, import just that song into its
+ * track. A file counts only if named as the song and, when tagged, the same
+ * take and length. Unmatched downloads stay queued and show on the Health
+ * page (lib/health).
  */
 
 const LABEL = 'Music Imports';
 
-/** Lidarr's states for a finished download it hasn't imported. */
+/** Lidarr states for a finished download it hasn't imported. */
 export const HELD_BACK = ['importBlocked', 'importFailed'];
 
 /**
- * Lidarr's words for the reasons handled here: the download has fewer
- * tracks than the edition, or other ones, or its tags are too far from
- * the edition's. Any other ("unknown artist", "not an upgrade") is left.
+ * Lidarr reasons handled here: missing or unmatched tracks, or tags too far
+ * from the edition. Others ("unknown artist", "not an upgrade") are left.
  */
 const HANDLED =
   /missing tracks|unmatched tracks|album match is not close enough/i;
 
-/** A file's tagged length may be this far from the track's and be it. */
+/** Max tagged-length difference between a file and its track. */
 const SAME_LENGTH_MS = 8000;
 
-/** A download already handled isn't tried again for this long. */
+/** How long before a handled download is retried. */
 const TRY_AGAIN_MS = 60 * 60_000;
 
 type QueueItem = Awaited<ReturnType<LidarrAPI['getMusicQueue']>>[number];
 
-/** A finished download Lidarr is holding back, and why. */
+/** True for a finished download Lidarr hasn't imported. */
 export const heldBack = (
   item: QueueItem
 ): item is QueueItem & Required<Pick<LidarrQueueAppend, 'outputPath'>> =>
   HELD_BACK.includes(item.trackedDownloadState) && !!item.outputPath;
 
-/** Lidarr's reasons, as one line: "Has missing tracks". */
+/** Lidarr's reasons joined into one line. */
 export const heldBackReason = (item: QueueItem): string =>
   [
     ...new Set(
@@ -65,11 +60,11 @@ export const heldBackReason = (item: QueueItem): string =>
   ].join(' · ');
 
 class BlockedImports {
-  /** When each download was last tried, by download and song. */
+  /** Last attempt per download and song. */
   private tried = new Map<string, number>();
   private running = false;
 
-  /** Every Lidarr's queue, once: what can be imported is. */
+  /** Imports what it can from every Lidarr's queue. */
   public async run(now = Date.now()): Promise<void> {
     if (this.running) return;
     this.running = true;
@@ -104,7 +99,7 @@ class BlockedImports {
       ),
     ];
     if (!albums.length) return;
-    // Songs on their way through these singles.
+    // Approved songs fetched through these singles.
     const songs = await getRepository(SongRequest).find({
       relations: { request: { media: true } },
       where: {
@@ -132,7 +127,7 @@ class BlockedImports {
     }
   }
 
-  /** The wanted songs' files, each into its own track. */
+  /** Imports each wanted song's file into its track. */
   private async importSongs(
     api: LidarrAPI,
     item: QueueItem & { outputPath: string },
@@ -148,7 +143,6 @@ class BlockedImports {
     if (!release) return;
     const artist =
       item.artist?.artistName ?? songs[0].request?.media?.foreignTitle ?? '';
-    // Only a download named as this single of this artist.
     if (!namesAlbum(item.title, album.title, artist)) {
       logger.info('A held-back download isn’t named as the single', {
         label: LABEL,
@@ -160,7 +154,7 @@ class BlockedImports {
     const files = found.map((file, index) => ({
       index,
       path: file.path,
-      // Lidarr not saying is no reason to pass a file over.
+      // Unknown size mustn't exclude a file.
       size: file.size ?? Number.MAX_SAFE_INTEGER,
       quality: file.quality,
       title: file.audioTags?.title,
@@ -174,7 +168,7 @@ class BlockedImports {
     for (const song of songs) {
       const track = trackOf(tracks, song);
       if (!track || track.hasFile) continue;
-      // As its tags say, when they do: the same take, and as long.
+      // When tagged: same take and similar length.
       const file = fileForTrack(
         files.filter(
           (f) =>
@@ -206,7 +200,7 @@ class BlockedImports {
       });
       return;
     }
-    // Lidarr's own download: copied or moved as Lidarr would.
+    // 'auto' copies or moves as Lidarr would for its own download.
     await api.manualImport(
       'auto',
       picked.map((file) => ({

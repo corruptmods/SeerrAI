@@ -7,11 +7,10 @@ import type {
 import { z } from 'zod';
 
 /*
- * A second opinion on the files Backfill could not place: an episode named
- * only by its title, a special, a number in some other numbering. The
- * model only says which episode a name points to. Sonarr still judges the
- * file, every match is shown as the model's, and none is ever approved
- * without an admin seeing it.
+ * AI second opinion on files Backfill could not place: an episode named only
+ * by title, a special, a number in another numbering. The model only names
+ * the episode; Sonarr still judges the file, every match is labelled as the
+ * model's, and none is approved without an admin seeing it.
  */
 
 export interface UnclearFile {
@@ -35,9 +34,9 @@ export interface OpinionRequest {
 
 export type SecondOpinion = (req: OpinionRequest) => Promise<Opinion[]>;
 
-/** The most files sent from one pack. */
+/** Max files sent per pack. */
 export const MAX_FILES = 40;
-/** Above this, only the stretch of the series the pack is about is sent. */
+/** Above this, only the part of the series near the pack is sent. */
 const MAX_EPISODES = 500;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -66,9 +65,9 @@ const line = (ep: SonarrEpisode, n: number) =>
     .join(' ');
 
 /**
- * The episodes worth listing. A long series is cut down to the seasons the
- * pack's other files point at, with every special, since the files nobody
- * could place are most often specials.
+ * Episodes to list. A long series is cut to the seasons the pack's other
+ * files point at, plus every special, since unplaced files are most often
+ * specials.
  */
 export const episodesFor = (
   episodes: SonarrEpisode[],
@@ -96,8 +95,8 @@ export const episodesFor = (
 };
 
 /**
- * The model's answer, checked: only files that were asked about, only
- * episodes that were listed, and nothing claimed twice.
+ * The model's answer, validated: only asked-about files, only listed
+ * episodes, nothing claimed twice.
  */
 export const readOpinions = (
   answer: z.infer<typeof reply>,
@@ -135,8 +134,8 @@ const SYSTEM =
   'Reply with JSON only: {"m":[{"f":file,"e":[episode],"w":"the evidence, under 15 words"}]}.';
 
 /**
- * The second opinion as the given admin asks for it, or nothing when the
- * feature is off or no model is set up.
+ * The second opinion for this admin; undefined if the feature is off or no
+ * model is set up.
  */
 export const aiSecondOpinion = (
   user: User | null | undefined

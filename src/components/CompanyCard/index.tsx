@@ -36,8 +36,7 @@ const CompanyCard = ({ image, url, name }: CompanyCardProps) => {
           type="tmdb"
           src={image}
           alt={name}
-          // Studio and network logos come white, for a dark card; in light
-          // mode they are turned dark, for a light one.
+          // Logos are white; inverted for light mode.
           className="relative z-40 h-full w-full light:invert"
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           fill

@@ -137,8 +137,7 @@ const NetworkSliderEditor = ({
       const response = await axios.get<TvNetwork>(`/api/v1/network/${id}`);
       const network = response.data;
 
-      // The editor may have closed, or the list may have changed, while the
-      // lookup was running, so check again against the latest list.
+      // The editor may have closed or the list changed during the lookup.
       if (!isMounted.current) {
         return;
       }
@@ -165,8 +164,8 @@ const NetworkSliderEditor = ({
         return;
       }
 
-      // Use the same rules as the server so a network that is added here can
-      // always be saved. A very long name is shortened instead of rejected.
+      // Server rules, so an added network can always be saved; long names are
+      // truncated, not rejected.
       const validated = readDiscoverNetwork({
         id: network.id,
         name: network.name?.trim().slice(0, MAX_DISCOVER_NETWORK_NAME_LENGTH),

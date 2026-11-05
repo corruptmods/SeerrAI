@@ -3,7 +3,7 @@ import { afterEach, describe, it } from 'node:test';
 
 import { resetTestDb, seedTestDb } from '@server/utils/seedTestDb';
 
-// NODE_ENV is typed readonly, so it is swapped through the whole env object
+// NODE_ENV is typed readonly, so swap it through the whole env object.
 function setNodeEnv(value: string | undefined) {
   Object.assign(process.env, { NODE_ENV: value });
 }

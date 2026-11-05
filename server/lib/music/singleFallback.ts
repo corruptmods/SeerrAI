@@ -14,21 +14,19 @@ import logger from '@server/logger';
 import { In, IsNull, Not } from 'typeorm';
 
 /*
- * A song is fetched through its single when it had one, as Lidarr fetches
- * any album. Older singles are seldom posted on their own (Usenet has the
- * albums), so Lidarr often finds no release at all. Then Seerr takes the
- * song itself (lib/music/songFetch), at once: Lidarr is asked to search for
- * the single once, and when that search ends with nothing grabbed, the song
- * is taken from one of the artist's albums with it, or else from the single,
- * Seerr's own searches looking again on their schedule.
+ * Songs with a single are fetched by Lidarr like any album. Older singles
+ * are rarely posted alone, so Lidarr often finds nothing. Lidarr searches
+ * once; if nothing is grabbed, the song goes to Seerr's song fetch
+ * (lib/music/songFetch), from an album with the recording or else the
+ * single, retrying on its own schedule.
  */
 
 const LABEL = 'Song Fetch';
 
-/** Searches started a minute, so many singles don't flood the indexers. */
+/** Max searches started per minute, so singles don't flood indexers. */
 export const SEARCHES_AT_ONCE = 3;
 
-/** Lidarr's states for a command that is over. */
+/** Lidarr's terminal command states. */
 const OVER = ['completed', 'failed', 'aborted', 'cancelled', 'orphaned'];
 
 interface Single {
@@ -38,24 +36,24 @@ interface Single {
 }
 
 /**
- * How long after Lidarr's search ends a grab may take to show in its
- * queue: the songs aren't handed on before, or both would download them.
+ * Wait after Lidarr's search ends for a grab to show in its queue, so Seerr
+ * and Lidarr don't both download the song.
  */
 const QUEUE_SETTLE_MS = 2 * 60_000;
-/** A search Lidarr couldn't run, or lost, is asked for again after this. */
+/** Retry delay for a search Lidarr couldn't run or lost. */
 const SEARCH_RETRY_MS = 60 * 60_000;
 
-/** Where Lidarr's one search for a single stands. */
+/** State of Lidarr's search for a single. */
 interface Search {
   commandId?: number;
   /** When the search ended with nothing grabbed. */
   endedAt?: number;
-  /** Not asked for again before then. */
+  /** No new search before this. */
   retryAt?: number;
 }
 
 class SingleFallback {
-  /** Lidarr's search for each single, by server and Lidarr album. */
+  /** Search state keyed by server and Lidarr album id. */
   private searches = new Map<string, Search>();
 
   /** Hands songs whose single Lidarr couldn't find to Seerr's song fetch. */
@@ -80,14 +78,14 @@ class SingleFallback {
       live.add(key);
       const api = lidarrApi(single.server);
       try {
-        // On its way, or here and waiting for the music scans.
+        // Downloading, or downloaded and waiting for library scans.
         if (await inQueue(single)) {
           this.searches.delete(key);
           continue;
         }
         const album = await api.getAlbum(single.lidarrAlbumId);
-        // Lidarr has part of the single: what it has waits for the scans,
-        // and what it hasn't it won't fetch, so Seerr takes it.
+        // Lidarr has part of the single and won't fetch the rest, so Seerr
+        // takes the missing songs.
         if ((album.statistics?.trackFileCount ?? 0) > 0) {
           const tracks = await api.getTracks(album.id);
           const missing = single.songs.filter(
@@ -103,7 +101,6 @@ class SingleFallback {
         const search = this.searches.get(key) ?? {};
         this.searches.set(key, search);
         if (search.endedAt !== undefined) {
-          // Not handed on before Lidarr's queue could list a grab.
           if (now - search.endedAt < QUEUE_SETTLE_MS) continue;
           if (await inQueue(single, true)) {
             this.searches.delete(key);
@@ -130,8 +127,8 @@ class SingleFallback {
           .catch(() => null);
         if (command && !OVER.includes(command.status)) continue;
         search.commandId = undefined;
-        // A search that couldn't run, or that Lidarr no longer knows of
-        // (restarted), says nothing: asked for again later, not at once.
+        // A failed or forgotten search (Lidarr restarted) proves nothing;
+        // retry later, not now.
         if (command?.status !== 'completed') {
           search.retryAt = now + SEARCH_RETRY_MS;
           continue;
@@ -151,10 +148,9 @@ class SingleFallback {
   }
 
   /**
-   * Songs on their way through singles Lidarr lists, by single: Lidarr's
-   * own albums of each artist say which, the music scans needn't have
-   * caught up. A request one of whose songs failed still has the others
-   * on their way.
+   * Approved songs grouped by single, using Lidarr's album list so library
+   * scans needn't have caught up. Includes failed requests, whose other
+   * songs are still in progress.
    */
   private async waiting(): Promise<Single[]> {
     const songs = await getRepository(SongRequest).find({
@@ -176,7 +172,7 @@ class SingleFallback {
         servers.find((s) => s.id === song.request.serverId) ??
         servers.find((s) => s.isDefault);
       const artistMbid = song.request.media?.foreignId;
-      // Searches are left alone where Lidarr is told not to search.
+      // Respect a server's preventSearch.
       if (!server || server.preventSearch || !artistMbid) continue;
       const artistKey = `${server.id}:${artistMbid}`;
       let albums = albumsOf.get(artistKey);
@@ -194,7 +190,7 @@ class SingleFallback {
         albumsOf.set(artistKey, albums);
       }
       const lidarrAlbumId = albums.get(song.singleMbid!);
-      // Not listed by Lidarr yet: its request is still being sent.
+      // Not in Lidarr yet: the request is still being sent.
       if (lidarrAlbumId === undefined) continue;
       const key = `${server.id}:${lidarrAlbumId}`;
       const single = singles.get(key) ?? { server, lidarrAlbumId, songs: [] };
@@ -205,12 +201,10 @@ class SingleFallback {
   }
 
   /**
-   * Each of the single's songs to Seerr's song fetch: taken from the
-   * artist's album with that very recording, or from the single itself when
-   * no album has it. Lidarr no longer looks for the single, and a single
-   * nobody else is waiting for is no longer counted as on its way (it would
-   * keep its other songs from being asked for). False while a song's
-   * recording couldn't be looked up, for it to be tried again.
+   * Hands the single's songs to Seerr's song fetch, sourced from an album
+   * with the recording or else the single. Unmonitors the single and frees
+   * it if nothing else waits on it, so its other songs stay requestable.
+   * False if a recording lookup failed, so it's retried.
    */
   private async handOn(
     api: LidarrAPI,
@@ -264,8 +258,8 @@ class SingleFallback {
   }
 
   /**
-   * The single's row back to nobody having asked, when no other song or
-   * album request still waits for it and nothing of it is here.
+   * Resets the single's album row to unknown when no open request needs it
+   * and it has no files.
    */
   private async release(singleMbid: string): Promise<void> {
     const open = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];

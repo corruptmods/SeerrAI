@@ -85,8 +85,7 @@ const Setup = () => {
     (library) => library.enabled
   );
 
-  // Back from signing in to Plex in this tab (the Plex window could not
-  // open): to the sign-in step, which finishes it.
+  // Back from a same-tab Plex sign-in: go to the sign-in step to finish it.
   useEffect(() => {
     if (hasPlexReturn('setup')) {
       setMediaServerType(MediaServerType.PLEX);

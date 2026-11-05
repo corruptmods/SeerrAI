@@ -6,14 +6,13 @@ import useSWR from 'swr';
 
 interface AiStatus {
   features: Partial<Record<AiFeature, boolean>>;
-  /** Answers left today, or null for no limit. */
+  /** Answers left today; null for unlimited. */
   remaining: number | null;
 }
 
 /**
- * The AI features this person has (set up by an admin, and not turned off),
- * and how many answers they have left today. Nothing is fetched until a
- * model is set up.
+ * The user's enabled AI features and answers left today. Fetches nothing
+ * until a model is set up.
  */
 const useAi = () => {
   const { currentSettings } = useSettings();
@@ -25,7 +24,7 @@ const useAi = () => {
   return {
     on: (feature: AiFeature) => !!data?.features[feature],
     remaining: data?.remaining ?? null,
-    /** After an answer: the count left has changed. */
+    /** Call after an answer to refresh the count. */
     refresh: () => mutate(),
   };
 };

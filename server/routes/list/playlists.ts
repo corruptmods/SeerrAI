@@ -1,6 +1,6 @@
 /**
- * Playlists: linking one to a Spotify or Apple Music playlist, unlinking
- * it, and taking a song off.
+ * Playlists: linking to a Spotify or Apple Music playlist, unlinking, and
+ * removing songs.
  */
 import { getRepository } from '@server/datasource';
 import { MediaListSong } from '@server/entity/MediaList';
@@ -20,7 +20,7 @@ const playlistRoutes = Router();
 
 const NOT_FOUND = { status: 404, message: 'Playlist not found.' };
 
-/** The playlist in the path, when this person may see it. */
+/** The playlist in the path, if the user may see it. */
 const playlistFor = async (req: Request<{ listId: string }>) => {
   const access = await loadAccessibleList(
     Number(req.params.listId),
@@ -30,18 +30,17 @@ const playlistFor = async (req: Request<{ listId: string }>) => {
 };
 
 /**
- * Each link reads a page from Spotify or Apple Music, and brings in up to
- * hundreds of songs to look for on MusicBrainz, which answers the whole
- * server a request a second: so a person links only so many in a while,
- * and not while many of their songs are still waiting to be looked for.
+ * Each link reads a Spotify or Apple Music page and can queue hundreds of
+ * songs for MusicBrainz, which allows the whole server one request a second,
+ * so links are rate limited and refused while many songs still wait.
  */
 const linkRate = perUserRateLimit({ windowMs: 10 * 60_000, limit: 20 });
-/** Each search asks every music indexer: a few a person, now and then. */
+/** Each search queries every music indexer, so allow only a few per user. */
 const searchAgainRate = perUserRateLimit({ windowMs: 10 * 60_000, limit: 5 });
-/** A person's songs waiting to be looked for, past which nothing is linked. */
+/** Max songs a user may have awaiting a match before linking is refused. */
 export const MOST_SONGS_MATCHING = 1000;
 
-/** Links a playlist; its songs are read now, and requested for the linker. */
+/** Links a playlist; its songs are read now and requested for the linker. */
 playlistRoutes.post<{ listId: string }>(
   '/:listId/link',
   isAuthenticated(),
@@ -72,7 +71,7 @@ playlistRoutes.post<{ listId: string }>(
         });
       }
       await playlists.link(access.list, String(req.body.url ?? ''), req.user!);
-      // Read again as linked; gone if it was deleted meanwhile.
+      // Re-read as linked; missing if deleted meanwhile.
       const linked = await playlistFor(req);
       if (!linked) {
         return next(NOT_FOUND);
@@ -91,7 +90,7 @@ playlistRoutes.post<{ listId: string }>(
   }
 );
 
-/** Unlinks it; its songs stay. */
+/** Unlinks a playlist; its songs stay. */
 playlistRoutes.delete<{ listId: string }>(
   '/:listId/link',
   isAuthenticated(),
@@ -112,9 +111,8 @@ playlistRoutes.delete<{ listId: string }>(
 );
 
 /**
- * Takes a song off; a request made for it stands. On a linked playlist it
- * is kept, out of sight, so reading the playlist again doesn't bring it
- * back.
+ * Removes a song; its request stands. On a linked playlist it is kept hidden
+ * so re-reading the playlist doesn't bring it back.
  */
 playlistRoutes.delete<{ listId: string; songId: string }>(
   '/:listId/song/:songId',
@@ -135,7 +133,7 @@ playlistRoutes.delete<{ listId: string; songId: string }>(
   }
 );
 
-/** Looks for a song that wasn't found, or couldn't be requested, again. */
+/** Retries a song that wasn't found or couldn't be requested. */
 playlistRoutes.post<{ listId: string; songId: string }>(
   '/:listId/song/:songId/retry',
   isAuthenticated(),
@@ -144,7 +142,7 @@ playlistRoutes.post<{ listId: string; songId: string }>(
     if (!access) {
       return next(NOT_FOUND);
     }
-    // Its songs are asked for in the owner's name.
+    // Songs are requested in the owner's name.
     if (!access.isOwner) {
       return next({
         status: 403,
@@ -163,8 +161,8 @@ playlistRoutes.post<{ listId: string; songId: string }>(
 );
 
 /**
- * Has the albums of its requested songs that found nothing, waiting hours
- * to look again, looked for now. Answers how many.
+ * Searches now for albums of requested songs that found nothing and would
+ * otherwise wait hours. Returns how many.
  */
 playlistRoutes.post<{ listId: string }>(
   '/:listId/search-again',
@@ -181,7 +179,7 @@ playlistRoutes.post<{ listId: string }>(
         message: 'Only the playlist’s owner can search for its songs again.',
       });
     }
-    // Requested, or approved by an admin after waiting for it.
+    // Requested, or approved by an admin after waiting.
     const songs = await getRepository(MediaListSong).find({
       select: { recordingMbid: true },
       where: {

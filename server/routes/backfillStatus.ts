@@ -13,11 +13,10 @@ import { Router } from 'express';
 import { In, Not } from 'typeorm';
 
 /*
- * For the person who asked for a title: whether Backfill is looking beyond
- * Sonarr's and Radarr's own search for it, or downloading what it found,
- * and whether the admin agent (an AI) is looking for it. Only their own
- * requests (an admin's covers everyone's), and only that much: what was
- * found, from where, and waiting on whom is for admins.
+ * For the requester: whether Backfill is searching beyond Sonarr's and Radarr's
+ * own search or downloading what it found, and whether the admin agent (an AI)
+ * is looking. Only their own requests (everyone's for an admin), and only that
+ * much: what was found, where, and who it's waiting on are admin-only.
  */
 
 const backfillStatusRoutes = Router();
@@ -33,8 +32,7 @@ backfillStatusRoutes.get('/', async (req, res, next) => {
       return res.status(200).json([]);
     }
 
-    // The titles among these that this person has an open request for;
-    // anyone's, for an admin.
+    // Titles here this person has an open request for; anyone's, for an admin.
     const everyone = req.user!.hasPermission(Permission.ADMIN);
     const query = getRepository(MediaRequest)
       .createQueryBuilder('request')

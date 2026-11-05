@@ -15,15 +15,14 @@ const AirDateBadge = ({ airDate }: AirDateBadgeProps) => {
   const DAY_MS = 1000 * 60 * 60 * 24;
   const RELATIVE_WINDOW_MS = DAY_MS * 8;
   const intl = useIntl();
-  // TMDB air_date has no time/tz, it's just the origin country's local date.
-  // We pin it to UTC anyway for consistency.
+  // TMDB air_date is the origin country's local date with no time zone; pin it to UTC.
   // https://www.themoviedb.org/talk/6365be67d7107e008d777337
   const dAirDate = new Date(airDate);
   dAirDate.setUTCHours(0, 0, 0, 0);
   const todayUtc = new Date();
   todayUtc.setUTCHours(0, 0, 0, 0);
   const diffMs = dAirDate.getTime() - todayUtc.getTime();
-  // The air date itself counts as "Airing" and "Aired" starts the next UTC day.
+  // The air date counts as "Airing"; "Aired" starts the next UTC day.
   const alreadyAired = diffMs < 0;
   const showRelative = Math.abs(diffMs) <= RELATIVE_WINDOW_MS;
   const diffInDays = diffMs / DAY_MS;

@@ -189,7 +189,7 @@ class SlackAgent
       });
     }
 
-    // Plain text, so nothing in the reason is formatted or links anywhere.
+    // Plain text, so the reason can't format or link.
     const declineReason = declineReasonOf(type, payload);
     if (declineReason) {
       blocks.push({

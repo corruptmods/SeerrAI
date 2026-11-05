@@ -1,13 +1,11 @@
 /*
- * The "Or sign in with" buttons on the sign-in page: equal widths in two
- * aligned columns where every label fits in half the width, otherwise one
- * button to a row, so no label is squeezed or cut off.
+ * "Or sign in with" layout: two equal columns when every label fits in half
+ * the width, otherwise one button per row, so no label is cut off.
  */
 
 /**
- * Every sign-in button in the list: one height, as wide as its column, and a label too
- * long for it ends in an ellipsis rather than spilling out. (The label is a
- * `truncate` span inside the button's own inner span.)
+ * Sign-in option button: fixed height, full column width, label truncates (it
+ * is a `truncate` span inside the inner span).
  */
 export const OPTION_BUTTON =
   'relative h-10 w-full min-w-0 [&>span]:min-w-0 [&>span]:max-w-full';
@@ -16,8 +14,7 @@ export const OPTION_BUTTON =
 const BUTTON_EXTRA = '4rem';
 
 /**
- * How many character widths a label takes: letters from Chinese, Japanese
- * and Korean scripts (and other wide characters) take about two.
+ * Label width in character widths; CJK and other wide characters count as two.
  */
 export const labelWidth = (label: string): number =>
   [...label].reduce(
@@ -27,10 +24,9 @@ export const labelWidth = (label: string): number =>
   );
 
 /**
- * The columns for buttons with these labels (CSS grid-template-columns):
- * a column is at least half the width, or the widest label's width if
- * that is more, so two fit side by side only when every label does. Never
- * wider than the space there is.
+ * grid-template-columns for these labels: each column is at least half the
+ * width or the widest label, capped at 100%, so two fit side by side only
+ * when every label does.
  */
 export const optionColumns = (labels: string[]): string => {
   const widest = Math.max(0, ...labels.map(labelWidth));
@@ -38,8 +34,8 @@ export const optionColumns = (labels: string[]): string => {
 };
 
 /**
- * Whether the button at `index` of `count` takes a whole row: the last of
- * an odd number, so the rows above it stay paired.
+ * Whether the button at `index` spans a row: the last of an odd count, so the
+ * rows above stay paired.
  */
 export const spansRow = (index: number, count: number): boolean =>
   count % 2 === 1 && index === count - 1;

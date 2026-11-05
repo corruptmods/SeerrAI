@@ -28,21 +28,20 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Settings → Users → Single Sign-On: the providers people can sign in with.
- * Like the download clients, the client secret is never sent back, a blank
- * one on saving or testing keeps the saved one (only while the issuer URL
- * is the same), and a provider is checked before it is saved.
+ * Settings → Users → Single Sign-On providers. As for download clients: the
+ * client secret is never sent back, a blank one keeps the saved one (only
+ * for the same issuer URL), and a provider is checked before saving.
  */
 const oidcSettingsRoutes = Router();
 
 /**
- * Says what is wrong: as a code with its details, which the settings page
- * shows in the admin's language, and in English for anything else.
+ * Answers 400 with the problem code and details (translated by the settings
+ * page) plus an English message.
  */
 const refuse = (res: Response, problem: OidcProblem) =>
   res.status(400).json({ message: problemText(problem), ...problem });
 
-/** The issuer URL, or the provider's configuration address pasted. */
+/** The issuer URL, or a pasted configuration URL. */
 const issuerUrl = z.string().trim().min(1).transform(issuerFromEntered);
 
 const providerBody = z.object({
@@ -54,7 +53,7 @@ const providerBody = z.object({
   scopes: z.string().trim().default(DEFAULT_OIDC_SCOPES),
   enabled: z.boolean().default(true),
   newUserSignUp: z.boolean().default(false),
-  // A list of rules, or upstream's claim names separated by spaces.
+  // A list of rules, or upstream's space-separated claim names.
   requiredClaims: z
     .union([
       z.string(),
@@ -70,7 +69,7 @@ const testBody = z.object({
   clientSecret: z.string().default(''),
 });
 
-/** As the settings page is shown it: no secret, only that one is saved. */
+/** Provider as shown to the page: no secret, only whether one is saved. */
 const shown = (provider: OidcProviderSettings) => {
   const applicationUrl = oidcApplicationUrl(getSettings().main.applicationUrl);
   return {
@@ -84,8 +83,8 @@ const shown = (provider: OidcProviderSettings) => {
 };
 
 /**
- * A secret's address, for keeping a saved secret left blank: the saved one
- * only ever goes to the issuer it was saved for.
+ * Address a saved secret is bound to: a blank secret keeps the saved one only
+ * for the issuer it was saved for.
  */
 const addressOf = (issuerUrl: string) => {
   try {
@@ -114,8 +113,8 @@ const secretFor = (
   );
 
 /**
- * A logo: blank, an https address, or a picture on this site. Not plain
- * http: the sign-in page would show it over https without it.
+ * A logo must be blank, https, or a path on this site. Plain http is refused:
+ * it would be mixed content on an https sign-in page.
  */
 const logoProblem = (logoUrl: string): OidcProblem | undefined => {
   if (!logoUrl || /^\/(?![/\\])/.test(logoUrl)) {
@@ -127,12 +126,12 @@ const logoProblem = (logoUrl: string): OidcProblem | undefined => {
       return undefined;
     }
   } catch {
-    // Not an address at all.
+    // Not a URL.
   }
   return { problem: 'logo-url' };
 };
 
-/** Ids that must not be given again: current providers and removed ones. */
+/** Ids never to reuse: current and removed providers'. */
 const takenIds = async (): Promise<string[]> => {
   const linked = await getRepository(OidcLink)
     .createQueryBuilder('link')
@@ -151,19 +150,19 @@ type CheckTarget = Pick<
   'issuerUrl' | 'clientId' | 'clientSecret'
 >;
 
-/** What the provider calls itself, asked afresh. */
+/** The provider's own issuer, fetched fresh. */
 const issuerOf = async (target: CheckTarget): Promise<string> =>
   (await discover(target, { fresh: true })).serverMetadata().issuer;
 
 /**
- * Checks a provider can be used: its issuer URL is acceptable, a secret is
- * there, and the provider answers. Gives what the provider calls itself and
- * the issuer URL to keep, or what is wrong in plain words.
+ * Checks a provider is usable: acceptable issuer URL, a secret, and the
+ * provider answers. Returns its issuer and the issuer URL to keep, or the
+ * problem.
  *
- * An issuer URL that differs from the provider's own only by a slash at the
- * end is the provider's: links already treat the two as one, and an admin
- * pasting the configuration address can't tell which the provider uses
- * (Authentik's has one, Keycloak's doesn't).
+ * An issuer URL differing from the provider's only by a trailing slash is
+ * accepted: links already treat them as one, and an admin pasting the
+ * configuration URL can't tell which the provider uses (Authentik's has one,
+ * Keycloak's doesn't).
  */
 const check = async (
   target: CheckTarget
@@ -234,7 +233,7 @@ oidcSettingsRoutes.post('/test', async (req, res) => {
   return res.status(200).json(result);
 });
 
-/** The provider as it will be saved, once it has passed the check. */
+/** The provider to save, once it passes the check. */
 const toSave = async (
   body: z.infer<typeof providerBody>,
   id: string,
@@ -296,15 +295,14 @@ oidcSettingsRoutes.put<{ id: string }>('/:id', async (req, res, next) => {
   if (!parsed.success) {
     return refuse(res, { problem: 'check-details' });
   }
-  // The id stays: people's links refer to it.
+  // Keep the id: users' links refer to it.
   const provider = await toSave(parsed.data, saved.id, saved);
   if ('problem' in provider) {
     return refuse(res, provider);
   }
 
-  // Links made at the old issuer stay with it: the provider at the new
-  // address is someone else, whose ids for people mean nothing here. Each
-  // person links again.
+  // Links stay with the old issuer: a new issuer's user ids mean nothing
+  // here, so each user links again.
   if (
     normalizeIssuer(provider.issuerUrl) !== normalizeIssuer(saved.issuerUrl)
   ) {
@@ -326,7 +324,7 @@ oidcSettingsRoutes.delete<{ id: string }>('/:id', async (req, res, next) => {
   if (!saved) {
     return next({ status: 404, message: 'Provider not found.' });
   }
-  // People's links to it stay, unused: its id is never given again.
+  // Users' links to it stay, unused; its id is never reused.
   settings.oidc = {
     providers: settings.oidc.providers.filter((p) => p.id !== saved.id),
   };

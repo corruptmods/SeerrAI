@@ -5,16 +5,13 @@ import type {
 import logger from '@server/logger';
 
 /*
- * Which albums and artists a music search shows first.
- *
- * MusicBrainz scores every exact match the same (100) and lists those in no
- * useful order, so a search for "Moonlurker" can fill the page with obscure
- * albums of that name and leave out Marcus Delray's. The search asks for
- * many more than it shows and ranks them here, using only what the search
- * answer already carries: no extra request per result.
+ * Ranks music search results. MusicBrainz scores every exact match 100 in
+ * no useful order, so a search for "Moonlurker" can bury Marcus Delray's
+ * album under obscure ones. The search over-fetches and ranks here using
+ * only fields in the response, with no per-result requests.
  */
 
-/** Album before EP before single before anything else. */
+/** Album, then EP, then single, then anything else. */
 const TYPE_ORDER = ['album', 'ep', 'single'];
 
 const typeRank = (group: MbReleaseGroup): number => {
@@ -23,13 +20,13 @@ const typeRank = (group: MbReleaseGroup): number => {
 };
 
 /**
- * How many releases (pressings, editions, countries) an album has: the
- * best sign in a search answer of how widely it is known.
+ * Number of releases (pressings, editions, countries): the best popularity
+ * signal in a search response.
  */
 const releaseCount = (group: MbReleaseGroup): number =>
   group.count ?? group.releases?.length ?? 0;
 
-/** Only ever released as bootlegs: shown after the rest. */
+/** True when every release is a bootleg. */
 const onlyBootlegs = (group: MbReleaseGroup): boolean => {
   const releases = group.releases ?? [];
   return (
@@ -38,10 +35,7 @@ const onlyBootlegs = (group: MbReleaseGroup): boolean => {
   );
 };
 
-/**
- * Sorted by each key in turn; ties keep the order MusicBrainz gave (the
- * sort is stable).
- */
+/** Sorts by each key in turn; ties keep MusicBrainz's order. */
 const rankBy = <T>(
   list: T[],
   keys: ((item: T) => number)[],
@@ -61,9 +55,8 @@ const rankBy = <T>(
     .map(({ item }) => item);
 
 /**
- * The albums to show, best first: by how well they matched, then by how
- * many releases they have, then albums before EPs and singles, then
- * anything officially released before bootlegs.
+ * Albums best first: by score, release count, type, then non-bootlegs
+ * before bootlegs.
  */
 export const rankAlbums = (
   groups: MbReleaseGroup[],
@@ -81,10 +74,8 @@ export const rankAlbums = (
   );
 
 /**
- * The artists to show, best first: by how well they matched, then the
- * artists of the albums shown (the first album's before the second's), then
- * the ones MusicBrainz's users have tagged most. Searching a band's name
- * then puts the band itself ahead of others with the same name.
+ * Artists best first: by score, then position of their first shown album,
+ * then total tag count. Puts a band ahead of others with the same name.
  */
 export const rankArtists = (
   artists: MbArtist[],
@@ -111,23 +102,17 @@ export const rankArtists = (
   );
 };
 
-/** One page of a MusicBrainz search: the total there is, and this page. */
+/** One page of a MusicBrainz search, with the total count. */
 export interface SearchPage<T> {
   count: number;
   items: T[];
 }
 
 /**
- * A search's results, looking further while they are still tied.
- *
- * When every result on a page has the top score, the one people mean can
- * be on the next page as easily as this one (a search for "Moonlurker" has
- * a hundred exact matches before Marcus Delray's). So while a page ends
- * on the top score and there are more, the next page is asked for too, up
- * to `maxPages`. Only searches like that cost the extra requests.
- *
- * Extra pages are a nicety: if one fails (MusicBrainz busy), what was
- * found so far is used.
+ * Search results, fetching further pages while the last result still has
+ * the top score, up to `maxPages`: the intended match can be on any page of
+ * ties ("Moonlurker" has a hundred exact matches before Marcus Delray's).
+ * A failed extra page returns what was found so far.
  */
 export const searchWhileTied = async <T extends { id: string; score?: number }>(
   page: (offset: number) => Promise<SearchPage<T>>,

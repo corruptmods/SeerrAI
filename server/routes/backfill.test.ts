@@ -33,10 +33,10 @@ import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * Approving a pack, end to end, through the real validator: Prowlarr hands
- * over a .torrent, qBittorrent downloads only the chosen files, Sonarr's
- * manual import takes them, the torrent is removed and admins are told.
- * Prowlarr, qBittorrent and Sonarr are stubbed at their API clients.
+ * Approving a pack end to end through the real validator: Prowlarr provides a
+ * .torrent, qBittorrent downloads only the chosen files, Sonarr's manual import
+ * takes them, the torrent is removed and admins are notified. Prowlarr,
+ * qBittorrent and Sonarr are stubbed at their API clients.
  */
 
 const ben = (value: unknown): Buffer => {
@@ -119,9 +119,9 @@ let filePrio: { indexes: number[]; priority: number }[] = [];
 let imports: { path: string; episodeIds: number[] }[][] = [];
 let deleted: string[] = [];
 let torrentDone = false;
-/** What qBittorrent says the torrent is doing, when not the usual. */
+/** qBittorrent's torrent state, when not the default. */
 let torrentState: string | undefined;
-/** The .torrent Prowlarr hands over next. */
+/** The .torrent Prowlarr returns next. */
 let torrentData: Buffer = TORRENT;
 
 const ep = (id: number, hasFile: boolean, fileId = 0): SonarrEpisode => ({
@@ -330,7 +330,7 @@ beforeEach(async () => {
       avatar: '',
     })
   );
-  // Loaded back, as the session would load them, so they have a display name.
+  // Reloaded as the session would, so they have a display name.
   admin = await users.findOneOrFail({ where: { id: admin.id } });
   member = await users.findOneOrFail({ where: { id: member.id } });
   actingAs = admin;
@@ -511,11 +511,11 @@ describe('Backfill routes', () => {
       'downloading'
     );
 
-    // Still downloading: nothing is imported.
+    // Still downloading: nothing imported.
     await backfill.tick();
     assert.equal(imports.length, 0);
 
-    // Done: the two files go to Sonarr, by the paths Sonarr sees.
+    // Done: both files go to Sonarr, by the paths Sonarr sees.
     torrentDone = true;
     await backfill.tick();
     job = await jobs.findOneOrFail({ where: { id: job.id } });
@@ -582,8 +582,8 @@ describe('Backfill routes', () => {
     assert.equal(after.body.stats.awaiting, 0);
     assert.equal(after.body.jobs.length, 1);
 
-    // Filled: the other pack was judged against files that are gone now,
-    // and is not offered once the title is done.
+    // Filled: the other pack was judged against files now gone, and isn't
+    // offered once the title is done.
     torrentDone = true;
     await backfill.tick();
     episodes = [ep(101, true, 900), ep(102, true, 901)];
@@ -686,14 +686,14 @@ describe('Backfill routes', () => {
       lookup.body[0].jobs.map((j: { id: number }) => j.id),
       [id]
     );
-    // The page still shows the download when Sonarr cannot be reached.
+    // The page still shows the download when Sonarr is unreachable.
     mock.method(backfill, 'context', async () => {
       throw new Error('Sonarr is down');
     });
     const review = await call('GET', `/api/v1/backfill/series/${series.id}`);
     assert.equal(review.body.arrError, 'Sonarr is down');
     assert.equal(review.body.jobs[0].progress, expected);
-    // Read, not saved: the tick keeps the record.
+    // Read, not saved: the tick owns the record.
     assert.equal(
       (await getRepository(BackfillJob).findOneOrFail({ where: { id } }))
         .progress,
@@ -726,7 +726,7 @@ describe('Backfill routes', () => {
     assert.deepEqual(res.body[0].jobs, []);
     assert.equal(res.body[0].workingRunId, null);
 
-    // The admin agent at work on it: its conversation, for the page.
+    // The admin agent working on it: its conversation, for the page.
     const run = await getRepository(AgentRun).save(
       new AgentRun({
         trigger: 'auto',
@@ -934,7 +934,7 @@ describe('Backfill routes', () => {
       ignored: 0,
       done: 1,
     });
-    // What the page shows above the list stays the whole picture.
+    // The stats above the list stay unfiltered.
     assert.equal(stuck.body.stats.stuck, 3);
 
     const done = await call('GET', '/api/v1/backfill?filter=done&q=kitsuraga');
@@ -942,7 +942,7 @@ describe('Backfill routes', () => {
       done.body.series.map((s: { title: string }) => s.title),
       ['Sorato: Kitsuraga Next Lanterns']
     );
-    // A % is a percent sign, not "anything".
+    // % is literal, not a wildcard.
     const percent = await call(
       'GET',
       `/api/v1/backfill?filter=ignored&q=${encodeURIComponent('0% w')}`
@@ -962,8 +962,7 @@ describe('Backfill routes', () => {
 
 describe('Backfill: stalled downloads, and the AI second opinion end to end', () => {
   it('gives up on a torrent that gains nothing, and offers the next pack', async () => {
-    // Replacing on its own is off, and the next pack is not good enough
-    // for it anyway.
+    // Auto-replace is off, and the next pack isn't good enough anyway.
     getSettings().backfill = {
       ...getSettings().backfill,
       replaceFailed: false,
@@ -1033,7 +1032,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       'found'
     );
     backfillNotices.flush();
-    // It opens at that pack's review, on the title's page.
+    // It opens at that pack's review on the title's page.
     const offered = sent.filter(
       (s) =>
         s.payload.actionUrl ===
@@ -1050,13 +1049,13 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       true
     );
 
-    // The failed download's page says what became of it, and so does the
-    // title's list of backfills.
+    // The failed download's page and the title's backfill list both say what
+    // became of it.
     const page = await call('GET', `/api/v1/backfill/jobs/${job.id}`);
     assert.equal(page.status, 200);
     assert.equal(page.body.followUp, 'offered');
     assert.equal(page.body.replacedById, null);
-    // Once an admin takes the pack offered, it is what replaced it.
+    // Once an admin takes the offered pack, it's the replacement.
     clock.mock.restore();
     const taken = await call(
       'POST',
@@ -1099,7 +1098,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       (await jobs.findOneOrFail({ where: { id: res.body.id } })).stage,
       'Paused in qBittorrent'
     );
-    // Back to downloading: the clock starts from there, not from before.
+    // Back to downloading: the clock restarts from here.
     torrentState = 'stalledDL';
     now += 60_000;
     await backfill.tick();
@@ -1205,7 +1204,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     now += 11 * 60_000;
     await backfill.tick();
     assert.deepEqual(deleted, ['old-probe']);
-    // Not again until ten minutes on.
+    // Not again until ten minutes later.
     await backfill.tick();
     assert.deepEqual(deleted, ['old-probe']);
   });
@@ -1250,7 +1249,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     assert.equal(detail.status, 200);
     assert.equal(detail.body.retryAt, until);
     assert.equal(detail.body.log[0].count, 3);
-    // Once the wait is over, there is no time to give.
+    // Once the wait is over, there's no retry time.
     await getRepository(BackfillJob).update(waiting.id, {
       indexerWait: {
         indexer: 'Tabula Rasa',
@@ -1287,7 +1286,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     assert.equal(detail.body.followUp, 'agent');
     assert.equal(detail.body.agentRunId, 37);
     assert.equal(detail.body.replacedById, null);
-    // The title's list of backfills says it too (Sonarr left out of it).
+    // The title's backfill list says so too (without Sonarr).
     mock.method(backfill, 'context', async () => {
       throw new Error('Sonarr is down');
     });
@@ -1334,7 +1333,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       where: { id: res.body.id },
     });
     assert.notEqual(job.id, running.id);
-    // S03E06 is the other download's; this one takes only S03E07.
+    // S03E06 belongs to the other download; this one takes only S03E07.
     assert.deepEqual(
       job.files.map((f) => f.episodeIds),
       [[102]]
@@ -1344,7 +1343,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       new RegExp(`left out 1 already downloading in #${running.id}`)
     );
 
-    // A pack with nothing the running download does not already fetch.
+    // A pack with nothing the running download doesn't already fetch.
     const again = await getRepository(BackfillCandidate).save(
       new BackfillCandidate({
         ...candidate,
@@ -1446,7 +1445,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       quality: { id: 7, name: 'Bluray-1080p' },
       revision: { version: 1, real: 0 },
     };
-    // What Sonarr answered on the live server for these names.
+    // What the live Sonarr parsed for these names.
     const parsed: Record<string, unknown> = {
       '[Tengu] Kitsuraga - S05E17 (202)': {
         title: '',

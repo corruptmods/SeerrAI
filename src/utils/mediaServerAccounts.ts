@@ -2,12 +2,11 @@ import type { MediaServerKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 
 /*
- * Which media servers someone has accounts on, and which of them Seerr is
- * connected to, for the pages that show or use them: sign-in, linked
- * accounts, the user list and the profile.
+ * A user's media server accounts and which servers Seerr is connected to, for
+ * sign-in, linked accounts, the user list and the profile.
  */
 
-/** Each server's name, as people know it. */
+/** Display name per server kind. */
 export const SERVER_NAMES: Record<MediaServerKind, string> = {
   plex: 'Plex',
   jellyfin: 'Jellyfin',
@@ -20,7 +19,7 @@ const KIND_OF_USER_TYPE: Partial<Record<number, MediaServerKind>> = {
   [UserType.EMBY]: 'emby',
 };
 
-/** The server that holds someone's main account; none for a password one. */
+/** The server of a user's main account; none for a password account. */
 export const mainServerOf = (user: {
   userType: number;
 }): MediaServerKind | undefined => KIND_OF_USER_TYPE[user.userType];
@@ -30,10 +29,7 @@ interface PersonWithAccounts {
   linkedServers?: MediaServerKind[];
 }
 
-/**
- * The servers someone has accounts on, their main one first. An answer from
- * before people could have several only says their main one.
- */
+/** Servers the user has accounts on, main first. Older responses list only the main one. */
 export const accountServers = (user: PersonWithAccounts): MediaServerKind[] => {
   const main = mainServerOf(user);
   const linked = user.linkedServers ?? (main ? [main] : []);
@@ -43,13 +39,13 @@ export const accountServers = (user: PersonWithAccounts): MediaServerKind[] => {
   ];
 };
 
-/** Someone has an account on this server linked, connected or not. */
+/** Whether the user has a linked account on this server, connected or not. */
 export const hasAccountOn = (
   user: PersonWithAccounts | undefined,
   kind: MediaServerKind
 ): boolean => !!user && accountServers(user).includes(kind);
 
-/** Of someone's accounts, those on servers Seerr is connected to now. */
+/** The user's account servers that Seerr is currently connected to. */
 export const connectedAccountServers = (
   user: PersonWithAccounts,
   mediaServers: { kind: MediaServerKind }[]
@@ -58,7 +54,7 @@ export const connectedAccountServers = (
     mediaServers.some((server) => server.kind === kind)
   );
 
-/** The servers people may sign in with, the primary one first. */
+/** Servers allowed for sign-in, primary first. */
 export const signInServers = (settings: {
   mediaServerLogin: boolean;
   mediaServers: { kind: MediaServerKind; signIn: boolean }[];

@@ -1,51 +1,50 @@
 import type { MediaServerKind } from '@server/constants/server';
 
 /*
- * Who sees which library on each media server, as Settings → Media
- * Servers and a person's Libraries page show it (routes/settings/
- * libraryAccess).
+ * Per-server library access, for Settings → Media Servers and a user's
+ * Libraries page (routes/settings/libraryAccess).
  */
 
 export type AccessLibraryType = 'movie' | 'show' | 'music' | 'photo' | 'other';
 
 export interface AccessLibrary {
-  /** The server's id for it, as access lists it. */
+  /** The server's id, as access lists use it. */
   id: string;
   title: string;
   type: AccessLibraryType;
 }
 
-/** What one person may see. */
+/** The libraries one user may see. */
 export interface AccessSet {
-  /** Every library, new ones too. */
+  /** Every library, including new ones. */
   all: boolean;
-  /** The libraries they have; every one when `all`. */
+  /** Every one when `all`. */
   libraries: string[];
 }
 
-/** Someone a server is shared with, or an account on it. */
+/** A user the server is shared with, or an account on it. */
 export interface AccessPerson extends AccessSet {
-  /** Their id on the server. */
+  /** Server-side id. */
   id: string;
   name: string;
-  /** Their Seerr AI account, when one is linked. */
+  /** Linked Seerr AI user, if any. */
   userId?: number;
-  /** An administrator on Jellyfin or Emby: sees everything, never changed. */
+  /** Jellyfin/Emby administrator: sees everything, never changed. */
   admin?: boolean;
-  /** The account is switched off on the server. */
+  /** Disabled on the server. */
   disabled?: boolean;
 }
 
 export interface LibraryAccessView {
   kind: MediaServerKind;
   libraries: (AccessLibrary & {
-    /** How many of `people` (administrators left out) have it. */
+    /** Count of `people` (excluding administrators) with access. */
     sharedWith: number;
   })[];
   people: AccessPerson[];
 }
 
-/** Take a library away from everyone, or give it to everyone. */
+/** Remove a library from, or add it to, everyone. */
 export type AccessBulkAction = 'remove' | 'add';
 
 export interface AccessPlanPerson {
@@ -54,31 +53,30 @@ export interface AccessPlanPerson {
   userId?: number;
 }
 
-/** What a bulk change would do, before it is made. */
+/** Preview of a bulk change. */
 export interface AccessPlan {
   kind: MediaServerKind;
   library: AccessLibrary;
   action: AccessBulkAction;
-  /** Who would change. */
   change: AccessPlanPerson[];
-  /** Of those, who had every library: they stop getting new ones. */
+  /** Of `change`, those who had every library and stop getting new ones. */
   fromAll: number;
-  /** Who would be left with no library, and so is left as they are. */
+  /** Left unchanged because they would end up with no library. */
   emptied: AccessPlanPerson[];
-  /** Who already is as asked. */
+  /** Already as requested. */
   unchanged: number;
   /** Administrators, who always see everything. */
   admins: number;
 }
 
-/** One change made here, for its history and Undo. */
+/** One recorded change, for history and Undo. */
 export interface AccessChangeView {
   id: number;
   kind: MediaServerKind;
-  /** A bulk change, or one person's libraries. */
+  /** A bulk change, or one user's libraries. */
   action: AccessBulkAction | 'person';
   libraryTitle?: string;
-  /** For one person's change: who. */
+  /** For a 'person' change: whose. */
   personName?: string;
   byName?: string;
   createdAt: string;
@@ -87,23 +85,23 @@ export interface AccessChangeView {
   failed: number;
 }
 
-/** What a bulk change or an Undo did. */
+/** Result of a bulk change or Undo. */
 export interface AccessResult {
   change?: AccessChangeView;
   changed: number;
   failed: { name: string; error: string }[];
-  /** Undo: people no longer on the server, or changed since. */
+  /** Undo: users gone from the server or changed since. */
   skipped?: number;
 }
 
-/** A person's libraries on one server they have an account on. */
+/** A user's libraries on one server where they have an account. */
 export interface UserLibraryAccess {
   kind: MediaServerKind;
   libraries: AccessLibrary[];
-  /** "Every library, new ones too" can be given (Jellyfin and Emby). */
+  /** "Every library" can be granted (Jellyfin and Emby). */
   canGiveAll: boolean;
-  /** Missing when the server does not list them (not shared, or gone). */
+  /** Missing when the server doesn't list them (not shared, or gone). */
   person?: AccessPerson;
-  /** The server could not be read. */
+  /** Set when the server could not be read. */
   error?: string;
 }

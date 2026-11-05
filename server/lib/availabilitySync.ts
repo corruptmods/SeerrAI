@@ -45,11 +45,9 @@ import { In, MoreThan } from 'typeorm';
 /** What one media server said about one version of a title. */
 interface ServerCheck {
   server: MediaServerKind;
-  /** The server has it. */
   exists: boolean;
   /**
-   * The server answered that its id for the title is not there (a 404):
-   * the id is stale, not merely unanswered.
+   * The server answered 404 for its id: the id is stale, not just unanswered.
    */
   gone: boolean;
   /** For a show: the seasons the server has (only ever true). */
@@ -63,11 +61,11 @@ const serverIdColumns = () =>
 class AvailabilitySync {
   public running = false;
   /**
-   * The media servers changed while a run was under way (one was removed):
-   * the titles it had already checked are checked again once it finishes.
+   * A media server was removed mid-run: rerun once it finishes, since titles
+   * already checked used the old server list.
    */
   private runAgain = false;
-  /** The connected media servers this run asks, the primary one first. */
+  /** Connected media servers this run asks, primary first. */
   private servers: MediaServerKind[] = [];
   private plexClient?: PlexAPI;
   private plexSeasonsCache: Record<string, PlexMetadata[] | undefined>;
@@ -88,8 +86,8 @@ class AvailabilitySync {
   readonly tmdb = new TheMovieDb();
 
   async run() {
-    // A second run at once (Run now during a scheduled one) would reset the
-    // first one's caches under it and stop it when it finished.
+    // A concurrent run (Run now during a scheduled one) would reset the
+    // first's caches and stop it when finishing.
     if (this.running) {
       logger.debug('Availability sync is already running.', {
         label: 'AvailabilitySync',
@@ -101,7 +99,7 @@ class AvailabilitySync {
       do {
         this.runAgain = false;
         await this.syncOnce();
-        // Stopped (cancelled, or a server could not be reached): no rerun.
+        // Stopped (cancelled, or a server unreachable): no rerun.
       } while (this.runAgain && this.running);
     } finally {
       this.runAgain = false;
@@ -110,9 +108,8 @@ class AvailabilitySync {
   }
 
   /**
-   * Runs a sync now, or, when one is under way, once more after it: the
-   * media servers changed, and the titles it has already checked were
-   * checked against servers as they were.
+   * Runs a sync now, or once more after the current one, since the media
+   * servers changed under titles it already checked.
    */
   public runSoon(): Promise<void> {
     if (this.running) {
@@ -123,8 +120,8 @@ class AvailabilitySync {
   }
 
   /**
-   * Stops asking a server Seerr is no longer connected to (it was removed
-   * during the run): what it has must not keep a title available.
+   * Stops asking a server removed during the run: what it has must not keep
+   * a title available.
    */
   private dropRemovedServers(): void {
     const connected = connectedServers();
@@ -177,8 +174,8 @@ class AvailabilitySync {
         return;
       }
 
-      // Every connected server has to answer before anything is checked: a
-      // title on a server that cannot be asked would look deleted.
+      // Every connected server must answer first: a title on an unreachable
+      // server would look deleted.
       for (const server of this.servers) {
         if (!(await this.connect(server))) {
           this.running = false;
@@ -192,16 +189,14 @@ class AvailabilitySync {
         }
         this.dropRemovedServers();
 
-        // A blocklisted title stays blocklisted, files or not: marking it
-        // deleted would let it be requested again.
+        // Blocklisted stays blocklisted, files or not: marking it deleted
+        // would let it be requested again.
         if (isBlocklisted(media)) {
           continue;
         }
 
-        // Check every connected media server, Radarr and Sonarr for that
-        // specific media and if unavailable, then we change the status
-        // accordingly. If a non-4k or 4k version exists in at least one of
-        // them, we will only update that specific version.
+        // Check every media server, Radarr and Sonarr; update only the
+        // version (non-4K or 4K) that is missing everywhere.
         if (media.mediaType === 'movie') {
           const existsInRadarr = await this.mediaExistsInRadarr(media, false);
           const existsInRadarr4k = await this.mediaExistsInRadarr(media, true);
@@ -228,8 +223,7 @@ class AvailabilitySync {
           }
         }
 
-        // If both versions still exist on the media servers, we still need
-        // to check through sonarr to verify season availability
+        // Even when both versions exist, check per-season availability.
         if (media.mediaType === 'tv') {
           const checks = await this.checkServers(media, false);
           const checks4k = await this.checkServers(media, true);
@@ -266,11 +260,8 @@ class AvailabilitySync {
             await this.clearStaleIds(media, true, checks4k);
           }
 
-          // Here we will create a final map that will cross compare
-          // with the media servers and sonarr. Filtered seasons will go
-          // through each season and assume the season does not exist. If any
-          // media server or Sonarr finds that season, we will change the
-          // final seasons value to true. A season on any of them counts.
+          // Each season starts missing; it exists if any media server or
+          // Sonarr has it.
           const filteredSeasonsMap: Map<number, boolean> = new Map();
           media.seasons
             .filter(
@@ -304,7 +295,7 @@ class AvailabilitySync {
             ...sonarrSeasonsMap4k,
           ]);
 
-          // Each season's episode count, from where the scans take it
+          // Each season's episode count, from the scans' source.
           let tvShow: TmdbTvScanDetails | TmdbTvDetails | undefined;
           try {
             let found: TmdbTvScanDetails | TmdbTvDetails | undefined;
@@ -318,11 +309,9 @@ class AvailabilitySync {
               });
             }
 
-            // With TheTVDB chosen for series (Settings → Metadata), the scans
-            // number seasons its way, and so must this. TMDB can split a
-            // series' seasons differently: a season only TMDB has would read
-            // as missing here, and the next scan would set it back, hour
-            // after hour.
+            // With TheTVDB chosen for series (Settings → Metadata), number
+            // seasons as the scans do. Otherwise a TMDB-only season reads as
+            // missing here and the next scan restores it, every hour.
             if (found) {
               const provider = detectAnime(found)
                 ? await getMetadataProvider('anime')
@@ -340,10 +329,12 @@ class AvailabilitySync {
           }
 
           if (tvShow) {
-            // fill the finalSeasons and finalSeasons4k maps with false for missing seasons
+            // Mark missing seasons false in finalSeasons and finalSeasons4k.
             media.seasons.forEach((season) => {
-              // Specials don't count towards availability (baseScanner skips them too)
-              // TODO: doesn't respect enableSpecialEpisodes; needs a shared predicate with baseScanner.ts
+              // Specials don't count toward availability (baseScanner skips
+              // them too).
+              // TODO: respect enableSpecialEpisodes via a predicate shared with
+              // baseScanner.ts.
               if (season.seasonNumber === 0) {
                 return;
               }
@@ -394,7 +385,7 @@ class AvailabilitySync {
             await this.mediaUpdater(media, true);
           }
 
-          // TODO: Figure out how to run seasonUpdater for each season
+          // TODO: run seasonUpdater for each season.
 
           if ([...finalSeasons.values()].includes(false)) {
             await this.seasonUpdater(media, finalSeasons, false);
@@ -423,10 +414,9 @@ class AvailabilitySync {
   }
 
   /**
-   * Saves what the sync changed on a title. Every server's id is left out of
-   * the save unless the sync cleared it itself (`clearing`): the title was
-   * read at the start of its page, and a server removed since has had its
-   * ids taken off, which writing the old copy back would undo.
+   * Saves the sync's changes to a title. Server ids are left out unless the
+   * sync cleared them (`clearing`): the title was read at page start, and
+   * writing that copy back would restore ids of a server removed since.
    */
   private async saveTitle(
     media: Media,
@@ -435,7 +425,7 @@ class AvailabilitySync {
     const kept = serverIdColumns()
       .filter((column) => !clearing.includes(column))
       .map((column) => [column, media[column]] as const);
-    // A column left undefined is not written.
+    // Undefined columns aren't written.
     for (const [column] of kept) {
       (media as unknown as Record<string, unknown>)[column] = undefined;
     }
@@ -464,8 +454,8 @@ class AvailabilitySync {
 
     let mediaPage: Media[];
 
-    // Paged by id, not by position: titles marked deleted as the sync goes
-    // drop out of the set, and counting past them would skip as many others.
+    // Page by id, not offset: titles marked deleted leave the set, and an
+    // offset would skip as many others.
     do {
       mediaPage = await mediaRepository.find({
         where: whereOptions.map((where) => ({
@@ -482,18 +472,17 @@ class AvailabilitySync {
   }
 
   /**
-   * Gets ready to ask a server, and checks it answers. False, with the
-   * reason logged, when it cannot be asked.
+   * Sets up a server client and checks it answers; false (reason logged) if
+   * not.
    */
   private async connect(server: MediaServerKind): Promise<boolean> {
     if (server === 'plex') {
-      // Plex is asked with the owner's Plex token.
+      // Plex uses the owner's Plex token.
       const admin = await getRepository(User).findOne({
         select: { id: true, plexToken: true },
         where: { id: 1 },
       });
-      // As for Jellyfin below: without Plex to ask, every title Radarr
-      // and Sonarr do not have would look deleted.
+      // Without Plex, every title Radarr and Sonarr lack would look deleted.
       if (!admin?.plexToken) {
         logger.error('Plex admin is not configured.', {
           label: 'AvailabilitySync',
@@ -515,8 +504,7 @@ class AvailabilitySync {
       return true;
     }
 
-    // Jellyfin and Emby are asked with their API key, as their admin
-    // account (jellyfinAdmin).
+    // Jellyfin and Emby use their API key, as their admin (jellyfinAdmin).
     const name = serverName(server);
     const admin = await jellyfinAdmin(server);
     if (!admin) {
@@ -566,10 +554,9 @@ class AvailabilitySync {
   }
 
   /**
-   * A server that no longer has a version of a title another server still
-   * has loses its id for it, so the title page offers no Play button that
-   * leads nowhere. The title stays available; the server's next scan puts
-   * the id back if the title returns.
+   * Clears a server's id for a version it lost but another server still has,
+   * so the title page offers no dead Play button. The title stays available;
+   * the server's next scan restores the id if the title returns.
    */
   private async clearStaleIds(
     media: Media,
@@ -598,15 +585,14 @@ class AvailabilitySync {
     }
   }
 
-  /** The connected servers, by name, for messages. */
+  /** Connected server names, for messages. */
   private serverNames(): string {
     return this.servers.map(serverName).join(', ');
   }
 
   private async mediaUpdater(media: Media, is4k: boolean): Promise<void> {
     try {
-      // Check if an approved request for this version is still in flight
-      // to see if we need to keep the external metadata
+      // An approved request still in flight keeps the external metadata.
       let isMediaProcessing = false;
 
       const requestRepository = getRepository(MediaRequest);
@@ -630,9 +616,7 @@ class AvailabilitySync {
         isMediaProcessing = true;
       }
 
-      // Set the non-4K or 4K media to deleted
-      // and change related columns to null if media
-      // is not processing
+      // Mark this version deleted; clear its columns unless processing.
       media[is4k ? 'status4k' : 'status'] = MediaStatus.DELETED;
       await recordMediaDeletion(media.tmdbId, media.mediaType);
       media[is4k ? 'serviceId4k' : 'serviceId'] = isMediaProcessing
@@ -646,7 +630,7 @@ class AvailabilitySync {
         isMediaProcessing
           ? media[is4k ? 'externalServiceSlug4k' : 'externalServiceSlug']
           : null;
-      // Gone from every server: none of them keeps an id for it.
+      // Gone from every server: clear all their ids.
       const clearing = isMediaProcessing
         ? []
         : MEDIA_SERVER_KINDS.map((kind) => MEDIA_ID[kind][is4k ? 1 : 0]);
@@ -681,16 +665,13 @@ class AvailabilitySync {
     seasons: Map<number, boolean>,
     is4k: boolean
   ): Promise<void> {
-    // Filter out only the values that are false
-    // (media that should be deleted)
+    // Seasons that no longer exist.
     const seasonsPendingRemoval = new Map(
-      // Disabled linter as only the value is needed from the filter
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       [...seasons].filter(([_, exists]) => !exists)
     );
-    // Retrieve the season keys to pass into our log
     const seasonKeys = [...seasonsPendingRemoval.keys()];
-    // Specials can still be marked DELETED below, but shouldn't demote the show
+    // Specials can still be marked DELETED below, but don't demote the show.
     const nonSpecialSeasonKeys = seasonKeys.filter((key) => key !== 0);
 
     try {
@@ -749,8 +730,7 @@ class AvailabilitySync {
       )
     );
 
-    // Check for availability in all of the available radarr servers
-    // If any find the media, we will assume the media exists
+    // The movie exists if any Radarr server of this version has it.
     for (const server of this.radarrServers.filter(
       (server) => server.is4k === is4k
     )) {
@@ -785,10 +765,10 @@ class AvailabilitySync {
             resolution?.length === 2 && Number(resolution[0]) >= 2000;
 
           if (hasSameServerInBothModes && resolution?.length === 2) {
-            // Same server in both modes then use resolution to distinguish
+            // One server for both: tell versions apart by resolution.
             existsInRadarr = is4k ? is4kMovie : !is4kMovie;
           } else {
-            // One server type and if file exists, count it
+            // Dedicated server with a file: it counts.
             existsInRadarr = true;
           }
         }
@@ -820,8 +800,7 @@ class AvailabilitySync {
     let existsInSonarr = false;
     let preventSeasonSearch = false;
 
-    // Check for availability in all of the available sonarr servers
-    // If any find the media, we will assume the media exists
+    // The series exists if any Sonarr server of this version has it.
     for (const server of this.sonarrServers.filter((server) => {
       return server.is4k === is4k;
     })) {
@@ -873,9 +852,7 @@ class AvailabilitySync {
       }
     }
 
-    // Here we check each season for availability
-    // If the API returns an error other than a 404,
-    // we will have to prevent the season check from happening
+    // A non-404 API error prevents the season check.
     const seasonsMap: Map<number, boolean> = new Map();
 
     if (!preventSeasonSearch) {
@@ -909,9 +886,8 @@ class AvailabilitySync {
   ): Promise<boolean> {
     let seasonExists = false;
 
-    // Check each sonarr instance to see if the media still exists
-    // If found, we will assume the media exists and prevent removal
-    // We can use the cache we built when we fetched the series with mediaExistsInSonarr
+    // Found on any Sonarr instance: exists, so no removal. Uses the cache
+    // built by mediaExistsInSonarr.
     for (const server of this.sonarrServers.filter(
       (server) => server.is4k === is4k
     )) {
@@ -942,7 +918,6 @@ class AvailabilitySync {
     return seasonExists;
   }
 
-  // Plex
   private async mediaExistsInPlex(
     media: Media,
     is4k: boolean
@@ -953,9 +928,8 @@ class AvailabilitySync {
     let gone = false;
     let preventSeasonSearch = false;
 
-    // Check each plex instance to see if the media still exists
-    // If found, we will assume the media exists and prevent removal
-    // We can use the cache we built when we fetched the series with mediaExistsInPlex
+    // Found on Plex: exists, so no removal. Uses the cache built by
+    // mediaExistsInPlex.
     try {
       let plexMedia: PlexMetadata | undefined;
 
@@ -1019,7 +993,7 @@ class AvailabilitySync {
                     break;
                   }
                 } catch {
-                  // If we can't fetch episodes for a season, continue checking other seasons
+                  // Can't fetch this season's episodes: check the others.
                 }
               }
               if (verifiedAnySeason && !has4kInAnySeason) {
@@ -1051,7 +1025,7 @@ class AvailabilitySync {
       }
     }
 
-    // Here we check each season in plex for availability
+    // Per-season availability in Plex.
     if (media.mediaType === 'tv') {
       const seasonsMap: Map<number, boolean> = new Map();
       const filteredSeasons = media.seasons.filter(
@@ -1061,10 +1035,9 @@ class AvailabilitySync {
             MediaStatus.PARTIALLY_AVAILABLE
       );
 
-      // If Plex could not answer for the show (any error but a 404), it
-      // cannot say which seasons are there either. They are kept as they
-      // are, as the show is: no answer would read as every season gone, and
-      // those Sonarr has no files for would be marked deleted.
+      // Plex couldn't answer for the show (non-404 error): keep seasons as
+      // they are. Otherwise every season reads as gone, and those Sonarr has
+      // no files for would be marked deleted.
       if (preventSeasonSearch) {
         for (const season of filteredSeasons) {
           seasonsMap.set(season.seasonNumber, true);
@@ -1119,8 +1092,7 @@ class AvailabilitySync {
         seasonExistsInPlex = this.plexEpisodeExistsCache[cacheKey];
       } else {
         try {
-          // Season metadata exists, but we need to verify it has actual
-          // episode files. Plex can keep empty season entries.
+          // Plex can keep empty season entries; verify episode files exist.
           const episodes = await this.plexClient?.getChildrenMetadata(
             seasonMeta.ratingKey
           );
@@ -1140,8 +1112,7 @@ class AvailabilitySync {
             seasonExistsInPlex = episodeVersions.length > 0;
           }
         } catch {
-          // If we can't fetch episodes, assume the season exists
-          // to avoid false removal
+          // Can't fetch episodes: assume it exists to avoid false removal.
           seasonExistsInPlex = true;
         }
 
@@ -1152,7 +1123,6 @@ class AvailabilitySync {
     return seasonExistsInPlex;
   }
 
-  // Jellyfin
   private async mediaExistsInJellyfin(
     server: JellyfinFamilyKind,
     media: Media,
@@ -1167,9 +1137,8 @@ class AvailabilitySync {
     let gone = false;
     let preventSeasonSearch = false;
 
-    // Check each jellyfin instance to see if the media still exists
-    // If found, we will assume the media exists and prevent removal
-    // We can use the cache we built when we fetched the series with mediaExistsInJellyfin
+    // Found on Jellyfin: exists, so no removal. Uses the cache built by
+    // mediaExistsInJellyfin.
     try {
       let jellyfinMedia: JellyfinLibraryItem | undefined;
 
@@ -1177,7 +1146,7 @@ class AvailabilitySync {
 
       if (id && client) {
         jellyfinMedia = await client.getItemData(id);
-        // Answered, without the item: the id is no longer there.
+        // Answered without the item: the id is stale.
         gone = jellyfinMedia === undefined;
 
         if (media.mediaType === 'tv' && jellyfinMedia !== undefined) {
@@ -1207,7 +1176,7 @@ class AvailabilitySync {
       }
     }
 
-    // Here we check each season in jellyfin for availability
+    // Per-season availability in Jellyfin.
     if (media.mediaType === 'tv') {
       const seasonsMap: Map<number, boolean> = new Map();
       const filteredSeasons = media.seasons.filter(
@@ -1217,10 +1186,9 @@ class AvailabilitySync {
             MediaStatus.PARTIALLY_AVAILABLE
       );
 
-      // If Jellyfin could not answer for the show (any error but a 404), it
-      // cannot say which seasons are there either. They are kept as they
-      // are, as the show is: no answer would read as every season gone, and
-      // those Sonarr has no files for would be marked deleted.
+      // Jellyfin couldn't answer for the show (non-404 error): keep seasons
+      // as they are. Otherwise every season reads as gone, and those Sonarr
+      // has no files for would be marked deleted.
       if (preventSeasonSearch) {
         for (const season of filteredSeasons) {
           seasonsMap.set(season.seasonNumber, true);
@@ -1281,10 +1249,8 @@ class AvailabilitySync {
           seasonExistsInJellyfin = this.jellyfinEpisodeExistsCache[cacheKey];
         } else {
           try {
-            // Season metadata exists, but we need to verify it has actual
-            // episode files. Jellyfin keeps season entries even after all
-            // episodes are deleted. getEpisodes already filters out
-            // virtual episodes.
+            // Jellyfin keeps season entries after all episodes are deleted;
+            // verify files exist. getEpisodes already drops virtual episodes.
             const episodes = await this.jellyfinClients[server]?.getEpisodes(
               seriesId,
               seasonMeta.Id
@@ -1292,8 +1258,7 @@ class AvailabilitySync {
 
             seasonExistsInJellyfin = !!episodes?.length;
           } catch {
-            // If we can't fetch episodes, assume the season exists
-            // to avoid false removal
+            // Can't fetch episodes: assume it exists to avoid false removal.
             seasonExistsInJellyfin = true;
           }
 

@@ -10,10 +10,10 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
 /*
- * The Quality Profiles Check job, hourly: TRaSH Guides once every 24 hours
- * while a managed server uses it, each managed server's state (what Health shows),
- * TRaSH Guides updates applied on their own only when an admin turned that
- * on, and the Backfill step-down every six hours.
+ * Hourly Quality Profiles Check: refreshes TRaSH Guides every 24 hours while
+ * a managed server uses it, refreshes each managed server's state (shown in
+ * Health), auto-applies TRaSH updates only when enabled, and runs the
+ * Backfill step-down every six hours.
  */
 
 const LABEL = 'Quality';

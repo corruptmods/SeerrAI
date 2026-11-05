@@ -63,9 +63,8 @@ export const SettingsProvider = ({
     fallbackData: currentSettings,
   });
 
-  // A failed refresh keeps the settings last loaded (SWR holds on to them):
-  // falling back to the defaults would turn features off until it next
-  // succeeded.
+  // SWR keeps the last settings on a failed refresh; defaults would turn
+  // features off until it succeeded.
   const newSettings = data ?? defaultSettings;
 
   return (

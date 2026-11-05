@@ -19,9 +19,9 @@ import { Router } from 'express';
 const serviceRoutes = Router();
 
 /*
- * Anyone signed in reads these, for the request window. Why a server did
- * not answer (its address, the error) is for the log; people are told
- * only that it did not.
+ * Anyone signed in reads these for the request window. Failure details
+ * (address, error) go to the log only; clients just learn the server didn't
+ * answer.
  */
 const serverFailed = (
   next: NextFunction,
@@ -249,7 +249,7 @@ serviceRoutes.get<{ tmdbId: string }>(
   }
 );
 
-/** A Lidarr server as the request window needs it: nothing secret. */
+/** A Lidarr server as the request window needs it, without secrets. */
 const lidarrServer = (lidarr: LidarrSettings): LidarrServer => ({
   id: lidarr.id,
   name: lidarr.name,
@@ -262,10 +262,10 @@ const lidarrServer = (lidarr: LidarrSettings): LidarrServer => ({
 });
 
 /*
- * Lidarr, for the music request window: only for people with music on.
- * Given `?artist=<MusicBrainz id>`, it also says whether that artist is in
- * this Lidarr already, and where: an artist's folder and profiles are its
- * own in Lidarr, and a request does not change them.
+ * Lidarr for the music request window, only for people with music on. With
+ * `?artist=<MusicBrainz id>`, also says whether and where that artist already
+ * is in Lidarr: its folder and profiles are its own there, and a request
+ * doesn't change them.
  */
 serviceRoutes.get('/lidarr', requireMusic, async (_req, res) => {
   return res.status(200).json(getSettings().lidarr.map(lidarrServer));

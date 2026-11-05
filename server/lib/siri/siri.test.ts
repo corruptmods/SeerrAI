@@ -27,9 +27,9 @@ import path from 'node:path';
 import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * "Fix this show" through the real API validator: what is playing, the
- * report, and the yes or no to a fix that replaces files. What is playing
- * and the fixes themselves are stubbed; what is filed is checked.
+ * "Fix this show" through the real API validator: now playing, the report,
+ * and the yes or no to a fix that replaces files. Now playing and the fixes
+ * are stubbed; what is filed is checked.
  */
 
 setupTestDb();
@@ -282,8 +282,8 @@ describe('Siri: a report', () => {
   });
 
   it('asks before replacing a file, and does it on a yes', async () => {
-    // Sent back without asking what is playing first: named from TMDB.
-    // TMDB sets its methods on each instance: answered from the prototype.
+    // Reported without a now-playing lookup first, so named from TMDB.
+    // TMDB assigns methods per instance; a no-op setter keeps this stub.
     Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
       configurable: true,
       set() {},
@@ -317,7 +317,7 @@ describe('Siri: a report', () => {
       { issueId: issue.id, kind: 'broken', language: undefined },
     ]);
 
-    // Answered once: not again.
+    // A second answer to the same question is refused.
     const again = await call('POST', '/now-playing/answer', {
       confirm: asked.body.confirm,
       answer: 'yes',

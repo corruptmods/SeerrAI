@@ -10,7 +10,7 @@ export interface ListItem {
   posterPath?: string | null;
   releaseDate?: string;
   watchedAt?: string | null;
-  /** When it was added to the list. */
+  /** When added to the list. */
   createdAt?: string;
   mediaInfo?: { status?: number };
   availableEpisodes?: number;
@@ -35,34 +35,28 @@ export interface ListDetailData {
   /** Whether the viewer has accepted the list; the owner always has. */
   accepted: boolean;
   watchedSync?: boolean;
-  /** For the owner: people on the list whose watch history cannot be read. */
+  /** For the owner: members whose watch history can't be read. */
   cannotCheck?: { id: number; displayName: string }[];
   owner: { id: number; displayName: string };
   members: { id: number; displayName: string; accepted: boolean }[];
   items: ListItem[];
 }
 
-/**
- * Watchable means there is something to play right now. A partially available
- * series counts — you can watch the episodes that are here.
- */
+/** Whether something is playable now; a partly available series counts. */
 export const isWatchable = (item: ListItem): boolean =>
   item.mediaInfo?.status === MediaStatus.AVAILABLE ||
   item.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE;
 
 /**
- * Loads a list and derives the three groups the page renders.
- *
- * Kept out of the component so the grouping rules — which decide what the
- * roulette may land on — can be read and tested on their own.
+ * Loads a list and derives the page's three groups. Separate from the
+ * component so the grouping (which drives the roulette) is testable.
  */
 export const useListDetail = (listId: number | string | undefined) => {
   const { data, error, mutate } = useSWR<ListDetailData>(
     listId ? `/api/v1/list/${listId}` : null,
     {
-      // A playlist's songs are matched and requested in the background:
-      // followed closely while any are being found or requested, then less
-      // often while requested ones are still on their way.
+      // Songs are matched and requested in the background: poll fast while
+      // any are in progress, slower while requested ones are pending.
       refreshInterval: (latest) => {
         const songs = latest?.playlist?.songs ?? [];
         if (
@@ -83,8 +77,7 @@ export const useListDetail = (listId: number | string | undefined) => {
 
   const items = data?.items ?? [];
 
-  // Watched titles move to their own section so the list reads as what is
-  // still outstanding, with the finished ones kept below rather than removed.
+  // Watched titles move to their own section below rather than being removed.
   const watched = items.filter((item) => item.watchedAt);
   const unwatched = items.filter(
     (item) => !item.watchedAt && isWatchable(item)
@@ -93,7 +86,7 @@ export const useListDetail = (listId: number | string | undefined) => {
     (item) => !item.watchedAt && !isWatchable(item)
   );
 
-  /** The roulette only offers things that can actually be played tonight. */
+  /** Roulette candidates: only playable items. */
   const rouletteCandidates = (type: 'movie' | 'tv' | 'all') =>
     type === 'all'
       ? unwatched

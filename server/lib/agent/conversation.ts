@@ -1,11 +1,11 @@
 import type { ConverseMessage } from '@server/lib/ai/providers';
 
 /*
- * What the admin agent's model is told, and a saved conversation kept
- * fit to send again: every call answered, old tool results cut short.
+ * The admin agent's system prompt, and helpers that keep a saved
+ * conversation valid to resend.
  */
 
-/** Room for its thinking out loud and a tool call or two. */
+/** Room for reasoning plus a tool call or two. */
 export const TURN_TOKENS = 1500;
 
 export const SYSTEM = `You are the admin agent of a home media server run with Seerr, Sonarr, Radarr, Lidarr, Prowlarr and Backfill. You work like a careful admin by hand: get missing episodes, movies and albums downloaded when the automatic searches could not. An admin talks with you in a chat; do what they ask, including extra checks or changes of plan, and keep to it for the rest of the conversation.
@@ -22,14 +22,13 @@ How to work:
 
 Reply in short plain text, no headings or markdown: what was missing, what you found, what you started downloading (with its Backfill job number), and what is still missing and why.`;
 
-/** Above this, the oldest tool results are cut short to keep costs down. */
+/** Above this, the oldest tool results are shortened to cut cost. */
 const MAX_CONVERSATION_CHARS = 120_000;
 
 /**
- * A long conversation is resent on every turn. Past this size, the oldest
- * tool results (searches and file lists it has long acted on) are cut to
- * their first line; everything said, and each call and its answer's place,
- * stays.
+ * Cuts the oldest tool results to their first line until the conversation
+ * fits MAX_CONVERSATION_CHARS, since it is resent every turn. Text and each
+ * call/answer pairing stay.
  */
 export const compact = (messages: ConverseMessage[]): ConverseMessage[] => {
   const size = () =>
@@ -56,20 +55,18 @@ export const compact = (messages: ConverseMessage[]): ConverseMessage[] => {
   return messages;
 };
 
-/** Calls it asked for after it was told it had no steps left. */
+/** Answer for calls made after the step limit. */
 export const PAST_LIMIT =
   'Not run: that was past the step limit for this go. Ask for it again if it is still wanted.';
 
-/** Calls whose answer never came back, so it is not known what they did. */
+/** Answer for calls whose result never came back. */
 const NO_ANSWER =
   'No answer: it stopped on an error before this answer came back, so it may or may not have been done. Look at where things stand before doing it again.';
 
 /**
- * Every tool call answered in the message after it. Both APIs refuse a
- * conversation with a call left unanswered, so one saved that way (it
- * stopped on an error between a call and its answer, or was saved so by an
- * older version) could never be replied to; each such call is answered as
- * having no answer.
+ * Answers every unanswered tool call with NO_ANSWER. Both APIs reject a
+ * conversation with an unanswered call, such as one saved after an error
+ * mid-call.
  */
 export const answerCalls = (messages: ConverseMessage[]): ConverseMessage[] => {
   const out: ConverseMessage[] = [];
@@ -90,7 +87,7 @@ export const answerCalls = (messages: ConverseMessage[]): ConverseMessage[] => {
       }))
     );
     out.push({ role: 'tool', results });
-    // Its answers so far are in the one just added.
+    // The existing tool message is merged into the one just pushed.
     if (next?.role === 'tool') i += 1;
   }
   return out;

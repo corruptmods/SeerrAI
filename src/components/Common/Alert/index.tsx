@@ -11,8 +11,8 @@ interface AlertProps {
 }
 
 const Alert = ({ title, children, type }: AlertProps) => {
-  // Theme colours (tailwind.config.js). The pale text of dark mode would be
-  // lost on a light page, so light mode has its own.
+  // Theme colours (tailwind.config.js). Light mode has its own text: dark
+  // mode's pale text is lost on a light page.
   let design = {
     bgColor: 'border border-warning backdrop-blur bg-warning-soft/20',
     titleColor: 'text-yellow-100 light:text-warning-text',

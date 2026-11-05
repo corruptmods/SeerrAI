@@ -6,7 +6,6 @@ export enum MediaRequestStatus {
   COMPLETED,
 }
 
-/** The longest reason that can be given for declining a request. */
 export const DECLINE_REASON_MAX_LENGTH = 500;
 
 export enum MediaType {
@@ -17,9 +16,9 @@ export enum MediaType {
 }
 
 /**
- * Films and series: what everything built around TMDB, Radarr and Sonarr
- * works on. Code that goes through titles in bulk keeps to these, so an
- * artist never reaches a lookup or a service meant for video.
+ * Films and series: everything built around TMDB, Radarr and Sonarr. Bulk title
+ * code keeps to these, so an artist never reaches a video-only lookup or
+ * service.
  */
 export type VideoMediaType = MediaType.MOVIE | MediaType.TV;
 
@@ -34,8 +33,8 @@ export const isVideo = (
   mediaType === MediaType.MOVIE || mediaType === MediaType.TV;
 
 /**
- * MusicBrainz's "Various Artists", credited on compilations. Lidarr cannot
- * add it, so its albums cannot be requested.
+ * MusicBrainz's "Various Artists", credited on compilations. Lidarr can't add
+ * it, so its albums can't be requested.
  */
 export const VARIOUS_ARTISTS_MBID = '89ad4ac3-39f7-470e-963a-56509c546377';
 

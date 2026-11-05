@@ -29,11 +29,9 @@ import {
   mock,
 } from 'node:test';
 
-/*
- * Sending a music request to Lidarr, against a Lidarr on localhost that
- * writes down every call: which calls, in which order, and that nothing is
- * ever unmonitored or an existing artist's setup changed.
- */
+// Sending music requests to a local fake Lidarr that records every call: which
+// calls, in what order, and that nothing is ever unmonitored or an existing
+// artist's setup changed.
 
 setupTestDb();
 
@@ -63,7 +61,7 @@ const lookedUpAlbum = (mbId: string, title: string): LidarrAlbum => ({
   artist: lookedUpArtist(),
 });
 
-/** An approved request for these albums, saved as if already there. */
+/** An approved request for these albums, saved as pre-existing data. */
 const approvedRequest = async (
   albums: { mbId: string; title: string }[],
   overrides: Partial<MediaRequest> = {}
@@ -119,7 +117,7 @@ const approvedRequest = async (
 const calls = (method: string, path: string) =>
   lidarr.calls.filter((call) => call.method === method && call.path === path);
 
-/** Nothing anywhere asked Lidarr to stop monitoring something. */
+/** Asserts no call unmonitored anything. */
 const assertNothingUnmonitored = () => {
   for (const call of lidarr.calls) {
     assert.notEqual(call.body?.monitored, false, `${call.method} ${call.path}`);
@@ -141,7 +139,7 @@ beforeEach(() => {
   lidarr.reset();
   cacheManager.getCache('lidarr').flush();
   getSettings().lidarr = [lidarr.settings()];
-  // Notifications are not what these tests are about.
+  // Notifications are out of scope here.
   mock.method(MediaRequest, 'sendNotification', async () => true);
 });
 
@@ -258,7 +256,7 @@ describe('sending a music request to Lidarr', () => {
       string,
       never
     >;
-    // The server's own setup where the request chose none.
+    // The server's defaults, since the request chose none.
     assert.equal(body.qualityProfileId, 1);
     assert.equal(body.metadataProfileId, 2);
     assert.equal(body.rootFolderPath, '/music');
@@ -311,7 +309,7 @@ describe('sending a music request to Lidarr', () => {
         { mbId: STATIC_GARDEN, title: 'Static Garden' },
         { mbId: FOG_B, title: 'Fog B' },
       ],
-      // Chosen for the request, but an artist Lidarr has keeps its own.
+      // Chosen for the request, but an existing artist keeps its own.
       { profileId: 4, rootFolder: '/flac', metadataProfileId: 9 }
     );
 
@@ -337,8 +335,8 @@ describe('sending a music request to Lidarr', () => {
       string,
       never
     >;
-    // The artist as Lidarr has it (Lidarr refuses an album without its
-    // id, profiles and folder), its own folder and profiles, not the
+    // The artist as Lidarr has it (Lidarr rejects an album without its id,
+    // profiles and folder), with its own folder and profiles, not the
     // request's.
     assert.deepEqual(added.artist, lidarr.artists[0]);
     assert.deepEqual(added.addOptions, { searchForNewAlbum: true });
@@ -423,8 +421,8 @@ describe('sending a music request to Lidarr', () => {
       { searchForNewAlbum: false }
     );
 
-    // Lidarr now has the artist and the album: asked again, it monitors
-    // the album but does not search for it.
+    // Lidarr now has the artist and album: resending monitors the album but
+    // doesn't search.
     lidarr.calls = [];
     const again = await getRepository(MediaRequest).findOneOrFail({
       where: { id: one.id },
@@ -495,7 +493,7 @@ describe('sending a music request to Lidarr', () => {
     ).artist;
     assert.deepEqual(artist.tags, [3, tag]);
 
-    // An artist Lidarr has gets the tag added to its own, nothing else.
+    // An existing artist only gets the tag added.
     lidarr.calls = [];
     lidarr.artists[0].monitored = true;
     lidarr.artists[0].tags = [8];
@@ -600,7 +598,7 @@ describe('when a music request is approved', () => {
       asked.every((album) => album.status === MediaRequestStatus.APPROVED)
     );
 
-    // Saving it again without a change of status sends nothing more.
+    // Re-saving without a status change sends nothing.
     lidarr.calls = [];
     const again = await getRepository(MediaRequest).findOneOrFail({
       where: { id: request.id },
@@ -629,9 +627,9 @@ describe('when a music request is approved', () => {
   });
 
   it('fails, and stays failed, when approved as it is made and Lidarr cannot take it', async () => {
-    // On Postgres, sending began inside the request's own save, so a quick
-    // failure was written on another connection that could not yet see the
-    // new request: it stayed approved while "failed" went out.
+    // Regression: on Postgres, sending started inside the save, so a quick
+    // failure was written on a connection that couldn't see the new request
+    // yet, leaving it approved while "failed" went out.
     const notified: Notification[] = [];
     mock.method(
       MediaRequest,
@@ -662,7 +660,7 @@ describe('when a music request is approved', () => {
       { listeners: false }
     );
 
-    // Lidarr cannot look the album up, so it fails straight away.
+    // Lidarr can't look the album up, so it fails immediately.
     const request = await getRepository(MediaRequest).save(
       new MediaRequest({
         type: MediaType.MUSIC,
@@ -688,7 +686,7 @@ describe('when a music request is approved', () => {
     }
     assert.equal(await statusOf(request.id), MediaRequestStatus.FAILED);
 
-    // Told within minutes, by the notification reconciler, and once.
+    // Notified once, by the notification reconciler.
     await notificationReconciler.run();
     await notificationReconciler.run();
     assert.deepEqual(
@@ -702,8 +700,8 @@ describe('when a music request is approved', () => {
   });
 
   it('fails at once when its Lidarr was removed and there is no default', async () => {
-    // With no Lidarr at all it stays approved instead, as music fulfilled by
-    // hand would (routes/requestRecover.test.ts).
+    // With no Lidarr at all it stays approved, like music fulfilled by hand
+    // (routes/requestRecover.test.ts).
     getSettings().lidarr = [lidarr.settings({ id: 3, isDefault: false })];
     const request = await approvedRequest(
       [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],

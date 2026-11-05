@@ -19,24 +19,22 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Apple Music's charts, as Music's Top Songs, Trending, Top Albums and Top
- * Artists rows. Apple names each song and album; each is matched once to
- * MusicBrainz (its artist by name, then the song or album among theirs),
- * and the match kept for a month, so only what is new on a chart costs a
- * lookup. Matching runs behind the scenes, in MusicBrainz's background
- * line: a chart's rows show what has been matched so far, and fill in.
+ * Apple Music charts for the Top Songs, Trending, Top Albums and Top Artists
+ * rows. Each entry is matched to MusicBrainz once (artist by name, then the
+ * song or album) and cached for a month, so only new entries cost lookups.
+ * Matching runs in MusicBrainz's background queue; rows fill in over time.
  */
 
 const DAY = 24 * 60 * 60 * 1000;
-/** A match holds for a month; one not found is tried again the next day. */
+/** Matches are cached a month; misses are retried after a day. */
 const MATCH_KEPT = 30 * DAY;
 const MISS_KEPT = DAY;
-/** Songs out this recently are Trending. */
+/** Max song age in days for Trending. */
 export const TRENDING_DAYS = 30;
 
 const LABEL = 'Music charts';
 
-/** An album a chart's entry was matched to. */
+/** Album a chart entry matched. */
 export interface ChartAlbum {
   id: string;
   title: string;
@@ -52,7 +50,7 @@ interface ChartArtist {
   name: string;
 }
 
-/** The charts' country: Discover's region, else the United States. */
+/** Chart country: Discover's region, else "us". */
 export const chartCountry = (): string => {
   const region = getSettings().main.discoverRegion?.trim().toLowerCase();
   return region && /^[a-z]{2}$/.test(region) ? region : 'us';
@@ -60,12 +58,12 @@ export const chartCountry = (): string => {
 
 // ---- keeping matches --------------------------------------------------------
 
-/** Matches read this run, so a page of rows reads the database once. */
+/** In-process cache so a page of rows reads the database once. */
 const memory = new Map<string, { data: unknown; expiresAt: number }>();
 
 /**
- * The most matches held in memory; the database keeps the rest. Playlists
- * name artists without end, so the longest held are let go first.
+ * Max matches in memory; the database keeps the rest. Playlists name
+ * unbounded artists, so the oldest are evicted first.
  */
 export const MOST_HELD = 2000;
 
@@ -77,7 +75,7 @@ const hold = (key: string, data: unknown, expiresAt: number): void => {
   }
 };
 
-/** A kept match: the match, null for none found, undefined if not tried. */
+/** Cached matches: the match, null for a miss, absent if not tried. */
 const keptMany = async <T>(keys: string[]): Promise<Map<string, T | null>> => {
   const now = Date.now();
   const found = new Map<string, T | null>();
@@ -122,17 +120,14 @@ const keep = async (key: string, data: unknown): Promise<void> => {
 
 // ---- matching ---------------------------------------------------------------
 
-/** For comparing names: case, accents, quotes and punctuation aside. */
+/** Normalises a name for comparison, ignoring punctuation. */
 export const plainName = (name: string): string =>
   normalizeTitle(name)
     .replace(/&/g, ' and ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 
-/**
- * Apple's song title without what only credits someone: "Song (feat. B)"
- * and "Song (duet with B)" are the song "Song".
- */
+/** Strips credit brackets: "Song (feat. B)" and "Song (duet with B)". */
 export const chartSongTitle = (name: string): string =>
   name
     .replace(
@@ -142,8 +137,8 @@ export const chartSongTitle = (name: string): string =>
     .trim() || name;
 
 /**
- * Apple's album title without what Apple adds: "Album - EP", "Album -
- * Single", and editions MusicBrainz keeps under the album itself.
+ * Strips Apple's " - EP" / " - Single" suffixes and edition brackets that
+ * MusicBrainz files under the album itself.
  */
 export const chartAlbumTitle = (name: string): string =>
   name
@@ -154,7 +149,7 @@ export const chartAlbumTitle = (name: string): string =>
     )
     .trim() || name;
 
-/** The titles an album may be under, as Apple names it first. */
+/** Candidate album titles, Apple's own first. */
 export const albumTitles = (name: string): string[] => {
   const title = chartAlbumTitle(name);
   const before = title.split(/\s*:\s+/)[0]?.trim();
@@ -162,9 +157,8 @@ export const albumTitles = (name: string): string[] => {
 };
 
 /**
- * Whom an entry is credited to, most likely first: as Apple writes it
- * ("Simon & Garfunkel" is one act), then the first of several ("A & B",
- * "A, B & C", "A feat. B").
+ * Candidate artist names, most likely first: the full credit ("A & B" may
+ * be one act), then the first of several ("A, B & C", "A feat. B").
  */
 export const creditedNames = (artistName: string): string[] => {
   const first = artistName
@@ -202,31 +196,29 @@ const artistFor = async (artistName: string): Promise<ChartArtist | null> => {
 };
 
 /**
- * A song named by its title and artist (as a chart or a playlist names
- * it), among the artist's recordings on MusicBrainz, or null. Background
- * work: it waits its turn behind what people are looking at.
+ * Finds a song by title and artist among the artist's MusicBrainz
+ * recordings, or null. Uses the background queue, behind user requests.
  */
 export const songNamed = async (
   name: string,
   artistName: string,
   /**
-   * The version that will be asked for: kept as found, so asking for it
-   * needs no second lookup. The best known, when not given.
+   * Version that will be requested; its recording is cached so the request
+   * needs no second lookup. Defaults to the best known.
    */
   pick: (song: Song) => SongVersion | undefined = (song) => song.versions[0]
 ): Promise<Song | null> => {
   const artist = await artistFor(artistName);
   if (!artist) return null;
   const title = chartSongTitle(name);
-  // Songs are grouped under their title without what names a version
-  // ("Song (Tide Me Over)", "Song [Remix]" are "Song"), so that is what is
-  // looked for; the rest picks the version below.
+  // Songs group under the title without version parts ("Song [Remix]" is
+  // "Song"), so search that; the full title picks the version below.
   const { songTitle } = splitTitle(title);
   const wanted = plainName(songTitle);
   let song: Song | undefined;
   let recordings: MbRecording[] = [];
-  // MusicBrainz's search drops "&" but keeps "and": "Salt & Sand" is
-  // only found as "Salt Sand", and the other way round.
+  // MusicBrainz search drops "&" but keeps "and": "A & B" is only found as
+  // "A B", and vice versa.
   for (const phrase of [
     ...new Set([
       songTitle,
@@ -241,7 +233,7 @@ export const songNamed = async (
       'background'
     );
     recordings = found.recordings ?? [];
-    // Its versions all: the one a playlist means may be little known.
+    // Keep all versions: the one a playlist means may be obscure.
     song = groupSongs(recordings, songTitle, [artist.id], {
       songs: 5,
       versions: 50,
@@ -249,7 +241,7 @@ export const songNamed = async (
     if (song) break;
   }
   if (!song) return null;
-  // The version the title names, when some are titled just so.
+  // Narrow to versions titled exactly as given, when only some are.
   const full = plainName(title);
   const named = song.versions.filter((v) => plainName(v.title) === full);
   const result =
@@ -266,10 +258,8 @@ export const songNamed = async (
 };
 
 /**
- * A song by its recording's ISRC, as a store lists it: the artist's
- * recordings on MusicBrainz with that code, the very take meant, or null
- * when MusicBrainz has none of the artist's with it. Background work, as
- * songNamed.
+ * Finds the artist's MusicBrainz recordings with this ISRC (the exact
+ * take), or null. Uses the background queue, like songNamed.
  */
 export const songByIsrc = async (
   isrc: string,
@@ -294,11 +284,10 @@ export const songByIsrc = async (
   return song;
 };
 
-/** The song on a chart, among its artist's recordings. */
 const matchSong = (entry: AppleChartEntry): Promise<Song | null> =>
   songNamed(entry.name, entry.artistName);
 
-/** Which of an artist's albums is a chart's: its own albums before others. */
+/** Rank for picking a chart album: plain albums and EPs first. */
 const rank = (group: MbReleaseGroup): number =>
   (group['secondary-types']?.length ? 2 : 0) +
   (['Album', 'EP'].includes(group['primary-type'] ?? '') ? 0 : 1);
@@ -309,8 +298,8 @@ const matchAlbum = async (
   const artist = await artistFor(entry.artistName);
   if (!artist) return null;
   let group: MbReleaseGroup | undefined;
-  // An edition Apple names after a colon ("Album: The Encore") is kept
-  // under the album itself when MusicBrainz has it on its own.
+  // Apple's colon editions ("Album: The Encore") fall back to the base
+  // title, which MusicBrainz files them under.
   for (const title of albumTitles(entry.name)) {
     const found = await musicBrainz().searchReleaseGroupsBy(title, [artist.id]);
     const wanted = plainName(title);
@@ -339,10 +328,10 @@ const songKey = (country: string, entry: AppleChartEntry) =>
 const albumKey = (country: string, entry: AppleChartEntry) =>
   `chart-album:${country}:${entry.id}`;
 
-/** Matching under way, by country: one at a time. */
+/** In-flight matching per country; one run at a time. */
 const filling = new Map<string, Promise<void>>();
 
-/** Matches what has not been tried yet, in chart order. */
+/** Matches untried entries in chart order. */
 const fill = (
   country: string,
   songs: AppleChartEntry[],
@@ -356,7 +345,7 @@ const fill = (
     const triedAlbums = await keptMany<ChartAlbum>(
       albums.map((e) => albumKey(country, e))
     );
-    // Alternating, so neither row waits for the other to be done.
+    // Alternate songs and albums so neither row waits on the other.
     const todo: (() => Promise<void>)[] = [];
     const length = Math.max(songs.length, albums.length);
     for (let i = 0; i < length; i++) {
@@ -377,7 +366,7 @@ const fill = (
       try {
         await step();
       } catch (e) {
-        // Tried again on the next visit: MusicBrainz busy, a timeout.
+        // Retried on the next visit (MusicBrainz busy, timeout).
         logger.debug('Could not match a chart entry to MusicBrainz', {
           label: LABEL,
           errorMessage: e instanceof Error ? e.message : String(e),
@@ -399,8 +388,8 @@ export interface Charts {
 }
 
 /**
- * The charts, as far as they are matched, in chart order; what is not yet
- * is matched behind the scenes, for next time.
+ * Matched chart entries in chart order; unmatched ones are matched in the
+ * background for next time.
  */
 export const charts = async (): Promise<Charts> => {
   const country = chartCountry();
@@ -439,14 +428,14 @@ export const charts = async (): Promise<Charts> => {
   };
 };
 
-/** Songs on the chart that came out lately, highest first. */
+/** Chart songs released within TRENDING_DAYS, in chart order. */
 export const trending = (songs: ChartSong[], now = Date.now()): ChartSong[] =>
   songs.filter(({ entry }) => {
     const out = Date.parse(entry.releaseDate ?? '');
     return Number.isFinite(out) && now - out <= TRENDING_DAYS * DAY;
   });
 
-/** The artists of the charts, in the order they first appear. */
+/** Chart artists in order of first appearance. */
 export const chartArtists = ({ songs, albums }: Charts): ChartArtist[] => {
   const seen = new Set<string>();
   const artists: ChartArtist[] = [];
@@ -465,15 +454,15 @@ export const chartArtists = ({ songs, albums }: Charts): ChartArtist[] => {
   return artists;
 };
 
-/** For tests: forget what this run has read. */
+/** For tests: clears the in-memory cache. */
 export const forgetChartMatches = () => {
   memory.clear();
 };
 
-/** For tests: how many matches are held in memory. */
+/** For tests: in-memory cache size. */
 export const chartMatchesHeld = (): number => memory.size;
 
-/** For tests: once matching under way is done. */
+/** For tests: resolves when in-flight matching finishes. */
 export const chartsMatched = async (): Promise<void> => {
   await Promise.all(filling.values());
 };

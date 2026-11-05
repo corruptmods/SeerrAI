@@ -3,8 +3,8 @@ import type { Request, Response } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Routes worth having ready before anyone navigates. Everything else loads on
-// demand as before; precaching all 90+ routes would push ~9 MB per deploy.
+// Routes worth having ready before navigation; the rest load on demand.
+// Precaching all 90+ routes would push ~9 MB per deploy.
 const CORE_ROUTES = [
   '/',
   '/_app',
@@ -28,9 +28,9 @@ interface BuildManifest {
 let cached: { files: string[]; loadedAt: number } | null = null;
 
 /**
- * Lists the static chunks the service worker should precache on install, read
- * from the build manifest Next.js writes. Served outside /api so the OpenAPI
- * validator does not apply; it carries no user data.
+ * List the static chunks the service worker precaches on install, from
+ * Next.js's build manifest. Served outside /api so the OpenAPI validator
+ * doesn't apply; it carries no user data.
  */
 export const swPrecacheHandler = async (
   _req: Request,

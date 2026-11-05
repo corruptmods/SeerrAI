@@ -111,6 +111,11 @@ const UserGeneralSettings = () => {
     user ? `/api/v1/user/${user?.id}/settings/main` : null
   );
 
+  const emailSchema = Yup.string().test(
+    'email',
+    intl.formatMessage(messages.validationemailformat),
+    (value) => !value || isEmail(value, { require_tld: false })
+  );
   const UserGeneralSettingsSchema = Yup.object().shape({
     traktUsername: Yup.string()
       .trim()
@@ -119,29 +124,19 @@ const UserGeneralSettings = () => {
         intl.formatMessage(messages.validationtraktusername)
       ),
     email:
-      // Required for everybody but Jellyfin and Emby users other than the
-      // owner, and people who signed up through a provider that gave no
-      // email: they keep their stand-in until they add one.
+      // Optional for non-owner Jellyfin/Emby users and for stand-in emails
+      // from providers that gave none.
       user?.id === 1 ||
       (user?.userType !== UserType.JELLYFIN &&
         user?.userType !== UserType.EMBY &&
         !isStandInEmail(user?.email))
-        ? Yup.string()
-            .test(
-              'email',
-              intl.formatMessage(messages.validationemailformat),
-              (value) => !value || isEmail(value, { require_tld: false })
-            )
-            .required(intl.formatMessage(messages.validationemailrequired))
-        : Yup.string().test(
-            'email',
-            intl.formatMessage(messages.validationemailformat),
-            (value) => !value || isEmail(value, { require_tld: false })
-          ),
+        ? emailSchema.required(
+            intl.formatMessage(messages.validationemailrequired)
+          )
+        : emailSchema,
   });
 
-  // The watchlists their switches below apply to: Plex's for someone with
-  // a Plex account, while Plex is connected.
+  // Plex watchlist applies only with a linked account on a connected Plex.
   const plexWatchlist =
     !!user &&
     connectedAccountServers(user, currentSettings.mediaServers).includes(
@@ -354,7 +349,7 @@ const UserGeneralSettings = () => {
                       name="email"
                       type="text"
                       placeholder="example@domain.com"
-                      // A Plex account's email is its Plex email.
+                      // Plex users' email comes from Plex.
                       disabled={user?.userType === UserType.PLEX}
                       className={
                         user?.warnings.find((w) => w === 'userEmailRequired')

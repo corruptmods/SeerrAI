@@ -4,13 +4,10 @@ import { noteGrab } from '@server/lib/quality/notes';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 
-/*
- * The few Sonarr and Radarr calls fixing a reported problem needs: what
- * file an episode or movie has and where it came from, the releases there
- * are for it, and grabbing one of them. Both apps answer these the same way.
- */
+// Sonarr/Radarr calls auto-fix needs: current file and its source, available
+// releases, grabbing.
 
-/** Searching every indexer can take a while; 2½ minutes is ample. */
+/** Indexer searches are slow; 2½ minutes is ample. */
 const RELEASE_SEARCH_TIMEOUT_MS = 150_000;
 
 export interface ArrRelease {
@@ -30,14 +27,14 @@ export interface ArrRelease {
   qualityWeight?: number;
   customFormatScore?: number;
   quality?: { quality: { id: number; name: string } };
-  /** Sonarr: the episodes the release maps to. */
+  /** Sonarr: episodes the release maps to. */
   mappedEpisodeInfo?: { id: number }[];
   episodeRequested?: boolean;
-  /** The languages Sonarr or Radarr reads in its name. */
+  /** Languages parsed from the name. */
   languages?: { id?: number; name?: string }[];
-  /** Sonarr: the season a release is for. */
+  /** Sonarr: the release's season. */
   seasonNumber?: number;
-  /** Sonarr v5: every season a pack holds. */
+  /** Sonarr v5: all seasons in a pack. */
   seasonNumbers?: number[];
 }
 
@@ -87,7 +84,7 @@ export interface SonarrParse {
   episodes?: { id: number }[];
 }
 
-/** A custom format, as Sonarr (v4) and Radarr keep them. */
+/** A custom format (Sonarr v4, Radarr). */
 export interface ArrCustomFormat {
   id?: number;
   name: string;
@@ -101,7 +98,7 @@ export interface ArrCustomFormat {
   }[];
 }
 
-/** A quality profile, whole: it is sent back whole when changed. */
+/** A full quality profile; updates send it back whole. */
 export interface ArrQualityProfile {
   id: number;
   name: string;
@@ -111,9 +108,8 @@ export interface ArrQualityProfile {
 }
 
 /**
- * What an admin's changes need of Sonarr and Radarr alike: custom formats
- * and the scores profiles give them, the queue, marking a grab failed, and
- * where deleted files go.
+ * Shared Sonarr/Radarr admin calls: custom formats and scores, queue, mark
+ * failed, recycle bin.
  */
 const extrasOf = (http: AxiosInstance) => ({
   customFormats: async (): Promise<ArrCustomFormat[]> => {
@@ -137,7 +133,7 @@ const extrasOf = (http: AxiosInstance) => ({
   saveQualityProfile: async (profile: ArrQualityProfile): Promise<void> => {
     await http.put(`/qualityprofile/${profile.id}`, profile);
   },
-  /** Takes it out of the queue and the download client, blocklisting it. */
+  /** Removes from the queue and download client, and blocklists it. */
   removeFromQueue: async (id: number): Promise<void> => {
     await http.delete(`/queue/${id}`, {
       params: {
@@ -147,11 +143,11 @@ const extrasOf = (http: AxiosInstance) => ({
       },
     });
   },
-  /** Marks a grab failed: its release is blocklisted and searched again. */
+  /** Marks a grab failed: blocklists the release and searches again. */
   markFailed: async (historyId: number): Promise<void> => {
     await http.post(`/history/failed/${historyId}`);
   },
-  /** Where deleted files go; empty when they are deleted for good. */
+  /** Recycle bin path; empty when deletes are permanent. */
   recycleBin: async (): Promise<string> => {
     const { data } = await http.get<{ recycleBin?: string }>(
       '/config/mediamanagement'
@@ -168,9 +164,9 @@ const records = (data: unknown): ArrHistoryRecord[] =>
     : ((data as { records?: ArrHistoryRecord[] })?.records ?? []);
 
 export class FixSonarr extends SonarrAPI {
-  /** The server it is, for notes on what Seerr AI grabs (lib/quality). */
+  /** Server, for grab notes (lib/quality). */
   public serverId?: number;
-  /** The releases last offered, so a grab can say what it was chosen over. */
+  /** Last offered releases, so a grab can note what it beat. */
   private offered: ArrRelease[] = [];
 
   static forServer(server: SonarrSettings): FixSonarr {
@@ -186,7 +182,7 @@ export class FixSonarr extends SonarrAPI {
     return extrasOf(this.axios);
   }
 
-  /** The series' newest events, newest first. */
+  /** Series history, newest first. */
   public async seriesHistory(seriesId: number): Promise<ArrHistoryRecord[]> {
     const { data } = await this.axios.get('/history/series', {
       params: { seriesId },
@@ -216,7 +212,7 @@ export class FixSonarr extends SonarrAPI {
     await this.axios.delete(`/episodefile/${id}`);
   }
 
-  /** The newest events for one episode, newest first. */
+  /** Episode history, newest first. */
   public async history(episodeId: number): Promise<ArrHistoryRecord[]> {
     const { data } = await this.axios.get('/history', {
       params: {
@@ -239,8 +235,7 @@ export class FixSonarr extends SonarrAPI {
   }
 
   /**
-   * Sonarr's search for a whole season: its packs, and the single episodes
-   * the indexers return for it, each with why Sonarr would turn it down.
+   * Season search: packs and single episodes, each with Sonarr's rejections.
    */
   public async seasonReleases(
     seriesId: number,
@@ -254,7 +249,7 @@ export class FixSonarr extends SonarrAPI {
     return this.offered;
   }
 
-  /** One season's events, newest first: where each file came from. */
+  /** Season history, newest first: each file's source. */
   public async seasonHistory(
     seriesId: number,
     seasonNumber: number
@@ -267,7 +262,7 @@ export class FixSonarr extends SonarrAPI {
     );
   }
 
-  /** The series' name and original language, as Sonarr has them. */
+  /** Series name and original language in Sonarr. */
   public async seriesFacts(
     seriesId: number
   ): Promise<{ title?: string; originalLanguage?: string }> {
@@ -312,9 +307,9 @@ export interface RadarrMovieDetail {
 }
 
 export class FixRadarr extends RadarrAPI {
-  /** The server it is, for notes on what Seerr AI grabs (lib/quality). */
+  /** Server, for grab notes (lib/quality). */
   public serverId?: number;
-  /** The releases last offered, so a grab can say what it was chosen over. */
+  /** Last offered releases, so a grab can note what it beat. */
   private offered: ArrRelease[] = [];
 
   static forServer(server: RadarrSettings): FixRadarr {
@@ -330,7 +325,7 @@ export class FixRadarr extends RadarrAPI {
     return extrasOf(this.axios);
   }
 
-  /** Whether Radarr looks for the movie. */
+  /** Whether the movie is monitored. */
   public async setMonitored(movieId: number, monitored: boolean) {
     await this.axios.put('/movie/editor', { movieIds: [movieId], monitored });
   }

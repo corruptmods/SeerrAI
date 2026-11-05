@@ -13,7 +13,7 @@ import { describe, it } from 'node:test';
 
 setupTestDb();
 
-/** Lidarr knowing just these albums. */
+/** A Lidarr index holding only these albums. */
 const indexOf = (albums: Partial<IndexAlbum>[]): LidarrIndex => {
   const full = albums.map(
     (album) =>

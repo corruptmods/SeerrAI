@@ -8,9 +8,8 @@ import { LibraryAccessError } from '@server/lib/libraryAccess/types';
 import { jellyfinClient, jellyfinFamily } from '@server/lib/mediaServers';
 
 /*
- * Jellyfin and Emby: each account's policy says whether it sees every
- * library or only those listed. Jellyfin lists a library by its Id, Emby
- * by its Guid; both are matched, whichever a policy holds.
+ * Jellyfin/Emby account policies grant all libraries or a list. Jellyfin
+ * lists by Id, Emby by Guid; both are matched.
  */
 
 const TYPES: Record<string, AccessLibraryType> = {
@@ -33,7 +32,7 @@ export const jellyfinAccess = async (
     );
   }
   const client = await jellyfinClient(kind);
-  /** Every form a library goes by, plain, to its id here. */
+  /** Normalized Id and Guid of each library, to its id here. */
   let names = new Map<string, string>();
 
   return {
@@ -80,9 +79,10 @@ export const jellyfinAccess = async (
     },
 
     async write(person, to) {
-      // Read afresh, so nothing else in the policy is put back as it was.
+      // Fetch fresh so other policy fields aren't overwritten with stale
+      // values.
       const { Policy: policy } = await client.getPolicyAccount(person.ref);
-      // Libraries listed that the server no longer has stay listed.
+      // Keep listed ids the server no longer reports.
       const unknown = (policy.EnabledFolders ?? []).filter(
         (id) => !names.has(plain(id))
       );

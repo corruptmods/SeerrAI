@@ -14,11 +14,10 @@ import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 
 /*
- * The part of SABnzbd's API Seerr reads: its queue (downloading) and its
- * history (after downloading, where verifying, repairing, unpacking and the
- * post-processing script happen). Radarr and Sonarr record a SABnzbd job by
- * its nzo_id, which is how a queue item is matched to its job here: a UUID
- * on current SABnzbd (as yours records them), SABnzbd_nzo_… on older ones.
+ * Reads SABnzbd's queue (downloading) and history (verify, repair, unpack and
+ * post-processing script). Radarr and Sonarr record a job by its nzo_id,
+ * which matches queue items here: a UUID on current SABnzbd, SABnzbd_nzo_…
+ * on older ones.
  */
 
 interface QueueSlot {
@@ -34,7 +33,7 @@ interface HistorySlot {
   nzo_id: string;
   status: string;
   bytes?: number;
-  /** Where the finished job's files are. */
+  /** The finished job's files. */
   storage?: string;
   fail_message?: string;
 }
@@ -49,10 +48,10 @@ interface Answer {
 
 const MB = 1024 * 1024;
 
-/** A job as Backfill follows it. */
+/** A SABnzbd job as Backfill follows it. */
 export type SabJob = UsenetJob;
 
-/** SABnzbd's "time left": H:MM:SS, with days in front when it runs long. */
+/** Parses SABnzbd's "time left": H:MM:SS, prefixed by days when long. */
 export const sabSecondsLeft = (timeleft?: string): number | undefined => {
   if (!timeleft) {
     return undefined;
@@ -66,7 +65,7 @@ export const sabSecondsLeft = (timeleft?: string): number | undefined => {
   return total > 0 ? total : undefined;
 };
 
-/** A SABnzbd history status: what it is doing after the download. */
+/** SABnzbd history statuses mapped to post-download steps. */
 const AFTER_DOWNLOAD: Record<string, DownloadStep | undefined> = {
   QuickCheck: 'verifying',
   Verifying: 'verifying',
@@ -75,7 +74,7 @@ const AFTER_DOWNLOAD: Record<string, DownloadStep | undefined> = {
   Extracting: 'unpacking',
   Moving: 'moving',
   Running: 'script',
-  Queued: undefined, // waiting for its turn to be processed
+  Queued: undefined, // waiting to be processed
 };
 
 export const sabQueueDownload = (
@@ -136,12 +135,11 @@ class SabnzbdAPI implements UsenetClient {
   }
 
   /*
-   * Writing, for Backfill: it adds an NZB it found and checked, follows the
-   * job to SABnzbd's history, and removes it there once Sonarr has imported
-   * what it needed.
+   * Writes, for Backfill: add a checked NZB, follow the job into history,
+   * remove it there once Sonarr imported what it needed.
    */
 
-  /** Adds an NZB file; answers SABnzbd's id for the new job. */
+  /** Adds an NZB file; returns SABnzbd's id for the new job. */
   public async addNzb(
     nzb: Buffer,
     name: string,
@@ -172,10 +170,10 @@ class SabnzbdAPI implements UsenetClient {
     return id;
   }
 
-  /** Where a job is and what SABnzbd says about it; undefined if gone. */
+  /** The job's place and status; undefined if gone. */
   public async getJob(nzoId: string): Promise<SabJob | undefined> {
-    // The whole queue, not just this job: whether its speed is its own
-    // depends on what else is downloading.
+    // Read the whole queue: whether the speed is this job's depends on what
+    // else is downloading.
     const [queue, history] = await Promise.all([
       this.call({ mode: 'queue' }),
       this.call({ mode: 'history', nzo_ids: nzoId }),
@@ -193,9 +191,8 @@ class SabnzbdAPI implements UsenetClient {
         size: Math.round(Number(queued.mb) * MB) || 0,
         sizeLeft: Math.round(Number(queued.mbleft) * MB) || 0,
         secondsLeft: sabSecondsLeft(queued.timeleft),
-        // SABnzbd reports one speed, for its whole queue. It is this job's
-        // only while this is the one job downloading; with several at once
-        // nobody knows the split here, and the caller measures it.
+        // SABnzbd reports one speed for the whole queue: this job's only when
+        // it alone downloads. With several, the caller measures it.
         speed: !downloading(queued)
           ? 0
           : active.length === 1
@@ -234,9 +231,9 @@ class SabnzbdAPI implements UsenetClient {
   }
 
   /**
-   * Removes the job, with its files, from the queue or, once it has left
-   * the queue, from the history. SABnzbd answers status false, with no
-   * error, when the job isn't in the queue.
+   * Removes the job and its files from the queue, or from history once it
+   * left the queue. SABnzbd answers status false, no error, when the job
+   * isn't in the queue.
    */
   public async deleteJob(nzoId: string): Promise<void> {
     for (const mode of ['queue', 'history']) {
@@ -265,9 +262,8 @@ class SabnzbdAPI implements UsenetClient {
 
   public async getDownloads(ids: string[]): Promise<Map<string, LiveDownload>> {
     const found = new Map<string, LiveDownload>();
-    // SABnzbd's job ids: a UUID from SABnzbd 4.2 on, SABnzbd_nzo_… before.
-    // Anything that isn't a torrent's hash is asked about; ids it doesn't
-    // hold simply aren't in its answer.
+    // Job ids are UUIDs from SABnzbd 4.2, SABnzbd_nzo_… before. Ask about
+    // every non-hash id; unknown ones are absent from the response.
     const mine = ids.filter((id) => !isTorrentHash(id));
     if (!mine.length) {
       return found;
@@ -281,7 +277,7 @@ class SabnzbdAPI implements UsenetClient {
     for (const slot of history.history?.slots ?? []) {
       found.set(slot.nzo_id.toLowerCase(), sabHistoryDownload(slot));
     }
-    // A job is in one or the other; the queue is the fresher if both.
+    // A job is in one or the other; the queue wins if both.
     for (const slot of queue.queue?.slots ?? []) {
       found.set(slot.nzo_id.toLowerCase(), sabQueueDownload(slot, allPaused));
     }

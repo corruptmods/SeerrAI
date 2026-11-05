@@ -5,17 +5,15 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
 
-/*
- * A photo for AI Search may be up to 8 MB; every other body, and AI
- * Search's from someone not signed in, keeps the usual small limit.
- */
+// AI Search photos may be up to 8 MB; every other body, and AI Search's from
+// signed-out users, keeps the usual small limit.
 
 setupTestDb();
 
 const serve = async () => {
   const app = express();
   app.use(jsonBody);
-  // Stands in for the session: x-user is the signed-in person's id.
+  // Stands in for the session: x-user is the signed-in user's id.
   app.use((req, _res, next) => {
     if (req.header('x-user')) {
       (req as unknown as { session: { userId: number } }).session = {
@@ -54,11 +52,11 @@ describe('JSON request bodies', () => {
     try {
       assert.equal(await post('/api/v1/ai/chat', photo, 1), 200);
       assert.equal(await post('/api/v1/ai/chat/', photo, 1), 200);
-      // Not signed in: the usual limit, before the route turns them away.
+      // Signed out: the usual limit applies before the route rejects them.
       assert.equal(await post('/api/v1/ai/chat', photo), 413);
-      // Signed in as nobody the server knows.
+      // Signed in as an unknown user.
       assert.equal(await post('/api/v1/ai/chat', photo, 999), 413);
-      // A small message still reaches the route either way.
+      // A small message reaches the route either way.
       assert.equal(await post('/api/v1/ai/chat', { message: 'hi' }), 200);
     } finally {
       server.close();

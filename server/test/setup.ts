@@ -4,7 +4,7 @@ import https from 'node:https';
 import { after, before } from 'node:test';
 
 // supertest serves the app over a real loopback socket, so only external hosts
-// can be refused
+// can be blocked.
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1']);
 
 const blocked = new Set<string>();
@@ -42,7 +42,7 @@ function blockOutboundRequests(
   mod: typeof http | typeof https,
   scheme: string
 ) {
-  // get() calls the module's internal request(), not the exported one
+  // get() calls the module's internal request(), not the exported one.
   for (const name of ['request', 'get'] as const) {
     const original = mod[name] as (...args: unknown[]) => unknown;
 
@@ -74,7 +74,7 @@ before(() => {
 after(() => {
   if (process.env.VERBOSE != 'true') logger.silent = false;
 
-  // callers that swallow the error would otherwise leave the suite green
+  // Callers that swallow the error would otherwise leave the suite green.
   if (blocked.size) {
     throw new Error(
       `Test reached the network: ${[...blocked].join(', ')}. Stub the API client this test uses.`

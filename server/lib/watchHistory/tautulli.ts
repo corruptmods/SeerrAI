@@ -8,7 +8,6 @@ import type { TautulliSettings } from '@server/lib/settings';
 import type { Play, WatchSource } from '@server/lib/watchHistory/types';
 import { In } from 'typeorm';
 
-/** A Tautulli history record as a play. */
 export const playOf = (record: TautulliHistoryRecord): Play => {
   const movie = record.media_type === 'movie';
   return {
@@ -27,7 +26,7 @@ export const playOf = (record: TautulliHistoryRecord): Play => {
   };
 };
 
-/** Plex, through Tautulli, which keeps every play. */
+/** Plex history via Tautulli, which keeps every play. */
 export class TautulliWatchSource implements WatchSource {
   public readonly kind = 'tautulli' as const;
   public readonly label = 'Tautulli';
@@ -41,7 +40,7 @@ export class TautulliWatchSource implements WatchSource {
     return user.plexId ? String(user.plexId) : undefined;
   }
 
-  /** Once each: regular and 4K can be one Plex item, read once. */
+  /** Deduped: regular and 4K can be the same Plex item. */
   public titleIdsOf(media: Media): string[] {
     return [
       ...new Set(

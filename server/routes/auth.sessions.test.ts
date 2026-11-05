@@ -19,8 +19,8 @@ import session from 'express-session';
 import request from 'supertest';
 
 /*
- * Signing out everywhere else when a password changes or a passkey goes:
- * against the real session store, where sessions are database rows.
+ * Signing out other sessions when a password changes or a passkey is removed,
+ * against the real session store (sessions are database rows).
  */
 
 let app: Express;
@@ -166,7 +166,7 @@ describe('signing out everywhere else', () => {
     });
     await twelve.setPassword('test1234');
     await getRepository(User).save(twelve);
-    // Postgres numbers new rows itself, whatever id is given.
+    // Postgres assigns new row ids itself, whatever id is given.
     await getRepository(User).update(twelve.id, { id: 12 });
     const other = await signIn('twelve@seerr.dev');
     assert.equal(other.id, 12);

@@ -41,9 +41,9 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Playlists linked to Spotify or Apple Music: read from their public pages,
- * matched on MusicBrainz, and requested as songs within their person's
- * limit, or as one batch for an admin to approve. Names are invented.
+ * Linked Spotify and Apple Music playlists: read from public pages, matched
+ * on MusicBrainz, and requested within the user's limit or as one batch for
+ * admin approval. Names are invented.
  */
 
 setupTestDb();
@@ -102,7 +102,7 @@ const RECORDINGS: MbRecording[] = [
   },
 ];
 
-/** Spotify's embedded player page, holding these tracks. */
+/** A Spotify embedded player page with these tracks. */
 const spotifyPage = (
   tracks: { id: string; title: string; artists: string; ms?: number }[]
 ) =>
@@ -204,7 +204,7 @@ beforeEach(async () => {
     async (id: string) => ({ id, name: 'Glasswing' }) as MbArtist
   );
   mock.method(MusicBrainz.prototype, 'keptArtistReleaseGroups', async () => []);
-  // Deezer lists none of them, unless a test says it does.
+  // Deezer finds nothing unless a test says otherwise.
   mock.method(DeezerAPI.prototype, 'searchTracks', async () => []);
 });
 
@@ -334,7 +334,7 @@ describe('a playlist link', () => {
       artistMbid: ARTIST,
       artistName: 'Glasswing',
       versions: [
-        // Nearest the playlist's length, but acoustic or live.
+        // Nearest in length, but acoustic or live.
         version(LANTERN, 'Lantern Song (acoustic)', 193_234, 'acoustic'),
         version(NIGHT_SWIM, 'Lantern Song', 193_400, 'live, 2019: Pier Hall'),
         version(LANTERN_ALBUM, 'Lantern Song', 193_000),
@@ -344,12 +344,12 @@ describe('a playlist link', () => {
       versionFor(song, 193_467, 'Lantern Song')?.mbId,
       LANTERN_ALBUM
     );
-    // Named by the title, it is the one.
+    // Picked when the title names it.
     assert.equal(
       versionFor(song, 193_467, 'Lantern Song (Acoustic)')?.mbId,
       LANTERN
     );
-    // Only other takes: none, rather than one the playlist doesn't hold.
+    // Only other takes: none rather than the wrong one.
     const onlyLive = { ...song, versions: song.versions.slice(1, 2) };
     assert.equal(versionFor(onlyLive, 193_467, 'Lantern Song'), undefined);
   });
@@ -373,7 +373,7 @@ describe('a playlist link', () => {
       artistMbid: ARTIST,
       artistName: 'Glasswing',
       versions: [
-        // Nearest the length, but only on someone else's compilation.
+        // Nearest in length, but only on another artist's compilation.
         {
           mbId: LANTERN,
           length: 223_000,
@@ -402,7 +402,7 @@ describe('a linked playlist', () => {
       list.sourceUrl,
       `https://open.spotify.com/playlist/${PLAYLIST_ID}`
     );
-    // Not allowed to approve their own: their requests wait for an admin.
+    // Can't approve their own: requests wait for an admin.
     assert.deepEqual(await songsOf(list), {
       'Lantern Song': 'approval',
       'Night Swim': 'approval',
@@ -433,8 +433,8 @@ describe('a linked playlist', () => {
       'Unheard Tune': 'unmatched',
     });
 
-    // The limit frees up (the first request declined): the next pass
-    // requests the rest.
+    // Declining the first request frees the limit; the next pass requests
+    // the rest.
     const asked = await getRepository(MediaRequest).find();
     await getRepository(MediaRequest).update(
       asked.map((r) => r.id),
@@ -472,7 +472,7 @@ describe('a linked playlist', () => {
       permissions: Permission.REQUEST | Permission.AUTO_APPROVE,
     });
     user = await getRepository(User).findOneByOrFail({ id: user.id });
-    // MusicBrainz stops answering partway through the import.
+    // MusicBrainz stops answering mid-import.
     let answering = false;
     const search = MusicBrainz.prototype.searchRecordings;
     mock.method(
@@ -504,7 +504,7 @@ describe('a linked playlist', () => {
       MusicBrainz.prototype,
       'searchRecordings',
       async (title: string) => {
-        // Taken off the playlist while MusicBrainz is being asked.
+        // Removed from the playlist during the lookup.
         await getRepository(MediaListSong).update(
           { listId: list.id, title },
           { state: 'removed' }
@@ -534,7 +534,7 @@ describe('a linked playlist', () => {
       listId: list.id,
       title: 'Lantern Song',
     });
-    // As an admin deleting it does, it being of the wrong take.
+    // An admin deletes it for being the wrong take.
     await getRepository(MediaRequest).remove(
       await getRepository(MediaRequest).findOneByOrFail({
         id: lantern.requestId!,
@@ -553,7 +553,7 @@ describe('a linked playlist', () => {
       id: lantern.id,
     });
     assert.notEqual(now.requestId, lantern.requestId);
-    // Looked up again, not asked for as it was.
+    // Rematched rather than re-requested as before.
     assert.equal(now.recordingMbid, LANTERN);
     assert.equal((await songsOf(list))['Lantern Song'], 'approval');
   });
@@ -622,10 +622,10 @@ describe('a linked playlist', () => {
       title: 'Night Swim',
     });
     assert.equal(swim.requestId, theirs.id);
-    // Theirs, not this playlist's, to be told about.
+    // Their request, so not this playlist's to notify about.
     assert.equal((await playlistOfRequests([theirs.id])).has(theirs.id), false);
 
-    // Declined, as an admin declining it does: its songs with it.
+    // An admin declines it, along with its songs.
     const declined = await getRepository(MediaRequest).findOneByOrFail({
       id: theirs.id,
     });
@@ -682,7 +682,7 @@ describe('a linked playlist', () => {
       listId: list.id,
       title: 'Unheard Tune',
     });
-    // MusicBrainz has it now.
+    // MusicBrainz now has it.
     RECORDINGS.push({
       id: 'a1b2c3d4-0010-4000-8000-000000000010',
       title: 'Unheard Tune',
@@ -691,7 +691,7 @@ describe('a linked playlist', () => {
       releases: [onRelease('5d1c7b20-3e4f-4a8b-9c0d-1e2f3a4b5c6d', 'Unheard')],
     });
     try {
-      // Not a week yet: left as it is.
+      // Under a week: unchanged.
       await playlists.sync();
       await playlists.settled();
       assert.equal((await songsOf(list))['Unheard Tune'], 'unmatched');
@@ -722,7 +722,7 @@ describe('a playlist’s songs as they are got', () => {
   it('each follow their own part of the request', async () => {
     const list = await linked();
     const [request] = await getRepository(MediaRequest).find();
-    // Lidarr couldn't get one song: the request fails, the other goes on.
+    // One song can't be fetched: the request fails, the other continues.
     await getRepository(MediaRequest).update(request.id, {
       status: MediaRequestStatus.FAILED,
     });
@@ -740,7 +740,7 @@ describe('a playlist’s songs as they are got', () => {
       'Unheard Tune': 'unmatched',
     });
 
-    // Try again: its request is tried again, the song with it.
+    // Try again retries the request and the song with it.
     const song = await getRepository(MediaListSong).findOneByOrFail({
       listId: list.id,
       recordingMbid: LANTERN,
@@ -790,12 +790,12 @@ describe('a playlist’s songs that couldn’t be got', () => {
     );
     const failedAt = new Date(failed[0].updatedAt).getTime();
 
-    // Still failing one after another: held.
+    // Failures still arriving: held.
     await notifyPlaylistFailures(failed, listOf, failedAt + 60_000);
     assert.equal(told.length, 0);
 
-    // Settled: one for admins and channels, naming the song that failed,
-    // and the owner's own, by Playlist Updates.
+    // Settled: one for admins and channels naming the failed song, and one
+    // Playlist Update for the owner.
     await notifyPlaylistFailures(failed, listOf, failedAt + QUIET_MS);
     assert.equal(told.length, 2);
     const [admins, owner] = told;
@@ -810,7 +810,7 @@ describe('a playlist’s songs that couldn’t be got', () => {
     assert.equal(owner.message, 'Lantern Song (radio edit) — Glasswing');
     assert.equal(owner.actionUrl, `/lists/${list.id}`);
 
-    // Told once.
+    // Sent only once.
     await notifyPlaylistFailures(failed, listOf, failedAt + LONGEST_MS);
     assert.equal(told.length, 2);
   });
@@ -851,7 +851,7 @@ describe('a linked playlist that can’t be read', () => {
       },
     ]);
 
-    // Still unreadable the next time: not told again.
+    // Still unreadable next time: no second notice.
     await playlists.sync();
     await playlists.settled();
     assert.equal(told.length, 1);
@@ -876,7 +876,7 @@ describe('a playlist’s requests in a row of requests', () => {
     assert.equal(group.waiting, 0);
     assert.deepEqual(group.albums, [LANTERN_SINGLE, NIGHT_SWIM_SINGLE]);
 
-    // Someone who can't open the list isn't sent there.
+    // A viewer who can't open the list gets no link to it.
     const other = await getRepository(User).save(
       new User({
         email: `pl-other-${Math.random()}@test.local`,
@@ -922,8 +922,8 @@ describe('a song Deezer lists', () => {
 
   it('is matched to the recording its ISRC names, over one its name and length would pick', async () => {
     deezerLists({ 'Lantern Song': listing(11, 'Lantern Song', 215, 501) });
-    // The radio edit is nearer the playlist's length; the code names the
-    // album's take, the one the store lists.
+    // The radio edit is nearer in length, but the ISRC names the album
+    // take the store lists.
     mock.method(
       MusicBrainz.prototype,
       'searchRecordingsByIsrc',
@@ -950,7 +950,7 @@ describe('a song Deezer lists', () => {
     assert.equal(lantern.isrc, ISRC);
     assert.equal(lantern.catalog?.albumId, 501);
     assert.equal(lantern.catalog?.trackNumber, 3);
-    // Deezer lists no other: those are matched by name, as before.
+    // Songs Deezer lacks are matched by name.
     assert.equal(
       (await songNamed(list, 'Night Swim')).recordingMbid,
       NIGHT_SWIM
@@ -990,8 +990,8 @@ describe('a song Deezer lists', () => {
         },
       },
     ];
-    // The code is on a recording MusicBrainz has only on a compilation of
-    // others' songs, which can't be requested.
+    // The ISRC's recording is only on another artist's compilation, which
+    // can't be requested.
     mock.method(MusicBrainz.prototype, 'searchRecordingsByIsrc', async () => ({
       count: 1,
       offset: 0,
@@ -1017,13 +1017,13 @@ describe('a song Deezer lists', () => {
       ],
     }));
     let list = await linked();
-    // The artist's own, on their single, as long as the playlist's.
+    // The artist's own single version, same length.
     assert.equal(
       (await songNamed(list, 'Lantern Song')).recordingMbid,
       LANTERN
     );
 
-    // Their own is another length, so not this take: the code's stays.
+    // Their own is a different length, so the ISRC match stays.
     mock.method(
       MusicBrainz.prototype,
       'searchRecordings',
@@ -1057,7 +1057,7 @@ describe('a song Deezer lists', () => {
       unheard?.addToMusicBrainz,
       'https://harmony.pulsewidth.org.uk/release?deezer=777'
     );
-    // Found, or not on Deezer either: nothing to add.
+    // Matched, or not on Deezer either: no add link.
     assert.ok(
       shown
         .filter((s) => s.title !== 'Unheard Tune')

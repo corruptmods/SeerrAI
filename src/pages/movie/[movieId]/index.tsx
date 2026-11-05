@@ -11,9 +11,7 @@ interface MoviePageProps {
 
 const MoviePage: NextPage<MoviePageProps> = ({ movie }) => {
   const router = useRouter();
-  // Keyed by the title, so going from one movie's page straight to
-  // another's starts afresh instead of keeping the first one's state (its
-  // watchlist button, an open panel).
+  // Keyed by title so navigating between movies resets state.
   return <MovieDetails key={String(router.query.movieId)} movie={movie} />;
 };
 

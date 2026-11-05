@@ -8,29 +8,27 @@ import type {
 } from '@server/lib/quality/types';
 
 /*
- * Seerr AI's own presets: the qualities each takes, best first, and the
- * custom formats it adds, with the score each gets. These are also the
- * gaps it fills beside TRaSH Guides (SD, 720p, and the rules TRaSH Guides
- * has no format for).
+ * Seerr AI's own presets: allowed qualities (best first) and the custom
+ * formats it adds, with their scores. These also fill the gaps beside
+ * TRaSH Guides (SD, 720p, and rules TRaSH Guides has no format for).
  */
 
-/** What everything Seerr AI creates in Radarr and Sonarr is named with. */
+/** Prefix on everything Seerr AI creates in Radarr and Sonarr. */
 export const NAME_PREFIX = 'Seerr AI · ';
 
 /**
- * A custom format's name, for keeping names apart: two that differ only in
- * case (Seerr AI's "Wrong language", TRaSH Guides' "Wrong Language") read
- * as one in Radarr's and Sonarr's lists.
+ * Custom format name key. Radarr and Sonarr treat names differing only in
+ * case (Seerr AI's "Wrong language", TRaSH Guides' "Wrong Language") as one.
  */
 export const foldName = (name: string) => name.toLowerCase();
 
-/** Never taken: low enough that no score makes up for it. */
+/** Never taken: no score can make up for it. */
 export const NEVER = -1_000_000;
-/** Taken only when nothing else is out. */
+/** Taken only when nothing else is available. */
 export const LAST_RESORT = -10_000;
 /**
- * The lowest score a release may have: two last-resort formats together
- * still pass, a never format does not.
+ * Lowest score taken: two last-resort formats together pass; a never format
+ * doesn't.
  */
 export const LOWEST_TAKEN = 2 * LAST_RESORT;
 
@@ -47,11 +45,11 @@ export const PRESET_LABELS: Record<PresetKey, string> = {
 export const profileName = (preset: PresetKey) =>
   `${NAME_PREFIX}${PRESET_LABELS[preset]}`;
 
-/** A rung of a profile's ladder: one quality, or several as one. */
+/** A ladder rung: one quality, or a group treated as one. */
 export interface LadderEntry {
   name: string;
   allowed: boolean;
-  /** The qualities of a group; absent for a single quality. */
+  /** Group members; absent for a single quality. */
   items?: string[];
 }
 
@@ -72,7 +70,7 @@ const one = (name: string): LadderEntry => ({ name, allowed: true });
 const remux = (kind: ArrKind, resolution: '1080p' | '2160p') =>
   kind === 'radarr' ? `Remux-${resolution}` : `Bluray-${resolution} Remux`;
 
-/** Seerr AI's ladder for a preset, in this app's names. */
+/** Seerr AI's ladder for a preset, using this app's quality names. */
 export const seerrLadder = (preset: PresetKey, kind: ArrKind): Ladder => {
   const movies = kind === 'radarr';
   switch (preset) {
@@ -127,7 +125,7 @@ export const seerrLadder = (preset: PresetKey, kind: ArrKind): Ladder => {
   }
 };
 
-/** The looser preset a title steps down to, when nothing is found. */
+/** Preset a title steps down to when nothing is found. */
 export const LOOSER: Partial<Record<PresetKey, PresetKey>> = {
   '2160p-remux': '2160p',
   '2160p': '1080p',
@@ -136,7 +134,7 @@ export const LOOSER: Partial<Record<PresetKey, PresetKey>> = {
   '720p': 'sd',
 };
 
-/** A Seerr AI format, before Radarr or Sonarr gives it an id. */
+/** A Seerr AI format before Radarr or Sonarr assigns it an id. */
 export interface SeerrFormat {
   key: string;
   format: ArrCustomFormat;
@@ -200,7 +198,7 @@ export const UPSCALED = named('upscaled', 'Upscaled', [
   title('Upscaled', '\\b(upscal(e|ed|ing)|ai[ ._-]?upscaled?|regraded?)\\b'),
 ]);
 
-/** Releases in a language they shouldn't be, read from the name. */
+/** Releases whose name shows an unwanted language. */
 export const languageFormat = (choice: Languages): SeerrFormat | undefined =>
   choice === 'any'
     ? undefined
@@ -209,7 +207,7 @@ export const languageFormat = (choice: Languages): SeerrFormat | undefined =>
           ? [language('Not English', 1)]
           : []),
         language('Not the original language', -2),
-        // A name that says nothing of its language is not wrong.
+        // A name with no language isn't wrong.
         language('Language known', 0),
       ]);
 
@@ -230,7 +228,7 @@ export const DUAL_AUDIO = named('dual-audio', 'Dual audio', [
   ),
 ]);
 
-/** Sonarr only: one file holding several episodes. */
+/** Sonarr only: one file with several episodes. */
 export const MULTI_EPISODE = named('multi-episode', 'More than one episode', [
   {
     name: 'Multi-episode',
@@ -241,7 +239,7 @@ export const MULTI_EPISODE = named('multi-episode', 'More than one episode', [
   },
 ]);
 
-/** Radarr: a film bigger than this, which is never taken. */
+/** Radarr: movies over this size, never taken. */
 export const sizeFormat = (gb: number): SeerrFormat =>
   named(`size-${gb}`, `Over ${gb} GB`, [
     {
@@ -257,10 +255,9 @@ export const sizeFormat = (gb: number): SeerrFormat =>
   ]);
 
 /**
- * Radarr: the largest film each preset takes, in GB. Balanced takes a
- * usual Blu-ray encode (a 1080p one runs about 8 to 15); Smaller files, a
- * web release (4 to 8). Room is left for a long film: one over it is never
- * taken.
+ * Radarr: max movie size per preset, in GB. Balanced fits a typical Blu-ray
+ * encode (1080p runs about 8 to 15); Smaller files fits a web release (4 to
+ * 8). Caps leave room for long movies; anything over is never taken.
  */
 export const FILM_CAPS_GB: Record<
   Exclude<FileSize, 'best'>,
@@ -287,9 +284,8 @@ export const FILM_CAPS_GB: Record<
 };
 
 /**
- * Sonarr v5: the most each preset takes, in MB a minute. Balanced takes a
- * usual release (a 1080p WEB-DL runs about 40 to 80); Smaller files, the
- * compact ones.
+ * Sonarr v5: max size per preset, in MB per minute. Balanced fits a typical
+ * release (1080p WEB-DL runs about 40 to 80); Smaller files fits compact ones.
  */
 export const EPISODE_CAPS_MB_MIN: Record<
   Exclude<FileSize, 'best'>,
@@ -324,7 +320,7 @@ export const sizeOf = (
   preset: PresetKey
 ): PresetSize => config.sizes?.[preset] ?? config.adjustments.fileSize;
 
-/** Radarr: the largest film a size takes, in GB; none for Best. */
+/** Radarr: max movie size for a size setting, in GB; none for Best. */
 export const filmCapGb = (
   size: PresetSize,
   preset: PresetKey
@@ -335,7 +331,7 @@ export const filmCapGb = (
       ? undefined
       : FILM_CAPS_GB[size][preset];
 
-/** Sonarr v5: the most a size takes, in MB a minute; none for Best. */
+/** Sonarr v5: max for a size setting, in MB per minute; none for Best. */
 export const episodeCapMbMin = (
   size: PresetSize,
   preset: PresetKey
@@ -346,7 +342,7 @@ export const episodeCapMbMin = (
       ? undefined
       : EPISODE_CAPS_MB_MIN[size][preset];
 
-/** The raw scores of Seerr AI's own formats in its presets. */
+/** Raw scores of Seerr AI's own formats. */
 export const SEERR_SCORES = {
   repack: 5,
   hdr: 500,
@@ -357,9 +353,9 @@ export const is2160 = (preset: PresetKey) =>
   preset === '2160p' || preset === '2160p-remux';
 
 /**
- * The TRaSH Guides formats each of Seerr AI's own does the work of, by
- * name. The pre-build review (bin/quality-review.mjs) says when one of
- * these changes in TRaSH Guides, so ours can follow.
+ * TRaSH Guides formats each Seerr AI format stands in for, by name. The
+ * pre-build review (bin/quality-review.mjs) flags when one changes in TRaSH
+ * Guides so ours can follow.
  */
 export const TRASH_EQUIVALENTS: Record<ArrKind, Record<string, string[]>> = {
   radarr: {

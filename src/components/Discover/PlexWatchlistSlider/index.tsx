@@ -52,8 +52,7 @@ const PlexWatchlistSlider = () => {
         isLoading={!watchlistItems}
         isEmpty={!!watchlistItems && watchlistItems.results.length === 0}
         emptyMessage={
-          // The row is someone's Plex watchlist when they have Plex, and
-          // the one they keep here otherwise.
+          // Plex users see their Plex watchlist; others the local one.
           hasAccountOn(user, 'plex')
             ? intl.formatMessage(messages.emptywatchlist, {
                 PlexWatchlistSupportLink: (msg: React.ReactNode) => (

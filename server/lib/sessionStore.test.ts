@@ -12,9 +12,8 @@ import { after, describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * Postgres briefly out of connections fails one session write. Seerr must
- * keep signing people in afterwards: the store used to mark itself gone
- * for good, leaving every later request without a session.
+ * Postgres briefly out of connections fails one session write. Sign-ins must
+ * keep working afterwards instead of the store marking itself gone for good.
  */
 
 let server: Server | undefined;

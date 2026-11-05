@@ -8,10 +8,9 @@ import semver from 'semver';
 import { z } from 'zod';
 
 /*
- * Tautulli's address and API key, set up from Settings → Services like
- * Bazarr: the key is never sent back, a blank one on saving or testing keeps
- * the saved one (for the same address only), and the connection is tested
- * before anything is saved.
+ * Tautulli's address and API key (Settings → Services), as for Bazarr: the
+ * key is never sent back, a blank key keeps the saved one (same address
+ * only), and the connection is tested before saving.
  */
 const tautulliSettingsRoutes = Router();
 
@@ -23,7 +22,7 @@ const tautulliBody = z.object({
     .regex(/^[^\s/:]+$/),
   port: z.coerce.number().int().min(1).max(65535),
   useSsl: z.boolean().default(false),
-  // Joined straight onto the address: "/tautulli", never "tautulli/".
+  // Appended to the address as is: "/tautulli", never "tautulli/".
   urlBase: z
     .string()
     .trim()
@@ -47,7 +46,7 @@ const EMPTY: Required<TautulliSettings> = {
   externalUrl: '',
 };
 
-/** What the settings page is shown: no key, only that one is set. */
+/** Settings as shown to the page: no key, only whether one is set. */
 const shown = (tautulli: TautulliSettings) => ({
   ...tautulli,
   apiKey: '',
@@ -66,7 +65,7 @@ const withKey = (body: z.infer<typeof tautulliBody>): TautulliSettings => {
   };
 };
 
-/** Its version, if it answers and is new enough (2.9 or later). */
+/** Returns Tautulli's version if it answers and is 2.9 or later. */
 const check = async (tautulli: TautulliSettings): Promise<string> => {
   const info = await new TautulliAPI(tautulli).getInfo();
   const version = info?.tautulli_version;

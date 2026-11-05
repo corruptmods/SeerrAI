@@ -19,9 +19,8 @@ import {
 } from 'node:test';
 
 /*
- * Prowlarr's connection, set up in Settings → Services apart from the rest
- * of Backfill's settings, and kept by Backfill's own form, which leaves it
- * out.
+ * Prowlarr's connection: set in Settings → Services, separate from Backfill's
+ * settings, and kept when Backfill's form (which omits it) saves.
  */
 
 setupTestDb();
@@ -77,7 +76,7 @@ beforeEach(() => {
 
 afterEach(() => mock.restoreAll());
 
-/** Backfill's own form, which leaves Prowlarr out. */
+/** Backfill's form body, without Prowlarr. */
 const withoutProwlarr = () =>
   Object.fromEntries(
     Object.entries(getSettings().backfill).filter(([key]) => key !== 'prowlarr')

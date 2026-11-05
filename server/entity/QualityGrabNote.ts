@@ -9,9 +9,9 @@ import {
 } from 'typeorm';
 
 /**
- * A release Seerr AI grabbed through Radarr or Sonarr itself (Autofix),
- * with what it was chosen over: Radarr and Sonarr keep only the release
- * grabbed, so this is the one place a "why it won" can come from.
+ * A release Seerr AI grabbed through Radarr or Sonarr itself (Autofix), with
+ * what it beat. Radarr and Sonarr keep only the grabbed release, so this is the
+ * only source of "why it won".
  */
 @Entity()
 export class QualityGrabNote {
@@ -32,8 +32,8 @@ export class QualityGrabNote {
   public protocol: 'usenet' | 'torrent' | null;
 
   /**
-   * Another release of the same quality and score was on offer, over the
-   * other protocol: the grab won a tie.
+   * Another release of equal quality and score was available over the other
+   * protocol: the grab won a tie.
    */
   @Column({ type: 'boolean', default: false })
   public wonTie: boolean;

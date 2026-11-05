@@ -14,8 +14,8 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * Settings → Users → Single Sign-On, behind the real OpenAPI validator,
- * against a provider on localhost.
+ * Settings → Users → Single Sign-On against a provider on localhost, behind
+ * the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -40,7 +40,7 @@ before(async () => {
       err: { status?: number; message: string },
       _req: express.Request,
       res: express.Response,
-      // Express tells an error handler by its four parameters.
+      // Express detects an error handler by its four parameters.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _next: express.NextFunction
     ) => res.status(err.status ?? 500).json({ message: err.message })
@@ -175,7 +175,7 @@ describe('single sign-on settings', () => {
       elsewhere.body.message,
       'The provider gives its issuer URL as https://elsewhere.example/realms/test. Enter exactly that.'
     );
-    // And as a code the settings page puts in the admin's language.
+    // Also as a code the settings page translates.
     assert.equal(elsewhere.body.problem, 'issuer-mismatch');
     assert.deepEqual(elsewhere.body.params, {
       issuer: 'https://elsewhere.example/realms/test',
@@ -248,7 +248,7 @@ describe('single sign-on settings', () => {
     assert.equal(added.body.issuerUrl, fake.issuer);
     assert.equal(getSettings().oidc.providers[0].issuerUrl, fake.issuer);
 
-    // Authentik's, with its slash, pasted with one at the end too.
+    // Authentik's trailing-slash issuer, pasted with a slash too.
     getSettings().oidc = { providers: [] };
     fake.issuerSaid = `${fake.issuer}/`;
     const authentik = await add({
@@ -269,7 +269,7 @@ describe('single sign-on settings', () => {
     await add();
     const links = getRepository(OidcLink);
     const user = await getRepository(User).findOneByOrFail({ id: 1 });
-    // A link from before issuers were recorded, and one made since.
+    // One link from before issuers were recorded, one from after.
     await links.save(new OidcLink({ user, provider: 'authentik', sub: 'old' }));
     const other = await getRepository(User).save(
       new User({ email: 'sam@example.com', username: 'Sam', avatar: '' })
@@ -283,7 +283,7 @@ describe('single sign-on settings', () => {
       })
     );
 
-    // The secret left blank: it is the same provider, so it is kept.
+    // A blank secret for the same provider keeps the saved one.
     const pasted = await request(app)
       .put('/api/v1/settings/oidc/authentik')
       .send(
@@ -296,14 +296,14 @@ describe('single sign-on settings', () => {
     const [saved] = getSettings().oidc.providers;
     assert.equal(saved.issuerUrl, fake.issuer);
     assert.equal(saved.clientSecret, fake.clientSecret);
-    // Not a new issuer: nobody's link is touched.
+    // Same issuer: no link is touched.
     assert.equal((await links.findOneByOrFail({ sub: 'old' })).issuer, null);
     assert.equal(
       (await links.findOneByOrFail({ sub: 'new' })).issuer,
       fake.issuer
     );
 
-    // One saved without a configuration address stays exactly as it is.
+    // A provider without a configuration URL is saved unchanged.
     const untouched = await request(app)
       .put('/api/v1/settings/oidc/authentik')
       .send(body({ clientSecret: '', name: 'Renamed' }));
@@ -436,7 +436,7 @@ describe('single sign-on settings', () => {
     const listed = await request(app).get('/api/v1/settings/oidc');
     assert.deepEqual(listed.body.providers[0].requiredClaims, expected);
 
-    // Saved again unchanged, and emptied.
+    // Resaved unchanged, then emptied.
     const same = await request(app)
       .put('/api/v1/settings/oidc/authentik')
       .send(body({ clientSecret: '', requiredClaims: expected }));
@@ -448,7 +448,7 @@ describe('single sign-on settings', () => {
     assert.deepEqual(emptied.body.requiredClaims, []);
     assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, []);
 
-    // Not something the sign-in page is told.
+    // Never sent to the sign-in page.
     assert.ok(
       !JSON.stringify(getSettings().fullPublicSettings).includes('seerr-users')
     );
@@ -471,7 +471,7 @@ describe('single sign-on settings', () => {
   it('reads upstream’s space-separated names from the settings file', async () => {
     await add();
     const [saved] = getSettings().oidc.providers;
-    // As pasted into settings.json from an upstream install.
+    // Pasted into settings.json from an upstream install.
     getSettings().oidc = {
       providers: [{ ...saved, requiredClaims: 'is_seerr_user' as never }],
     };
@@ -484,7 +484,7 @@ describe('single sign-on settings', () => {
       { claim: 'is_seerr_user' },
     ]);
 
-    // And a provider saved before there were rules lets anyone in.
+    // A provider saved before rules existed lets anyone in.
     const older: Partial<typeof saved> = { ...saved };
     delete older.requiredClaims;
     getSettings().oidc = { providers: [older as typeof saved] };

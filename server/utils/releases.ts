@@ -1,14 +1,11 @@
 import semverGt from 'semver/functions/gt';
 import semverValid from 'semver/functions/valid';
 
-/*
- * Which of Seerr AI's GitHub releases is the latest for an install, and
- * whether it is newer than the version running. Shared by the update check
- * on the server and the release list in Settings → About, so the two never
- * disagree.
- */
+// Picks the latest Seerr AI GitHub release for an install and whether it's
+// newer than the running version. Shared by the server's update check and
+// Settings → About's release list, so they never disagree.
 
-/** What these checks need of a release as GitHub lists it. */
+/** The fields these checks need from a GitHub release. */
 export interface ReleaseSummary {
   tag_name: string;
   name: string | null;
@@ -17,9 +14,8 @@ export interface ReleaseSummary {
 }
 
 /**
- * The version a release is of: its tag without "ai-v" (ai-v1.2.3 is
- * 1.2.3), or for a tag not made that way, the last word of its title
- * ("Seerr AI 1.2.3").
+ * A release's version: its tag without "ai-v" (ai-v1.2.3 is 1.2.3), or for
+ * other tags, the last word of its title ("Seerr AI 1.2.3").
  */
 export const releaseVersion = (release: ReleaseSummary): string => {
   if (release.tag_name.startsWith('ai-v')) {
@@ -36,9 +32,9 @@ export const isCurrentRelease = (
 ): boolean => releaseVersion(release) === currentVersion;
 
 /**
- * The newest published release for an install of this version: drafts
- * never count, and pre-releases only for an install that is running one
- * (a version with a "-", like 1.3.0-beta.1). GitHub lists newest first.
+ * The newest published release for this version's install: never drafts, and
+ * pre-releases only when running one (a version with a "-", like 1.3.0-beta.1).
+ * GitHub lists newest first.
  */
 export const latestRelease = <T extends ReleaseSummary>(
   releases: T[],
@@ -51,9 +47,8 @@ export const latestRelease = <T extends ReleaseSummary>(
 };
 
 /**
- * Whether the latest release is newer than the version running. A version
- * that can't be compared as a version number counts as an update whenever
- * it differs.
+ * Whether the latest release is newer than the running version. Versions that
+ * can't be compared numerically count as an update whenever they differ.
  */
 export const releaseUpdateAvailable = (
   releases: ReleaseSummary[],

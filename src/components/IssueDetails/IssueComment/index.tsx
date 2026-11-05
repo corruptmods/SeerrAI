@@ -59,11 +59,9 @@ const IssueComment = ({
     try {
       await axios.delete(`/api/v1/issueComment/${comment.id}`);
     } catch {
-      // something went wrong deleting the comment
+      // Ignored; onUpdate refreshes the list either way.
     } finally {
-      if (onUpdate) {
-        onUpdate();
-      }
+      onUpdate?.();
     }
   };
 
@@ -190,9 +188,7 @@ const IssueComment = ({
                     message: values.newMessage,
                   });
 
-                  if (onUpdate) {
-                    onUpdate();
-                  }
+                  onUpdate?.();
 
                   setIsEditing(false);
                 }}

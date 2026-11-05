@@ -12,7 +12,7 @@ interface OverrideStatus {
   languageProfile?: string;
 }
 
-/** Where a request of this kind goes: Radarr, Sonarr or Lidarr. */
+/** The service a request type goes to: Radarr, Sonarr or Lidarr. */
 const serviceOf = (type: MediaRequest['type']) =>
   type === 'movie' ? 'radarr' : type === 'music' ? 'lidarr' : 'sonarr';
 

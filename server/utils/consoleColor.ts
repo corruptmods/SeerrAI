@@ -1,9 +1,8 @@
 /**
- * Whether console log lines get colour codes. Only for someone watching a
- * terminal: piped to a file or a container's log driver, escape codes are
- * noise that breaks log shippers. NO_COLOR (no-color.org) and TERM=dumb
- * always turn colour off; FORCE_COLOR turns it on, or off with 0/false,
- * whatever the output is.
+ * Whether console log lines get colour codes. Only for a terminal: in files or
+ * container log drivers, escape codes are noise that breaks log shippers.
+ * NO_COLOR (no-color.org) and TERM=dumb always disable colour; FORCE_COLOR
+ * enables it (or disables with 0/false) regardless of output.
  */
 export const consoleColor = (
   env: Record<string, string | undefined> = process.env,

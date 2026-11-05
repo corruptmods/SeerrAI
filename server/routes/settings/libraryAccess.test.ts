@@ -17,10 +17,9 @@ import path from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * Who sees which library: one person's libraries, and one library taken
- * from (or given to) everyone at once, with its preview and Undo, against
- * stand-ins that answer as Jellyfin, Emby and plex.tv do, behind the real
- * OpenAPI validator.
+ * Library access: one user's libraries, or one library for everyone at once
+ * with preview and Undo, against stand-in Jellyfin, Emby and plex.tv, behind
+ * the real OpenAPI validator.
  */
 
 setupTestDb();
@@ -74,7 +73,7 @@ const fresh = () => {
       Name: 'Pip',
       Policy: {
         EnableAllFolders: false,
-        // A library the server no longer has stays listed.
+        // A library removed from the server, still listed.
         EnabledFolders: [MOVIES, MUSIC, GONE],
       },
     },
@@ -187,7 +186,7 @@ before(async () => {
 
 after(() => servers.forEach((server) => server.close()));
 
-/** plex.tv, as its sharing answers come back. */
+/** A plex.tv share as returned. */
 interface PlexShare {
   user: { id: string; username: string };
   shareId: string;
@@ -255,7 +254,7 @@ const usePlex = () => {
             },
           ],
         })),
-        // A friend shared another server only.
+        // A friend with only another server shared.
         {
           $: { id: '600', username: 'elsewhere', title: '' },
           Server: [{ $: { id: '1', machineIdentifier: 'other-server' } }],
@@ -396,18 +395,18 @@ describe('library access on Jellyfin', () => {
       RemoteClientBitrateLimit: 8,
     });
     assert.deepEqual(policyOf(SOME).EnabledFolders, [GONE, MOVIES]);
-    // Left with nothing otherwise: left as they were.
+    // A user who would be left with nothing is unchanged.
     assert.deepEqual(policyOf(ONLY_MUSIC).EnabledFolders, [MUSIC]);
     assert.equal(policyOf(ADMIN).EnableAllFolders, true);
 
-    // Their Seerr AI account is matched, whatever the id's dashes.
+    // The Seerr AI account matches regardless of dashes in the id.
     const view = await (await api('/library-access/jellyfin')).json();
     assert.equal(
       view.people.find((p: { id: string }) => p.id === SOME).userId,
       linked.id
     );
 
-    // Someone changed again since is left alone.
+    // Undo skips a user changed again since.
     policyOf(SOME).EnabledFolders = [SHOWS];
     const undone = await post(
       `/library-access/history/${result.change.id}/undo`
@@ -532,7 +531,7 @@ describe('library access on Emby', () => {
   it('lists and changes libraries by Guid, whichever a policy holds', async () => {
     emby = true;
     getSettings().emby = { ...getSettings().jellyfin, connected: true };
-    // An older policy listing a library by its short id.
+    // An older policy lists a library by its short id.
     policyOf(NO_MUSIC).EnabledFolders = ['11'];
     const view = await (await api('/library-access/emby')).json();
     assert.deepEqual(
@@ -581,7 +580,7 @@ describe('library access on Plex', () => {
       { shareId: '9002', ids: ['101'] },
     ]);
 
-    // Undo gives back each library; Plex keeps no "new ones too" here.
+    // Undo restores each library; Plex has no "new ones too" here.
     await post(`/library-access/history/${result.change.id}/undo`);
     assert.deepEqual(plexPuts.slice(2), [
       { shareId: '9001', ids: ['101', '102', '103'] },

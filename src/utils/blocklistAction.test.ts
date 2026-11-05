@@ -16,9 +16,8 @@ const held = [
 const notHeld = [undefined, MediaStatus.UNKNOWN, MediaStatus.DELETED];
 
 /**
- * Who sees the blocklist button on a media page, and whether it deletes
- * files. Blocklisting a requested or downloaded title removes it from the
- * *arr and deletes its files, so that case is admin only.
+ * Blocklisting a requested or downloaded title removes it from the *arr and
+ * deletes its files, so that case is admin only.
  */
 describe('the blocklist button on a media page', () => {
   it('lets an admin blocklist a title in any state, deleting files when held', () => {

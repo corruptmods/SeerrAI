@@ -3,12 +3,11 @@ import type { DownloadClientSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 
 /*
- * Whether songs on no single can be taken from their albums: Settings →
- * Music allows it, and Backfill, whose Prowlarr and download client do the
- * fetching (lib/music/songFetch), is on and set up.
+ * Songs with no single are taken from albums via Backfill's Prowlarr and
+ * download client (lib/music/songFetch).
  */
 
-/** Whether songs can be taken from albums here, and why not. */
+/** Why songs can't be taken from albums, or undefined when they can. */
 export const songFetchProblem = (): string | undefined => {
   const settings = getSettings();
   const backfillSettings = settings.backfill;
@@ -27,7 +26,7 @@ export const songFetchProblem = (): string | undefined => {
   return undefined;
 };
 
-/** Backfill's client for a kind of release. */
+/** Backfill's download client for a protocol. */
 export const clientFor = (
   protocol: 'torrent' | 'usenet'
 ): DownloadClientSettings | undefined => {

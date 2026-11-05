@@ -24,14 +24,13 @@ interface ListSummary {
 }
 
 interface AddCollectionToListProps {
-  /** The collection's films, with their posters for the list. */
+  /** The collection's films, with posters. */
   movies: { tmdbId: number; posterPath?: string | null }[];
 }
 
 /**
- * Add to List for a collection: each watch list says how many of the
- * collection's films it has, and choosing one adds the rest. Films already
- * on it stay as they are.
+ * Add to List for a collection: each list shows how many of its films it
+ * has; choosing one adds the rest.
  */
 const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
   const intl = useIntl();
@@ -58,7 +57,7 @@ const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
       : null
   );
 
-  /** Which of the collection's films each list has. */
+  /** The collection's films on each list. */
   const onList = new Map<number, Set<number>>();
   for (const entry of membership ?? []) {
     const films = onList.get(entry.listId) ?? new Set<number>();
@@ -79,7 +78,7 @@ const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
     );
   };
 
-  /** Adds the films a list doesn't have yet, and says how many. */
+  /** Adds the missing films to a list and reports how many. */
   const addTo = async (listId: number, listName: string) => {
     const already = onList.get(listId) ?? new Set<number>();
     const missing = movies.filter((movie) => !already.has(movie.tmdbId));
@@ -145,9 +144,8 @@ const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
       </Button>
 
       {/*
-        Opens over the page: from the button's start on a phone, where it
-        sits beside the request button, and from its end on a wider screen,
-        where the row ends at the page's edge.
+        Anchored to the button's start on phones (beside the request button)
+        and its end on wider screens (at the page edge).
       */}
       {isOpen && (
         <div className="media-action-menu absolute start-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-md border border-gray-700 bg-gray-800 p-2 shadow-lg sm:end-0 sm:start-auto">

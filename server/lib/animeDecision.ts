@@ -4,8 +4,8 @@ import type { AnimeSignals } from '@server/utils/isAnime';
 import { isAnime } from '@server/utils/isAnime';
 
 /**
- * Anime detection (utils/isAnime) under this server's setting of which
- * countries' anime is left out (Settings → Services → Anime).
+ * Anime detection minus this server's excluded countries (Settings → Services →
+ * Anime).
  */
 export const detectAnime = (media: AnimeSignals): boolean =>
   isAnime(media, getSettings().main.animeExcludedCountries ?? []);
@@ -13,7 +13,7 @@ export const detectAnime = (media: AnimeSignals): boolean =>
 /** Who decided whether a title is anime. */
 export type AnimeDecidedBy = 'title' | 'request' | 'detection';
 
-/** The series type chosen on the newest of a title's requests that has one. */
+/** Series type of the newest request with this `is4k` that has one. */
 export const requestSeriesType = (
   requests: readonly {
     id: number;
@@ -27,15 +27,12 @@ export const requestSeriesType = (
     .sort((a, b) => b.id - a.id)[0]?.seriesType ?? null;
 
 /**
- * Whether a title is anime, and who said so: the series type on its request
- * (ticked or unticked as Anime by whoever requested it, or set by an
- * override rule), then the title's own setting (set on its page), then anime
- * detection.
+ * Whether a title is anime, and who decided: the request's series type, then
+ * the title's own setting, then detection.
  *
  * A request only carries a rule's type that agrees with the title's setting
- * (MediaRequest.request), and saving the setting clears request types that
- * disagree with it (lib/animePlacement), so the latest decision is the one
- * that stands.
+ * (MediaRequest.request), and saving the setting clears disagreeing request
+ * types (lib/animePlacement), so the latest decision stands.
  */
 export const decideAnime = (
   media: AnimeSignals,

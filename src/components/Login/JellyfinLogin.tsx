@@ -75,9 +75,8 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
     ),
     password: Yup.string(),
   });
-  // Where people reset their password there. Emby has its own; the
-  // Jellyfin ones are Jellyfin's unless Emby comes first among the
-  // connected servers, when they are Emby's and are not used here.
+  // Password reset host. The Jellyfin settings belong to Emby when Emby is
+  // the first connected Jellyfin-family server, so they are unused then.
   const isEmby = serverType === MediaServerType.EMBY;
   const firstFamily = settings.currentSettings.mediaServers.find(
     (server) => server.kind === 'jellyfin' || server.kind === 'emby'

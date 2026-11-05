@@ -19,8 +19,7 @@ import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
-// The filter panel, with its date pickers and selectors, is most of this
-// page's code; it is fetched when first opened.
+// The filter panel is most of this page's code, so it loads on first open.
 const FilterSlideover = dynamic(
   () => import('@app/components/Discover/FilterSlideover'),
   { ssr: false }

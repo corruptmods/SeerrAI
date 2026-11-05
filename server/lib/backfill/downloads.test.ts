@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
 /*
- * Backfill's own downloads (the admin agent's too) show on title pages and
- * cards like any download Radarr or Sonarr runs.
+ * Backfill's downloads (the admin agent's too) show on title pages and cards
+ * like Radarr or Sonarr downloads.
  */
 
 const file = (episodeId: number, episode: number, state = 'waiting') => ({

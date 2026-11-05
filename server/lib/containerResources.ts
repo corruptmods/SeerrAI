@@ -3,10 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 /*
- * What Seerr's own container is using, read from the kernel's accounting
- * for it (cgroups), the same figures `docker stats` shows. Only this
- * container: nothing here can see or reach any other. Both cgroup layouts
- * are read: v2 (TrueNAS, current Docker) and the older v1.
+ * Seerr's own container usage from its cgroup accounting (the figures
+ * `docker stats` shows). Reads only this container. Handles cgroup v2
+ * (TrueNAS, current Docker) and v1.
  */
 
 export interface ContainerResources {
@@ -17,7 +16,7 @@ export interface ContainerResources {
     used: number;
     /** The container's limit, or null when it has none. */
     limit: number | null;
-    /** The machine's memory, what an unlimited container can grow into. */
+    /** Host memory: the ceiling for an unlimited container. */
     hostTotal: number;
   };
   cpu?: {
@@ -72,7 +71,7 @@ export const countCpus = (list: string | undefined): number | undefined => {
   return count || undefined;
 };
 
-/** Cumulative CPU time used, in microseconds, and the limits around it. */
+/** One cgroup reading: cumulative CPU time (µs), memory, limits and pids. */
 interface Sample {
   usageUsec?: number;
   memoryUsage?: number;
@@ -186,10 +185,16 @@ const average = (values: (number | null)[]) => {
     : null;
 };
 
+/** Average of a bucket's readings, stamped with its last reading's time. */
+const bucketPoint = (bucket: ResourcePoint[]): ResourcePoint => ({
+  t: bucket[bucket.length - 1].t,
+  cpu: average(bucket.map((p) => p.cpu)),
+  memory: average(bucket.map((p) => p.memory)),
+});
+
 /**
- * Reads the container's use every 15 seconds and keeps the last hour of
- * readings and a day of five-minute averages, in memory: a restart starts
- * the history again, which is also when it would change anyway.
+ * Samples every 15 seconds, keeping an hour of readings and a day of
+ * five-minute averages in memory; history resets on restart.
  */
 export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
   let previous: { usageUsec: number; at: number } | undefined;
@@ -222,7 +227,7 @@ export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
       hostCores
     );
 
-    // CPU use is a rate: the time used since the last reading.
+    // CPU percent is the time used since the last reading.
     let percent: number | null = null;
     if (now.usageUsec !== undefined) {
       if (previous && at > previous.at) {
@@ -264,7 +269,7 @@ export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
     };
   };
 
-  /** Take a reading and file it. */
+  /** Takes a reading and records it. */
   const tick = async (at = Date.now()) => {
     latest = await read(at);
     if (!latest.inContainer) {
@@ -279,14 +284,7 @@ export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
 
     bucket.push(point);
     if (point.t - bucket[0].t >= BUCKET_MS) {
-      day = [
-        ...day.filter((p) => p.t > at - DAY_MS),
-        {
-          t: bucket[bucket.length - 1].t,
-          cpu: average(bucket.map((p) => p.cpu)),
-          memory: average(bucket.map((p) => p.memory)),
-        },
-      ];
+      day = [...day.filter((p) => p.t > at - DAY_MS), bucketPoint(bucket)];
       bucket = [];
     }
     return latest;
@@ -300,7 +298,7 @@ export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
       }
       void tick();
       timer = setInterval(() => void tick(), intervalMs);
-      // Never the reason the process stays up.
+      // Don't keep the process alive.
       timer.unref();
     },
     stop: () => {
@@ -311,17 +309,8 @@ export const createResourceMonitor = (root = '/sys/fs/cgroup') => {
     history: async (): Promise<ResourceHistory> => ({
       current: latest ?? (await tick()),
       recent,
-      // The day so far, finished with the five minutes in progress.
-      day: bucket.length
-        ? [
-            ...day,
-            {
-              t: bucket[bucket.length - 1].t,
-              cpu: average(bucket.map((p) => p.cpu)),
-              memory: average(bucket.map((p) => p.memory)),
-            },
-          ]
-        : day,
+      // Includes the bucket in progress.
+      day: bucket.length ? [...day, bucketPoint(bucket)] : day,
       intervalSeconds: INTERVAL_MS / 1000,
     }),
   };

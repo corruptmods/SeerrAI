@@ -101,7 +101,7 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   problemUnreachable: 'Could not reach {host}.',
 });
 
-/** Each problem the server can name, in the admin's language. */
+/** Translated message for each problem code the server sends. */
 const PROBLEM_MESSAGES: Record<
   OidcProblemCode,
   { id: string; defaultMessage: string }
@@ -123,7 +123,7 @@ const PROBLEM_MESSAGES: Record<
   unreachable: messages.problemUnreachable,
 };
 
-/** As the settings page is sent it: no secret, only that one is saved. */
+/** As sent to the settings page: no secret, only whether one is saved. */
 export type ShownOidcProvider = OidcProviderSettings & {
   hasClientSecret: boolean;
   callbackUrl: string | null;
@@ -169,8 +169,8 @@ const OidcProviderModal = ({
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
 
-  // A saved secret is only kept for the issuer it was saved for (with or
-  // without a slash at the end, or as its configuration address).
+  // A saved secret is kept only for its own issuer, ignoring a trailing slash
+  // or the configuration-address form.
   const sameIssuer = (issuerUrl: string) =>
     !!provider &&
     normalizeIssuer(issuerUrl) === normalizeIssuer(provider.issuerUrl);
@@ -231,8 +231,7 @@ const OidcProviderModal = ({
     }),
   });
 
-  // What the server said was wrong: by its code where there is one, in
-  // the admin's language; else its own words.
+  // The server's reason: translated by code when it has one, else its message.
   const reasonOf = (e: unknown) => {
     const data = isAxiosError(e)
       ? (e.response?.data as
@@ -249,7 +248,7 @@ const OidcProviderModal = ({
             ? messages.problemNoDiscoveryUnsaid
             : PROBLEM_MESSAGES[problem];
       const said = intl.formatMessage(message, params);
-      // Only a host was entered: where Authentik keeps it.
+      // Only a host was entered: add where Authentik serves the app.
       return problem === 'no-discovery' && params.origin !== undefined
         ? `${said} ${intl.formatMessage(messages.problemAppAddress, {
             origin: params.origin,
@@ -277,8 +276,7 @@ const OidcProviderModal = ({
           clientSecret: values.clientSecret,
         }
       );
-      // The provider's own form of it, as it will be saved (a slash at
-      // the end or not).
+      // Save the issuer in the provider's own form (trailing slash or not).
       if (data.issuerUrl) {
         setIssuerUrl(data.issuerUrl);
       }
@@ -296,8 +294,7 @@ const OidcProviderModal = ({
     }
   };
 
-  // The redirect URL a new provider will have, from its name; a saved
-  // one's never changes.
+  // A new provider's redirect URL comes from its name; a saved one's is fixed.
   const redirectUrlFor = (name: string) =>
     applicationUrl
       ? oidcCallbackUrl(
@@ -366,13 +363,11 @@ const OidcProviderModal = ({
           isValid,
         }) => {
           const redirectUrl = redirectUrlFor(values.name);
-          // One rule's claim error, shown straight away: an empty rule
-          // keeps Save from being pressed, and has to say why.
+          // Shown at once: an empty rule disables Save and must say why.
           const ruleError = (index: number) =>
             (errors.requiredClaims as FormikErrors<RuleValues>[] | undefined)?.[
               index
             ]?.claim;
-          // Saved with another issuer URL than it has now.
           const issuerChanged =
             !!provider &&
             !!values.issuerUrl.trim() &&
@@ -411,7 +406,7 @@ const OidcProviderModal = ({
               }
               okDisabled={isSubmitting || isTesting || !isValid}
               onOk={() => {
-                // The address as it will be saved, so the admin sees it.
+                // Show the address as it will be saved.
                 const issuerUrl = issuerFromEntered(values.issuerUrl);
                 if (issuerUrl !== values.issuerUrl) {
                   setFieldValue('issuerUrl', issuerUrl);
@@ -494,8 +489,7 @@ const OidcProviderModal = ({
                         placeholder="https://"
                         onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                           handleBlur(e);
-                          // A pasted configuration address becomes the
-                          // issuer it is under, here where it can be seen.
+                          // Turn a pasted configuration address into its issuer, visibly.
                           const issuerUrl = issuerFromEntered(e.target.value);
                           if (issuerUrl !== e.target.value) {
                             setFieldValue('issuerUrl', issuerUrl);
@@ -659,7 +653,7 @@ const OidcProviderModal = ({
                         <span className="flex-1">
                           {intl.formatMessage(messages.value)}
                         </span>
-                        {/* Room for the remove buttons below. */}
+                        {/* Spacer for the remove buttons. */}
                         <span className="w-10" />
                       </div>
                     )}

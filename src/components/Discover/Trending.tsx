@@ -30,13 +30,8 @@ const Trending = () => {
   const router = useRouter();
   const updateQueryParams = useUpdateQueryParams({});
 
-  /*
-   * Kept in the page address rather than component state, as the Discover
-   * pages do. Component state was rebuilt from the defaults whenever you came
-   * back from a title, so the filters reset; the address survives the round
-   * trip, and the browser restores it on back. Anything unrecognised in the
-   * address falls back to the default.
-   */
+  // Kept in the URL so filters survive going to a title and back; invalid
+  // values fall back to the default.
   const currentMediaType: MediaType = (['movie', 'tv'] as const).includes(
     router.query.mediaType as 'movie' | 'tv'
   )

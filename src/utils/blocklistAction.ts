@@ -1,8 +1,8 @@
 import { MediaStatus } from '@server/constants/media';
 
 /**
- * States in which a title is already requested or downloaded. Blocklisting it
- * then also removes it from Radarr/Sonarr and deletes its files.
+ * Requested or downloaded states, where blocklisting also removes the title
+ * from Radarr/Sonarr and deletes its files.
  */
 const HELD_STATUSES = [
   MediaStatus.PENDING,
@@ -12,13 +12,11 @@ const HELD_STATUSES = [
 ];
 
 /**
- * Whether the blocklist button shows on a media page, and whether using it
- * deletes files.
+ * Whether the blocklist button shows on a movie or series page, and whether
+ * it deletes files.
  *
- * One rule shared by the movie and series pages. Anyone who can manage the
- * blocklist sees it for titles nobody has asked for, as upstream always
- * allowed. For titles already requested or downloaded — where blocklisting
- * destroys files — only an admin sees it.
+ * Blocklist managers see it for unrequested titles (as upstream). For
+ * requested or downloaded titles, where it deletes files, only admins do.
  */
 export const blocklistAction = (
   status: MediaStatus | undefined,

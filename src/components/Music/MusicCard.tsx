@@ -34,30 +34,27 @@ const messages = defineMessages('components.Music.MusicCard', {
 
 interface MusicCardProps {
   album: MusicAlbumResult;
-  /** Fills a grid cell rather than taking a row's width. */
+  /** Fills a grid cell instead of a row's fixed width. */
   canExpand?: boolean;
   /**
-   * The artist under the title (rows, search); on the artist's own page,
-   * what kind of album it is instead (live, a compilation...).
+   * The artist under the title; off on the artist's page, which shows the
+   * album type instead.
    */
   showArtist?: boolean;
   /**
-   * The artist the album is requested under, where the album does not say
-   * (an artist's own page lists their albums without their credits).
+   * The artist to request under when the album lacks credits, as on an
+   * artist's page.
    */
   artistId?: string;
-  /** Told when the album has been requested from the card. */
+  /** Called when the album is requested from the card. */
   onRequested?: () => void;
-  /** The artist's downloads in Lidarr; the card shows its album's. */
+  /** The artist's Lidarr downloads; the card shows its album's. */
   downloads?: DownloadingItem[];
 }
 
 /**
- * An album's square cover in a poster's 2:3 tile: the cover across the
- * middle, at the tile's full width, over a blurred and enlarged copy of
- * itself that fills the rest. The bands above and below hold the corner
- * badges, so they never sit on the cover itself. Both are the one picture,
- * fetched once.
+ * A square cover in a 2:3 tile, over a blurred enlarged copy of itself. The
+ * bands above and below hold the corner badges. One image, fetched once.
  */
 export const CoverArt = ({
   src,
@@ -78,9 +75,8 @@ export const CoverArt = ({
 );
 
 /**
- * An album, as a film's or a series' card: its cover, what kind of release
- * it is and whether it is here, and on hover or a tap its year, title and
- * artist, with Request when it can be asked for.
+ * An album card: cover, release type and status, and on hover or tap its
+ * year, title and artist, with Request when requestable.
  */
 const MusicCard = ({
   album,
@@ -97,7 +93,7 @@ const MusicCard = ({
   const [requesting, setRequesting] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [missing, setMissing] = useState(false);
-  // Shown at once after a request from the card, before the row reloads.
+  // Shown right after a request from the card, before the row reloads.
   const [requestedStatus, setRequestedStatus] = useState<MediaStatus>();
   const status = requestedStatus ?? album.status;
 
@@ -178,7 +174,7 @@ const MusicCard = ({
             <ArrowDownTrayIcon />
             <span>
               {intl.formatMessage(
-                // Part of it is here: the rest is what's asked for.
+                // Partly here: request the rest.
                 status === MediaStatus.PARTIALLY_AVAILABLE
                   ? messages.requestMore
                   : globalMessages.request
@@ -191,7 +187,7 @@ const MusicCard = ({
   );
 };
 
-/** Where a card will be while its row loads: a film's placeholder. */
+/** Loading placeholder, as for films. */
 MusicCard.Placeholder = Placeholder;
 
 export default MusicCard;

@@ -13,10 +13,7 @@ interface SlideOverProps {
   subText?: string;
   onClose: () => void;
   children: React.ReactNode;
-  /**
-   * Kept below the scrolling content, on the panel's own background: a
-   * message box, say, that stays put however long the content gets.
-   */
+  /** Fixed below the scrolling content, such as a message box. */
   footer?: React.ReactNode;
 }
 

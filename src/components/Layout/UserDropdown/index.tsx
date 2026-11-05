@@ -51,7 +51,7 @@ const UserDropdown = () => {
   return (
     <Menu as="div" className="relative ml-2">
       <div>
-        {/* The same size and edge as the AI button beside it. */}
+        {/* Matches the AI button beside it. */}
         <MenuButton
           className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-strong text-sm transition hover:border-gray-500 focus:border-gray-500 focus:outline-none"
           data-testid="user-menu"

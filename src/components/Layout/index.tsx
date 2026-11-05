@@ -77,9 +77,8 @@ const Layout = ({ children }: LayoutProps) => {
     };
   }, []);
 
-  // Safari on an iPhone doesn't always bring the page back up when what's
-  // on it gets shorter (a long list closed, say): the space it took stays
-  // as empty page to scroll through. Put the page back at its new end.
+  // iPhone Safari can leave empty scroll space when the page gets shorter, so
+  // scroll back to the new end.
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const main = mainRef.current;
@@ -94,17 +93,13 @@ const Layout = ({ children }: LayoutProps) => {
     return () => observer.disconnect();
   }, []);
 
-  // How far into this visit's history the current page is, so the back
-  // button knows whether there is anywhere to go. A reload — an update
-  // prompt, or the app being restored by iOS — wipes the history stack, and
-  // router.back() on an empty stack does nothing at all, which reads as a
-  // dead button.
+  // History depth, so the back button knows if there is anywhere to go. A
+  // reload (update prompt, iOS restoring the app) wipes the stack, and
+  // router.back() on an empty stack does nothing.
   //
-  // Each history entry Next makes carries a key: a push makes a new one, a
-  // replace (a filter changing the address, say) keeps it. So an entry seen
-  // before is a step back or forward to a known depth, and a new one is one
-  // deeper. Counting route changes instead counted replaces, and the back
-  // step itself, as further pages, until the button walked out of the app.
+  // Next gives each history entry a key: a push makes a new one, a replace
+  // keeps it. A known key is a step to a known depth; a new one is one deeper.
+  // Counting route changes would count replaces and back steps as pages.
   const depthByEntry = useRef(new Map<string, number>());
   const historyDepth = useRef(0);
 
@@ -112,8 +107,8 @@ const Layout = ({ children }: LayoutProps) => {
     const entryKey = (): string | undefined =>
       (window.history.state as { key?: string } | null)?.key;
 
-    // The entry being left. Next only labels the first entry once the app
-    // has started, so it is recorded on the way out rather than on load.
+    // Records the entry being left: Next only keys the first entry after
+    // start-up, so it can't be recorded on load.
     const onRouteStart = () => {
       const key = entryKey();
       if (key && !depthByEntry.current.has(key)) {
@@ -150,8 +145,8 @@ const Layout = ({ children }: LayoutProps) => {
       return;
     }
 
-    // Nothing to return to: fall back to the listing the current page most
-    // likely came from, rather than leaving the button inert.
+    // Nothing to go back to: go to the listing this page most likely came
+    // from.
     if (router.pathname.startsWith('/movie')) {
       router.push('/discover/movies');
     } else if (router.pathname.startsWith('/tv')) {
@@ -164,7 +159,7 @@ const Layout = ({ children }: LayoutProps) => {
   }, [router]);
 
   return (
-    // Discover's customize mode and the menus share the menu being arranged.
+    // Shares the menu being arranged between Discover and the menus.
     <NavLayoutProvider>
       <div className="flex h-full min-h-full min-w-0 bg-page">
         <div className="pwa-only fixed inset-0 z-20 h-1 w-full border-subtle md:border-t" />
@@ -235,7 +230,7 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="mb-6">
               <div className="max-w-8xl mx-auto px-4">
                 <UserWarnings />
-                {/* One of these at a time, in order: see NoticeQueue. */}
+                {/* One at a time, in order (see NoticeQueue). */}
                 <PushOptInBanner />
                 <PasskeyNudge />
                 <WatchSuggestions />

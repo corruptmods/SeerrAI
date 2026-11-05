@@ -10,8 +10,8 @@ import type { SonarrSeriesDetail } from '@server/lib/backfill/sonarr';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 
 /*
- * What every tool of the admin agent shares: what a run knows, how
- * titles are named, and whether an admin is in the conversation.
+ * Shared by every admin-agent tool: run state, title references, and
+ * whether an admin is in the conversation.
  */
 
 /** A release found during a run, named by its reference. */
@@ -19,8 +19,8 @@ export interface KnownRelease extends ProwlarrRelease {
   ref: string;
   source: 'sonarr' | 'radarr' | 'lidarr' | 'prowlarr';
   /**
-   * A Usenet post in archives, or with scrambled file names, found when it
-   * was opened: its files can't be listed before it is downloaded.
+   * Set when opened: a Usenet post in archives or with scrambled names,
+   * whose files can't be listed before download.
    */
   packed?: 'archives' | 'scrambled';
 }
@@ -31,7 +31,7 @@ export interface TitleRef {
   arrId: number;
 }
 
-/** What one run knows as it goes. */
+/** State of one run. */
 export interface AgentState {
   run: AgentRun;
   /** Who it acts as: the admin who asked, or the owner. */
@@ -40,7 +40,7 @@ export interface AgentState {
   files: Map<string, PackFile[]>;
   series: Map<number, SonarrSeriesDetail[]>;
   movies: Map<number, RadarrMovieDetail[]>;
-  /** Each Lidarr's albums, with its artists' names, read once a run. */
+  /** Each Lidarr's albums and artist names, read once per run. */
   albums?: Map<number, LibraryAlbums>;
   /** Downloads started in the last day, this run's included. */
   grabsToday: number;
@@ -50,46 +50,45 @@ export interface AgentState {
   /** Pauses the run with a question for an admin. */
   ask(question: string): void;
   /**
-   * Puts a change to an admin, to approve or decline: the run pauses once
-   * this turn's tools are done, with every change proposed in it.
+   * Proposes a change for an admin to approve or decline. The run pauses
+   * after this turn's tools, with every change proposed in it.
    */
   propose(change: ProposedChange): void;
 }
 
-/** A Lidarr's albums, and the names of their artists by id. */
+/** A Lidarr's albums, and artist names by id. */
 export interface LibraryAlbums {
   albums: LidarrAlbum[];
   artists: Map<number, string>;
 }
 
-/** A refusal the model is told about, to try something else. */
+/** A refusal reported to the model so it tries something else. */
 export class ToolError extends Error {}
 
 /**
- * A release turned down for what it is (a dub in another language), not
- * for how it was asked for: remembered for the title, so later
- * conversations don't try it again.
+ * A release refused for what it is (a foreign dub), not how it was asked
+ * for. Remembered for the title so later conversations skip it.
  */
 export class Refused extends ToolError {}
 
 export interface AgentTool extends ConverseTool {
-  /** Only when an admin asked, never on its own. */
+  /** Offered only with an admin in the conversation. */
   askOnly?: boolean;
-  /** Only looks; several in one turn run at the same time. */
+  /** Read-only; several in one turn run in parallel. */
   readOnly?: boolean;
   run(state: AgentState, input: Record<string, unknown>): Promise<string>;
 }
 
 // ---- the run ----------------------------------------------------------------
 
-/** An admin's decision on what a run proposed, as its step says it. */
+/** An admin's decision on a proposal, as its step text. */
 export const decisionText = (
   by: string,
   approved: boolean,
   headlines: string
 ): string => `${by} ${approved ? 'approved' : 'declined'}: ${headlines}`;
 
-/** Whether a reply step is a decision, not something an admin said. */
+/** Whether a reply step is a decision rather than an admin's message. */
 const isDecision = (text: string | undefined): boolean => {
   const said = text ?? '';
   const end = said.indexOf(': ');
@@ -97,10 +96,10 @@ const isDecision = (text: string | undefined): boolean => {
 };
 
 /**
- * Whether an admin is in the conversation: they asked, or have replied
- * since. Only then may it propose changes or request titles. Approving
- * what it proposed is not replying: a run that read release names on its
- * own gets no more say for it.
+ * Whether an admin is in the conversation: they asked, or replied since.
+ * Only then may the run propose changes or request titles. Approving a
+ * proposal is not a reply, so a run that read release names on its own
+ * gains no extra say.
  */
 export const adminPresent = (run: AgentRun): boolean =>
   run.trigger === 'ask' ||
@@ -112,8 +111,8 @@ export const replaceReported = (run: AgentRun): boolean =>
 
 /**
  * Whether replacing files may be proposed: with an admin in the
- * conversation, or for a report asking for it. Either way it only waits
- * for an admin's approval; nothing is replaced before that.
+ * conversation, or for a report asking for it. Nothing is replaced before
+ * an admin approves.
  */
 export const mayReplace = (run: AgentRun): boolean =>
   adminPresent(run) || replaceReported(run);
@@ -137,7 +136,7 @@ export const readTitleRef = (value: unknown): TitleRef => {
   };
 };
 
-/** The main servers: a 4K twin of one is the same library. */
+/** Non-4K servers (all if none); a 4K twin is the same library. */
 export const mainServers = <T extends SonarrSettings | RadarrSettings>(
   servers: T[]
 ): T[] => {
@@ -168,13 +167,13 @@ export const titleMatches = (query: string, ...titles: string[]) => {
 
 /** The title a run is bound to, once it is. */
 export const boundTitle = (run: AgentRun): TitleRef | null =>
-  run.kind && run.arrId !== null && run.arrId !== undefined
+  run.kind && run.arrId != null
     ? { kind: run.kind, serverId: run.serverId ?? 0, arrId: run.arrId }
     : null;
 
 /**
  * A series' original language. Anime with none recorded is taken as
- * Japanese: its English dub may not exist, and the original is wanted.
+ * Japanese, since the original is wanted and an English dub may not exist.
  */
 export const originalOf = (series: {
   originalLanguage?: { name: string };

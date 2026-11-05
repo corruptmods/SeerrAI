@@ -9,11 +9,8 @@ import {
   writeStreamingRow,
 } from './streamingServices';
 
-/*
- * Streaming services on Discover: the ones a page or row shows only titles
- * on, and the ones it leaves out. Rows made before services could be left
- * out keep working exactly as they did.
- */
+// Discover streaming services: those a page or row is limited to, and those it
+// excludes. Rows from before exclusions keep working unchanged.
 
 describe('streaming service ids', () => {
   it('reads TMDB ids split by | or , each once, in order', () => {

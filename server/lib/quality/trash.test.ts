@@ -13,8 +13,8 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Keeping TRaSH Guides current: what is asked of GitHub, that an unchanged
- * answer (304) refetches nothing, and that checks don't overlap.
+ * Keeping TRaSH Guides current: GitHub requests, no refetch on a 304, and
+ * no overlapping checks.
  */
 
 const CF = 'docs/json/radarr/cf/made-up-format.json';

@@ -26,18 +26,18 @@ const messages = defineMessages('components.DeclineRequestModal', {
 
 interface DeclineRequestModalProps {
   show: boolean;
-  /** One request, or every waiting request for a title, declined together. */
+  /** One request, or all pending requests for a title. */
   requests: Pick<NonFunctionProperties<MediaRequest>, 'id'>[];
-  /** The title they are for, if the caller knows it. */
+  /** Their title, if known. */
   subTitle?: string;
   onCancel: () => void;
-  /** Once every request has been declined. */
+  /** Called once all requests are declined. */
   onComplete: () => void;
 }
 
 /**
- * Declines requests, with an optional reason the requester is told. The
- * reason is sent as typed; the server trims it and keeps it as plain text.
+ * Declines requests with an optional reason for the requester. Sent as typed;
+ * the server trims it and stores plain text.
  */
 const DeclineRequestModal = ({
   show,
@@ -54,8 +54,7 @@ const DeclineRequestModal = ({
   const hintId = useId();
 
   useEffect(() => {
-    // Each opening starts blank, so a reason typed for one request never
-    // carries over to the next.
+    // Reset on open so a reason never carries over to the next request.
     if (show) {
       setReason('');
     }
@@ -65,8 +64,8 @@ const DeclineRequestModal = ({
     setIsDeclining(true);
     const declineReason = reason.trim();
 
-    // One after another: declined at the same time, each still saw the
-    // others as waiting, so the title was never set back to not requested.
+    // Sequential: in parallel each sees the others as pending, so the title
+    // never resets to not requested.
     const failed = (
       await oneAfterAnother(requests, (request) =>
         axios.post(
@@ -86,8 +85,7 @@ const DeclineRequestModal = ({
       );
     }
 
-    // Stays open, reason and all, when nothing was declined, so it can be
-    // tried again; otherwise what did change is shown.
+    // Stay open with the reason if nothing was declined; otherwise show the result.
     if (failed < requests.length) {
       onComplete();
     }
@@ -118,7 +116,7 @@ const DeclineRequestModal = ({
         }
         okButtonType="danger"
         okDisabled={isDeclining || requests.length === 0}
-        // A reason being typed is not lost to a stray tap outside.
+        // Don't lose a typed reason to a stray tap outside.
         backgroundClickable={!reason.trim()}
       >
         <label htmlFor={reasonId} className="sr-only">

@@ -7,11 +7,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-/** Where a song taken from an album is. */
+/** Status of a song taken from an album. */
 export type SongFetchStatus =
   /** Waiting its turn, or for Lidarr to know the album. */
   | 'queued'
-  /** Looking for a release of the album that has the songs. */
+  /** Looking for an album release containing the songs. */
   | 'searching'
   | 'downloading'
   /** Lidarr is importing the songs' files. */
@@ -31,11 +31,11 @@ export interface SongFetchFile {
 }
 
 /**
- * Songs only on an album, fetched through it: a release of the album is
- * found and downloaded (only the songs' files, for a torrent), Lidarr's
- * manual import takes just those tracks into the album, which stays
- * unmonitored so Lidarr never goes looking for the rest, and the download
- * is removed. One for each album, for the songs asked for from it.
+ * Songs only on an album, fetched through it: a release is found and downloaded
+ * (only the songs' files, for a torrent), Lidarr's manual import takes just
+ * those tracks into the album, which stays unmonitored so Lidarr never searches
+ * for the rest, and the download is removed. One row per album, for the songs
+ * requested from it.
  */
 @Entity()
 class SongFetch {
@@ -56,14 +56,14 @@ class SongFetch {
   @Column({ type: 'varchar' })
   public artistName: string;
 
-  /** The songs it fetches: their MusicBrainz recording ids. */
+  /** The songs' MusicBrainz recording ids. */
   @Column({ type: 'simple-json', default: '[]' })
   public recordings: string[];
 
   @Column({ type: 'varchar', default: 'queued' })
   public status: SongFetchStatus;
 
-  /** What it is doing now, in words. */
+  /** Current progress, in words. */
   @Column({ type: 'varchar', nullable: true })
   public stage: string | null;
 
@@ -81,11 +81,11 @@ class SongFetch {
   @Column({ type: 'int', nullable: true })
   public lidarrAlbumId: number | null;
 
-  /** The album's release in Lidarr the songs are taken into. */
+  /** The Lidarr album release the songs are imported into. */
   @Column({ type: 'int', nullable: true })
   public lidarrReleaseId: number | null;
 
-  /** The release taken, as Prowlarr found it, or a Soulseek sharer's files. */
+  /** The chosen release, as Prowlarr found it, or a Soulseek sharer's files. */
   @Column({ type: 'simple-json', nullable: true })
   public release: {
     guid: string;
@@ -111,8 +111,8 @@ class SongFetch {
   public clientId: number | null;
 
   /**
-   * The torrent's hash, or the Usenet client's job id; for Soulseek, the
-   * slskd batches asked for, comma-separated.
+   * The torrent hash or Usenet job id; for Soulseek, the requested slskd
+   * batches, comma-separated.
    */
   @Column({ type: 'varchar', nullable: true })
   public downloadId: string | null;
@@ -122,18 +122,17 @@ class SongFetch {
   public commandId: number | null;
 
   /**
-   * Searches that found no release with the songs. Indexers come and go
-   * (one busy, one at its limit), so it is looked for again a few times
-   * before the songs are given up on.
+   * Searches that found no release with the songs. Indexers come and go (busy,
+   * rate-limited), so it retries a few times before giving up.
    */
   @Column({ type: 'int', default: 0 })
   public searches: number;
 
-  /** When it is next looked for, after a search found nothing. */
+  /** When to search again after a search found nothing. */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public searchAgainAt: Date | null;
 
-  /** Releases tried that failed, never taken again for this album. */
+  /** Failed releases, never retried for this album. */
   @Column({ type: 'simple-json', default: '[]' })
   public tried: string[];
 

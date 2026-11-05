@@ -14,12 +14,12 @@ import { RELEASE_SEARCH_TIMEOUT_MS } from '@server/lib/backfill/sonarr';
 import type { LidarrSettings } from '@server/lib/settings';
 
 /*
- * The Lidarr calls Backfill makes for albums: what Lidarr is missing, how
- * it reads a release's name, its quality profiles (Sonarr's shape), and
- * its manual import, track by track into one release of the album.
+ * Lidarr calls for album Backfill: wanted albums, name parsing, quality
+ * profiles (Sonarr's shape), and manual import track by track into one
+ * release of the album.
  */
 
-/** A track as Backfill judges it: where it sits on the album. */
+/** A track with its position on the album. */
 export interface AlbumTrack extends LidarrTrack {
   trackNumber?: string;
   absoluteTrackNumber?: number;
@@ -27,7 +27,7 @@ export interface AlbumTrack extends LidarrTrack {
   albumReleaseId?: number;
 }
 
-/** A track's file on disk, as Lidarr has it. */
+/** A track's file on disk, per Lidarr. */
 export interface AlbumTrackFile {
   id: number;
   albumId: number;
@@ -36,7 +36,7 @@ export interface AlbumTrackFile {
   path?: string;
 }
 
-/** What Lidarr makes of a release's or a file's name. */
+/** Lidarr's parse of a release or file name. */
 export interface LidarrParseResult {
   title: string;
   parsedAlbumInfo?: {
@@ -80,7 +80,7 @@ class BackfillLidarr extends LidarrAPI {
     return data;
   }
 
-  /** The album in this Lidarr, by its MusicBrainz id, if it has it. */
+  /** The album with this MusicBrainz id, if Lidarr has it. */
   public async getAlbumByMbid(mbId: string): Promise<LidarrAlbum | undefined> {
     const { data } = await this.axios.get<LidarrAlbum[]>('/album', {
       params: { foreignAlbumId: mbId },
@@ -95,7 +95,7 @@ class BackfillLidarr extends LidarrAPI {
     return data;
   }
 
-  /** The tracks Lidarr has for an album: those of its monitored release. */
+  /** An album's tracks: those of its monitored release. */
   public async getAlbumTracks(albumId: number): Promise<AlbumTrack[]> {
     const { data } = await this.axios.get<AlbumTrack[]>('/track', {
       params: { albumId },
@@ -126,9 +126,8 @@ class BackfillLidarr extends LidarrAPI {
   }
 
   /**
-   * Monitored albums that are missing, or below their cutoff, each with its
-   * artist. `complete` is false when there were more than `maxPages` pages:
-   * what was left out is still wanted, not found.
+   * Monitored albums missing or below cutoff, with their artists. `complete`
+   * is false past `maxPages` pages: the rest is still wanted, not found.
    */
   public async getWanted(
     kind: 'missing' | 'cutoff',
@@ -150,7 +149,7 @@ class BackfillLidarr extends LidarrAPI {
     return { records: albums, complete: false };
   }
 
-  /** Lidarr's own search for an album, with its reasons for each refusal. */
+  /** Lidarr's search for an album, with each rejection reason. */
   public async getReleases(albumId: number): Promise<ArrSearchRelease[]> {
     const { data } = await this.axios.get<ArrSearchRelease[]>('/release', {
       params: { albumId },
@@ -160,9 +159,8 @@ class BackfillLidarr extends LidarrAPI {
   }
 
   /**
-   * How many of Lidarr's own downloads are for this album. The paged
-   * /queue has no album filter (it would answer the whole queue); its
-   * details do.
+   * Lidarr's queued downloads for this album. Uses /queue/details because
+   * the paged /queue ignores an album filter.
    */
   public async getAlbumQueueCount(albumId: number): Promise<number> {
     const { data } = await this.axios.get<{ albumId?: number }[]>(
@@ -184,7 +182,7 @@ class BackfillLidarr extends LidarrAPI {
     return Array.isArray(data) ? data : [];
   }
 
-  /** A finished folder's files, as Lidarr sees them, for one artist. */
+  /** A finished folder's files as Lidarr sees them for one artist. */
   public async getFolderFiles(
     folder: string,
     artistId?: number
@@ -198,8 +196,8 @@ class BackfillLidarr extends LidarrAPI {
   }
 
   /**
-   * Imports files into the tracks given; answers the command's id. Moves,
-   * as Backfill's imports do: the download is removed after.
+   * Imports files into the given tracks; returns the command id. Moves, so
+   * the download is removed after.
    */
   public async importAlbumFiles(files: AlbumImportFile[]): Promise<number> {
     const { data } = await this.axios.post<SonarrCommand>('/command', {

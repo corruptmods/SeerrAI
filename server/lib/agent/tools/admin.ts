@@ -26,7 +26,7 @@ import { musicReady } from '@server/lib/music/access';
 import { z } from 'zod';
 
 /*
- * Asking an admin, and what it does only with one in the conversation
+ * Asking an admin, and the tools allowed only with one in the conversation
  * or for a report asking for it: relinking a file, proposing changes,
  * replacing a season, searching for an upgrade, requesting a title.
  */
@@ -53,8 +53,8 @@ export const askAdmin: AgentTool = {
 
 export const relinkFile: AgentTool = {
   name: 'relink_file',
-  // It changes what Sonarr has on file, from what a file's name and length
-  // suggest: only with an admin in the conversation to see it done.
+  // Changes Sonarr's file links on a guess from name and length, so only
+  // with an admin in the conversation to see it.
   askOnly: true,
   description:
     'Fixes a file already imported that holds several episodes (S06E01-02) but that Sonarr links to only one, so the others look missing and Plex shows one: links the file to every episode it holds and has Sonarr rename it (S06E01-E02). Give the season and every episode the file holds, in a row; the file is the one on the first of them that has one. The others must have no file of their own. Nothing is downloaded, moved or deleted.',
@@ -303,9 +303,8 @@ export const searchUpgrade: AgentTool = {
 // ---- requesting ----------------------------------------------------------------
 
 /**
- * An album not in Lidarr, requested for its artist (its first credited,
- * as the music pages do): once approved, Lidarr adds the artist and
- * searches for the album.
+ * Requests an album not in Lidarr under its first credited artist, as the
+ * music pages do. Once approved, Lidarr adds the artist and searches.
  */
 const requestAlbum = async (
   state: AgentState,

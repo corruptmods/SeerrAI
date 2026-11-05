@@ -17,8 +17,8 @@ const messages = defineMessages('components.Themes.ImportThemeButton', {
 const loadImport = () => import('@app/components/Themes/ImportThemeModal');
 
 /**
- * Import a Theme: a button that opens the importer (loaded when first
- * wanted), which shows the file before handing it to `onApply`.
+ * Opens the lazily loaded importer, which previews the file before calling
+ * `onApply`.
  */
 const ImportThemeButton = ({
   base,

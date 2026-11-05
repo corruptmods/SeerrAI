@@ -81,7 +81,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
       return;
     }
 
-    // The maximum number of queries we're expected to execute
+    // The maximum number of queries expected.
     this.total =
       blocklistedTagsArr.length *
       pageLimit *
@@ -176,7 +176,8 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
           this.progress += queryMax - response.total_pages;
           fixedSortMode = true;
           queryMax = response.total_pages;
-          // restart the counter so sequential paging resumes at page 2 even if earlier queries failed
+          // Reset so sequential paging resumes at page 2 even if earlier
+          // queries failed.
           query = 0;
         }
       } catch (error) {
@@ -203,8 +204,8 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
       });
 
       if (blocklistEntry) {
-        // Don't mark manual blocklists with tags
-        // If media wasn't previously blocklisted for this tag, add the tag to the media's blocklist
+        // Skip manual blocklists; add this tag to the entry if it isn't there
+        // yet.
         if (
           blocklistEntry.blocklistedTags &&
           !blocklistEntry.blocklistedTags.includes(`,${keywordId},`)
@@ -214,7 +215,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
           });
         }
       } else {
-        // Media wasn't previously blocklisted, add it to the blocklist
+        // Not blocklisted yet: add it.
         await Blocklist.addToBlocklist(
           {
             blocklistRequest: {
@@ -231,7 +232,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
   }
 
   private async cleanBlocklist(em: EntityManager) {
-    // Remove blocklist and media entries blocklisted by tags
+    // Remove media (and blocklist entries) blocklisted by tags.
     const mediaRepository = em.getRepository(Media);
     const mediaToRemove = await mediaRepository
       .createQueryBuilder('media')
@@ -246,9 +247,10 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
       })
       .getMany();
 
-    // Batch removes so the query doesn't get too large
+    // Batched to keep queries small; removing media cascades to their blocklist
+    // entries.
     for (let i = 0; i < mediaToRemove.length; i += 500) {
-      await mediaRepository.remove(mediaToRemove.slice(i, i + 500)); // This also deletes the blocklist entries via cascading
+      await mediaRepository.remove(mediaToRemove.slice(i, i + 500));
     }
   }
 }

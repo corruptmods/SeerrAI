@@ -5,10 +5,9 @@ import {
 import type { ParsedUrlQuery } from 'querystring';
 
 /*
- * The Discover filters, read from the address. Kept apart from constants.ts,
- * which every Discover slider imports, and read without a schema library:
- * every field is an optional string, which needs no more than the check
- * below, and the filtered pages are the ones opened most.
+ * Discover filters read from the URL. Kept out of constants.ts (imported by
+ * every slider) and free of a schema library, since every field is an
+ * optional string and these pages are the most opened.
  */
 
 const TEXT_FILTERS = [
@@ -42,10 +41,7 @@ export type FilterOptions = {
   [K in (typeof TEXT_FILTERS)[number]]?: string;
 } & { certificationMode?: 'exact' | 'range' };
 
-/**
- * A filter's value from the address. A parameter given twice arrives as a
- * list; the first is used rather than the page failing.
- */
+/** A URL filter value; a repeated parameter uses its first value. */
 const textOf = (value: string | string[] | undefined): string | undefined => {
   const first = Array.isArray(value) ? value[0] : value;
   return typeof first === 'string' ? first : undefined;
@@ -137,8 +133,7 @@ export const prepareFilterValues = (
     filterValues.watchProviders = values.watchProviders;
   }
 
-  // Services left out, without anything that is not one or that is also
-  // shown, so a mistyped link still opens.
+  // Drop invalid or also-included IDs so a mistyped link still opens.
   const leftOut = leftOutServices(
     values.watchProviders,
     values.excludeWatchProviders
@@ -200,8 +195,7 @@ export const countActiveFilters = (filterValues: FilterOptions): number => {
     delete clonedFilters.withRuntimeLte;
   }
 
-  // Services shown and services left out are a filter each; their country
-  // is part of them, not one more.
+  // The region belongs to the service filters, not a filter of its own.
   delete clonedFilters.watchRegion;
 
   if (
@@ -223,10 +217,7 @@ export const countActiveFilters = (filterValues: FilterOptions): number => {
   return totalCount;
 };
 
-/*
- * Streaming services in Filters. Each one is shown only, left out, or
- * neither; choosing one again moves it along.
- */
+/* Streaming services: each is included, excluded or neither; a click cycles. */
 
 export type ServiceChoice = 'on' | 'notOn' | undefined;
 
@@ -250,7 +241,7 @@ export const serviceChoiceOf = (
       ? 'notOn'
       : undefined;
 
-/** Shown only, then left out, then neither. */
+/** Cycles included → excluded → neither. */
 export const nextServiceChoice = (choice: ServiceChoice): ServiceChoice =>
   choice === undefined ? 'on' : choice === 'on' ? 'notOn' : undefined;
 
@@ -266,10 +257,7 @@ export const chooseService = (
   return { on, notOn };
 };
 
-/**
- * The address's streaming service filters. With no service chosen the
- * country goes too, as it narrows nothing on its own.
- */
+/** URL service filters; the region is dropped when no service is chosen. */
 export const serviceFilters = (
   region: string,
   { on, notOn }: ChosenServices

@@ -2,9 +2,8 @@ import { accentColours, neutralsFor } from '@app/utils/theme';
 import type { Appearance, ThemeDefaults } from '@server/constants/theme';
 
 /**
- * A small picture of a look in one mode: its page, a panel with text, and
- * a button in its accent. Drawn in the look's own colours, whatever look
- * the page around it is in. Decorative: the name beside it says which.
+ * Decorative preview of a look in one mode, drawn in its own colours
+ * regardless of the page's look. The adjacent name labels it.
  */
 const LookSwatch = ({
   look,

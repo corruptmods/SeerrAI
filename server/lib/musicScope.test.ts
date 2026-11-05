@@ -35,14 +35,13 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * An artist is a Media row of type music with tmdbId 0. Everything that
- * goes through titles in bulk for films and series (TMDB, Radarr, Sonarr,
- * the media servers' video libraries) must never see one: looking it up as
- * series 0, or reading its Lidarr ids as Sonarr's, would be wrong at best.
+ * An artist is a music Media row with tmdbId 0. Bulk title code for films and
+ * series (TMDB, Radarr, Sonarr, video libraries) must never see one: looking
+ * it up as series 0, or reading its Lidarr ids as Sonarr's, is wrong at best.
  *
- * Each job and route below runs with music in the database. TMDB answers
- * but records what it was asked; Sonarr records too; the network is
- * blocked. Nothing may ask about a music title, and no music row may change.
+ * Each job and route below runs with music in the database. TMDB answers but
+ * records calls, Sonarr records too, and the network is blocked. Nothing may
+ * ask about a music title, and no music row may change.
  */
 
 setupTestDb();
@@ -55,8 +54,8 @@ const stubPrototype = (
   name: string,
   impl: (...args: never[]) => unknown
 ) =>
-  // The clients assign their methods in their constructors, so the stub
-  // needs a setter that swallows that write.
+  // Clients assign methods in their constructors, so the stub needs a setter
+  // that swallows that write.
   Object.defineProperty(proto, name, {
     configurable: true,
     set() {},
@@ -110,7 +109,7 @@ app.use(
   }
 );
 
-/** Every music row, as it is stored. */
+/** Every music row as stored. */
 const musicRows = async () => ({
   media: await getRepository(Media).find({
     where: { mediaType: MediaType.MUSIC },
@@ -162,7 +161,7 @@ describe('music stays out of film and series code', () => {
     getSettings().sonarr = [SONARR];
 
     music = await seedMusicFixtures();
-    // A series beside it, so the checks below are seen to still work.
+    // A series alongside, proving the checks below still work.
     series = await getRepository(Media).save(
       new Media({
         mediaType: MediaType.TV,
@@ -241,8 +240,8 @@ describe('music stays out of film and series code', () => {
     await notificationReconciler.run();
     const musicIds = before.requests.map((r) => r.id);
     const deliveries = await getRepository(NotificationDelivery).find();
-    // The failed music request is told of; the completed one is not, as
-    // the album it asked for is not here.
+    // The failed music request is notified; the completed one isn't, since its
+    // album isn't here.
     assert.deepEqual(
       deliveries
         .filter((d) => musicIds.includes(d.requestId))
@@ -335,8 +334,8 @@ describe('music stays out of film and series code', () => {
   });
 
   it('GET /request/count counts music on its own, once Lidarr is set up', async () => {
-    // As the list: music someone cannot see is not in their counts, or the
-    // pending badge would show requests they cannot open.
+    // As in the list: music a user can't see is excluded from their counts, or
+    // the pending badge would show requests they can't open.
     let res = await request(app).get('/api/v1/request/count');
     assert.equal(res.status, 200);
     assert.equal(res.body.music, 0);

@@ -8,10 +8,9 @@ import { PencilIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { useIntl } from 'react-intl';
 
 /*
- * The tile for one configured service on the Services settings page: Radarr,
- * Sonarr, Maintainerr. Its own module so any section can use it without
- * importing the page. Message ids are unchanged from when it lived in
- * SettingsServices, so existing translations still apply.
+ * The tile for one configured service on the Services page (Radarr, Sonarr,
+ * Maintainerr). Its own module so any section can use it without importing
+ * the page. Message ids match SettingsServices', so translations still apply.
  */
 const messages = defineMessages('components.Settings', {
   ssl: 'SSL',
@@ -36,7 +35,7 @@ interface ServerInstanceProps {
   logo?: React.ReactNode;
   /** Another service's detail line, in place of the active profile. */
   detail?: { label: string; value: string };
-  /** What the address line shows, for a service with no host and port of its own. */
+  /** The address line, for a service without its own host and port. */
   address?: string;
   onEdit: () => void;
   onDelete: () => void;

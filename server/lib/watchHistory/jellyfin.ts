@@ -16,18 +16,15 @@ import { COMPLETE_PERCENT } from '@server/lib/watchHistory/types';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
-/*
- * Jellyfin and Emby keep what each person has watched themselves, item by
- * item: whether it was played to the end, how far, and when last. There is
- * no log of every play, so a title shows once, at its latest play.
- */
+// Jellyfin/Emby keep per-item user data, not a play log: each item appears
+// once, at its latest play.
 
-/** Accounts asked about one title at a time. */
+/** Accounts queried in parallel for one title. */
 const ACCOUNT_CONCURRENCY = 4;
-/** More accounts than this are not all asked who watched something. */
+/** Cap on accounts queried for a title's history. */
 const MAX_ACCOUNTS = 100;
 
-/** One person's item as a play; undefined when they never started it. */
+/** A user's item as a play; undefined if never started. */
 export const playOf = (
   item: JellyfinUserItem,
   viewer: { id: string; name: string }
@@ -40,8 +37,7 @@ export const playOf = (
   if (!started) return undefined;
   const movie = item.Type === 'Movie';
   if (!movie && item.Type !== 'Episode') return undefined;
-  // An episode the server has not placed in a series yet (still being
-  // scanned, or named oddly) cannot be told apart from any other title.
+  // An episode not yet placed in a series can't be attributed to a title.
   if (!movie && !item.SeriesId) return undefined;
   const at = data.LastPlayedDate ? Date.parse(data.LastPlayedDate) : NaN;
   return {
@@ -54,10 +50,8 @@ export const playOf = (
     season: movie ? undefined : item.ParentIndexNumber,
     episode: movie ? undefined : item.IndexNumber,
     finished: !!data.Played,
-    // The server decides when something counts as played (and says so in
-    // Played), so a part-watched item never reads as finished here, even
-    // when its percentage runs past the end because the runtime it knows
-    // is shorter than the file.
+    // Only Played means finished; cap the percentage below COMPLETE_PERCENT,
+    // since it can exceed 100 when the known runtime is shorter than the file.
     percent: data.Played
       ? 100
       : Math.min(
@@ -71,7 +65,7 @@ export const playOf = (
 
 const newestFirst = (a: Play, b: Play) => b.at - a.at;
 
-/** Jellyfin or Emby, which answer the same way. */
+/** Jellyfin or Emby (same API). */
 export class JellyfinWatchSource implements WatchSource {
   public readonly label: string;
   private api: JellyfinAPI;
@@ -89,7 +83,7 @@ export class JellyfinWatchSource implements WatchSource {
     return user[USER_ID[this.kind]] || undefined;
   }
 
-  /** Once each: regular and 4K can be one item, read once. */
+  /** Deduped: regular and 4K can be the same item. */
   public titleIdsOf(media: Media): string[] {
     return [
       ...new Set(
@@ -135,8 +129,7 @@ export class JellyfinWatchSource implements WatchSource {
       SortOrder: 'Descending',
       Limit: limit,
     };
-    // Finished and part-watched are asked apart: the server's filters
-    // both have to match when given together.
+    // Separate queries: combined Filters must all match.
     const [finished, started] = await Promise.all([
       this.api.getUserItems(id, { ...query, Filters: 'IsPlayed' }),
       this.api.getUserItems(id, { ...query, Filters: 'IsResumable' }),
@@ -149,7 +142,6 @@ export class JellyfinWatchSource implements WatchSource {
     return [...plays.values()].sort(newestFirst).slice(0, limit);
   }
 
-  /** One account's plays of one title on the server. */
   private async playsOf(
     viewer: { id: string; name: string },
     titleId: string,
@@ -205,8 +197,7 @@ export class JellyfinWatchSource implements WatchSource {
         this.playsOf(viewer, titleId, isShow)
       )
     );
-    // Emby keeps no date for an item marked watched by hand: with no moment
-    // to be after, it counts; after one, it cannot be shown to be.
+    // Undated plays (Emby, marked by hand) count only with no cutoff.
     return plays
       .flat()
       .filter((play) => cutoff <= 0 || play.at > cutoff)

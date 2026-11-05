@@ -53,8 +53,8 @@ interface AppearanceSettings {
 }
 
 /**
- * Settings → Appearance: the look of everyone who has not chosen their own,
- * and of the sign-in page.
+ * Settings → Appearance: the default look for everyone without their own, and
+ * the sign-in page's.
  */
 const SettingsAppearance = () => {
   const intl = useIntl();

@@ -21,14 +21,12 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import type { EntityManager } from 'typeorm';
 
-/*
- * When a scan marks an approved title available, "now available" should go
- * out during that save — not minutes later from the reconciler — and once.
- *
- * Suspected: the notification reads the title on a connection that cannot
- * see the save's own uncommitted status on Postgres, skips, and is later
- * delivered by the reconciler.
- */
+// When a scan marks an approved title available, "now available" must go out
+// during that save, not minutes later from the reconciler, and only once.
+//
+// The failure mode: on Postgres the notification read the title on a connection
+// that couldn't see the save's uncommitted status, skipped, and the reconciler
+// delivered it later.
 
 setupTestDb();
 
@@ -83,8 +81,8 @@ beforeEach(async () => {
   );
 });
 
-// Approved and sent, as a request is by the time its title arrives. Moved to
-// approved without the save hooks, so no dispatch is attempted here.
+// Approved and sent, as a request is by the time its title arrives. Set
+// approved without save hooks, so no dispatch is attempted.
 const approvedRequest = async (media: Media, seasons?: number[]) => {
   const request = await getRepository(MediaRequest).save(
     new MediaRequest({
@@ -240,9 +238,8 @@ describe('"now available" when a scan marks the title available', () => {
   });
 });
 
-// Several people asking for the same title is common in a household. When it
-// arrives, every one of their requests completes in the same save, and each
-// of them must hear about it once.
+// Several household members requesting the same title is common. On arrival,
+// all their requests complete in the same save, and each must be notified once.
 describe('several requests for the same title completing together', () => {
   const otherUsers = async (names: string[]) =>
     Promise.all(
@@ -375,9 +372,9 @@ describe('several requests for the same title completing together', () => {
     assert.equal(title.seasons[0].status, MediaStatus.AVAILABLE);
   });
 
-  // The save hook saves its completed requests one at a time. Put back the
-  // single save of all of them that tripped over itself on Postgres: the
-  // nested transactions their hooks open must now take turns by themselves.
+  // The hook saves completed requests one at a time. This restores the single
+  // save of all of them that broke on Postgres: their hooks' nested
+  // transactions must take turns on their own.
   it('completes them all even when they are saved together', async () => {
     type Hook = (
       manager: EntityManager,

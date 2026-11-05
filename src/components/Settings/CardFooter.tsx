@@ -1,38 +1,30 @@
 import Link from 'next/link';
 
 /*
- * The buttons along the bottom of a settings card (Edit, Make Primary,
- * Remove…), side by side with a line between them. Each has its icon
- * beside its label where the card has room, and over it where it hasn't,
- * and a label too long for its button wraps, centred: in German or French
- * nothing runs into the next button or gets cut off. Which it is depends
- * on the card's width, so cards side by side look alike.
+ * Action buttons along a settings card's bottom edge. Icons sit beside
+ * labels when the card is wide enough, above them otherwise; long labels
+ * wrap. Layout follows card width, so neighbouring cards match.
  */
 
 export interface CardFooterAction {
-  /** What the button says. */
   label: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  /** A page to open instead of something to do. */
+  /** Renders a link instead of a button. */
   href?: string;
   onClick?: () => void;
   disabled?: boolean;
-  /** Shown on hovering, as why it is disabled. */
+  /** Hover text, e.g. why it is disabled. */
   title?: string;
 }
 
 interface CardFooterProps {
   actions: CardFooterAction[];
-  /**
-   * How many buttons cards like this can have: icons go beside their
-   * labels once each of that many buttons would have 10rem.
-   */
+  /** Max buttons on this card type; icons go beside labels at 10rem each. */
   room: 2 | 3;
 }
 
-// Written out whole: Tailwind only builds the classes it finds in full.
-// Over its icon, a label is a little smaller, as in a tab bar, so that
-// long words (Russian, Finnish…) still fit a narrow button.
+// Full class names: Tailwind only builds classes it finds whole.
+// Stacked labels are smaller so long words fit narrow buttons.
 const BUTTON_BESIDE: Record<CardFooterProps['room'], string> = {
   2: 'px-1 py-3 text-xs [@container(min-width:20rem)]:px-2 [@container(min-width:20rem)]:py-4 [@container(min-width:20rem)]:text-sm',
   3: 'px-1 py-3 text-xs [@container(min-width:30rem)]:px-2 [@container(min-width:30rem)]:py-4 [@container(min-width:30rem)]:text-sm',

@@ -9,10 +9,7 @@ import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { describe, it } from 'node:test';
 
-/*
- * The webhook's media server variables. The Jellyfin ones carried an Emby
- * server's ids before Emby had columns of its own, and still do.
- */
+// Media server variables. The Jellyfin ones still fall back to Emby ids.
 
 const value = (key: string, payload: Partial<NotificationPayload>) => {
   const entry = KeyMap[key];

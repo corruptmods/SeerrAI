@@ -20,10 +20,7 @@ import {
 } from './index';
 import { ACCENTS, DARK_BACKGROUNDS, LIGHT, STATUS } from './palette';
 
-/*
- * What each choice of look turns into on the page: the colours behind the
- * tokens, the attributes on <html>, and the colour of the browser's bar.
- */
+/* Each look's token colours, <html> attributes and theme-color. */
 
 const classic = appearanceFromDefaults(SERVER_THEME_DEFAULTS);
 const look = (changes: Partial<Appearance>): Appearance => ({
@@ -111,9 +108,8 @@ describe('every built-in look', () => {
           assert.ok(contrastRatio(n.textDefault, surface) >= 4.5, surface);
           assert.ok(contrastRatio(n.textMuted, surface) >= 4.5, surface);
           for (const [name, status] of Object.entries(STATUS[mode])) {
-            // Dark keeps today's danger and info text (red-500, indigo-500),
-            // which reach 3:1, enough for icons and large text, so that
-            // Classic does not change.
+            // Dark keeps Classic's danger/info text (red-500, indigo-500) at
+            // 3:1, enough for icons and large text.
             const kept =
               mode === 'dark' && (name === 'danger' || name === 'info');
             assert.ok(
@@ -122,15 +118,14 @@ describe('every built-in look', () => {
             );
           }
         }
-        // Lines that can be seen.
+        // Visible borders.
         assert.ok(contrastRatio(n.borderSubtle, n.surface) >= 1.3, mode);
       }
     }
   });
 
   it('gives True black, Slate and Warm status colours that read on them', () => {
-    // Classic keeps today's (some of its badges and danger text reach only
-    // 3:1); the other dark backgrounds have no today to keep.
+    // Classic keeps its originals (some only 3:1); other dark backgrounds don't.
     const over = (top: string, alpha: number, under: string) =>
       `#${[1, 3, 5]
         .map((i) =>
@@ -142,7 +137,7 @@ describe('every built-in look', () => {
             .padStart(2, '0')
         )
         .join('')}`;
-    // The pale text on danger, warning and success badges.
+    // Pale text on danger, warning and success badges.
     const badgeText = {
       danger: '#fee2e2',
       warning: '#fef9c3',
@@ -180,10 +175,8 @@ describe('every built-in look', () => {
   });
 
   it('keeps the count on the page you are on readable in every accent', () => {
-    // The request and issue counts beside the page you are on (sidebar and
-    // the phone's bar) sit on the accent's deep gradient. Indigo keeps
-    // today's indigo-100 text; an accent whose palest shade doesn't read on
-    // its gradient gets white.
+    // Active-page counts sit on the accent's deep gradient. Indigo keeps
+    // indigo-100 text; accents whose palest shade doesn't read get white.
     assert.equal(
       themeVariables(classic, 'dark')['on-accent-deep'],
       '224 231 255'
@@ -214,9 +207,8 @@ describe('every built-in look', () => {
   });
 
   it('makes accent fills solid in dark when the accent’s button text is dark', () => {
-    // See-through over a dark page, a bright fill turns too dark for dark
-    // text. Other fills (white text on green, teal, red…) keep today's
-    // see-through ones, and so do accents with white text.
+    // Translucent over a dark page, a bright fill is too dark for dark text.
+    // Fills with white text stay translucent.
     const fills = (appearance: Appearance) => {
       const vars = themeVariables(appearance, 'dark');
       return [vars['accent-fill-opacity'], vars['fill-opacity']];
@@ -236,7 +228,7 @@ describe('every built-in look', () => {
     for (const [id, accent] of Object.entries(ACCENTS)) {
       assert.ok(contrastRatio(accent.ink, accent.fill) >= 4.5, id);
       for (const mode of ['dark', 'light'] as const) {
-        // Indigo keeps today's link and hover colours in dark.
+        // Indigo keeps its original dark link and hover colours.
         if (id === 'indigo' && mode === 'dark') {
           continue;
         }
@@ -261,8 +253,8 @@ describe('every built-in look', () => {
   });
 
   it('uses the approved colours for each accent', () => {
-    // Fill, text on it, and link colour in dark and in light, as designed.
-    // Indigo's dark link stays today's indigo-500 so Classic is unchanged.
+    // Fill, its text, and dark/light link colours, as designed. Indigo's dark
+    // link stays indigo-500 so Classic is unchanged.
     const designed: Record<string, [string, string, string, string]> = {
       indigo: ['#4f46e5', '#ffffff', '#6366f1', '#4338ca'],
       seerr: ['#7357f0', '#ffffff', '#b39afc', '#5b3fd9'],
@@ -368,7 +360,7 @@ describe('the stylesheet for a look', () => {
     const both = themeCss(look({ mode: 'auto' }));
     assert.match(both, /data-mode="dark"/);
     assert.match(both, /data-mode="light"/);
-    // Nothing but variables, so nothing in it can be anything else.
+    // Only variables.
     assert.match(
       both,
       /^(:root\[data-mode="(dark|light)"\]\{(--[\w-]+:[\d. ]+;)+\})+$/

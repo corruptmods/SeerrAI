@@ -5,24 +5,23 @@ import { episodeLabel } from '@server/lib/agent/rules';
 import { getSettings } from '@server/lib/settings';
 
 /*
- * What the admin agent tried for a title, kept with the title rather than
- * with one conversation: its searches and what they found, the releases it
- * started, and those that failed or were turned down and why. The next
- * conversation about the title is told, so it neither searches again for
- * what found nothing a moment ago nor takes what failed.
+ * What the admin agent tried for a title, kept per title rather than per
+ * conversation: searches and their results, releases started, and those
+ * that failed or were refused and why. The next conversation is told, so it
+ * neither repeats a search that just found nothing nor takes what failed.
  *
- * Kept as long as Backfill waits before searching a title again, and at
- * most MOST_KEPT, newest last.
+ * Kept as long as Backfill waits before searching a title again, at most
+ * MOST_KEPT, newest last.
  */
 
 export type { AgentNote };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** The most notes a title keeps. */
+/** Max notes per title. */
 const MOST_KEPT = 120;
-/** The most of them told to the agent, newest first. */
+/** Max notes told to the agent, newest first. */
 const MOST_TOLD = 50;
-/** The longest a note's words and reason may be. */
+/** Max length of a note's text and of its reason. */
 const MOST_CHARS = 300;
 
 interface TitleKey {
@@ -31,7 +30,7 @@ interface TitleKey {
   arrId: number;
 }
 
-/** One title's notes are written one at a time, oldest first. */
+/** Serializes each title's writes, in order. */
 const writing = new Map<string, Promise<unknown>>();
 
 const keyOf = (title: TitleKey) =>
@@ -44,8 +43,8 @@ const fresh = (notes: AgentNote[], now = Date.now()) => {
 };
 
 /**
- * Adds notes to a title's. A title Backfill has no row for (nothing is
- * missing from it) keeps none.
+ * Appends notes to a title's. A title with no Backfill row (nothing
+ * missing) keeps none.
  */
 export const addNotes = (
   title: TitleKey,
@@ -83,7 +82,7 @@ export const addNotes = (
   return work;
 };
 
-/** A title's notes still kept, oldest first. */
+/** A title's unexpired notes, oldest first. */
 export const notesOf = async (title: TitleKey): Promise<AgentNote[]> => {
   const row = await getRepository(BackfillSeries).findOne({
     select: { id: true, agentNotes: true },
@@ -95,9 +94,9 @@ export const notesOf = async (title: TitleKey): Promise<AgentNote[]> => {
 const day = (at: string) => at.slice(0, 10);
 
 /**
- * The notes as the agent is told them, newest first, grouped by what they
- * are; empty when there are none. The same search, or the same release,
- * is told once, as it last went.
+ * The notes as told to the agent, newest first, grouped by kind; empty when
+ * there are none. A repeated search or release appears once, as it last
+ * went.
  */
 export const describeNotes = (notes: AgentNote[]): string => {
   if (!notes.length) return '';
@@ -144,20 +143,20 @@ export const describeNotes = (notes: AgentNote[]): string => {
     .join('\n');
 };
 
-/** A whole number the model gave, as a number or in words of digits. */
+/** A whole number the model gave, as a number or a string of digits. */
 const wholeNumber = (value: unknown): number | undefined => {
-  if (value === undefined || value === null || value === '') return undefined;
+  if (value == null || value === '') return undefined;
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 ? n : undefined;
 };
 
-/** The most episodes a note names. */
+/** Max episodes a note names. */
 const MOST_EPISODES = 20;
 
 /**
- * The note a tool call makes, if any: a search that finished (with how
- * many results), a release started, or one turned down for what it is.
- * `release` is the name of the release the call was about.
+ * The note a tool call makes, if any: a finished search with its result
+ * count, a release started, or one refused for what it is. `release` is the
+ * name of the call's release.
  */
 export const noteOfCall = (
   name: string,
@@ -169,7 +168,7 @@ export const noteOfCall = (
   if (name === 'search_releases' || name === 'search_indexers') {
     if (result.isError) return undefined;
     const count = /^(\d+) results/.exec(result.text);
-    // Still running: nothing yet to say.
+    // Still running: nothing to note yet.
     if (!count && !/^(No results|Nothing for)/.test(result.text)) {
       return undefined;
     }
@@ -195,7 +194,7 @@ export const noteOfCall = (
   }
   if (name !== 'grab' || !release) return undefined;
   if (result.isError && !result.refused) return undefined;
-  // Only put to the admin: nothing was downloaded.
+  // Only proposed to the admin: nothing was downloaded.
   if (!result.isError && /^Not started/.test(result.text)) return undefined;
   const files = Array.isArray(input.files)
     ? (input.files as Record<string, unknown>[])

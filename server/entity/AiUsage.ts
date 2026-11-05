@@ -1,8 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 /**
- * How many AI answers one person has had on one day, for the daily limit.
- * Only the last week is kept.
+ * AI answers per user per day, for the daily limit. Only the last week is kept.
  */
 @Entity()
 @Unique(['userId', 'day'])

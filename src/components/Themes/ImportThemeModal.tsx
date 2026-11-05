@@ -48,16 +48,15 @@ const problemText = (
     : intl.formatMessage(messages[problem.problem]);
 
 /**
- * Import a theme file: choose the file (or paste it), see what it looks
- * like, then use it. Using it puts it into the form being edited; it is
- * kept when that is saved. Loaded only when someone asks to import.
+ * Theme file importer: pick or paste, preview, then apply to the form (saved
+ * with it). Lazily loaded.
  */
 const ImportThemeModal = ({
   base,
   onCancel,
   onApply,
 }: {
-  /** The look it would be used with, for the preview. */
+  /** Appearance the preview is drawn on. */
   base: Appearance;
   onCancel: () => void;
   onApply: (theme: ThemeFile) => void;

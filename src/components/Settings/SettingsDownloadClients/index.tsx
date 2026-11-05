@@ -51,9 +51,8 @@ const LOGOS: Record<
 };
 
 /*
- * Download clients, laid out like the Maintainerr section: a tile per client
- * with Edit and Delete, a dashed tile to add one, and a dialog for the
- * details.
+ * Download clients, laid out like Maintainerr: a tile per client with Edit and
+ * Delete, a dashed tile to add one, and a dialog for the details.
  */
 const SettingsDownloadClients = () => {
   const intl = useIntl();

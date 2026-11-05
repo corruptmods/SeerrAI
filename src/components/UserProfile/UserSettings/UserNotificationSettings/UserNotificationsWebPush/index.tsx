@@ -48,7 +48,7 @@ const messages = defineMessages(
   }
 );
 
-/** Why this device can't be switched on or off here, when it can't. */
+/** Why this device's switch is unavailable, per state. */
 const UNAVAILABLE: Partial<Record<PushDeviceState, MessageDescriptor>> = {
   denied: pushOptInMessages.denieddescription,
   'blocked-by-browser': pushOptInMessages.blockeddescription,
@@ -66,9 +66,7 @@ const UserWebPushSettings = () => {
   const device = usePushDeviceState();
   const [switching, setSwitching] = useState(false);
   const [subEndpoint, setSubEndpoint] = useState<string | null>(null);
-  // This device is the signed-in person's to switch: on someone else's
-  // settings, only their devices are listed. Nor is there one while web
-  // push is off for everyone.
+  // Only on one's own settings, and not while web push is disabled globally.
   const showSwitch =
     !!user && user.id === signedIn?.id && device.state !== 'disabled';
   const {
@@ -90,15 +88,14 @@ const UserWebPushSettings = () => {
     revalidateOnMount: true,
   });
 
-  // Takes effect at once, as the browser asks for its permission on the
-  // click itself.
+  // Runs directly in the click so the browser's permission prompt can open.
   const switchThisDevice = async (on: boolean) => {
     if (!user) {
       return;
     }
     setSwitching(true);
     if (!on) {
-      // Before, so the banner asking to turn it on doesn't come up instead.
+      // Dismiss first so the opt-in banner doesn't appear.
       dismissPushOptIn(user.id);
     }
     const done = on ? await device.subscribe() : await device.unsubscribe();
@@ -140,7 +137,7 @@ const UserWebPushSettings = () => {
     }
   };
 
-  // This browser's subscription, to mark its device in the list.
+  // This browser's subscription, to mark it in the list.
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       return;

@@ -7,6 +7,15 @@ import { Router } from 'express';
 
 const radarrRoutes = Router();
 
+// One default per type (4K or not): clear the others of that type.
+const clearDefaults = (servers: RadarrSettings[], is4k: boolean) => {
+  servers
+    .filter((radarrInstance) => radarrInstance.is4k === is4k)
+    .forEach((radarrInstance) => {
+      radarrInstance.isDefault = false;
+    });
+};
+
 radarrRoutes.get('/', (_req, res) => {
   const settings = getSettings();
 
@@ -17,18 +26,11 @@ radarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newRadarr = req.body as RadarrSettings;
-  // Never a removed server's id: titles keep the id of the server they are on.
+  // Never reuse a removed server's id: titles keep the id of their server.
   newRadarr.id = settings.newId('radarr');
 
-  // If we are setting this as the default, clear any previous defaults for the same type first
-  // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true
-  // and are the default
   if (req.body.isDefault) {
-    settings.radarr
-      .filter((radarrInstance) => radarrInstance.is4k === req.body.is4k)
-      .forEach((radarrInstance) => {
-        radarrInstance.isDefault = false;
-      });
+    clearDefaults(settings.radarr, req.body.is4k);
   }
 
   settings.radarr = [...settings.radarr, newRadarr];
@@ -71,7 +73,7 @@ radarrRoutes.post<
       message: e.message,
     });
 
-    // Turned away for the name it was reached by: say how to let it in.
+    // Refused for the hostname used: tell the admin how to allow it.
     if (answerHostRefused(res, 'Radarr', e)) return;
     next({ status: 500, message: 'Failed to connect to Radarr' });
   }
@@ -90,15 +92,8 @@ radarrRoutes.put<{ id: string }, RadarrSettings, RadarrSettings>(
       return next({ status: 404, message: 'Settings instance not found' });
     }
 
-    // If we are setting this as the default, clear any previous defaults for the same type first
-    // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true
-    // and are the default
     if (req.body.isDefault) {
-      settings.radarr
-        .filter((radarrInstance) => radarrInstance.is4k === req.body.is4k)
-        .forEach((radarrInstance) => {
-          radarrInstance.isDefault = false;
-        });
+      clearDefaults(settings.radarr, req.body.is4k);
     }
 
     settings.radarr[radarrIndex] = {

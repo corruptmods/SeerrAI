@@ -16,15 +16,15 @@ import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
- * "Watched by" on a title, from a fake Tautulli's history, behind the real
- * API validator.
+ * "Watched by" on a title from a fake Tautulli history, behind the real API
+ * validator.
  */
 
 setupTestDb();
 
 const DAY = 24 * 60 * 60;
 const now = Math.floor(Date.now() / 1000);
-// History as Tautulli's get_history gives it, keyed by what was asked for.
+// History as Tautulli's get_history returns it, keyed by query.
 let history: Record<string, unknown[]> = {};
 let asked: string[] = [];
 const fake = http.createServer((req, res) => {
@@ -146,7 +146,7 @@ const watchedBy = (mediaId: number) =>
             try {
               body = JSON.parse(raw);
             } catch {
-              // An error page: the status is what matters.
+              // An error page: only the status matters.
             }
             resolve({ status: res.statusCode ?? 0, body });
           });
@@ -231,7 +231,7 @@ describe('watched by', () => {
         ratingKey: '400',
       })
     );
-    // The setting merges rather than replaces, so clear the fields.
+    // The setter merges, so clear the fields.
     getSettings().tautulli = { hostname: '', port: 0, apiKey: '' };
     assert.deepEqual((await watchedBy(media.id)).body, {
       configured: false,

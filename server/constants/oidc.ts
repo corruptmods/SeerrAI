@@ -1,16 +1,13 @@
-/*
- * Single sign-on through an OpenID Connect provider (Authentik, Authelia,
- * Keycloak, Pocket ID, Google…): the parts the settings page and the server
- * both need to agree on.
- */
+// Single sign-on via OpenID Connect (Authentik, Authelia, Keycloak, Pocket ID,
+// Google…): shared by the settings page and the server.
 
-/** What a new provider asks for: who someone is, their name and email. */
+/** Scopes requested by default: identity, name and email. */
 export const DEFAULT_OIDC_SCOPES = 'openid profile email';
 
 /**
- * The email given to someone who signed up through a provider that gave
- * none (or none it had verified): "<provider id>:<random id>". It is never
- * shown as an email, and they can replace it with a real one.
+ * Stand-in email for a sign-up whose provider gave no (verified) email:
+ * "<provider id>:<random id>". Never shown as an email; the user can replace
+ * it.
  */
 export const standInEmail = (providerId: string, id: string): string =>
   `${providerId}:${id}`;
@@ -18,13 +15,12 @@ export const standInEmail = (providerId: string, id: string): string =>
 const STAND_IN =
   /^[a-z0-9-]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Whether an email is a stand-in, not one to show or write to. */
+/** Whether an email is a stand-in, not one to show or send to. */
 export const isStandInEmail = (email: string | null | undefined): boolean =>
   !!email && STAND_IN.test(email);
 
 /**
- * The email to show beside a name, if any: not a stand-in, and not the
- * name again.
+ * The email to show beside a name, unless it's a stand-in or the name itself.
  */
 export const shownEmail = (
   name: string | null | undefined,
@@ -34,15 +30,12 @@ export const shownEmail = (
     ? email
     : undefined;
 
-/** The longest id a provider gets from its name. */
 const MAX_ID_LENGTH = 40;
 
 /**
- * The id a new provider is given from its name: lower case letters, digits
- * and dashes ("My Authentik!" is "my-authentik"), with a number added when
- * that id is taken. An id is never given twice, not even after its provider
- * was removed: people's links to the old one must never start working for
- * a different provider.
+ * A new provider's id from its name: lowercase letters, digits and dashes ("My
+ * Authentik!" is "my-authentik"), numbered if taken. Ids are never reused, even
+ * after removal, so old links can't start working for a different provider.
  */
 export const oidcProviderId = (name: string, taken: string[]): string => {
   const base =
@@ -62,43 +55,41 @@ export const oidcProviderId = (name: string, taken: string[]): string => {
   return id;
 };
 
-/** The address a provider sends people back to after they sign in there. */
+/** The provider's redirect URI after sign-in. */
 export const oidcCallbackUrl = (applicationUrl: string, id: string): string =>
   `${applicationUrl.replace(/\/+$/, '')}/api/v1/auth/oidc/${id}/callback`;
 
 /**
- * Why a sign-in or link through a provider did not go through, as the page
- * it ends on is told (`?sso=`), or that a link did.
+ * A provider sign-in or link outcome, passed to the landing page as `?sso=`.
  */
 export type OidcOutcome =
-  /** The provider is switched off, removed, or the Application URL unset. */
+  /** Provider disabled or removed, or Application URL unset. */
   | 'unavailable'
-  /** The provider could not be reached, or refused Seerr's request. */
+  /** Provider unreachable, or it refused Seerr's request. */
   | 'provider'
-  /** The person cancelled, or the provider said no. */
+  /** The user cancelled, or the provider denied. */
   | 'denied'
-  /** Too long, or started in another browser or window. */
+  /** Took too long, or started in another browser or window. */
   | 'expired'
-  /** No account here is linked to theirs, and sign-up is off. */
+  /** No linked account here, and sign-up is off. */
   | 'no-account'
-  /** A new account's email belongs to an account here already. */
+  /** A new account's email already belongs to an account here. */
   | 'existing-account'
-  /** Linking: that account is linked to someone else here. */
+  /** Linking: that provider account is linked to someone else. */
   | 'taken'
   /** Linking: they already have an account on this provider linked. */
   | 'already-linked'
-  /** The provider's claims for them don't meet its rules. */
+  /** Their claims don't meet the provider's rules. */
   | 'not-allowed'
-  /** Too many failed attempts from here; wait a few minutes. */
+  /** Too many failed attempts; wait a few minutes. */
   | 'too-many'
-  /** Linking: done. */
+  /** Linking succeeded. */
   | 'linked';
 
 /**
- * One rule for who may sign in with a provider. Without a value, the claim
- * must be true (as upstream's `requiredClaims` means). With one, the claim
- * must be exactly that text, or, when it is a list (such as `groups`),
- * contain it.
+ * One sign-in rule. Without a value, the claim must be true (like upstream's
+ * `requiredClaims`). With one, the claim must equal it or, for a list claim
+ * such as `groups`, contain it.
  */
 export interface OidcClaimRule {
   claim: string;
@@ -106,12 +97,11 @@ export interface OidcClaimRule {
 }
 
 /**
- * Rules as saved, in either form: a list of rules, or upstream's claim
- * names separated by spaces ("is_seerr_user other_claim"), each of which
- * must be true. Names and values are trimmed; a blank value is no value.
- * A rule that can't be read (from a hand-edited settings file) is kept as
- * one with no claim name, which nobody passes: a mistake keeps people out
- * rather than letting everyone in, and the settings page asks for a name.
+ * Parses saved rules in either form: a rule list, or upstream's space-separated
+ * claim names ("is_seerr_user other_claim") that must each be true. Names and
+ * values are trimmed; a blank value means none. An unreadable rule (hand-edited
+ * settings) becomes one with no claim name, which nobody passes, so a mistake
+ * locks people out rather than letting everyone in.
  */
 export const requiredClaimsFrom = (saved: unknown): OidcClaimRule[] => {
   if (saved === undefined || saved === null) {
@@ -141,10 +131,9 @@ export const requiredClaimsFrom = (saved: unknown): OidcClaimRule[] => {
 };
 
 /**
- * The Application URL (Settings → General) providers send people back to,
- * without a trailing slash; blank when it isn't set or isn't a web address.
- * Single sign-on needs it: the address a provider sends people back to has
- * to be registered with the provider in advance.
+ * The Application URL (Settings → General) without a trailing slash, or blank
+ * when unset or not a web address. SSO requires it, since the redirect URI must
+ * be registered with the provider.
  */
 export const oidcApplicationUrl = (applicationUrl?: string): string => {
   const value = (applicationUrl ?? '').trim();
@@ -158,66 +147,63 @@ export const oidcApplicationUrl = (applicationUrl?: string): string => {
   }
 };
 
-/** Where a provider says what it is, under its issuer: Seerr adds it. */
+/** The discovery document path under an issuer; Seerr appends it. */
 const DISCOVERY_PATH = /\/\.well-known\/openid-configuration\/*$/i;
 
 /**
- * An issuer URL as an admin entered it, ready to use. Authentik and others
- * show the provider's whole configuration address beside the issuer
- * (…/.well-known/openid-configuration); pasted, it is taken back to the
- * issuer it is under, keeping the slash before it, as Authentik's issuer
- * has one. Anything else is left as it is, without spaces around it.
+ * Normalizes an entered issuer URL. A pasted discovery address
+ * (…/.well-known/openid-configuration) is cut back to its issuer, keeping the
+ * trailing slash since Authentik's issuer has one. Otherwise only trimmed.
  */
 export const issuerFromEntered = (entered: string): string =>
   entered.trim().replace(DISCOVERY_PATH, '/');
 
 /**
- * An issuer URL as links remember it: without a slash at the end, so the
- * same provider typed with or without one, or as its configuration
- * address, is the same provider.
+ * An issuer URL as links store it: no trailing slash, so the same provider
+ * entered with or without one, or as its discovery address, matches.
  */
 export const normalizeIssuer = (issuerUrl: string): string =>
   issuerFromEntered(issuerUrl).replace(/\/+$/, '');
 
 /**
- * What is wrong with a provider in Settings → Users → Single Sign-On, as a
- * code the settings page puts in the admin's language, with the details it
- * needs. The server's log keeps the English.
+ * A provider problem in Settings → Users → Single Sign-On, as a code the
+ * settings page localizes using the details it needs. The server log keeps the
+ * English.
  */
 export type OidcProblemCode =
-  /** The request could not be read. */
+  /** The request couldn't be parsed. */
   | 'check-details'
-  /** The issuer URL is not an address. */
+  /** The issuer URL isn't a URL. */
   | 'issuer-url'
   /** The issuer URL has a ? or # part. */
   | 'issuer-query'
-  /** The issuer URL is not https (or http on this machine). */
+  /** The issuer URL isn't https (or http on localhost). */
   | 'issuer-https'
-  /** No client secret, entered or saved for this issuer. */
+  /** No client secret entered or saved for this issuer. */
   | 'client-secret'
-  /** The logo is not https or a picture on this site. */
+  /** The logo isn't https or an image on this site. */
   | 'logo-url'
-  /** A rule for who may sign in has no claim name, or one with spaces. */
+  /** A sign-in rule has no claim name, or one with spaces. */
   | 'claim-name'
-  /** `host` did not answer within `seconds`. */
+  /** `host` didn't answer within `seconds`. */
   | 'timeout'
-  /** The provider calls itself by another issuer URL (`issuer`, if said). */
+  /** The provider reports a different issuer URL (`issuer`, if given). */
   | 'issuer-mismatch'
   /**
-   * Nothing at the discovery address (`status`, if it answered). With only
-   * a host entered and a 404, `origin` too: some providers (Authentik) give
-   * each app its own address under it.
+   * Nothing at the discovery address (`status`, if it answered). With only a
+   * host entered and a 404, also `origin`: some providers (Authentik) give each
+   * app its own path under it.
    */
   | 'no-discovery'
   /** Something answered, but not with a discovery document. */
   | 'not-discovery'
-  /** `host` could not be found. */
+  /** `host` couldn't be resolved. */
   | 'host-not-found'
-  /** Nothing answered at `host`. */
+  /** Connection refused at `host`. */
   | 'refused'
-  /** `host`'s certificate is not trusted (`reason`). */
+  /** `host`'s certificate isn't trusted (`reason`). */
   | 'certificate'
-  /** `host` could not be reached. */
+  /** `host` couldn't be reached. */
   | 'unreachable';
 
 export interface OidcProblem {

@@ -8,6 +8,7 @@ import { isMbid } from '@server/api/musicbrainz';
 import type {
   MbArtist,
   MbArtistCredit,
+  MbGenre,
   MbMedium,
   MbReleaseGroup,
 } from '@server/api/musicbrainz/interfaces';
@@ -18,53 +19,49 @@ import type { Song } from '@server/lib/music/songs';
 import { albumFor, singleFor } from '@server/lib/music/songs';
 
 /*
- * Artists and albums as the pages show them, shaped from MusicBrainz and
- * ListenBrainz answers. An artist's own record here (mediaInfo) has been
- * through mediaForViewer before it is attached; an album's status is its
- * MusicAlbum's.
+ * Artists and albums for the pages, mapped from MusicBrainz and ListenBrainz.
+ * An artist's mediaInfo has been through mediaForViewer before it is
+ * attached; an album's status is its MusicAlbum's.
  */
 
 export interface MusicArtistResult {
   mediaType: 'artist';
-  /** The artist's MusicBrainz id. */
+  /** MusicBrainz artist id. */
   id: string;
   name: string;
   disambiguation?: string;
   /** Person, Group, Orchestra, Choir, Character or Other. */
   type?: string;
   country?: string;
-  /** The artist's status here, when Seerr has them. */
+  /** Seerr's status for the artist, if tracked. */
   status?: MediaStatus;
 }
 
 export interface MusicAlbumResult {
   mediaType: 'album';
-  /** The album's MusicBrainz release-group id. */
+  /** MusicBrainz release-group id. */
   id: string;
   title: string;
   /** Album, EP, Single, Broadcast or Other. */
   primaryType?: string;
-  /** Live, Compilation, Soundtrack, Remix and so on. */
+  /** Live, Compilation, Soundtrack, Remix, etc. */
   secondaryTypes: string[];
-  /** As precise as MusicBrainz knows it: "2004", "2004-03" or a full date. */
+  /** "2004", "2004-03" or a full date, as precise as MusicBrainz has it. */
   releaseDate?: string;
-  /** The first credited artist, whom the album belongs to here. */
+  /** The first credited artist, who owns the album here. */
   artistId?: string;
-  /** Everyone credited, as MusicBrainz writes it ("A feat. B"). */
+  /** Full credit as MusicBrainz writes it ("A feat. B"). */
   artistName?: string;
-  /** Its front cover at the Cover Art Archive; may not exist. */
+  /** Cover Art Archive front cover; may not exist. */
   coverUrl: string;
-  /** The album's status here, when Seerr has it. */
+  /** Seerr's status for the album, if tracked. */
   status?: MediaStatus;
-  /**
-   * Lidarr has its files and no media server lists it yet: it is being
-   * added to the library.
-   */
+  /** Lidarr has the files but no media server lists it yet. */
   addingToLibrary?: boolean;
 }
 
 export interface MusicLink {
-  /** MusicBrainz's name for the link: official homepage, wikipedia... */
+  /** MusicBrainz link type: official homepage, wikipedia... */
   kind: string;
   url: string;
 }
@@ -77,7 +74,7 @@ export interface MusicArtistDetails extends MusicArtistResult {
   ended: boolean;
   genres: string[];
   links: MusicLink[];
-  /** The start of their Wikipedia article, as plain text. */
+  /** Plain-text start of their Wikipedia article. */
   biography: string | null;
   mediaInfo?: Media;
 }
@@ -85,31 +82,28 @@ export interface MusicArtistDetails extends MusicArtistResult {
 export interface MusicAlbumDetails extends MusicAlbumResult {
   disambiguation?: string;
   genres: string[];
-  /** Everyone credited, in order. */
+  /** All credited artists, in order. */
   artists: { id: string; name: string; joinphrase?: string }[];
-  /** The artist's own record here. */
+  /** The artist's Seerr media record. */
   mediaInfo?: Media;
-  /** Where to play the album: each connected server that has it. */
+  /** Each connected server that has the album. */
   playLinks: PlayLink[];
 }
 
-/** Where a song stands here, when it is asked for or coming. */
+/** A song's status when requested or on its way. */
 export interface MusicSongStatus {
-  /**
-   * Its own request's (pending, processing, available), or else that of
-   * the album bringing it.
-   */
+  /** Its own request's status, else that of the album bringing it. */
   status?: MediaStatus;
-  /** The album here or on its way that brings it, when one does. */
+  /** The album that brings it, if any. */
   onAlbum?: { id: string; title: string };
 }
 
 /** One version of a song: a MusicBrainz recording. */
 export interface MusicSongVersion extends MusicSongStatus {
-  /** The recording's MusicBrainz id. */
+  /** MusicBrainz recording id. */
   id: string;
   title: string;
-  /** What tells it apart ("radio edit"), when anything does. */
+  /** Distinguishing label ("radio edit"), if any. */
   version?: string;
   /** Milliseconds. */
   length?: number | null;
@@ -121,11 +115,10 @@ export interface MusicSongVersion extends MusicSongStatus {
     secondaryTypes: string[];
     coverUrl: string;
   };
-  /** How many releases it is on. */
   releaseCount: number;
   /**
-   * It is on no single or EP of the artist's, only on albums, so it cannot
-   * be fetched, or asked for, on its own.
+   * On no single or EP of the artist's, so it can't be fetched or requested
+   * alone.
    */
   onlyOnAlbums?: boolean;
 }
@@ -133,16 +126,16 @@ export interface MusicSongVersion extends MusicSongStatus {
 /** A song: one artist's versions of one title. */
 export interface MusicSongResult {
   mediaType: 'song';
-  /** The artist and title, as one key. */
+  /** Artist and title as one key. */
   id: string;
   title: string;
-  /** The first credited artist, whom the song belongs to here. */
+  /** The first credited artist, who owns the song here. */
   artistId: string;
-  /** Everyone credited, as MusicBrainz writes it ("A feat. B"). */
+  /** Full credit as MusicBrainz writes it ("A feat. B"). */
   artistName: string;
   /** Best known first. */
   versions: MusicSongVersion[];
-  /** Song requests are switched off: only its album can be asked for. */
+  /** Song requests are off; only its album can be requested. */
   canRequest?: false;
 }
 
@@ -152,7 +145,7 @@ export interface MusicSongSearchResponse {
 
 export interface MusicTrack extends MusicSongStatus {
   disc: number;
-  /** The disc's own name, when it has one. */
+  /** The disc's title, if any. */
   discTitle?: string;
   position: number;
   /** As printed: "1", "A1"... */
@@ -160,14 +153,14 @@ export interface MusicTrack extends MusicSongStatus {
   title: string;
   /** Milliseconds. */
   length?: number | null;
-  /** The recording on this track: the version asked for when it is. */
+  /** The track's recording: the version requested when it is. */
   recordingId?: string;
   /**
-   * It is on no single or EP of the artist's, and songs aren't taken from
-   * albums here, so it can't be asked for by itself: its album can.
+   * On no single or EP of the artist's, and songs aren't taken from albums
+   * here, so only its album can be requested.
    */
   onlyOnAlbums?: boolean;
-  /** Whether it is on a single is still being looked up. */
+  /** Still checking whether it is on a single. */
   checking?: boolean;
 }
 
@@ -221,8 +214,8 @@ export const mapAlbumResult = (
 });
 
 /**
- * Links worth showing: https addresses only, of the kinds people follow.
- * MusicBrainz lists dozens (lyrics sites, databases, shops).
+ * Link types worth showing (https only); MusicBrainz lists dozens (lyrics
+ * sites, databases, shops).
  */
 const LINK_KINDS = [
   'official homepage',
@@ -248,6 +241,11 @@ const linksOf = (artist: MbArtist): MusicLink[] =>
       url: relation.url!.resource,
     }));
 
+const genreNames = (genres?: MbGenre[]): string[] =>
+  [...(genres ?? [])]
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    .map((genre) => genre.name);
+
 export const mapArtistDetails = (
   artist: MbArtist,
   { biography, mediaInfo }: { biography: string | null; mediaInfo?: Media }
@@ -259,9 +257,7 @@ export const mapArtistDetails = (
   beginDate: artist['life-span']?.begin ?? undefined,
   endDate: artist['life-span']?.end ?? undefined,
   ended: !!artist['life-span']?.ended,
-  genres: [...(artist.genres ?? [])]
-    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
-    .map((genre) => genre.name),
+  genres: genreNames(artist.genres),
   links: linksOf(artist),
   biography,
   mediaInfo,
@@ -278,9 +274,7 @@ export const mapAlbumDetails = (
   ...mapAlbumResult(group),
   status,
   disambiguation: group.disambiguation || undefined,
-  genres: [...(group.genres ?? [])]
-    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
-    .map((genre) => genre.name),
+  genres: genreNames(group.genres),
   artists: (group['artist-credit'] ?? []).map((credit) => ({
     id: credit.artist.id,
     name: credit.name,
@@ -303,11 +297,11 @@ export const mapTracks = (media: MbMedium[]): MusicTrack[] =>
     }))
   );
 
-/** A song and its versions as search shows them, with where each stands. */
+/** A song and its versions for search, with each version's status. */
 export const mapSongResult = (
   song: Song,
   standing: Map<string, MusicSongStatus>,
-  /** Songs on no single can be taken from their albums. */
+  /** Allow taking songs on no single from their albums. */
   fromAlbums = false
 ): MusicSongResult => ({
   mediaType: 'song',
@@ -338,8 +332,8 @@ export const mapSongResult = (
 });
 
 /**
- * ListenBrainz's own cover for a release when it names one (it knows the
- * Cover Art Archive has it), else the album's.
+ * The release cover ListenBrainz names (it knows the Cover Art Archive has
+ * it), else the album's.
  */
 const listenBrainzCover = (
   releaseGroupId: string,

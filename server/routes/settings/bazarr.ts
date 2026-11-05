@@ -7,9 +7,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Bazarr's address and API key. Like the download clients, the key is never
- * sent back, a blank one on saving or testing keeps the saved one (for the
- * same address only), and the connection is tested before anything is saved.
+ * Bazarr's address and API key. As for download clients: the key is never
+ * sent back, a blank key keeps the saved one (same address only), and the
+ * connection is tested before saving.
  */
 const bazarrSettingsRoutes = Router();
 
@@ -33,7 +33,7 @@ const EMPTY: BazarrSettings = {
   apiKey: '',
 };
 
-/** What the settings page is shown: no key, only that one is set. */
+/** Settings as shown to the page: no key, only whether one is set. */
 const shown = (bazarr: BazarrSettings) => ({
   ...bazarr,
   apiKey: '',

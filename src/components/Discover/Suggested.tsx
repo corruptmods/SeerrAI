@@ -20,17 +20,13 @@ const messages = defineMessages('components.Discover.Suggested', {
 
 type MediaType = 'all' | 'movie' | 'tv';
 
-/**
- * Everything suggested from what this person has been watching: the full
- * list behind the home page row.
- */
+/** Full list behind the home page's Suggested row, from the user's watching. */
 const Suggested = () => {
   const intl = useIntl();
   const router = useRouter();
   const updateQueryParams = useUpdateQueryParams({});
 
-  // In the address, as on the other Discover pages, so it survives going to
-  // a title and back.
+  // Kept in the URL so it survives going to a title and back.
   const currentMediaType: MediaType = (['movie', 'tv'] as const).includes(
     router.query.mediaType as 'movie' | 'tv'
   )
@@ -89,7 +85,7 @@ const Suggested = () => {
             </select>
           </div>
           <SuggestionReasons
-            // A fresh explanation for each filter, as the list differs.
+            // Remount per filter: the list differs.
             key={currentMediaType}
             titles={titles ?? []}
             mediaType={currentMediaType}

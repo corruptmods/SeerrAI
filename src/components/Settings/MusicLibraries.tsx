@@ -20,14 +20,13 @@ const messages = defineMessages('components.Settings.MusicLibraries', {
   toggleFailure: 'Failed to update library.',
 });
 
-/** Where a server's music libraries are read, so a sync can refresh them. */
+/** SWR key for a server's music libraries; a sync revalidates it. */
 export const musicLibrariesKey = (endpoint: string): string =>
   `${endpoint}/music-library`;
 
 /**
- * A server's music libraries and switching one on or off. Only read while
- * music is set up and on for everyone (`ready` says whether it is), and
- * not before `read` is true.
+ * A server's music libraries and a toggle for each. Fetches only when
+ * music is ready (returned as `ready`) and `read` is true.
  */
 export const useMusicLibraries = (endpoint: string, read = true) => {
   const intl = useIntl();
@@ -60,9 +59,8 @@ export const useMusicLibraries = (endpoint: string, read = true) => {
 };
 
 /**
- * Said where music libraries would be listed while music is off. During
- * first-time setup there is no Settings → Music to go to yet, so it isn't
- * a link there.
+ * Placeholder shown while music is off. Not a link during first-time setup,
+ * where Settings → Music doesn't exist yet.
  */
 export const MusicLibrariesOff = ({ linked }: { linked: boolean }) => {
   const intl = useIntl();
@@ -88,17 +86,11 @@ export const MusicLibrariesOff = ({ linked }: { linked: boolean }) => {
 interface MusicLibrariesProps {
   /** The server's settings, e.g. /api/v1/settings/plex. */
   endpoint: string;
-  /**
-   * First-time setup: while music is off, says when music libraries can be
-   * chosen rather than showing nothing.
-   */
+  /** First-time setup: shows the music-off placeholder instead of nothing. */
   isSetup?: boolean;
 }
 
-/**
- * A server's music libraries, to switch on or off. Only while music is set
- * up and on.
- */
+/** Music library toggles; hidden unless music is ready or `isSetup`. */
 const MusicLibraries = ({ endpoint, isSetup }: MusicLibrariesProps) => {
   const intl = useIntl();
   const { ready, data, toggle } = useMusicLibraries(endpoint);

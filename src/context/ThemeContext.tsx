@@ -10,33 +10,29 @@ import { activeSeason, localDay, shownSeason } from '@server/lib/seasons';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 
 /*
- * The look on screen. The server writes it into the page (pages/_document);
- * from then on this keeps it in step with the signed-in person's choice
- * and the server's default, and lets the Appearance page show a look
- * before it is saved. A seasonal theme, while one runs, sits on top.
+ * The look on screen. The server writes it (pages/_document); this keeps it
+ * in sync with the user's choice and server default, supports Appearance
+ * page previews, and layers any running season on top.
  */
 
 interface ThemeContextValue {
-  /** The look on screen now, a preview included. */
+  /** The look on screen, including a preview. */
   appearance: Appearance;
-  /** Shows a look without keeping it; null goes back to the chosen one. */
+  /** Previews a look without saving; null restores the chosen one. */
   setPreview: (appearance: Appearance | null) => void;
-  /** The seasonal theme on screen now, a preview included. */
+  /** The season on screen, including a preview. */
   season?: SeasonId;
-  /** The season this server is running today, whether shown or not. */
+  /** The server's season today, shown or not. */
   current?: ActiveSeason;
-  /** Today on this device's calendar, 'YYYY-MM-DD'. */
+  /** Today on this device, 'YYYY-MM-DD'. */
   today: string;
-  /**
-   * Shows a season on top of the look being previewed; null for none. Only
-   * while a look is previewed (the Appearance page).
-   */
+  /** Previews a season over the previewed look (Appearance page only); null for none. */
   setSeasonPreview: (season: SeasonId | null) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
-/** How long until the next day starts on this device, and a second over. */
+/** Ms until one second past local midnight. */
 const untilTomorrow = (now: Date): number =>
   new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() -
   now.getTime() +
@@ -47,12 +43,11 @@ export const ThemeProvider = ({
   seasonDay,
   children,
 }: {
-  /** The copy kept on this device, for pages before anyone signs in. */
+  /** The device's copy, for pages before sign-in. */
   deviceAppearance?: Appearance;
   /**
-   * The day the page was made for. The server's day at first, so the page
-   * starts as it was sent; then this device's own, kept up to date so a
-   * season ends by itself on a page left open.
+   * The server's date at first, so the page starts as sent; then the
+   * device's, kept current so a season ends on a page left open.
    */
   seasonDay?: string;
   children: React.ReactNode;
@@ -74,7 +69,7 @@ export const ThemeProvider = ({
       timer = setTimeout(check, untilTomorrow(now));
     };
     check();
-    // A device that slept past midnight runs its timers late.
+    // Timers run late on a device that slept past midnight.
     document.addEventListener('visibilitychange', check);
     return () => {
       clearTimeout(timer);
@@ -99,8 +94,7 @@ export const ThemeProvider = ({
     () => activeSeason(calendar ?? [], today),
     [calendar, today]
   );
-  // While a look is previewed, only a season asked for is shown on top, so
-  // the look itself can be seen.
+  // During a preview, only an explicitly previewed season shows.
   const season = preview
     ? (seasonPreview ?? undefined)
     : shownSeason({
@@ -115,16 +109,14 @@ export const ThemeProvider = ({
     }
   }, [preview]);
 
-  // Compared as text: a refetched user brings an equal but new object.
+  // Compare as text: a refetched user is an equal but new object.
   const shown = JSON.stringify(appearance);
   const signedIn = !!user;
   const hasOwn = !!own;
   useEffect(() => {
-    // A preview is never kept. A signed-in person's own look is copied to
-    // the device for the sign-in page; using the server's default clears
-    // the copy. The season is never part of the copy. Safe mode shows
-    // every look without its theme file, but keeps the season: seasons
-    // are built in.
+    // Previews are never stored. The user's own look is copied to the device
+    // for the sign-in page; the server default clears it. The season is never
+    // stored. Safe mode drops theme files but keeps the built-in season.
     const look = JSON.parse(shown) as Appearance;
     applyAppearance(
       isSafeMode() ? withoutThemeFile(look) : look,
@@ -150,7 +142,7 @@ export const ThemeProvider = ({
   );
 };
 
-/** The look on screen, and a way to preview another. */
+/** The look on screen, and preview controls. */
 export const useTheme = (): ThemeContextValue => {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -159,10 +151,7 @@ export const useTheme = (): ThemeContextValue => {
   return context;
 };
 
-/**
- * The copy of a look kept on this device: from the request on the server,
- * from the page's cookies in the browser.
- */
+/** The device's stored look: from request cookies on the server, document cookies in the browser. */
 export const deviceAppearanceFrom = (
   cookieHeader: string | undefined
 ): Appearance | undefined =>

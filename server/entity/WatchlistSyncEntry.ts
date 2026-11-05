@@ -33,9 +33,9 @@ export class WatchlistSyncEntry {
   public watchlistedAt: number;
 
   /**
-   * Which watchlist watchlistedAt came from; null for entries made before
-   * Trakt, which are Plex's. A different time from the same watchlist is a
-   * re-add; from the other one it is the same entry.
+   * Which watchlist watchlistedAt came from; null for pre-Trakt entries, which
+   * are Plex's. A different time from the same watchlist is a re-add; from the
+   * other watchlist it's the same entry.
    */
   @Column({ type: 'varchar', nullable: true })
   public watchlistedFrom?: WatchlistSource | null;

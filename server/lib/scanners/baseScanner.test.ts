@@ -11,9 +11,9 @@ import { describe, it, mock } from 'node:test';
 setupTestDb();
 
 /*
- * What a media server scan does to titles beyond the one it finds: the
- * title a re-matched item leaves no longer has it, and downloads shown as
- * "being added" stop showing once the media server lists the title.
+ * Scan effects beyond the found title: the title a re-matched item leaves
+ * loses it, and "being added" downloads stop showing once the media server
+ * lists the title.
  */
 
 class ProbeScanner extends BaseScanner<unknown> {
@@ -43,7 +43,7 @@ describe('a media server scan', () => {
   it('takes an item away from the title it was wrongly matched to', async () => {
     const scanner = new ProbeScanner();
     scanner.begin();
-    // Plex first took the new "Wrenna" for "The Wrenna Diaries".
+    // Plex first mismatches the new "Wrenna" as "The Wrenna Diaries".
     await scanner.seeShow(57284, '126741');
     const wrong = await getRepository(Media).findOneOrFail({
       where: { tmdbId: 57284, mediaType: MediaType.TV },
@@ -51,7 +51,7 @@ describe('a media server scan', () => {
     });
     assert.equal(wrong.status, MediaStatus.PARTIALLY_AVAILABLE);
 
-    // Corrected, the same item is now Wrenna (2026), which Sonarr has.
+    // After correction the same item is Wrenna (2026), which Sonarr has.
     await getRepository(Media).save(
       new Media({
         tmdbId: 375182,

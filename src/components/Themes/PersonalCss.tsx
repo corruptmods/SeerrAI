@@ -46,10 +46,9 @@ const problemText = (
 };
 
 /**
- * Profile → Settings → Appearance → Personal CSS: a person's own styles,
- * shown while an admin lets people add their own. It is checked as it is
- * typed, with the same check the server makes. Saved on its own, apart
- * from the rest of the look. The way into safe mode is always shown.
+ * Personal CSS editor, shown while admins allow it. Validates as typed with
+ * the server's check and saves separately from the look. The safe mode link
+ * always shows.
  */
 const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
   const intl = useIntl();
@@ -80,7 +79,7 @@ const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
       );
       await mutate(response.data, { revalidate: false });
       setCss(response.data.css);
-      // Pages load it by the version the signed-in person carries.
+      // The stylesheet URL is versioned from the user object.
       if (isOwn) {
         await revalidate();
       }

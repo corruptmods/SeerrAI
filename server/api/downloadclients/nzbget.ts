@@ -14,16 +14,14 @@ import type { AxiosInstance } from 'axios';
 import axios, { isAxiosError } from 'axios';
 
 /*
- * The part of NZBGet's JSON-RPC Seerr reads: its queue and its history.
- * Radarr and Sonarr add a "drone" parameter to each NZB they send and record
- * its value as the download id (the NZB's own NZBID on older versions), so a
- * job is matched by either. NZBGet signs in with HTTP basic auth.
+ * Reads NZBGet's JSON-RPC queue and history. Radarr and Sonarr add a "drone"
+ * parameter to each NZB and record its value as the download id (the NZBID
+ * on older versions), so a job matches by either. Auth is HTTP basic.
  *
- * For Backfill it also adds NZBs (NZBGet 16 and newer), follows them to the
- * history, and removes them there. NZBGet keeps a finished job's folder when
- * it is removed; Backfill's imports move the videos out of it, and what is
- * left (an .nfo, a sample) stays until NZBGet's own cleanup or someone
- * clears it.
+ * For Backfill it also adds NZBs (NZBGet 16+), follows them into history and
+ * removes them there. NZBGet keeps a removed job's folder; imports move the
+ * videos out, and leftovers (.nfo, sample) stay until NZBGet's cleanup or
+ * someone clears them.
  */
 
 interface Parameter {
@@ -33,13 +31,15 @@ interface Parameter {
 
 export interface NzbgetGroup {
   NZBID: number;
-  /** QUEUED, PAUSED, DOWNLOADING, FETCHING, PP_QUEUED, LOADING_PARS,
+  /**
+   * QUEUED, PAUSED, DOWNLOADING, FETCHING, PP_QUEUED, LOADING_PARS,
    * VERIFYING_SOURCES, REPAIRING, VERIFYING_REPAIRED, RENAMING, UNPACKING,
-   * MOVING, EXECUTING_SCRIPT, PP_FINISHED. */
+   * MOVING, EXECUTING_SCRIPT, PP_FINISHED.
+   */
   Status: string;
   FileSizeMB: number;
   RemainingSizeMB: number;
-  /** Repair files held back until they are needed. */
+  /** Repair files held back until needed. */
   PausedSizeMB?: number;
   Parameters?: Parameter[];
 }
@@ -49,7 +49,7 @@ export interface NzbgetHistoryItem {
   /** SUCCESS/…, FAILURE/…, WARNING/…, DELETED/… */
   Status: string;
   FileSizeMB: number;
-  /** Where it was put, and where a script moved it after, if one did. */
+  /** Where it was put, and where a script later moved it, if one did. */
   DestDir?: string;
   FinalDir?: string;
   Parameters?: Parameter[];
@@ -62,7 +62,7 @@ interface Status {
 
 const MB = 1024 * 1024;
 
-/** What NZBGet does to a job after downloading it. */
+/** NZBGet's post-download steps. */
 const AFTER_DOWNLOAD: Record<string, DownloadStep | undefined> = {
   PP_QUEUED: undefined,
   LOADING_PARS: 'verifying',
@@ -75,7 +75,7 @@ const AFTER_DOWNLOAD: Record<string, DownloadStep | undefined> = {
   EXECUTING_SCRIPT: 'script',
 };
 
-/** The download id Radarr or Sonarr recorded for a job, in lower case. */
+/** The lower-case download id Radarr or Sonarr recorded for a job. */
 export const nzbgetJobId = (job: {
   NZBID: number;
   Parameters?: Parameter[];
@@ -85,8 +85,8 @@ export const nzbgetJobId = (job: {
   ).toLowerCase();
 
 /**
- * A job's size and what is left, without the repair files NZBGet holds
- * back: they are only fetched if the download turns out damaged.
+ * A job's size and remainder, excluding held-back repair files, which are
+ * only fetched if the download is damaged.
  */
 const groupSize = (group: NzbgetGroup) => {
   const paused = Number(group.PausedSizeMB) || 0;
@@ -105,7 +105,7 @@ const groupSize = (group: NzbgetGroup) => {
 export const nzbgetQueueDownload = (
   group: NzbgetGroup,
   status: Status,
-  /** The one job downloading, when only one is: it has all the speed. */
+  /** The only job downloading, so all the speed is its own. */
   soleDownloading: boolean
 ): LiveDownload => {
   const { size, sizeLeft } = groupSize(group);
@@ -136,7 +136,7 @@ export const nzbgetQueueDownload = (
             : undefined,
       };
     default:
-      // QUEUED, and FETCHING (the NZB itself is being fetched).
+      // QUEUED, and FETCHING (fetching the NZB itself).
       return {
         ...base,
         stage: status.DownloadPaused ? 'paused' : 'queued',
@@ -157,7 +157,7 @@ export const nzbgetHistoryDownload = (
   return { ...base, stage: 'failed' };
 };
 
-/** NZBGet's queue states, in Backfill's words (see UsenetJob). */
+/** NZBGet queue states mapped to UsenetJob statuses. */
 const QUEUE_WORDS: Record<string, string> = {
   QUEUED: 'queued',
   PAUSED: 'paused',
@@ -165,7 +165,7 @@ const QUEUE_WORDS: Record<string, string> = {
   FETCHING: 'fetching',
 };
 
-/** After downloading, still in NZBGet's queue: Backfill's history words. */
+/** Post-download states still in NZBGet's queue, mapped to history statuses. */
 const AFTER_WORDS: Record<string, string> = {
   PP_QUEUED: 'queued',
   LOADING_PARS: 'verifying',
@@ -176,11 +176,11 @@ const AFTER_WORDS: Record<string, string> = {
   UNPACKING: 'extracting',
   MOVING: 'moving',
   EXECUTING_SCRIPT: 'running',
-  // Done, and about to be put in the history, where its folder is.
+  // Done and about to move into history, which has its folder.
   PP_FINISHED: 'moving',
 };
 
-/** Why a job in the history did not succeed, in words. */
+/** Failure reasons for history statuses. */
 const FAILURES: Record<string, string> = {
   'FAILURE/PAR': 'repairing it failed',
   'FAILURE/UNPACK': 'unpacking it failed',
@@ -196,7 +196,7 @@ const FAILURES: Record<string, string> = {
   'WARNING/SKIPPED': 'it was skipped as a duplicate',
 };
 
-/** A job in NZBGet's queue as Backfill follows it. */
+/** Maps a queued NZBGet job to a UsenetJob. */
 export const nzbgetJob = (
   group: NzbgetGroup,
   status: Status,
@@ -234,7 +234,7 @@ export const nzbgetJob = (
   };
 };
 
-/** A job in NZBGet's history as Backfill follows it. */
+/** Maps an NZBGet history item to a UsenetJob. */
 export const nzbgetHistoryJob = (item: NzbgetHistoryItem): UsenetJob => {
   const status = String(item.Status);
   const base = {
@@ -244,7 +244,7 @@ export const nzbgetHistoryJob = (item: NzbgetHistoryItem): UsenetJob => {
     sizeLeft: 0,
     speed: 0,
   };
-  // A failing script leaves the download itself fine.
+  // A failing script leaves the download itself intact.
   if (status.startsWith('SUCCESS/') || status === 'WARNING/SCRIPT') {
     return {
       ...base,
@@ -261,7 +261,7 @@ export const nzbgetHistoryJob = (item: NzbgetHistoryItem): UsenetJob => {
   };
 };
 
-/** The oldest NZBGet whose API Backfill speaks. */
+/** Oldest NZBGet whose API Backfill supports. */
 const BACKFILL_MIN_VERSION = 16;
 
 interface RpcAnswer<T> {
@@ -282,9 +282,8 @@ class NzbgetAPI implements UsenetClient {
     this.axios = axios.create({
       baseURL: `${clientBaseUrl(settings)}/jsonrpc`,
       timeout: CLIENT_TIMEOUT_MS,
-      // NZBGet closes its connection after every answer. One kept open to be
-      // used again, as Node does, was gone by the next request: after a
-      // refused sign-in, that request failed with "socket hang up".
+      // NZBGet closes the connection after every response; a reused
+      // keep-alive socket fails with "socket hang up" after a refused sign-in.
       headers: { Connection: 'close' },
       auth: settings.username
         ? { username: settings.username, password: settings.password ?? '' }
@@ -321,11 +320,11 @@ class NzbgetAPI implements UsenetClient {
       nzb.toString('base64'),
       category,
       0, // priority
-      false, // to the top
+      false, // add to top
       false, // paused
       '', // duplicate key
       0, // duplicate score
-      'FORCE', // never held back as a duplicate
+      'FORCE', // never hold back as a duplicate
       [],
     ]);
     if (!(Number(id) > 0)) {
@@ -373,10 +372,7 @@ class NzbgetAPI implements UsenetClient {
     }
   }
 
-  /**
-   * Removes the job from the queue (with what it downloaded) or from the
-   * history, whichever it is in.
-   */
+  /** Removes the job from the queue (with its download) or from history. */
   public async deleteJob(id: string): Promise<void> {
     if (!(await this.edit('GroupFinalDelete', id))) {
       await this.edit('HistoryFinalDelete', id);
@@ -417,7 +413,7 @@ class NzbgetAPI implements UsenetClient {
     const downloading = (groups ?? []).filter(
       (group) => group.Status === 'DOWNLOADING'
     ).length;
-    // The queue last: a job back in it after a failure is what counts now.
+    // Queue last: a job requeued after a failure overrides its history entry.
     for (const group of groups ?? []) {
       const id = nzbgetJobId(group);
       if (mine.has(id)) {

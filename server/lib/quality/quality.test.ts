@@ -52,16 +52,15 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Quality profiles: how a server's choices become profiles and formats,
- * and applying, undoing, change checks and the step-down against a
- * stand-in that keeps profiles, formats and titles the way Radarr and
- * Sonarr do.
+ * Quality profiles: building profiles and formats from a server's choices,
+ * plus apply, undo, change checks and step-down, against an in-memory
+ * stand-in that behaves like Radarr and Sonarr.
  */
 
 setupTestDb();
 
-// Every quality, lowest first, as Radarr's and Sonarr's empty profiles
-// lay them out (the WEB pairs grouped).
+// Every quality, lowest first, as in Radarr's and Sonarr's empty profiles
+// (WEB pairs grouped).
 const QUALITIES: Record<ArrKind, [number, string][]> = {
   radarr: [
     [0, 'Unknown'],
@@ -191,7 +190,7 @@ const standIn = (
     calls: [] as string[],
   };
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
-  // The apps take a profile only with every format they have scored.
+  // The apps reject a profile unless every format they have is scored.
   const everyFormat = (p: ArrQualityProfile) => {
     const scored = new Set((p.formatItems ?? []).map((i) => i.format));
     if (state.formats.some((f) => !scored.has(f.id as number))) {
@@ -338,7 +337,7 @@ beforeEach(() => {
     ref.kind === 'radarr' ? radarr.fake : sonarr.fake
   );
   setTrashDataForTests(null);
-  // TRaSH Guides is never fetched here: tests hand it their own copy.
+  // TRaSH Guides is never fetched; tests supply their own copy.
   mock.method(trashModule, 'readTrashState', async () => ({
     blobs: {},
     commit: 'abc1234',
@@ -553,7 +552,7 @@ describe('a profile laid out for the app', () => {
   });
 });
 
-/** A small TRaSH Guides, in the shape it publishes. */
+/** A small TRaSH Guides fixture in its published shape. */
 const trashFixture = (): TrashData => {
   const app = (kind: ArrKind) => {
     const id1080 = TRASH_PROFILES[kind]['1080p'] as string;
@@ -758,7 +757,7 @@ describe('TRaSH Guides presets', () => {
       ).profiles[0].formats.find((f) => /AV1/.test(f.name));
     assert.equal(av1(true, 'seerr')?.score, LAST_RESORT);
     assert.equal(av1(false, 'seerr')?.score, 0);
-    // TRaSH Guides never takes AV1; the adjustment goes on top of it.
+    // TRaSH Guides blocks AV1; the AV1 adjustment overrides it.
     assert.equal(av1(true, 'trash')?.score, LAST_RESORT);
     assert.deepEqual(av1(true, 'trash')?.changes, [
       { kind: 'av1', to: 'last-resort' },
@@ -897,11 +896,11 @@ describe('applying, undoing and changes made elsewhere', () => {
     );
     await undo(second.applyId as number);
     assert.equal(x265(), NEVER);
-    // Undone, it no longer counts as a change made in the app.
+    // Once undone, it no longer counts as an app-side change.
     manage('radarr');
     assert.equal((await stateOf(RADARR)).status, 'in-sync');
 
-    // The first undone removes what it created, and puts the delay back.
+    // Undoing the first removes what it created and restores the delay.
     await undo(first.applyId as number);
     assert.deepEqual(
       radarr.state.profiles.map((p) => p.name),
@@ -920,7 +919,7 @@ describe('applying, undoing and changes made elsewhere', () => {
   });
 
   it('keeps a profile on undo while titles or request settings use it', async () => {
-    // Anime requests left as they are, so an admin's own choice is tested.
+    // Anime requests left as is, to test an admin's own choice.
     manage('radarr', (c) => {
       c.animeRequestPreset = 'keep';
     });
@@ -942,7 +941,7 @@ describe('applying, undoing and changes made elsewhere', () => {
       (p) => p.name === 'Seerr AI · 1080p'
     );
     assert.equal(radarr.state.titles[0].profileId, ours?.id);
-    // Seerr AI's request settings now send titles to the anime preset.
+    // Seerr AI's request settings send titles to the anime preset.
     const anime = radarr.state.profiles.find(
       (p) => p.name === 'Seerr AI · Anime'
     );
@@ -1008,7 +1007,7 @@ describe('applying, undoing and changes made elsewhere', () => {
     };
     assert.deepEqual(maxOf('Seerr AI · 1080p'), [120]);
     assert.deepEqual(maxOf('Seerr AI · 720p'), [15]);
-    // No size of its own: the server's, Balanced.
+    // No own size: uses the server's (Balanced).
     assert.deepEqual(maxOf('Seerr AI · 2160p'), [200]);
   });
 
@@ -1127,8 +1126,8 @@ describe('applying only what was previewed, and undoing it whole', () => {
   });
 
   it('names a TRaSH Guides format apart from a Seerr AI one named in another case', async () => {
-    // TRaSH Guides' "Wrong Language" beside Seerr AI's "Wrong language",
-    // applied after Seerr AI's own presets were.
+    // TRaSH Guides' "Wrong Language" alongside Seerr AI's "Wrong language",
+    // applied after Seerr AI's own presets.
     manage('radarr');
     await apply(RADARR);
     const trash = trashFixture();
@@ -1176,7 +1175,7 @@ describe('applying only what was previewed, and undoing it whole', () => {
     const names = radarr.state.formats.map((f) => f.name);
     assert.ok(names.includes('Seerr AI · WEB Tier 01'));
     assert.ok(names.includes('Seerr AI · WEB Tier 01 (2)'));
-    // It stays as it is from then on.
+    // It stays in sync afterwards.
     assert.equal((await stateOf(RADARR)).status, 'in-sync');
     const again = await preview(RADARR);
     assert.deepEqual(
@@ -1289,7 +1288,7 @@ describe('applying only what was previewed, and undoing it whole', () => {
     assert.ok(
       radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 6 GB')
     );
-    // And one the admin made meanwhile.
+    // Plus one the admin made meanwhile.
     radarr.state.formats.push({
       id: 99,
       name: 'Made later',
@@ -1387,8 +1386,8 @@ describe('applying only what was previewed, and undoing it whole', () => {
     await runQualityCheck();
     assert.equal(await getRepository(QualityApply).count(), 1);
 
-    // Back to the choices applied: the update goes on, the delay profile
-    // someone changed in the app stays as they left it.
+    // Back to the applied choices: the update applies, and the delay
+    // profile changed in the app stays as left.
     save('radarr', (s) => {
       s.adjustments.x265At1080p = false;
     });
@@ -1742,7 +1741,7 @@ describe('where new requests go', () => {
     assert.equal(server.activeProfileId, 1);
     assert.equal(server.activeProfileName, 'Admin’s own');
     assert.equal(server.activeAnimeProfileId, undefined);
-    // No longer used by the request settings, so they go.
+    // No longer used by the request settings, so they're deleted.
     assert.deepEqual(undone.keptInUse, []);
     assert.ok(
       !radarr.state.profiles.some((p) => p.name.startsWith('Seerr AI'))
@@ -1796,7 +1795,7 @@ describe('what it does, with choices not saved yet', () => {
     assert.ok(!draft.lastResort.some((f) => f.name === 'Seerr AI · AV1'));
     assert.equal(draft.applied, false);
 
-    // The same choices as applied: applied.
+    // Same choices as applied: reads as applied.
     const same = await describeProfile(RADARR, '1080p', {
       adjustments: config.adjustments,
     });
@@ -1837,7 +1836,7 @@ describe('a format as Radarr and Sonarr answer with it', () => {
         ])
       )
     );
-    // A fingerprint kept before this (false fields counted) still matches.
+    // A fingerprint stored with false fields still matches.
     const { createHash } = await import('crypto');
     const legacy = createHash('sha1')
       .update(

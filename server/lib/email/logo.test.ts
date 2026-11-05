@@ -5,11 +5,7 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-/*
- * The logo at the top of every email. Gmail and Outlook don't show SVG
- * pictures, so it is a PNG, wherever it comes from, and says what it is for
- * anyone who can't see it.
- */
+// Email logo: always a PNG (Gmail and Outlook don't render SVG), with alt text.
 
 const TEMPLATES = path.join(__dirname, '../../templates/email');
 

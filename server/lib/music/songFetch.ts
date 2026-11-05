@@ -81,35 +81,31 @@ import { isAxiosError } from 'axios';
 import { In, IsNull, Not } from 'typeorm';
 
 /*
- * Songs only on albums, taken from them (Settings → Music, "Take songs
- * from albums"). For each album songs are asked for from:
+ * Takes songs that are only on albums from those albums (Settings → Music,
+ * "Take songs from albums"). Per album:
  *
- * 1. Lidarr: the artist is added if it is new (nothing of theirs
- *    monitored), and the album too, unmonitored, so Lidarr lists its
- *    tracks and never goes looking for the rest.
- * 2. A release of the album is searched for through Backfill's Prowlarr:
- *    one whose name is the album's, with a file for each song. With none,
- *    Soulseek (Settings → Services) is searched for each song, then a pack
- *    of the artist's releases, then what Backfill's second opinion names.
- * 3. It goes to Backfill's download client (a torrent with only the songs'
- *    files picked), or the songs' files alone are asked of a Soulseek
- *    sharer through slskd.
- * 4. Lidarr's manual import takes just those files into their tracks.
- * 5. The download is removed. The music scans then see the songs here, and
- *    the requests are done (lib/music/completion).
+ * 1. Lidarr: add the artist if new (nothing monitored) and the album
+ *    unmonitored, so Lidarr lists its tracks without fetching the rest.
+ * 2. Search Backfill's Prowlarr for a release named as the album with a
+ *    file per song. Failing that: Soulseek per song (Settings → Services),
+ *    then artist packs, then the AI fallback's picks.
+ * 3. Download via Backfill's client (a torrent with only the songs' files
+ *    selected), or the files alone from a Soulseek sharer via slskd.
+ * 4. Lidarr's manual import puts just those files into their tracks.
+ * 5. Remove the download. Music scans then complete the requests
+ *    (lib/music/completion).
  *
- * A song not found, or not taken by Lidarr, is failed with the reason; its
- * request can be retried like any failed request.
+ * Songs not found or not imported fail with a reason and can be retried
+ * like any failed request.
  */
 
 const LABEL = 'Song Fetch';
 
 /**
- * Which releases are opened first: whichever of torrents and Usenet
- * Lidarr's delay profile prefers (a torrent can download only the songs;
- * Usenet brings the whole album), then the other; torrents nobody seems to
- * share come last, as they may never finish and their file list can take
- * minutes to come from the swarm.
+ * Release order tier: Lidarr's preferred protocol first (torrents can fetch
+ * only the songs; Usenet brings the whole album), then the other.
+ * Unseeded torrents last: they may never finish and their file list can
+ * take minutes to arrive.
  */
 const releaseTier = (
   release: ProwlarrRelease,
@@ -120,8 +116,8 @@ const releaseTier = (
 };
 
 /**
- * The delay profile Lidarr uses for an artist: the first, in Lidarr's
- * order, sharing a tag with them, else the one for everyone.
+ * Lidarr's delay profile for an artist: the first by order sharing a tag,
+ * else the untagged default.
  */
 export const delayProfileFor = (
   profiles: LidarrDelayProfile[],
@@ -132,7 +128,7 @@ export const delayProfileFor = (
     .find((p) => p.tags.some((tag) => artistTags.includes(tag))) ??
   profiles.find((p) => !p.tags.length);
 
-/** Releases of an album in the order they are opened. */
+/** Sorts an album's releases into the order they're opened. */
 export const rankReleases = (
   releases: ProwlarrRelease[],
   prefer: LidarrDelayProfile['preferredProtocol'] = 'torrent'
@@ -144,27 +140,23 @@ export const rankReleases = (
       a.size - b.size
   );
 
-/** What a fetch waiting for a song download slot shows. */
+/** Stage shown while waiting for a song download slot. */
 export const WAITING_FOR_SLOT = 'Waiting for another song download to finish';
-/** Results opened for their file lists, best first. */
+/** Max results opened for their file lists, best first. */
 export const MAX_OPEN = 5;
-/** Packs of an artist's releases read in one search, when nothing names the album. */
+/** Max artist packs read per search when nothing names the album. */
 export const MAX_CATALOGS = 3;
 
-/** A release as a fetch keeps it. */
 type FetchRelease = NonNullable<SongFetch['release']>;
 
-/** A release chosen for songs, with each song's file in it. */
+/** A chosen release with each song's file in it. */
 interface ChosenRelease {
   release: ProwlarrRelease;
   files: SongFetchFile[];
   hash: string | null;
 }
 
-/**
- * Each wanted song's file in a release, as `find` finds it: each file one
- * song, never two tracks from the same file.
- */
+/** Each wanted song's file via `find`; no file is used for two tracks. */
 const pickSongs = <T extends { index: number; path: string; size: number }>(
   files: T[],
   wanted: { song: SongRequest; track: LidarrTrack }[],
@@ -189,54 +181,52 @@ const pickSongs = <T extends { index: number; path: string; size: number }>(
   return picked;
 };
 /**
- * A download that has brought nothing for this long stops holding one of
- * the song download slots, so the next song can start meanwhile; it is
- * still given up only at Backfill's stall time.
+ * A download idle this long frees its slot so the next song can start; it
+ * is only abandoned at Backfill's stall time.
  */
 const IDLE_SLOT_MS = 15 * 60_000;
-/** Releases tried before the songs are given up on. */
+/** Releases tried before giving up on the songs. */
 const MAX_TRIES = 3;
-/** Soulseek sharers tried before Soulseek is passed over for the songs. */
+/** Soulseek sharers tried before skipping Soulseek. */
 export const MAX_SOULSEEK_TRIES = 5;
-/** Songs of an album Soulseek is searched for each time, one at a time. */
+/** Songs per album searched on Soulseek each time, one at a time. */
 export const MAX_SOULSEEK_SEARCHES = 3;
-/** How long a sharer's queue is waited in before another is tried. */
+/** Max wait in a sharer's queue before trying another. */
 const SOULSEEK_QUEUE_GIVE_UP_MS = 2 * 60 * 60_000;
-/** Times a sharer is asked again after slskd restarts mid-download. */
+/** Max re-requests after slskd restarts mid-download. */
 const MAX_SOULSEEK_RESUMES = 5;
-/** How soon songs are looked for again while slskd isn't answering. */
+/** Retry delay while slskd isn't answering. */
 const SOULSEEK_DOWN_WAIT_MS = 30 * 60_000;
-/** Where slskd puts songs' files, under its downloads folder. */
+/** slskd subfolder for song files, under its downloads folder. */
 const SOULSEEK_FOLDER = 'seerr-ai';
-/** The slskd batches a Soulseek fetch's files were asked for in, oldest first. */
+/** slskd batch ids of a Soulseek fetch, oldest first. */
 const soulseekBatches = (fetch: SongFetch): string[] =>
   (fetch.downloadId ?? '').split(',').filter(Boolean);
-/** What `tried` holds for a Soulseek sharer. */
+/** `tried` entry for a Soulseek sharer. */
 const sharerKey = (username: string) => `soulseek:${username}`;
-/** Bigger than any album the songs are worth. */
+/** Larger than any album worth downloading for a few songs. */
 const MAX_RELEASE_BYTES = 4 * 1024 ** 3;
-/** How long the swarm may take to send a magnet's file list. */
+/** Max wait for a magnet's file list from the swarm. */
 const METADATA_GIVE_UP_MS = 30 * 60_000;
-/** How long Lidarr may take to import. */
+/** Max wait for Lidarr to import. */
 const IMPORT_GIVE_UP_MS = 3 * 60 * 60_000;
-/** How long Lidarr may take to know the artist and album. */
+/** Max wait for Lidarr to look up the artist and album. */
 const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
 /**
- * How long to wait before looking again for a release with the songs, after
- * each search that found none: indexers come and go, so the songs are
- * given up on only after about two days of finding nothing.
+ * Waits after each empty search, in order. Indexers come and go, so songs
+ * are only given up after about two days of nothing.
  */
 export const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map(
   (hours) => hours * 60 * 60_000
 );
-/** How soon a search Prowlarr or an indexer couldn't answer is tried again. */
+/** Retry delay when Prowlarr or an indexer couldn't answer. */
 const SEARCH_SOON_MS = 10 * 60_000;
-/** What a fetch waiting to look again shows. */
+/** Stage shown while waiting to search again. */
 const SEARCHING_AGAIN = 'Nothing found yet; looking again later';
-/** How long a fetch may keep stumbling on errors before it gives up. */
+/** How long a fetch may keep erroring before it gives up. */
 const STUMBLE_GIVE_UP_MS = 24 * 60 * 60_000;
 
-/** A fetch's statuses while it is under way. */
+/** Statuses of an in-progress fetch. */
 export const ACTIVE: SongFetch['status'][] = [
   'queued',
   'searching',
@@ -246,17 +236,16 @@ export const ACTIVE: SongFetch['status'][] = [
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** A failure that is the release's fault: the next release is tried. */
+/** A release-specific failure; the next release is tried. */
 class ReleaseProblem extends Error {}
 
-/** A torrent's stage until only the songs' files are picked and it starts. */
+/** Torrent stage until the songs' files are selected and it starts. */
 const CHOOSING = 'Choosing the songs’ files';
 
 /**
- * Whether a download counts against the song download slots: not once it
- * has brought nothing for a while (`idleMs`, as its watch last saw), or the
- * swarm hasn't sent its file list for as long, so one nobody shares doesn't
- * hold up the songs behind it.
+ * Whether a download holds a song slot. Releases it once idle for
+ * IDLE_SLOT_MS (`idleMs` from its watch) or once the swarm has taken that
+ * long to send the file list, so an unseeded one doesn't block the queue.
  */
 export const holdsSlot = (
   fetch: Pick<SongFetch, 'stage' | 'startedAt'>,
@@ -268,8 +257,8 @@ export const holdsSlot = (
     : idleMs < IDLE_SLOT_MS;
 
 /**
- * Songs in a request another of its songs failed in: the request shows as
- * failed, but its other songs carry on.
+ * Request statuses whose songs still proceed: a failed request's other
+ * songs carry on.
  */
 const UNDER_WAY = [MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED];
 
@@ -279,7 +268,7 @@ const clientById = (id: number | null): DownloadClientSettings => {
   return client;
 };
 
-/** A song's track in Lidarr's album: its recording, else its title. */
+/** A song's Lidarr track, by recording id, else by title. */
 export const trackOf = (
   tracks: LidarrTrack[],
   song: Pick<SongRequest, 'recordingMbid' | 'title' | 'version'>
@@ -302,10 +291,9 @@ export const trackOf = (
 };
 
 /**
- * Fetches in the order a tick moves them along: what is quick first
- * (setting an album up in Lidarr, starting a chosen release, following a
- * download or an import), then searches, which take a minute or more each
- * and all come due at once after an update. Oldest first within each.
+ * Tick order: quick steps first (Lidarr setup, starting a chosen release,
+ * tracking downloads and imports), then searches, which take a minute or
+ * more and all come due together after an update. Oldest first within each.
  */
 export const quickestFirst = <
   T extends Pick<SongFetch, 'id' | 'status' | 'release' | 'files'>,
@@ -322,18 +310,17 @@ export const quickestFirst = <
 class SongFetcher {
   private ticking = false;
 
-  /** Moving songs along right now, for the job's status. */
+  /** True during a tick, for the job's status. */
   public isRunning(): boolean {
     return this.ticking;
   }
 
-  /** Every minute: starts fetches for new songs and moves each along. */
+  /** Runs each minute: plans new fetches and advances each. */
   public async tick(): Promise<void> {
     if (this.ticking || !musicReady() || songFetchProblem()) return;
     this.ticking = true;
     try {
-      // Songs whose single Lidarr found nothing for join those taken from
-      // albums, before those are planned.
+      // Hand off singles Lidarr found nothing for before planning.
       await singleFallback.run().catch((e) =>
         logger.warn('Could not check singles Lidarr is looking for', {
           label: LABEL,
@@ -361,7 +348,7 @@ class SongFetcher {
     }
   }
 
-  /** The songs waiting to be taken from an album that no fetch has yet. */
+  /** Approved songs to be taken from albums. */
   private async waiting(): Promise<SongRequest[]> {
     return getRepository(SongRequest).find({
       where: {
@@ -374,12 +361,11 @@ class SongFetcher {
     });
   }
 
-  /** One fetch for each album songs are waiting for. */
+  /** Creates one fetch per album with waiting songs. */
   private async plan(): Promise<void> {
     const songs = await this.waiting();
     if (!songs.length) return;
-    // One under way, or done (its songs then wait for the music scans to
-    // see them here), already has them.
+    // Songs in an active or done fetch (awaiting the music scans) are taken.
     const active = await getRepository(SongFetch).find({
       where: { status: In([...ACTIVE, 'done']) },
     });
@@ -395,10 +381,9 @@ class SongFetcher {
       byAlbum.set(key, [...(byAlbum.get(key) ?? []), song]);
     }
     for (const [albumMbid, list] of byAlbum) {
-      // One fetch at a time for an album: a second would download it again,
-      // or take the first's download for a release that failed. One that
-      // hasn't chosen a release yet takes the new songs; one downloading
-      // finishes first.
+      // One fetch per album: a second would re-download it or grab the
+      // first's download for a failed release. Add songs to one that hasn't
+      // chosen a release yet; otherwise wait for it to finish.
       const under = active.find(
         (fetch) => fetch.albumMbid === albumMbid && fetch.status !== 'done'
       );
@@ -467,7 +452,7 @@ class SongFetcher {
     return lidarrApi(server);
   }
 
-  /** The tracks of the release the songs go into. */
+  /** Tracks of the release the songs are imported into. */
   private tracksOf(
     lidarr: LidarrAPI,
     fetch: SongFetch
@@ -478,8 +463,8 @@ class SongFetcher {
   }
 
   /**
-   * The songs it is for that are still asked for, approved: each by its own
-   * status, so one song failing doesn't stop the others in its request.
+   * The fetch's songs still approved, each by its own status, so one failing
+   * doesn't stop the others.
    */
   private async songsOf(fetch: SongFetch): Promise<SongRequest[]> {
     if (!fetch.recordings.length) return [];
@@ -498,7 +483,7 @@ class SongFetcher {
     const songs = await this.songsOf(fetch);
     if (!songs.length) {
       await this.removeDownload(fetch).catch(() => undefined);
-      // The scans can finish its songs before it ends (while Lidarr imports).
+      // Scans can complete its songs before it ends (while Lidarr imports).
       const finished = fetch.recordings.length
         ? await getRepository(SongRequest).count({
             where: {
@@ -534,12 +519,12 @@ class SongFetcher {
         await this.prepare(fetch, songs);
         return;
       case 'searching':
-        // Chosen already, and waiting for a download slot or the indexer.
+        // Release chosen; waiting for a download slot or the indexer.
         if (fetch.release && fetch.files.length) {
           await this.start(fetch);
           return;
         }
-        // Found nothing last time: waits its turn to look again.
+        // Last search found nothing; wait for searchAgainAt.
         if (fetch.searchAgainAt && fetch.searchAgainAt.getTime() > Date.now()) {
           return;
         }
@@ -555,9 +540,8 @@ class SongFetcher {
   }
 
   /**
-   * Lidarr has the artist and the album (unmonitored), and knows which of
-   * its tracks each song is. Songs Lidarr has a file for already are left
-   * to the music scans.
+   * Ensures Lidarr has the artist and the album (unmonitored) and maps each
+   * song to a track. Songs already on file are left to the music scans.
    */
   private async prepare(fetch: SongFetch, songs: SongRequest[]): Promise<void> {
     const lidarr = this.lidarr(fetch);
@@ -585,8 +569,8 @@ class SongFetcher {
         label: LABEL,
         artist: fetch.artistMbid,
       });
-      // Lidarr lists the artist's albums itself, the album perhaps among
-      // them; it is looked for next time rather than added alongside.
+      // Lidarr lists the artist's albums itself, maybe including this one;
+      // look for it next tick instead of adding a duplicate.
       fetch.lidarrArtistId = artist.id;
       fetch.stage = 'Waiting for Lidarr to list the artist’s albums';
       await getRepository(SongFetch).save(fetch);
@@ -599,8 +583,8 @@ class SongFetcher {
       (await lidarr.getAlbums({ artistId: artist.id })).find(
         (a) => a.foreignAlbumId === fetch.albumMbid
       ) ??
-      // Under another of Lidarr's artists: a duet is kept under the one
-      // credited first. Lidarr keeps each album once, so it is used there.
+      // Lidarr keeps each album once, under its first credited artist (e.g.
+      // a duet), so use it there.
       (await lidarr.findAlbum(fetch.albumMbid));
     if (!album) {
       const found = await lidarr.lookupAlbum(fetch.albumMbid);
@@ -618,7 +602,6 @@ class SongFetcher {
     fetch.lidarrAlbumId = album.id;
     await this.keepAlbumRow(fetch, album, songs[0].request);
 
-    // The release the songs are imported into: one with them on it.
     const release = await releaseForSongs(
       lidarr,
       album.id,
@@ -637,9 +620,8 @@ class SongFetcher {
       await getRepository(SongFetch).save(fetch);
       return;
     }
-    // Not on the edition Lidarr has (another can't be imported into while
-    // it has files of this one): taken from the artist's next album with
-    // it, else its single, if there is one.
+    // Not on Lidarr's edition (can't switch editions while it has files):
+    // move to the artist's next album with the song, else its single.
     const unknown = songs.filter((song) => !trackOf(tracks, song));
     if (unknown.length) {
       await this.toNextAlbum(
@@ -648,7 +630,7 @@ class SongFetcher {
         `Lidarr’s ${fetch.albumTitle} has no “${unknown[0].title}”.`
       );
     }
-    // Already on file: the scans will find it here.
+    // Songs already on file are left to the scans.
     const wanted = songs.filter((song) => {
       const track = trackOf(tracks, song);
       return track && !track.hasFile;
@@ -664,9 +646,8 @@ class SongFetcher {
   }
 
   /**
-   * The artist's media row knows which Lidarr has them, as sending an
-   * album there records, so the music scans follow the album the songs go
-   * into. An artist already on another Lidarr keeps it.
+   * Links the artist's media row to this Lidarr, as sending an album would,
+   * so the music scans follow the album. Keeps an existing link.
    */
   private async linkArtist(
     request: MediaRequest,
@@ -685,10 +666,9 @@ class SongFetcher {
   }
 
   /**
-   * Songs taken before the artist was linked to their Lidarr (fixed since)
-   * wait for scans that never looked at their album: linked now, their
-   * requests finish with the next scan. Those already finished are linked
-   * too, for the artist's page to reach Lidarr.
+   * Repairs done fetches whose artist isn't linked to Lidarr: their songs
+   * would wait on scans that never check the album. Finished ones are also
+   * linked so the artist page reaches Lidarr.
    */
   private async linkFinished(): Promise<void> {
     const finished = await getRepository(SongFetch).find({
@@ -717,10 +697,9 @@ class SongFetcher {
   }
 
   /**
-   * An album songs were taken from is only partly here until Lidarr has
-   * every track of it, whatever the server listing it shows: before this
-   * was fixed, such albums were taken as wholly here. Lidarr is asked once
-   * for each album.
+   * Repairs albums songs were taken from that are marked fully available:
+   * they're only partly available until Lidarr has every track, whatever
+   * the server shows. Lidarr is asked once per album.
    */
   private async correctFinished(): Promise<void> {
     const finished = await getRepository(SongFetch).find({
@@ -740,8 +719,7 @@ class SongFetcher {
         },
         where: { mbId: fetch.albumMbid },
       });
-      // Asked once: the counts Lidarr gave are kept, and the music scans
-      // keep the album's status from then on.
+      // Once counts are stored, the music scans own the status.
       if (
         row?.status !== MediaStatus.AVAILABLE ||
         (row.trackCount != null && row.trackFileCount != null)
@@ -765,7 +743,7 @@ class SongFetcher {
         }
         await getRepository(MusicAlbum).update(row.id, changes);
       } catch (e) {
-        // Lidarr not answering: the next run asks again.
+        // The next run retries.
         logger.debug('Could not check an album songs were taken from', {
           label: LABEL,
           album: fetch.albumTitle,
@@ -777,9 +755,8 @@ class SongFetcher {
   }
 
   /**
-   * The album's row on the artist, with Lidarr's id, so the music scans
-   * follow it and the songs can be checked off once their files are in.
-   * Not asked for: it stays unknown until the scans see some of it here.
+   * Stores the album row with Lidarr's id so the scans follow it and can
+   * complete the songs. Not requested, so it stays unknown until scanned.
    */
   private async keepAlbumRow(
     fetch: SongFetch,
@@ -811,14 +788,12 @@ class SongFetcher {
   }
 
   /**
-   * A release of the album with a file for the songs: its name is the
-   * album's, and each song's file is found by its name. The best of a few
-   * opened is downloaded; with none, the songs fail.
+   * Searches for a release named as the album with a file per song. The
+   * best of a few opened is downloaded; with none, the songs fail.
    */
   private async search(fetch: SongFetch, songs: SongRequest[]): Promise<void> {
     const lidarr = this.lidarr(fetch);
     const tracks = await this.tracksOf(lidarr, fetch);
-    // Those Lidarr has no file for yet.
     const wanted = songs
       .map((song) => ({ song, track: trackOf(tracks, song) }))
       .filter(
@@ -830,8 +805,8 @@ class SongFetcher {
       return;
     }
     const prowlarr = new ProwlarrAPI(getSettings().backfill.prowlarr);
-    // Only indexers with music that aren't resting: a search waits on every
-    // indexer it asks. Without an answer, all of them.
+    // Only music indexers that aren't resting, since a search waits on
+    // every indexer it asks. All of them if Prowlarr doesn't answer.
     const indexerIds = await prowlarr.musicIndexerIds().catch((e) => {
       logger.debug('Could not read Prowlarr’s indexers', {
         label: LABEL,
@@ -863,16 +838,15 @@ class SongFetcher {
           await getRepository(SongFetch).save(fetch);
           return;
         }
-        // Prowlarr not answering in time is no answer: the other search
-        // may still find it.
+        // A timeout isn't a miss; the other term may still find it.
         searchError = e;
         continue;
       }
       if (found.size >= MAX_OPEN) break;
     }
 
-    // As Lidarr would choose for the artist: the protocol it prefers, and
-    // none it is told not to use. Without an answer, torrents first.
+    // Follow Lidarr's delay profile for the artist: preferred protocol,
+    // none it disables. Torrents first if unknown.
     const profile = await Promise.all([
       lidarr.getDelayProfiles(),
       fetch.lidarrArtistId
@@ -905,8 +879,8 @@ class SongFetcher {
       prefer
     ).slice(0, MAX_OPEN);
 
-    // Nothing usable while a search failed: it may have been there. Tried
-    // again soon, not counted as a search that found nothing.
+    // A failed search may have missed it: retry soon without counting a
+    // search.
     if (!usable.length && searchError) {
       await this.searchSoon(
         fetch,
@@ -915,23 +889,16 @@ class SongFetcher {
       return;
     }
 
-    let best:
-      | {
-          release: ProwlarrRelease;
-          files: SongFetchFile[];
-          hash: string | null;
-        }
-      | undefined;
-    // A Usenet post whose files are packed or renamed: they are only known
-    // once it is downloaded, when each song is found by its name.
+    let best: ChosenRelease | undefined;
+    // A Usenet post with packed or renamed files: songs are matched by name
+    // only after download.
     let packedRelease: ProwlarrRelease | undefined;
-    // An indexer waiting out its download limit: its releases are passed
-    // over this time, and the others opened.
+    // An indexer at its download limit: skip its releases this time.
     let limited: IndexerLimitReached | undefined;
-    // The releases whose files were read, for the log when none has them.
+    // Releases whose file lists were read, for logging a miss.
     const opened: string[] = [];
     for (const release of usable) {
-      // Torrents nobody seems to share, only when nothing better was found.
+      // Unseeded torrents only when nothing better was found.
       if (releaseTier(release, prefer) === 2 && (best || packedRelease)) break;
       try {
         const { files, infoHash, packed } = await backfill.filesOf(release);
@@ -960,8 +927,7 @@ class SongFetcher {
       }
     }
 
-    // Nothing named for the album has the songs: a Soulseek sharer may,
-    // file by file.
+    // No album release has the songs: try Soulseek file by file.
     let shared: { release: FetchRelease; files: SongFetchFile[] } | undefined;
     let soulseekDown = false;
     if (!best && !packedRelease && !limited) {
@@ -970,9 +936,8 @@ class SongFetcher {
       shared = sharing === 'unreachable' ? undefined : sharing;
     }
 
-    // Nor a sharer: a pack of the artist's own releases may (their
-    // discography, a collection), as smaller artists are mostly shared.
-    // Only the songs' files are taken from it.
+    // No sharer: try an artist pack (discography, collection), how smaller
+    // artists are mostly shared. Only the songs' files are taken.
     if (!best && !shared && !packedRelease && !limited) {
       const catalog = await this.fromCatalog(
         fetch,
@@ -1005,14 +970,12 @@ class SongFetcher {
     }
 
     const needed = wanted.map((w) => w.song);
-    // What a resting indexer has may be it: looked at again soon, not
-    // counted as a search that found nothing.
+    // A resting indexer may have it: retry soon without counting a search.
     if (!best && !shared && limited) {
       await this.searchSoon(fetch, limited.message);
       return;
     }
-    // Nor is slskd being down a search that found nothing: Soulseek may
-    // have the songs once it is back.
+    // slskd being down isn't a miss either: retry once it's back.
     if (!best && !shared && soulseekDown) {
       await this.searchSoon(
         fetch,
@@ -1055,8 +1018,8 @@ class SongFetcher {
       return;
     }
     const files = shared?.files ?? best!.files;
-    // Not in the release chosen for the others: searched for again on their
-    // own, on the usual schedule, once this download is done.
+    // Songs missing from the chosen release are dropped from this fetch
+    // and searched again on their own once it's done.
     const missed = new Set(
       needed
         .filter(
@@ -1091,12 +1054,10 @@ class SongFetcher {
   }
 
   /**
-   * The songs from a Soulseek sharer, when Soulseek is set up: each song
-   * searched for by artist and title (the first few of an album's), and of
-   * the sharers with a file named as one, the best (see soulseekSongs). A
-   * sharer tried already is passed over, and Soulseek altogether after a
-   * few. slskd not answering is no reason to stop: the rest is looked at,
-   * and 'unreachable' told when it couldn't be searched at all.
+   * Finds the songs from a Soulseek sharer, when configured: searches the
+   * first few songs by artist and title and picks the best sharer (see
+   * soulseekSongs). Skips tried sharers, and Soulseek after
+   * MAX_SOULSEEK_TRIES. Returns 'unreachable' when no search succeeded.
    */
   private async fromSoulseek(
     fetch: SongFetch,
@@ -1171,13 +1132,11 @@ class SongFetcher {
   }
 
   /**
-   * Songs from the artist's other releases, found by searching for the
-   * artist's name, as Lidarr's profile allows: first a pack of their own
-   * releases (a discography, a collection); else, with Backfill's second
-   * opinion on, the releases the model names as holding them (the album a
-   * single is on). Each release's files are read and the songs found in it
-   * by name, the album's folder first. Packed Usenet posts are passed over:
-   * the whole release would be downloaded.
+   * Searches the artist's name for other releases the delay profile allows:
+   * first artist packs (discography, collection), then, with the AI fallback
+   * on, the releases it picks. Songs are matched by file name, album folder
+   * first. Packed Usenet posts are skipped, since the whole release would
+   * download.
    */
   private async fromCatalog(
     fetch: SongFetch,
@@ -1245,7 +1204,7 @@ class SongFetcher {
         !packs.includes(release) &&
         !opened.includes(release.title) &&
         release.size <= MAX_RELEASE_BYTES &&
-        // Its files may be named just as the songs (a live album's are).
+        // Other versions' files can be named like the songs (live albums).
         !namesOtherVersion(
           release.title,
           fetch.albumTitle,
@@ -1300,9 +1259,9 @@ class SongFetcher {
   }
 
   /**
-   * The release of these with the most of the songs, each found in it by
-   * name (the album's folder first, never another version's), the best
-   * shared first; a torrent nobody shares only when nothing else has them.
+   * The release with the most songs, matched by name (album folder first,
+   * never another version's), best seeded first; unseeded torrents only
+   * when nothing else has them.
    */
   private async readReleases(
     fetch: SongFetch,
@@ -1342,9 +1301,9 @@ class SongFetcher {
   }
 
   /**
-   * Songs this album can't bring moved to the artist's next album with the
-   * same recording, in the order albums are chosen in (so never back to
-   * one tried), to be taken from it; failed when none is left.
+   * Moves songs this album can't provide to the artist's next album with the
+   * recording, in selection order (never back to a tried one). Fails them
+   * when none is left.
    */
   private async toNextAlbum(
     fetch: SongFetch,
@@ -1360,7 +1319,7 @@ class SongFetcher {
       const albums = version ? albumsFor(version) : [];
       const single = version ? singleFor(version) : null;
       const at = albums.findIndex((album) => album.mbId === fetch.albumMbid);
-      // After the last album with it, its own single; after that, nothing.
+      // After the last album comes its single, then nothing.
       const next =
         single?.mbId === fetch.albumMbid
           ? undefined
@@ -1390,8 +1349,8 @@ class SongFetcher {
   }
 
   /**
-   * Searched again in a few minutes, the search not counted: Prowlarr or an
-   * indexer couldn't answer, which says nothing of whether it's there.
+   * Retries in a few minutes without counting a search: an unanswered
+   * Prowlarr or indexer says nothing about availability.
    */
   private async searchSoon(
     fetch: SongFetch,
@@ -1403,10 +1362,9 @@ class SongFetcher {
     await getRepository(SongFetch).save(fetch);
   }
 
-  /** Adds the release to Backfill's download client. */
+  /** Starts the download via Backfill's client or slskd once a slot is free. */
   private async start(fetch: SongFetch): Promise<void> {
     const release = fetch.release!;
-    // Soulseek's files come through slskd, not a download client.
     const client =
       release.protocol === 'soulseek' ? undefined : clientFor(release.protocol);
     if (release.protocol !== 'soulseek' && !client) {
@@ -1476,9 +1434,8 @@ class SongFetcher {
       fetch.stage = CHOOSING;
     } else {
       if (fetched.kind !== 'nzb') throw new ReleaseProblem('Expected an NZB.');
-      // Only the songs' files, when the post names them: the rest of the
-      // album isn't downloaded, nor left behind (the client never deletes
-      // what it finished).
+      // Only the songs' files when the post names them, so the rest isn't
+      // downloaded or left behind (the client never deletes finished files).
       const chosen = new Set(fetch.files.map((file) => file.index));
       const only = fetch.files.every((file) => file.path)
         ? nzbWith(fetched.data, (file) => chosen.has(file.index))
@@ -1499,9 +1456,8 @@ class SongFetcher {
   }
 
   /**
-   * Asks the sharer for the songs' files, through slskd, into a folder of
-   * their own under slskd's downloads. A sharer offline, or turning them
-   * down, is the release's fault: the next is tried.
+   * Requests the songs' files from the sharer via slskd into their own
+   * folder. An offline or refusing sharer is a ReleaseProblem.
    */
   private async startSoulseek(fetch: SongFetch): Promise<void> {
     const release = fetch.release!;
@@ -1530,7 +1486,7 @@ class SongFetcher {
     await getRepository(SongFetch).save(fetch);
   }
 
-  /** Skips every file of the torrent but the songs', then starts it. */
+  /** Deselects every torrent file but the songs', then starts it. */
   private async pickFiles(fetch: SongFetch): Promise<boolean> {
     const torrents = torrentClientFor(clientById(fetch.clientId));
     const files = await torrents.getFiles(fetch.downloadId!);
@@ -1562,7 +1518,7 @@ class SongFetcher {
     return true;
   }
 
-  /** Follows the download; once the songs' files are in, imports them. */
+  /** Tracks the download and imports the songs' files once complete. */
   private async follow(fetch: SongFetch, songs: SongRequest[]): Promise<void> {
     if (!fetch.downloadId) {
       await this.start(fetch);
@@ -1619,7 +1575,7 @@ class SongFetcher {
         });
         return;
       }
-      // Lidarr copies what it is given: never a file named out of the
+      // Lidarr copies whatever path it's given: reject files escaping the
       // torrent's folder.
       if (chosen.some((f) => f.name.split(/[\\/]/).includes('..'))) {
         throw new ReleaseProblem(
@@ -1646,9 +1602,8 @@ class SongFetcher {
         const size = fetch.release?.size || 1;
         const left = size * (1 - Math.min(100, job.percentage) / 100);
         this.sizes.set(fetch.id, { size, left });
-        // Waiting its turn in the client's queue is no stall; paused (by
-        // its duplicate check, or for lack of space) is, and gives up its
-        // slot, then its release, as a stalled torrent does.
+        // Queued in the client isn't a stall; paused (duplicate check, no
+        // space) is, and frees its slot then its release like a torrent.
         await this.stalled(fetch, {
           have: size - left,
           left,
@@ -1667,9 +1622,8 @@ class SongFetcher {
         await getRepository(SongFetch).save(fetch);
         return;
       }
-      // Lidarr reads the finished folder; each song's file by the name it
-      // had in the NZB, or, when the post was packed, renamed or its names
-      // scrambled, by the song's own name.
+      // Lidarr reads the finished folder. Match each file by its NZB name,
+      // or by song name when packed, renamed or obfuscated.
       const seen = await lidarr.getManualImport(
         lidarrPath(job.storage),
         fetch.lidarrArtistId!
@@ -1677,7 +1631,7 @@ class SongFetcher {
       const unpacked = seen.map((item, index) => ({
         index,
         path: item.path,
-        // Lidarr not saying is no reason to pass a file over.
+        // Unknown size mustn't exclude a file.
         size: item.size ?? Number.MAX_SAFE_INTEGER,
       }));
       const baseName = (path: string) =>
@@ -1705,9 +1659,9 @@ class SongFetcher {
   }
 
   /**
-   * Follows a Soulseek download. Waiting in the sharer's queue is no stall,
-   * up to a couple of hours; then, or once a file fails, the next sharer is
-   * tried. Once every file is in, Lidarr reads the folder and imports them.
+   * Tracks a Soulseek download. Queueing at the sharer isn't a stall for up
+   * to two hours; after that, or on a failed file, the next sharer is tried.
+   * Once complete, Lidarr imports the folder.
    */
   private async followSoulseek(
     fetch: SongFetch,
@@ -1773,8 +1727,8 @@ class SongFetcher {
       });
       return;
     }
-    // In: Lidarr reads the folder, each song's file by its name, else by
-    // the song's own name (slskd may have made the name safe for disk).
+    // Complete: Lidarr reads the folder. Match by file name, else by song
+    // name (slskd may have sanitised the name).
     const lidarr = this.lidarr(fetch);
     const root = soulseek.downloadsPath.replace(/[\\/]+$/, '');
     const sep = root.includes('\\') && !root.includes('/') ? '\\' : '/';
@@ -1809,8 +1763,8 @@ class SongFetcher {
   }
 
   /**
-   * Each song's file as slskd has it: its transfer in the latest of the
-   * fetch's batches to hold it (each restart of slskd's adds one).
+   * Each file's transfer from the latest batch holding it (each slskd
+   * restart adds a batch).
    */
   private async soulseekTransfers(
     slskd: SlskdAPI,
@@ -1827,10 +1781,9 @@ class SongFetcher {
   }
 
   /**
-   * slskd restarted mid-download: what it hadn't finished is asked of the
-   * same sharer again, into the same folder. slskd asks for those files
-   * again itself once it is back, but into its usual downloads folder,
-   * where Lidarr isn't looking: those are stopped first.
+   * After an slskd restart, re-requests unfinished files from the same
+   * sharer into the same folder. slskd's own retries go to its default
+   * folder, where Lidarr won't look, so those are removed first.
    */
   private async resumeSoulseek(
     slskd: SlskdAPI,
@@ -1867,7 +1820,7 @@ class SongFetcher {
     }
     fetch.downloadId = [...batches, batch].join(',');
     fetch.stage = 'Asked for on Soulseek again: slskd restarted';
-    // Its place in the sharer's queue starts afresh.
+    // Queue time restarts with the new request.
     fetch.startedAt = new Date();
     await getRepository(SongFetch).save(fetch);
     logger.info('slskd restarted; asked the sharer again', {
@@ -1878,8 +1831,8 @@ class SongFetcher {
   }
 
   /**
-   * A torrent that stalls, can't finish or crawls, by Backfill's limits, is
-   * given up, and the next release tried.
+   * Abandons a download that stalls, can't finish or crawls by Backfill's
+   * limits, so the next release is tried.
    */
   private async stalled(
     fetch: SongFetch,
@@ -1896,12 +1849,12 @@ class SongFetcher {
 
   private watch = new TorrentWatch();
 
-  /** Each download's size and what is left of it, as last read. */
+  /** Last-read size and bytes left per download. */
   private sizes = new Map<number, { size: number; left: number }>();
 
   /**
-   * What is downloading or importing, for the downloading pills on the
-   * album, its songs and their requests, as Lidarr's own downloads have.
+   * Publishes active downloads and imports to the download tracker, for the
+   * same progress pills Lidarr's downloads get.
    */
   private showDownloads(fetches: SongFetch[]): void {
     const shown = fetches.filter(
@@ -1942,7 +1895,7 @@ class SongFetcher {
     );
   }
 
-  /** Hands the songs' files to Lidarr's manual import, track by track. */
+  /** Sends the songs' files to Lidarr's manual import, one per track. */
   private async importFiles(
     fetch: SongFetch,
     songs: SongRequest[],
@@ -1958,14 +1911,13 @@ class SongFetcher {
     const ready = fetch.files.filter(
       (file) => paths.has(file.index) && isAudio(paths.get(file.index)!)
     );
-    // A download with none of the songs in it is the release's fault: the
-    // next release is tried.
+    // No songs in the download: blame the release and try the next.
     if (!ready.length) {
       throw new ReleaseProblem(
         'None of the songs were in the finished download.'
       );
     }
-    // Of those it was downloading.
+    // Songs this download was meant to bring but didn't.
     const lost = songs.filter(
       (song) =>
         fetch.files.some((file) => file.recordingMbid === song.recordingMbid) &&
@@ -1978,7 +1930,7 @@ class SongFetcher {
         fetch
       );
     }
-    // Each file's quality as Lidarr reads it, for its own folder.
+    // Each file's quality as Lidarr reads it, per folder.
     const qualities = new Map<string, LidarrQualityModel>();
     for (const folder of new Set(
       ready.map((file) => paths.get(file.index)!.replace(/[\\/][^\\/]*$/, ''))
@@ -1989,15 +1941,15 @@ class SongFetcher {
         if (item.quality) qualities.set(item.path, item.quality);
       }
     }
-    // A torrent's files stay for it to seed; a Usenet download's song is
-    // moved out, leaving nothing behind.
+    // Copy torrent files so they keep seeding; move Usenet files so nothing
+    // is left behind.
     fetch.commandId = await lidarr.manualImport(
       fetch.release?.protocol === 'torrent' ? 'copy' : 'move',
       ready.map((file) => {
         const path = paths.get(file.index)!;
         return {
           path,
-          // The album's own artist, who may be another than the song's.
+          // The album's artist, which may differ from the song's.
           artistId: album.artistId || fetch.lidarrArtistId!,
           albumId: fetch.lidarrAlbumId!,
           albumReleaseId: release.id,
@@ -2017,16 +1969,15 @@ class SongFetcher {
     await getRepository(SongFetch).save(fetch);
   }
 
-  /** Once Lidarr's import is over: what landed, and the download removed. */
+  /** After Lidarr's import: checks what landed and removes the download. */
   private async followImport(
     fetch: SongFetch,
     songs: SongRequest[]
   ): Promise<void> {
     const lidarr = this.lidarr(fetch);
     if (fetch.commandId) {
-      // Lidarr not answering says nothing of the import: asked again next
-      // time, as one still running is, until it's given up on. A command
-      // Lidarr no longer knows (it restarted) is over.
+      // No answer says nothing about the import: retry like a running one
+      // until IMPORT_GIVE_UP_MS. A 404 (Lidarr restarted) means it's over.
       const command = await lidarr
         .getCommand(fetch.commandId)
         .catch((e: Error) =>
@@ -2060,8 +2011,8 @@ class SongFetcher {
         fetch
       );
     }
-    // Only the songs were wanted, and Lidarr copies them: the download goes,
-    // whatever landed.
+    // Only the songs were wanted and Lidarr has its copies, so remove the
+    // download whatever landed.
     await this.removeDownload(fetch).catch((e) =>
       logger.warn('Could not remove a finished song download', {
         label: LABEL,
@@ -2084,8 +2035,8 @@ class SongFetcher {
   }
 
   /**
-   * Marks songs failed, and each request they are in, with why. Taken off
-   * the fetch too (saved when it next is), so a retry fetches them again.
+   * Fails the songs and their requests with a reason, and drops them from
+   * the fetch (saved on its next save) so a retry fetches them again.
    */
   private async failSongs(
     songs: SongRequest[],
@@ -2113,10 +2064,10 @@ class SongFetcher {
     }
   }
 
-  /** Something went wrong: the release's fault, or to be tried again. */
+  /** Handles errors: ReleaseProblem tries the next release; others retry. */
   private async stumbled(fetch: SongFetch, e: unknown): Promise<void> {
     if (e instanceof ReleaseProblem) {
-      // The next release's progress starts afresh.
+      // Reset progress tracking for the next release.
       this.watch.forget(fetch.id);
       this.troubleSince.delete(fetch.id);
       await this.removeDownload(fetch).catch(() => undefined);
@@ -2132,7 +2083,7 @@ class SongFetcher {
         fetchId: fetch.id,
         errorMessage: message(e),
       });
-      // Soulseek's sharers are counted apart (fromSoulseek).
+      // Soulseek sharers are counted separately (fromSoulseek).
       if (
         fetch.tried.filter(
           (key) => !key.startsWith('hash:') && !key.startsWith(sharerKey(''))
@@ -2165,7 +2116,7 @@ class SongFetcher {
       fetchId: fetch.id,
       errorMessage: message(e),
     });
-    // Given up after a day of nothing but errors, counted from the first.
+    // Give up after STUMBLE_GIVE_UP_MS of errors since the first.
     const since = this.troubleSince.get(fetch.id) ?? Date.now();
     this.troubleSince.set(fetch.id, since);
     if (Date.now() - since > STUMBLE_GIVE_UP_MS) {
@@ -2175,22 +2126,21 @@ class SongFetcher {
       await this.end(fetch, 'failed', message(e));
       return;
     }
-    // A torrent still to have its files picked keeps that stage, which
-    // picks them on the next try.
+    // Keep CHOOSING so the next try still selects the torrent's files.
     if (fetch.stage !== CHOOSING) {
       fetch.stage = `Trying again: ${message(e)}`.slice(0, 250);
     }
     await getRepository(SongFetch).save(fetch);
   }
 
-  /** When each fetch began failing for reasons other than its release. */
+  /** When each fetch started hitting non-release errors. */
   private troubleSince = new Map<number, number>();
 
   private async removeDownload(fetch: SongFetch): Promise<void> {
     if (fetch.release?.protocol === 'soulseek') {
       const soulseek = soulseekOf(getSettings().music);
       if (!fetch.downloadId || !soulseek) return;
-      // What Lidarr didn't move goes with the folder.
+      // Removing the folder deletes whatever Lidarr didn't move.
       const slskd = new SlskdAPI(soulseek);
       for (const id of soulseekBatches(fetch)) {
         const batch = await slskd.getBatch(id);
@@ -2230,7 +2180,7 @@ class SongFetcher {
 const songFetcher = new SongFetcher();
 export default songFetcher;
 
-/** Where each song taken from an album stands, for its request's card. */
+/** Fetch stage per album:recording, for request cards. */
 export const songFetchStages = async (
   songs: Pick<SongRequest, 'recordingMbid' | 'sourceAlbumMbid'>[]
 ): Promise<Map<string, string>> => {

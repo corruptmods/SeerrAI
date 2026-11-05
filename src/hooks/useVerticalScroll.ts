@@ -3,20 +3,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 const IS_SCROLLING_CHECK_THROTTLE = 200;
 
-/**
- * How far ahead of the bottom the next page is asked for, in screen
- * heights: far enough that a fast scroll does not reach the end before that
- * page, and its posters, have arrived.
- */
+/** Screen heights before the bottom to request the next page, so fast scrolls don't outrun it. */
 const BUFFER_SCREENS = 2;
 
-/** How often the position is checked while scrolling. */
+/** Scroll position check interval. */
 const CHECK_EVERY_MS = 100;
 
 /**
- * useVerticalScroll is a custom hook to handle infinite scrolling
+ * Infinite scroll.
  *
- * @param callback Callback is executed when page reaches bottom
+ * @param callback Called near the bottom of the page
  * @param shouldFetch Disables callback if true
  */
 const useVerticalScroll = (
@@ -28,7 +24,7 @@ const useVerticalScroll = (
     undefined
   );
 
-  // The latest callback and state, for a check that outlives renders.
+  // Latest callback and state, for a check that outlives renders.
   const latest = useRef({ callback, shouldFetch });
   latest.current = { callback, shouldFetch };
 
@@ -50,13 +46,11 @@ const useVerticalScroll = (
         latest.current.callback();
       }
     };
-    // Checked while scrolling, not only once it stops: a debounce here meant
-    // a steady scroll never asked for the next page until it paused.
+    // Throttled, not debounced, so a steady scroll still triggers the next page.
     return throttle(runCallback, CHECK_EVERY_MS);
   }, []);
 
-  // After every render: a page that has just loaded may still be short of
-  // the screen.
+  // After every render: a freshly loaded page may not fill the screen.
   useEffect(() => {
     check();
   });

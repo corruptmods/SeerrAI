@@ -12,8 +12,7 @@ describe('the kind of search in the address', () => {
   });
 
   it('is everything when music is asked for by someone without it', () => {
-    // Off for everyone, off for themselves, or no Lidarr yet: a shared
-    // link to music search shows them films and series instead.
+    // Music unavailable to them: a shared music search link falls back to all.
     assert.equal(searchType('music', false), 'all');
   });
 
@@ -30,7 +29,7 @@ describe('music in All', () => {
   });
 
   it('is never there for someone with music off, whatever an admin chose', () => {
-    // Off for everyone, or off for themselves: theirs wins.
+    // Music off globally or for the user overrides the admin's choice.
     assert.equal(musicInAll(false, { inAll: true }), false);
   });
 
@@ -49,7 +48,7 @@ describe('music below the films and series', () => {
   it('is only for All', () => {
     assert.equal(musicBelowTitles('movie', true, true), false);
     assert.equal(musicBelowTitles('tv', true, true), false);
-    // Music shows music on its own, not as rows below anything.
+    // The music tab shows music alone, not below titles.
     assert.equal(musicBelowTitles('music', true, true), false);
   });
 

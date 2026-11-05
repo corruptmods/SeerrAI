@@ -7,10 +7,9 @@ import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
 /*
- * Collections the library has part of: films in a series where some are
- * here and some released ones are not. Found by asking TMDB which collection
- * each film in the library belongs to — lookups Seerr already caches — and
- * rebuilt once a day in the background, since that is a lookup per film.
+ * Collections the library has part of: some films here, some released ones
+ * not. Found by looking up each library film's TMDB collection (cached
+ * lookups), rebuilt daily in the background since it is one lookup per film.
  */
 
 export interface CollectionGap {
@@ -20,12 +19,12 @@ export interface CollectionGap {
   total: number;
   inLibrary: number;
   requested: number;
-  /** Released, and neither here nor on the way. */
+  /** Released, and neither here nor requested. */
   missing: number;
 }
 
 const REBUILD_MS = 24 * 60 * 60 * 1000;
-/** TMDB lookups at once: well inside its rate limit. */
+/** Concurrent TMDB lookups; well inside its rate limit. */
 const CONCURRENCY = 4;
 
 let built: { at: number; gaps: CollectionGap[] } | undefined;
@@ -51,7 +50,7 @@ const build = async (): Promise<void> => {
         );
       }
     } catch {
-      // One film TMDB cannot answer for is not a reason to stop.
+      // Skip a film TMDB can't answer for.
     }
   });
 
@@ -63,7 +62,7 @@ const build = async (): Promise<void> => {
     async (collectionId) => {
       try {
         const collection = await tmdb.getCollection({ collectionId });
-        // Only films already out: one not yet released is not missing.
+        // An unreleased film isn't missing.
         const released = collection.parts.filter((part) => {
           const at = part.release_date
             ? new Date(part.release_date).getTime()
@@ -101,12 +100,12 @@ const build = async (): Promise<void> => {
           });
         }
       } catch {
-        // As above: skip what TMDB cannot answer.
+        // Skip what TMDB can't answer.
       }
     }
   );
 
-  // Nearest to complete first: those are the ones a request finishes.
+  // Nearest to complete first: a request finishes those.
   gaps.sort(
     (a, b) =>
       a.missing - b.missing ||
@@ -123,8 +122,8 @@ const build = async (): Promise<void> => {
 };
 
 /**
- * The collections with gaps, or undefined while the first list is still being
- * built. A list older than a day is served as it is while a new one builds.
+ * Collections with gaps, or undefined while the first list builds. A list
+ * older than a day is served while a new one builds.
  */
 export const getCollectionGaps = (): CollectionGap[] | undefined => {
   const stale = !built || Date.now() - built.at > REBUILD_MS;

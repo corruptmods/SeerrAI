@@ -4,10 +4,9 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 /**
  * A Plex account whose Seerr user an admin deleted.
  *
- * The automatic Plex user import would otherwise create it again on its next
- * run, undoing the deletion. Kept apart from User because the user row is
- * gone. It only matters while no user has this Plex account: importing it by
- * hand, or its owner signing in, brings the account back as before.
+ * Otherwise the automatic Plex user import would recreate it on its next run.
+ * Separate from User because the user row is gone. Only matters while no user
+ * has this Plex account: a manual import, or its owner signing in, restores it.
  */
 @Entity()
 export class RemovedPlexAccount {

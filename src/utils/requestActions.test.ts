@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { oneAfterAnother, requestActionError } from './requestActions';
 
-/** An error as axios gives it for an answer from the server. */
+/** An axios error for a server response. */
 const answered = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
     status,

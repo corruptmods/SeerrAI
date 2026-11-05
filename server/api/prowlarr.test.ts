@@ -7,10 +7,9 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 
 /*
- * Fetching a search result through Prowlarr, against a stand-in Prowlarr.
- * Most torrent indexers give no download link, only Prowlarr's own link
- * for the magnet (which redirects to it): the shapes here are what the
- * live Prowlarr answered for EZTV, Knaben and ExtraTorrent results.
+ * Fetching results through a stand-in Prowlarr. Most torrent indexers give
+ * only Prowlarr's redirecting magnet link; shapes are from a live Prowlarr's
+ * EZTV, Knaben and ExtraTorrent results.
  */
 
 const MAGNET = 'magnet:?xt=urn:btih:7ea162cd6756dd883e69ce57085648ecd035dae3';
@@ -31,9 +30,9 @@ const INDEXERS = [
   { id: 6, enable: true, capabilities: { categories: [music] } },
 ];
 const STATUSES = [
-  // Resting until tomorrow.
+  // Disabled until tomorrow.
   { indexerId: 5, disabledTill: '2026-11-03T12:00:00Z' },
-  // Rested, and answering again.
+  // Disable expired; answering again.
   { indexerId: 6, disabledTill: '2026-11-01T12:00:00Z' },
 ];
 
@@ -134,7 +133,7 @@ describe('Fetching a result through Prowlarr', () => {
   });
 
   it('never sends the key back to Prowlarr from an indexer’s redirect', async () => {
-    // An indexer, at another address, that sends the fetch on to Prowlarr.
+    // An indexer at another address that redirects back to Prowlarr.
     const indexer = createServer((_req, res) => {
       res.writeHead(302, { Location: `${base}/2/download?from=indexer` }).end();
     });

@@ -60,12 +60,12 @@ interface StatusBadgeProps {
   downloadItem?: DownloadingItem[];
   is4k?: boolean;
   inProgress?: boolean;
-  /** Where the viewer can play this version of the title (usePlayLinks). */
+  /** Where the viewer can play this version (usePlayLinks). */
   playLink?: PlayTarget;
   serviceUrl?: string;
   tmdbId?: number;
   mediaType?: 'movie' | 'tv' | 'music';
-  /** Music: the artist's MusicBrainz id, whose page manages it. */
+  /** Music: the artist's MusicBrainz id; its page manages the album. */
   artistId?: string;
   title?: string | string[];
   statusLabelOverride?: string;
@@ -87,20 +87,18 @@ const StatusBadge = ({
   const intl = useIntl();
   const { user, hasPermission } = useUser();
   const settings = useSettings();
-  // On a touchscreen there is no hover to show a download's details, so a
-  // pill that is downloading opens them when tapped, rather than following
-  // its link (to Plex, or the manage panel); the link is then inside.
+  // No hover on touch: tapping a downloading pill opens its details (which
+  // hold the link) instead of following the link.
   const isTouch = useIsTouch();
 
   let mediaLink: string | undefined;
   let mediaLinkDescription: string | undefined;
 
-  // The server a finished download is being added to, as far as the viewer
-  // is concerned: the one they would play it on.
+  // The server a finished download goes to, from the viewer's view: the one they play on.
   const watchServer = viewerServer(user, settings.currentSettings.mediaServers);
   const mediaServerName = watchServer ? SERVER_NAMES[watchServer] : '';
 
-  // What is actually happening to its downloads, all of them together.
+  // All of its downloads combined.
   const download = summarizeDownloads(downloadItem);
   const downloadBusy = !download || isDownloadBusy(download);
   const downloadLabel = (() => {
@@ -115,8 +113,7 @@ const StatusBadge = ({
       : intl.formatMessage(messages[label], { mediaServerName });
   })();
 
-  // Which episodes are downloading: a season pack names its season, not
-  // whichever of its episodes is listed first.
+  // A season pack names its season, not its first listed episode.
   const span = mediaType === 'tv' ? episodeSpan(downloadItem) : undefined;
   const episodeLabel = !span
     ? undefined
@@ -195,9 +192,8 @@ const StatusBadge = ({
     }
   }
 
-  // A pill showing downloads opens where they are listed (the title's page,
-  // with its downloads for those who manage requests), not where it plays:
-  // that link is in its details.
+  // A downloading pill links to the download list (the title page, or its
+  // downloads for managers), not the play link, which is in its details.
   const downloadsLink =
     mediaType === 'music'
       ? artistId && hasPermission(Permission.MANAGE_REQUESTS)
@@ -221,8 +217,7 @@ const StatusBadge = ({
       />
     ) : (
       <ul>
-        {/* A series lists each release once: a pack is one download, not one
-            per episode it brings. */}
+        {/* One row per release: a pack is one download, not one per episode. */}
         {(mediaType === 'tv'
           ? releasesOf(downloadItem)
           : downloadItem.map((item) => ({ item, episodes: 1 }))
@@ -257,7 +252,7 @@ const StatusBadge = ({
     />
   );
 
-  /** Where the details' link goes, as a row at their foot. */
+  /** The details' footer link. */
   const detailsLink =
     mediaLink && mediaLinkDescription ? (
       <div className="border-t border-gray-700 py-2 text-right">
@@ -281,11 +276,7 @@ const StatusBadge = ({
       </div>
     ) : null;
 
-  /**
-   * A pill that shows a download's progress while there is one: its
-   * details on hover (or on a tap, on a touchscreen), and otherwise the
-   * status it stands for.
-   */
+  /** A pill with download progress and hover (or tap) details; else the plain status. */
   const progressBadge = (
     badgeType: 'success' | 'primary' | 'danger',
     idleLabel: string
@@ -301,10 +292,8 @@ const StatusBadge = ({
               ? (downloadsLink ?? mediaLink)
               : mediaLink
         }
-        // Never wider than where it is shown: its words are cut short, and
-        // the spinner stays. On the grey it has while in progress, its words
-        // are the page's own colour: a pill's are meant for its fill, and an
-        // accent's (dark on orange, say) can't be read on grey.
+        // Truncates text but keeps the spinner. On the in-progress grey, text
+        // uses the page colour: a fill's ink (e.g. dark on orange) won't read on grey.
         className={`${
           inProgress &&
           'relative !bg-gray-700/80 !px-0 !text-strong hover:!bg-gray-700'

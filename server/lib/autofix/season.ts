@@ -18,24 +18,21 @@ import { blockedGroupOf } from '@server/lib/blockedGroups';
 import logger from '@server/logger';
 
 /*
- * Replacing every file of a season, for when someone says the whole season
- * is bad. Its files and the releases they came from are noted first; then
- * Sonarr's search for the season is read for a release that is none of
- * those, a season pack Sonarr would take first, otherwise one release per
- * episode. Only once a replacement is grabbed are the old releases marked
- * failed (so Sonarr never takes them again) and the old files removed, so
- * the new ones import: Sonarr refuses a file of the same quality over one
- * already there. Nothing is removed when nothing could be grabbed.
+ * Whole-season replacement. Notes the files and their source releases, then
+ * picks a different release from Sonarr's season search: a pack first, else
+ * one per episode. Only after a grab are the old releases marked failed (so
+ * Sonarr never retakes them) and the old files removed, since Sonarr won't
+ * import same quality over an existing file. Nothing is removed if nothing
+ * was grabbed.
  *
- * Auto-fix uses this for an admin at once, and for anyone else once an
- * admin approves it through the admin agent; the agent's replace_season
- * tool proposes it the same way.
+ * Runs immediately for admins, else after admin approval via the admin
+ * agent; the agent's replace_season tool proposes it the same way.
  */
 
 const LABEL = 'Auto-fix';
-/** The most episodes searched for one by one when there is no pack. */
+/** Max episodes searched individually when there's no pack. */
 const MAX_EPISODE_SEARCHES = 30;
-/** Searches for single episodes running at once. */
+/** Concurrent single-episode searches. */
 const SEARCHES_AT_ONCE = 3;
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,44 +41,43 @@ const episodeName = (ep: Pick<ArrEpisode, 'seasonNumber' | 'episodeNumber'>) =>
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
-/** A release a season's files came from, as Sonarr's history has it. */
+/** A source release of the season's files, from Sonarr history. */
 interface OldRelease {
   title: string;
-  /** Its grab, to mark failed; none for a file imported by hand. */
+  /** Its grab, to mark failed; none for a manual import. */
   historyId?: number;
   guid?: string;
 }
 
-/** What replacing one season would do, worked out before anything changes. */
+/** A season replacement plan, computed before any change. */
 export interface SeasonPlan {
   seriesId: number;
   seasonNumber: number;
-  /** The series' name, as Sonarr has it. */
+  /** Series name in Sonarr. */
   name: string;
-  /** The season's episodes that have a file. */
+  /** Episodes with a file. */
   episodes: ArrEpisode[];
-  /** The releases the files came from: never taken again. */
+  /** Source releases of the files; never retaken. */
   old: OldRelease[];
-  /** A season pack to take for all of it. */
+  /** Season pack covering all of it. */
   pack?: ArrRelease;
   /** Otherwise, one release per episode. */
   singles: { episode: ArrEpisode; release: ArrRelease }[];
-  /** Episodes nothing else was found for: their files stay. */
+  /** Episodes with no alternative; their files stay. */
   left: ArrEpisode[];
 }
 
-/** What came of replacing a season. */
+/** Outcome of a season replacement. */
 export interface SeasonOutcome {
   ok: boolean;
   message: string;
-  /** The episodes a new release is coming for, their old files gone. */
+  /** Episodes with a new release coming and old files removed. */
   episodeIds: number[];
 }
 
 /**
- * Notes a season's files and where each came from: the release it was
- * imported from, and that release's grab, which is what marking it failed
- * blocklists.
+ * Records each file's source release and its grab (marking the grab failed
+ * blocklists it).
  */
 const oldReleases = (
   episodes: ArrEpisode[],
@@ -127,7 +123,7 @@ const oldReleases = (
   return [...found.values()];
 };
 
-/** Whether a release is one of the old ones, by name or by its guid. */
+/** Whether a release is one of the old ones, by name or guid. */
 const isOld = (release: ArrRelease, old: OldRelease[]) =>
   old.some(
     (o) =>
@@ -135,9 +131,8 @@ const isOld = (release: ArrRelease, old: OldRelease[]) =>
   );
 
 /**
- * The rules every replacement keeps to, beyond Sonarr's own: not a release
- * the files came from, not from a blocked group, and in English or the
- * series' own language.
+ * Beyond Sonarr's rules: not an old release, not a blocked group, English or
+ * the original language.
  */
 const allowed = (release: ArrRelease, old: OldRelease[], original?: string) =>
   !isOld(release, old) &&
@@ -147,7 +142,7 @@ const allowed = (release: ArrRelease, old: OldRelease[], original?: string) =>
 const groupName = (r: ArrRelease) =>
   (r.releaseGroup ?? groupOf(r.title)).toLowerCase();
 
-/** Best first: another group than the old files', then as Sonarr ranks. */
+/** Best first: a different group from the old files', then Sonarr's ranking. */
 const best = (releases: ArrRelease[], oldGroups: Set<string>) =>
   [...releases].sort(
     (a, b) =>
@@ -158,7 +153,7 @@ const best = (releases: ArrRelease[], oldGroups: Set<string>) =>
       (b.seeders ?? 0) - (a.seeders ?? 0)
   )[0];
 
-/** Runs `work` on each item, a few at a time. */
+/** Runs `work` on each item with limited concurrency. */
 const fewAtOnce = async <T, R>(
   items: T[],
   work: (item: T) => Promise<R>
@@ -180,9 +175,8 @@ const fewAtOnce = async <T, R>(
 };
 
 /**
- * Works out how a season would be replaced, changing nothing. `prefer` is
- * the season pack chosen earlier (when an admin approves what was
- * proposed): taken again if Sonarr still offers it and it is still allowed.
+ * Plans a season replacement without changing anything. `prefer` is a pack
+ * chosen earlier (on approval), reused if still offered and allowed.
  */
 export const planSeason = async (
   api: FixSonarr,
@@ -230,8 +224,8 @@ export const planSeason = async (
     (r) => acceptedBut(r) && allowed(r, old, original)
   );
 
-  // A season pack for this season alone, holding every episode with a file
-  // when Sonarr says which it holds.
+  // A pack for this season only, covering every episode with a file when
+  // Sonarr reports its contents.
   const packs = found.filter((r) => {
     if (!r.fullSeason) return false;
     const seasons = r.seasonNumbers ?? [];
@@ -253,8 +247,8 @@ export const planSeason = async (
   const base = { seriesId, seasonNumber, name, episodes, old };
   if (chosen) return { ...base, pack: chosen, singles: [], left: [] };
 
-  // No pack: one release per episode, from the season's search first, then
-  // each episode's own search.
+  // No pack: one release per episode, from the season search, then per-episode
+  // searches.
   const singles: SeasonPlan['singles'] = [];
   const left: ArrEpisode[] = [];
   const searchable: ArrEpisode[] = [];
@@ -300,8 +294,8 @@ export const planSeason = async (
 };
 
 /**
- * The one line an admin is asked to approve: "Replace season 6 of Slow
- * Horses: download <release> and then remove the 5 current files".
+ * One-line approval prompt: "Replace season 6 of Harbour Lights: download
+ * <release> and then remove the 5 current files".
  */
 export const planHeadline = (plan: SeasonPlan): string => {
   const replaced = plan.pack
@@ -318,7 +312,7 @@ export const planHeadline = (plan: SeasonPlan): string => {
   }`;
 };
 
-/** What happens, line by line, for an admin deciding on it. */
+/** Step-by-step details for the approving admin. */
 export const planDetails = (plan: SeasonPlan): string[] => {
   const app = 'Sonarr';
   const lines = plan.pack
@@ -356,9 +350,9 @@ export const planDetails = (plan: SeasonPlan): string[] => {
 };
 
 /**
- * Carries a plan out: grabs first, and only for what was grabbed marks the
- * old releases failed and removes the old files. Episodes left unmonitored
- * are monitored again, so Sonarr keeps wanting them.
+ * Executes a plan: grabs first, then for what was grabbed marks old releases
+ * failed and removes old files. Re-monitors unmonitored episodes so Sonarr
+ * keeps wanting them.
  */
 export const carryOutSeason = async (
   api: FixSonarr,
@@ -404,7 +398,7 @@ export const carryOutSeason = async (
     }
   }
 
-  // A file holding several episodes goes only when all of them are coming.
+  // Remove a multi-episode file only if all its episodes are coming.
   const coming = new Set(replaced.map((ep) => ep.id));
   const removable = [
     ...new Set(

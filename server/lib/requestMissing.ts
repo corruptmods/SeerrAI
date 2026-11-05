@@ -22,18 +22,18 @@ export type RequestMissingOutcome =
   | 'requested'
   /** Already in the library, or on its way. */
   | 'here'
-  /** Someone has already asked for it. */
+  /** Someone already requested it. */
   | 'asked'
-  /** Could not be requested: see the message. */
+  /** Couldn't be requested: see the message. */
   | 'failed';
 
 export interface RequestMissingResult {
   outcome: RequestMissingOutcome;
-  /** Why it could not be requested, in words for the person. */
+  /** Why it couldn't be requested, in user-facing words. */
   message?: string;
 }
 
-/** Why a request was refused, said plainly. */
+/** A refusal reason in plain words. */
 const refusal = (e: unknown): string => {
   if (e instanceof QuotaRestrictedError) {
     return 'Your request limit has been reached.';
@@ -54,11 +54,11 @@ const refusal = (e: unknown): string => {
 };
 
 /**
- * Requests a title if nothing has it yet: a series with every season.
+ * Requests a title (a series with every season) if nothing has it yet.
  *
- * Goes through MediaRequest.request, so quotas, permissions and
- * auto-approval behave exactly as they do from the request window: asking
- * for many titles at once must not become a way around any of that.
+ * Goes through MediaRequest.request so quotas, permissions and auto-approval
+ * behave exactly as from the request window: bulk requests must not bypass
+ * any of that.
  */
 export const requestMissing = async (
   tmdbId: number,
@@ -74,9 +74,9 @@ export const requestMissing = async (
   });
 
   /*
-   * Leave alone anything already here or on its way. Media that was removed
-   * from the library counts as missing, not as handled: its old requests are
-   * history, so they must not block a new one either.
+   * Skip anything already here or on its way. Media removed from the library
+   * counts as missing: its old requests are history and must not block a new
+   * one.
    */
   const isMissing =
     !media ||

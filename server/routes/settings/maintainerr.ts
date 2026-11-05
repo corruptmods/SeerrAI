@@ -6,10 +6,9 @@ import logger from '@server/logger';
 import { Router } from 'express';
 
 /*
- * Maintainerr servers, managed like Radarr and Sonarr: a list, added and
- * edited through a dialog, each tested before it is saved. Saving without a
- * working connection is refused, so a typo cannot quietly leave badges
- * missing.
+ * Maintainerr servers, managed like Radarr and Sonarr. Each is tested before
+ * saving and refused without a working connection, so a typo can't silently
+ * leave badges missing.
  */
 const maintainerrSettingsRoutes = Router();
 
@@ -47,7 +46,7 @@ maintainerrSettingsRoutes.post('/', async (req, res, next) => {
     return next(connectionFailed(e));
   }
 
-  // Never a removed server's id, as for Radarr and Sonarr.
+  // Never reuse a removed server's id, as for Radarr and Sonarr.
   const server: MaintainerrSettings = {
     ...incoming,
     id: settings.newId('maintainerr'),

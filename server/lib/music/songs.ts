@@ -4,58 +4,54 @@ import type {
 } from '@server/api/musicbrainz/interfaces';
 
 /*
- * Songs, from MusicBrainz's recordings. A recording is one version of a
- * song: the album take, the radio edit and the club mix of one song are
- * three recordings, often on different releases (a single carries its own
- * edit, not the album's take). So a song is shown as its versions, each
- * named from what MusicBrainz says of it, and asked for on its own.
- *
- * Nothing here asks MusicBrainz or the database.
+ * Songs from MusicBrainz recordings. Each recording is one version (album
+ * take, radio edit, club mix), often on different releases, so a song is
+ * shown and requested per version. Pure: no MusicBrainz or database calls.
  */
 
-/** A version of a song as it is shown and asked for. */
+/** A song version as shown and requested. */
 export interface SongVersion {
-  /** The recording's MusicBrainz id. */
+  /** Recording MusicBrainz id. */
   mbId: string;
-  /** The recording's title as MusicBrainz has it. */
+  /** Recording title as MusicBrainz has it. */
   title: string;
-  /** The song's title, without what names the version. */
+  /** Title without the version part. */
   songTitle: string;
-  /** What tells it apart ("radio edit", "club mix"), when anything does. */
+  /** Version label ("radio edit", "club mix"), if any. */
   version: string | null;
   /** Milliseconds. */
   length: number | null;
-  /** The first credited artist, whom the song belongs to here. */
+  /** First credited artist, who owns the song here. */
   artistMbid: string;
-  /** Everyone credited, as MusicBrainz writes it ("A feat. B"). */
+  /** Full credit as MusicBrainz writes it ("A feat. B"). */
   artistName: string;
-  /** The album or single it is best known from. */
+  /** Album or single it's best known from. */
   from: SongRelease | null;
-  /** Every album and single it is on, best known first. */
+  /** Every album and single it's on, best known first. */
   releaseGroups: SongRelease[];
-  /** How many releases it is on: the more, the better known. */
+  /** Number of releases it's on; a popularity signal. */
   releaseCount: number;
 }
 
 /** An album or single a song is on. */
 export interface SongRelease {
-  /** Its MusicBrainz release-group id. */
+  /** MusicBrainz release-group id. */
   mbId: string;
   title: string;
   primaryType: string | null;
   secondaryTypes: string[];
-  /** Its earliest release with this song on it. */
+  /** Earliest release date with this song. */
   date: string | null;
   /**
-   * One of its releases is credited to the song's artist (or says nothing
-   * of whom it is by): it is theirs, not a compilation of others'.
+   * A release credits the song's artist (or credits no one), so it's theirs
+   * rather than someone else's compilation.
    */
   byArtist: boolean;
 }
 
-/** A song: its versions by one artist under one title. */
+/** A song: one artist's versions under one title. */
 export interface Song {
-  /** The artist's id and the song's title, as one key. */
+  /** Artist id plus normalised title. */
   key: string;
   title: string;
   artistMbid: string;
@@ -64,28 +60,25 @@ export interface Song {
   versions: SongVersion[];
 }
 
-/** Releases not to be counted or fetched from: unofficial copies. */
+/** Unofficial release statuses, never counted or fetched. */
 const UNUSABLE_STATUS = new Set(['bootleg', 'pseudo-release']);
 
-/**
- * A recording that is only part of a continuous DJ mix ("part of … DJ-mix")
- * is cut from the mix, not a version anyone can fetch on its own.
- */
+/** Recordings only on DJ mixes are cuts and can't be fetched alone. */
 const MIX_ONLY = 'DJ-mix';
 
-/** What a version is named by in a title's " - …" tail. */
+/** Words that mark a " - …" title tail as a version. */
 const VERSION_WORDS =
   /\b(edit|mix|remix|version|live|remaster(ed)?|acoustic|demo|instrumental|radio|extended|dub|mono|stereo|session|unplugged|rework|cut)\b/i;
 
-/** Every bracketed part at the end of a title: "X (radio edit) [live]". */
+/** One trailing bracketed part: "X (radio edit) [live]". */
 const TRAILING_BRACKETS = /\s*[([]([^()[\]]+)[)\]]\s*$/;
 
-/** A title's "Song - Radio Edit" tail, when it names a version. */
+/** A "Song - Radio Edit" dash tail. */
 const DASH_TAIL = /\s+[-–—]\s+([^-–—]+)$/;
 
 /**
- * A recording's title split into the song's own and what names the
- * version: "Song (radio edit)", "Song [Club Mix]", "Song - Live".
+ * Splits a title into the song title and version parts: "Song (radio
+ * edit)", "Song [Club Mix]", "Song - Live".
  */
 export const splitTitle = (
   title: string
@@ -111,9 +104,8 @@ export const splitTitle = (
 };
 
 /**
- * What tells a version apart: the parts of its title that name it, and
- * MusicBrainz's note on it ("radio edit", "live, 2013-05-31: …"). None
- * for a version with neither, which is shown by its release and length.
+ * Version label from title parts plus MusicBrainz's disambiguation ("live,
+ * 2013-05-31: …"). Null when neither exists.
  */
 export const versionLabel = (recording: MbRecording): string | null => {
   const { parts } = splitTitle(recording.title);
@@ -125,7 +117,7 @@ export const versionLabel = (recording: MbRecording): string | null => {
   return all.length ? all.join(' · ') : null;
 };
 
-/** A title as compared: case, accents, quotes and spacing aside. */
+/** Normalises case, accents, quotes, dashes and spacing for comparison. */
 export const normalizeTitle = (title: string): string =>
   title
     .normalize('NFD')
@@ -138,20 +130,17 @@ export const normalizeTitle = (title: string): string =>
     .trim();
 
 /**
- * Words that make a recording, or a release, another take of a song than
- * the one it is known by: live, acoustic or on piano, a remix or another
- * mix, an instrumental, a karaoke or tribute copy, a demo, a re-recording,
- * a sped-up copy, a Dolby Atmos or 360 mix. A radio edit, a single version
- * or a remaster is the same take. As a pattern, for words as `takeWords`
- * leaves them: lower case, punctuation as single spaces, an apostrophe
- * as a space or dropped ("Artist's Version" as "artist s version" or
- * "artists version").
+ * Regex source for words marking a different take (live, acoustic, remix,
+ * instrumental, karaoke, demo, re-recording, sped up, Atmos…). Radio edits,
+ * single versions and remasters are the same take. Matches `takeWords`
+ * output: lowercase, punctuation as spaces, apostrophes as a space or
+ * dropped ("artist s version" / "artists version").
  */
 export const OTHER_TAKE_WORDS = String.raw`live|acoustic|unplugged|piano|sessions?|orchestral|lullaby|remix|remixes|remixed|(?:club|extended|dub) mix|(?<!(?:radio|single|album|original|main|mono|stereo) )mix(?:es)?|instrumentals?|karaoke|a cappella|acapella|tribute|bootlegs?|mash ?ups?|reworks?|reworked|clean|censored|demos?|outtakes?|rehearsal|re recorded|rerecorded|(?!(?:this|his|its|hers|bonus|plus)\b)\w+(?: s|s) version|sped up|slowed|nightcore|8 bit|alternate (?:take|version|mix)|take \d+|dolby atmos|atmos|360 reality audio|spatial audio|binaural|surround`;
 
 const OTHER_TAKES = new RegExp(String.raw`\b(?:${OTHER_TAKE_WORDS})\b`, 'g');
 
-/** Words only: punctuation and brackets as spaces, case and accents aside. */
+/** Normalised words only: punctuation and brackets become spaces. */
 export const takeWords = (text: string): string =>
   normalizeTitle(text)
     .replace(/&/g, ' and ')
@@ -159,8 +148,8 @@ export const takeWords = (text: string): string =>
     .trim();
 
 /**
- * Whether `name` is another take than `title` asks for: it names one
- * `title` doesn't ("Song (acoustic)" for "Song"; not for "Song (Acoustic)").
+ * True when `name` has a take word `title` lacks ("Song (acoustic)" vs
+ * "Song"; not vs "Song (Acoustic)").
  */
 export const otherTake = (name: string, title: string): boolean => {
   const own = new Set(takeWords(title).match(OTHER_TAKES) ?? []);
@@ -172,9 +161,8 @@ const usable = (release: MbRecordingRelease): boolean =>
   !UNUSABLE_STATUS.has((release.status ?? '').toLowerCase());
 
 /**
- * How well an album or single stands for a song: the artist's own album
- * first, then their single or EP, then anything else (a soundtrack, a live
- * album, a compilation), compilations last.
+ * Rank of a release for representing a song: album, single, EP, other
+ * primary types, secondary types, compilations last.
  */
 const standing = (group: SongRelease): number => {
   const secondary = group.secondaryTypes;
@@ -199,8 +187,8 @@ const byStanding = (a: SongRelease, b: SongRelease): number =>
   a.title.localeCompare(b.title);
 
 /**
- * A recording as a version of a song, or null for one nobody can ask for:
- * a video, or one on no release but unofficial copies and DJ mixes.
+ * A recording as a song version, or null if unrequestable: a video, or only
+ * on unofficial releases or DJ mixes.
  */
 export const toVersion = (recording: MbRecording): SongVersion | null => {
   const credits = recording['artist-credit'] ?? [];
@@ -261,14 +249,13 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
   };
 };
 
-/** How well a single or EP serves to fetch one song through. */
+/** Rank of a single or EP for fetching one song; lower is better. */
 const asSingle = (group: SongRelease): number =>
   (group.secondaryTypes.length ? 2 : 0) + (group.primaryType === 'EP' ? 1 : 0);
 
 /**
- * The single or EP a version can be fetched through, as Lidarr fetches any
- * album: the artist's own that holds this very recording, a plain single
- * before an EP or a remix single, the earliest first. None for a version
+ * The artist's single or EP with this recording, for Lidarr to fetch:
+ * plain singles before EPs and remix singles, earliest first. Null when
  * only on albums.
  */
 export const singleFor = (
@@ -279,8 +266,7 @@ export const singleFor = (
       (group) =>
         group.byArtist &&
         (group.primaryType === 'Single' || group.primaryType === 'EP') &&
-        // A live single holds this very recording too: a live take only
-        // on one is fetched through it, a plain single first.
+        // Live singles are allowed: a live take may only be on one.
         !group.secondaryTypes.some((type) =>
           ['Compilation', 'DJ-mix'].includes(type)
         )
@@ -291,7 +277,7 @@ export const singleFor = (
         (a.date || '9999').localeCompare(b.date || '9999')
     )[0] ?? null;
 
-/** How well an album serves to take one song from. */
+/** Rank of an album for taking one song from; lower is better. */
 const asAlbum = (group: SongRelease): number =>
   group.secondaryTypes.some((type) => ['Compilation', 'Live'].includes(type))
     ? 2
@@ -300,10 +286,9 @@ const asAlbum = (group: SongRelease): number =>
       : 0;
 
 /**
- * The albums a version can be taken from, best first: the artist's own (as
- * Lidarr adds albums by their artist), a studio album before a soundtrack
- * or remix album, a compilation or live album only when nothing else has
- * it, the earliest first. Never part of a DJ mix.
+ * The artist's albums a version can be taken from (Lidarr adds albums by
+ * artist), best first: studio, then other secondary types, then
+ * compilation or live; earliest first. Never DJ mixes.
  */
 export const albumsFor = (
   version: Pick<SongVersion, 'releaseGroups'>
@@ -321,17 +306,16 @@ export const albumsFor = (
         (a.date || '9999').localeCompare(b.date || '9999')
     );
 
-/** The album a version only on albums is taken from: the best of those. */
+/** Best album to take a version from. */
 export const albumFor = (
   version: Pick<SongVersion, 'releaseGroups'>
 ): SongRelease | null => albumsFor(version)[0] ?? null;
 
 /**
- * Recordings found for what was typed, as songs: each artist's versions
- * of one title together, best known first. Only the artists given count
- * (a mash-up credits others first). A song titled as typed comes before
- * one that only holds it ("Song Medley"), then the artists in the order
- * given.
+ * Groups search recordings into songs (one artist's versions of a title),
+ * only for the given artists (a mash-up credits others first). Exact title
+ * matches first ("Song" before "Song Medley"), then artist order, then
+ * popularity.
  */
 export const groupSongs = (
   recordings: MbRecording[],
@@ -371,7 +355,7 @@ export const groupSongs = (
           Number(!!a.version) - Number(!!b.version) ||
           a.mbId.localeCompare(b.mbId)
       );
-      // Named for its best-known version, and credited as it is.
+      // Title and credit come from the best-known version.
       song.title = song.versions[0].songTitle;
       song.artistName = song.versions[0].artistName;
       song.versions = song.versions.slice(0, versions);

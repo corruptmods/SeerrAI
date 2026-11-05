@@ -94,7 +94,7 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
       const now = Math.floor(Date.now() / 1000);
       const diff = payload.exp - now;
 
-      // refresh token 1 week before expiration
+      // Refresh a week before expiry.
       if (diff < 604800) {
         await this.login();
       }
@@ -336,12 +336,9 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
       return this.createEmptySeasonResponse(tvId);
     }
 
-    // get season id
     const season = tvdbData.seasons.find(
       (season) =>
-        season.number === seasonNumber &&
-        season.type.type &&
-        season.type.type === 'official'
+        season.number === seasonNumber && season.type.type === 'official'
     );
 
     if (!season) {
@@ -356,7 +353,6 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
       Tvdb.DEFAULT_LANGUAGE
     );
 
-    // check if translation is available for the season
     const availableTranslation = season.nameTranslations.filter(
       (translation) =>
         translation === wantedTranslation ||
@@ -397,8 +393,7 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
 
     const allEpisodes = [] as TvdbEpisode[];
     let page = 0;
-    // Limit to max 50 pages to avoid infinite loops.
-    // 50 pages with 500 items per page = 25_000 episodes in a series which should be more than enough
+    // Guards against infinite loops; 50 pages × 500 = 25,000 episodes.
     const maxPages = 50;
 
     while (page < maxPages) {

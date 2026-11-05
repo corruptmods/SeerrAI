@@ -7,13 +7,10 @@ import {
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-/*
- * GitHub lists releases newest first, pre-releases and (for the owner)
- * drafts included. A stable install read the newest entry as the latest,
- * so publishing a pre-release told everyone on a stable version to update,
- * and a version was matched as part of a title, so 1.2.1 counted as
- * running 1.2.10.
- */
+// GitHub lists releases newest first, including pre-releases and (for the
+// owner) drafts. Regressions: a stable install took the newest entry as latest,
+// so a pre-release told everyone to update; and versions matched as part of a
+// title, so 1.2.1 counted as running 1.2.10.
 
 const release = (
   version: string,

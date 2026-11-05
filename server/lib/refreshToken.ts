@@ -11,9 +11,7 @@ class RefreshToken {
       return;
     }
 
-    const userRepository = getRepository(User);
-
-    const users = await userRepository
+    const users = await getRepository(User)
       .createQueryBuilder('user')
       .addSelect('user.plexToken')
       .where("user.plexToken != ''")
@@ -33,8 +31,7 @@ class RefreshToken {
       return;
     }
 
-    const plexTvApi = new PlexTvAPI(user.plexToken);
-    plexTvApi.pingToken();
+    new PlexTvAPI(user.plexToken).pingToken();
   }
 }
 

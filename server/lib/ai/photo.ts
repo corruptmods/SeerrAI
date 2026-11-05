@@ -4,32 +4,27 @@ import logger from '@server/logger';
 import type sharpType from 'sharp';
 
 /*
- * A photo made as cheap to read as it can be before the model sees it. Both
- * APIs bill a picture by its size: Claude by its area (about one token per
- * 750 pixels), OpenAI by the 512-pixel tiles it covers. A poster, a cover or
- * a message stays readable well below what a phone takes, so every photo is
- * turned the right way up, cut free of plain borders (letterboxing, a
- * screenshot's empty margins), and scaled to fit the budget below. Whatever
- * the app or another caller sends, the cost stays about the same.
+ * Shrinks a photo before the model reads it. Claude bills by area (about one
+ * token per 750 pixels), OpenAI by 512-pixel tiles, so each photo is turned
+ * upright, trimmed of plain borders and scaled to the budget below, keeping
+ * the cost about the same whatever is sent.
  */
 
 /** About 1,000 tokens on Claude, and four tiles on OpenAI. */
 export const PHOTO_PIXELS = 750_000;
-/** So a tall screenshot is not left long and thin. */
+/** Keeps a tall screenshot from staying long and thin. */
 export const PHOTO_LONGEST_SIDE = 1600;
-/** Borders are cut only when what is left is at least this share of it. */
+/** Trim borders only if at least this share of the picture remains. */
 const MIN_KEPT_AFTER_TRIM = 0.2;
 /**
- * Larger than any phone camera takes (a 48-megapixel photo fits), and
- * checked from the file's header before anything is decoded. A small file
- * can claim far more pixels than it has bytes, and reading one of those
- * took many seconds of the server's time.
+ * Above any phone camera (48 MP fits). Checked from the header before
+ * decoding, since a small file can claim huge dimensions and tie up the
+ * server for seconds.
  */
 export const PHOTO_MAX_INPUT_PIXELS = 50_000_000;
 /**
- * A picture is brought down to this before its borders are looked for, so
- * cutting them is quick whatever size it came in; still twice the longest
- * side sent, so nothing is lost to it.
+ * Downscaled to this before trimming so trimming stays fast; twice the
+ * longest side sent, so no detail is lost.
  */
 const WORKING_SIDE = PHOTO_LONGEST_SIDE * 2;
 
@@ -55,9 +50,8 @@ export const preparePhoto = async (
     return image;
   }
   try {
-    // Upright as taken, first frame of an animation, and nothing else of
-    // the original: its location and camera details stay behind. Kept as
-    // plain pixels between the steps, so nothing is encoded twice.
+    // Upright, first frame only, and no metadata (location, camera) kept.
+    // Raw pixels between steps, so nothing is encoded twice.
     const upright = await sharp(Buffer.from(image.data, 'base64'), {
       failOn: 'error',
       limitInputPixels: PHOTO_MAX_INPUT_PIXELS,

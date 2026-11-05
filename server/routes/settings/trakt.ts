@@ -5,9 +5,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * The Client ID of the admin's own Trakt app, set up from Settings →
- * Services. Like other keys it is never sent back, only whether one is set,
- * and it is tested with Trakt before it is saved.
+ * Client ID of the admin's own Trakt app (Settings → Services). Never sent
+ * back, only whether one is set; tested with Trakt before saving.
  */
 const traktSettingsRoutes = Router();
 

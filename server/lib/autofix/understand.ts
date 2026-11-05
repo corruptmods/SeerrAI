@@ -5,12 +5,10 @@ import logger from '@server/logger';
 import { z } from 'zod';
 
 /*
- * A report the word rules (classify) can't read, read by the AI model:
- * which fix it asks for, if any. Only the report's words are sent, never
- * who wrote it or the title. The answer is one of the fix kinds or
- * "unclear", so whatever a report says, the model can only choose among
- * those; what is then done with a fix that replaces files is up to the
- * caller (asked first from Siri, left for an admin on an issue).
+ * AI fallback for reports `classify` can't read. Only the report text is
+ * sent (no author or title). The model can only answer a fix kind or
+ * "unclear"; callers decide what to do with file-replacing kinds (confirm
+ * first from Siri, leave to an admin on an issue).
  */
 
 const KINDS = [
@@ -40,7 +38,7 @@ export interface ReadReport {
 }
 
 const DAY = 24 * 60 * 60 * 1000;
-/** Longer reports are cut here: the problem is in the first few lines. */
+/** Truncation length; the problem is in the first few lines. */
 const MOST_CHARACTERS = 600;
 
 const SYSTEM =
@@ -55,9 +53,8 @@ const SYSTEM =
   'Reply with JSON only: {"kind": one of those, "language": the two-letter code of a subtitle language they name, or null, "wrongSubtitles": true when the subtitles there are wrong rather than missing}.';
 
 /**
- * Which fix a report asks for, by the AI model, when "Understand Reports"
- * is on for this person. Undefined when it's off, unclear, or the model
- * couldn't be asked: a report is never acted on by a guess.
+ * The AI's fix kind for a report, when "Understand Reports" is on. Undefined
+ * if off, unclear or unavailable: a report is never acted on by a guess.
  */
 export const askAboutReport = async (
   text: string,
@@ -76,7 +73,7 @@ export const askAboutReport = async (
       cache: { key: cacheKey(prompt), ms: DAY },
     });
     if (answer.kind === 'unclear') return undefined;
-    // A film has no season to replace: its one file is.
+    // A film has no season; replace its file instead.
     const kind =
       !episode && answer.kind === 'replaceSeason' ? 'broken' : answer.kind;
     return {

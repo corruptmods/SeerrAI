@@ -2,9 +2,8 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 /*
- * The passkey library is only needed at the moment someone makes or uses a
- * passkey, so it is fetched then, not with every page. Whether the browser
- * can do passkeys at all is asked of the browser directly.
+ * The passkey library loads on demand, not with every page. Support checks
+ * ask the browser directly.
  */
 const loadWebAuthn = () => import('@simplewebauthn/browser');
 
@@ -21,9 +20,8 @@ export interface Passkey {
 }
 
 /**
- * Fetches the passkey library ahead of a passkey button being pressed. Safari
- * only allows a passkey prompt shortly after the tap that asked for it, so
- * the library should already be here by then.
+ * Preloads the passkey library. Safari only allows the prompt shortly after
+ * the tap, so it must be loaded by then.
  */
 export const preloadPasskeys = (): void => {
   if (browserSupportsWebAuthn()) {
@@ -32,9 +30,9 @@ export const preloadPasskeys = (): void => {
 };
 
 /**
- * Whether this browser can use passkeys at all, and whether this device can
- * make one itself (Face ID, Touch ID, Windows Hello, a phone's screen lock).
- * Undefined until checked, which happens after mounting.
+ * Whether the browser supports passkeys and the device has a platform
+ * authenticator (Face ID, Touch ID, Windows Hello…). Undefined until checked
+ * after mount.
  */
 export const usePasskeySupport = () => {
   const [support, setSupport] = useState<{
@@ -64,13 +62,9 @@ export const usePasskeySupport = () => {
   return support;
 };
 
-/**
- * Someone closing the system passkey sheet, or a device with no passkey for
- * this site, is not an error worth showing: the system already said so.
- */
+/** Whether the user cancelled or had no passkey; the system already said so, so don't show an error. */
 export const isCancelled = (e: unknown): boolean => {
-  // The library's WebAuthnError says why with a code, and carries the
-  // browser's own error, named, as its cause.
+  // WebAuthnError has a code, and the browser's named error as its cause.
   if (
     (e as { code?: unknown } | undefined)?.code === 'ERROR_CEREMONY_ABORTED'
   ) {
@@ -83,7 +77,7 @@ export const isCancelled = (e: unknown): boolean => {
     .some((name) => name === 'NotAllowedError' || name === 'AbortError');
 };
 
-/** Make a passkey on this device for whoever is signed in. */
+/** Registers a passkey on this device for the signed-in user. */
 export const addPasskey = async (): Promise<Passkey> => {
   const [{ startRegistration }, options] = await Promise.all([
     loadWebAuthn(),
@@ -96,7 +90,7 @@ export const addPasskey = async (): Promise<Passkey> => {
   return saved.data;
 };
 
-/** Sign in with whichever passkey the device offers for this site. */
+/** Signs in with whichever passkey the device offers. */
 export const signInWithPasskey = async (): Promise<void> => {
   const [{ startAuthentication }, options] = await Promise.all([
     loadWebAuthn(),

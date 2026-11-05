@@ -21,7 +21,7 @@ describe('the Music page with nothing in its rows', () => {
   });
 
   it('counts a row that failed as empty', () => {
-    // A row whose source did not answer hides itself, as an empty one does.
+    // A failed row hides itself, like an empty one.
     assert.deepEqual(emptyMusicPage([answered(0), answered(0)], false, true), {
       hints: [],
     });
@@ -34,13 +34,12 @@ describe('the Music page with nothing in its rows', () => {
   });
 
   it('tells an admin what would fill it', () => {
-    // New and Popular Music switched off: those rows stay empty until it is
-    // switched on, and Recently Added fills as albums reach the server.
+    // New and Popular Music off: its rows stay empty; Recently Added fills as
+    // albums reach the server.
     assert.deepEqual(emptyMusicPage([answered(0)], true, false), {
       hints: ['listenBrainz', 'albumsHere'],
     });
-    // Switched on (ListenBrainz had nothing, or did not answer), or not
-    // known yet: only the albums.
+    // On (ListenBrainz empty or not answering), or unknown: only albums.
     assert.deepEqual(emptyMusicPage([answered(0)], true, true), {
       hints: ['albumsHere'],
     });

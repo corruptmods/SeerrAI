@@ -8,10 +8,10 @@ interface HostnameParams {
 }
 
 /**
- * A Jellyfin or Emby server's address from its settings. Without them, the
- * connected Jellyfin-family server's (Emby's when that is the one). Code
- * that knows which server it means uses hostnameFor(kind) in
- * lib/mediaServers instead.
+ * A Jellyfin or Emby server's URL from its settings, defaulting to the
+ * connected Jellyfin-family server's (Emby's if that's the one). Code that
+ * knows which server it means uses hostnameFor(kind) in lib/mediaServers
+ * instead.
  */
 export const getHostname = (params?: HostnameParams): string => {
   const server = params ?? jellyfinFamilySettings();

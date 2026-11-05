@@ -14,10 +14,8 @@ const messages = defineMessages('components.Backfill.CoverageMap', {
 });
 
 /*
- * Every episode as a square, a row per season: what is on disk, what is
- * below the profile's cutoff, what is missing, and outlined, what the
- * selected pack would fill or upgrade. Colours are whole class names, never
- * built at runtime, so the CSS keeps them.
+ * One square per episode, one row per season; outlined squares are what the
+ * selected pack fills or upgrades. Full class names so Tailwind keeps them.
  */
 const STATE_CLASS = {
   onDisk: 'bg-green-600',

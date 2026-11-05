@@ -49,7 +49,7 @@ describe('speech input', () => {
     assert.equal(isHandheld({ userAgent: firefox }), false);
     assert.equal(isHandheld({ userAgent: iphone, maxTouchPoints: 5 }), true);
     assert.equal(isHandheld({ userAgent: android, maxTouchPoints: 5 }), true);
-    // An iPad asks for the desktop site, so it says Macintosh, with touch.
+    // An iPad reports Macintosh, but with touch.
     assert.equal(isHandheld({ userAgent: mac, maxTouchPoints: 5 }), true);
     assert.equal(
       isHandheld({ userAgent: windows, userAgentData: { mobile: true } }),

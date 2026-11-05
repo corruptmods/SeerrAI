@@ -26,35 +26,34 @@ import { IsNull, Not } from 'typeorm';
 import isEmail from 'validator/lib/isEmail';
 
 /*
- * Single sign-on: signing in through an OpenID Connect provider such as
- * Authentik, Authelia, Keycloak, Pocket ID or Google.
+ * Single sign-on through an OpenID Connect provider (Authentik, Authelia,
+ * Keycloak, Pocket ID, Google...).
  *
- * The browser is sent to the provider with a fresh state, nonce and PKCE
- * challenge, and comes back to the provider's callback address with a code.
- * What ties the two together (the state, the PKCE verifier, the nonce,
- * which provider and where to go afterwards) rides in a short-lived, signed,
- * httpOnly cookie, cleared when it is used. People are found only by the
- * provider and the provider's own id for them (`sub`), never by email.
+ * The browser goes to the provider with a fresh state, nonce and PKCE
+ * challenge and returns to the callback with a code. The state, PKCE
+ * verifier, nonce, provider and return path ride in a short-lived, signed,
+ * httpOnly cookie, cleared on use. Users are matched only by provider and
+ * the provider's `sub`, never by email.
  */
 
-/** How long a provider has to answer each request, in seconds. */
+/** Per-request timeout for provider calls, in seconds. */
 export const OIDC_TIMEOUT_SECONDS = 10;
 
-/** How long what a provider says about itself is reused. */
+/** How long discovery metadata is cached. */
 const DISCOVERY_TTL_MS = 5 * 60 * 1000;
 
-/** The cookie that carries a sign-in from here to the provider and back. */
+/** Cookie that carries a sign-in to the provider and back. */
 export const CORRELATION_COOKIE = 'seerr-sso';
 
-/** How long someone has to finish signing in at the provider. */
+/** Time allowed to finish signing in at the provider. */
 export const CORRELATION_TTL_MS = 10 * 60 * 1000;
 
 export const findProvider = (id: string): OidcProviderSettings | undefined =>
   getSettings().oidc.providers.find((provider) => provider.id === id);
 
 /**
- * A provider people can sign in with or link right now: it is switched on,
- * and the Application URL is set (the provider sends people back there).
+ * Whether a provider can be used now: enabled, and the Application URL is set
+ * (the callback is built from it).
  */
 export const usableProvider = (
   id: string
@@ -67,9 +66,9 @@ export const usableProvider = (
 };
 
 /**
- * Whether a link can sign someone in now: its provider can be used, and
- * still has the issuer the link was made at. A link from before issuers
- * were recorded has none, and goes with the provider's.
+ * Whether a link can sign in now: its provider is usable and still has the
+ * issuer the link was made at. Links from before issuers were recorded have
+ * none and follow the provider's.
  */
 export const linkUsable = (link: Pick<OidcLink, 'provider' | 'issuer'>) => {
   const provider = usableProvider(link.provider);
@@ -79,14 +78,14 @@ export const linkUsable = (link: Pick<OidcLink, 'provider' | 'issuer'>) => {
   );
 };
 
-/** Where this provider sends people back to. */
+/** The provider's callback URL. */
 export const callbackUrlFor = (provider: { id: string }): string =>
   oidcCallbackUrl(
     oidcApplicationUrl(getSettings().main.applicationUrl),
     provider.id
   );
 
-/** The scopes asked for: always `openid`, each once. */
+/** Scopes to request: always `openid`, deduplicated. */
 export const normalizeScopes = (scopes?: string): string => {
   const asked = (scopes ?? '').split(/\s+/).filter(Boolean);
   if (asked.length === 0) {
@@ -98,10 +97,9 @@ export const normalizeScopes = (scopes?: string): string => {
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
- * What is wrong with an issuer URL, or undefined when it can be used. A
- * provider is reached over https: a sign-in's code and the client secret
- * must not cross a network unencrypted. Plain http is only accepted on this
- * machine itself.
+ * What is wrong with an issuer URL, or undefined if usable. Requires https so
+ * codes and the client secret never cross the network unencrypted; plain http
+ * is allowed only for this machine.
  */
 export const issuerUrlProblem = (
   issuerUrl: string
@@ -134,7 +132,7 @@ const discovered = new Map<
   { config: client.Configuration; expires: number }
 >();
 
-/** One entry per provider address, client and secret. */
+/** Cache key: one entry per issuer, client and secret. */
 const discoveryKey = (target: DiscoveryTarget) =>
   [
     target.issuerUrl,
@@ -143,10 +141,8 @@ const discoveryKey = (target: DiscoveryTarget) =>
   ].join('\n');
 
 /**
- * How Seerr shows the provider its client secret: in an Authorization
- * header (client_secret_basic), which every provider takes and Authelia
- * expects by default, unless the provider says it only takes it in the
- * request body.
+ * How the client secret is sent: client_secret_basic (accepted everywhere,
+ * Authelia's default) unless the provider only accepts it in the body.
  */
 const clientAuthentication =
   (secret: string): client.ClientAuth =>
@@ -164,9 +160,8 @@ const clientAuthentication =
   };
 
 /**
- * What the provider says about itself: where to send people, where to
- * trade a code for tokens. Kept for a few minutes; `fresh` asks again, as
- * the settings page's Test does.
+ * Provider metadata (authorization and token endpoints), cached for a few
+ * minutes; `fresh` bypasses the cache, as the settings page's Test does.
  */
 export const discover = async (
   target: DiscoveryTarget,
@@ -202,10 +197,10 @@ export const discover = async (
   return config;
 };
 
-/** Forgets what providers said about themselves, as when settings change. */
+/** Clears the discovery cache, e.g. when settings change. */
 export const forgetDiscovery = (): void => discovered.clear();
 
-/** The error code openid-client (or the network) gives, when there is one. */
+/** The openid-client or network error code, if any. */
 export const errorCode = (e: unknown): string | undefined =>
   typeof e === 'object' && e && 'code' in e
     ? String((e as { code: unknown }).code)
@@ -225,7 +220,7 @@ const CERTIFICATE_PROBLEMS = new Set([
   'ERR_TLS_CERT_ALTNAME_INVALID',
 ]);
 
-/** The address's scheme, host and port, when it has no path after them. */
+/** Scheme, host and port, when the URL has no path. */
 const bareOrigin = (issuerUrl: string): string | undefined => {
   try {
     const url = new URL(issuerUrl);
@@ -236,8 +231,8 @@ const bareOrigin = (issuerUrl: string): string | undefined => {
 };
 
 /**
- * Why a provider could not be used, for the admin setting it up. Nothing
- * secret is in it: no client secret, token or code.
+ * Why a provider can't be used, for the admin. Contains no secrets: no client
+ * secret, token or code.
  */
 export const discoveryProblem = (
   e: unknown,
@@ -247,7 +242,7 @@ export const discoveryProblem = (
   try {
     host = new URL(issuerUrl).host;
   } catch {
-    // The address as typed.
+    // Not a URL: keep it as typed.
   }
   const code = errorCode(e);
   const cause = causeOf(e);
@@ -272,8 +267,8 @@ export const discoveryProblem = (
     if (typeof status !== 'number') {
       return { problem: 'no-discovery' };
     }
-    // Only a host, and nothing there: Authentik, for one, gives each app
-    // its own address under it, which is easy to miss.
+    // Bare host returning 404: Authentik, for one, gives each app its own path
+    // under it, which is easy to miss.
     const origin = status === 404 ? bareOrigin(issuerUrl) : undefined;
     return {
       problem: 'no-discovery',
@@ -296,8 +291,8 @@ export const discoveryProblem = (
 };
 
 /**
- * A problem in plain English, for the log and for anyone reading the API
- * without the settings page. The settings page shows its own translation.
+ * English problem text for the log and API clients; the settings page
+ * translates its own.
  */
 export const problemText = ({ problem, params = {} }: OidcProblem): string => {
   switch (problem) {
@@ -343,21 +338,20 @@ export const problemText = ({ problem, params = {} }: OidcProblem): string => {
 };
 
 /*
- * The correlation cookie. Signed with the session secret, so it can only
- * have come from here; it also says when it stops being good.
+ * Correlation cookie: signed with the session secret so only this server can
+ * have issued it, and carries its own expiry.
  */
 
 export interface Correlation {
-  /** The provider. */
   provider: string;
   state: string;
   verifier: string;
   nonce: string;
-  /** Where to go afterwards: a path on this site. */
+  /** Return path after sign-in: a path on this site. */
   returnTo: string;
-  /** Linking: the account it is for. Absent when signing in. */
+  /** The account being linked; absent when signing in. */
   userId?: number;
-  /** When it stops being good (ms since 1970). */
+  /** Expiry, ms since epoch. */
   expires: number;
 }
 
@@ -373,7 +367,7 @@ export const sealCorrelation = (correlation: Correlation): string => {
   return `${payload}.${signatureOf(payload).toString('base64url')}`;
 };
 
-/** What the cookie says, if it is genuine and still good. */
+/** The cookie's contents, if genuine and unexpired. */
 export const openCorrelation = (
   value: unknown,
   now = Date.now()
@@ -414,8 +408,7 @@ export const openCorrelation = (
 };
 
 /**
- * Where to send the browser to sign in at the provider, and the cookie
- * that has to come back with it.
+ * The provider authorization URL and the cookie that must come back with it.
  */
 export const startAtProvider = async (
   provider: OidcProviderSettings,
@@ -449,15 +442,15 @@ export const startAtProvider = async (
   };
 };
 
-/** Who the provider says someone is. */
+/** Who the provider says the user is. */
 export interface OidcIdentity {
-  /** The provider's own id for them. */
+  /** The provider's id for the user. */
   sub: string;
-  /** Their email, only when the provider says it has been verified. */
+  /** Email, only when the provider says it is verified. */
   email?: string;
-  /** What to call them here. */
+  /** Display name here. */
   displayName?: string;
-  /** What to show for the account on Linked Accounts. */
+  /** Label for the account on Linked Accounts. */
   label?: string;
 }
 
@@ -465,9 +458,9 @@ const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
 /**
- * Finishes a sign-in: trades the code the provider sent back for tokens,
- * checking the state, the PKCE verifier and the ID token's nonce on the
- * way, and reads who it is. Throws when anything does not match.
+ * Finishes a sign-in: exchanges the code for tokens, checking state, PKCE
+ * verifier and the ID token's nonce, and reads the identity. Throws on any
+ * mismatch.
  */
 export const finishAtProvider = async (
   provider: OidcProviderSettings,
@@ -475,13 +468,13 @@ export const finishAtProvider = async (
   correlation: Correlation
 ): Promise<{
   identity: OidcIdentity;
-  /** The ID token's claims, with userinfo's over them when it was read. */
+  /** ID token claims, overlaid with userinfo when it was read. */
   claims: Record<string, unknown>;
   userinfoFailed?: unknown;
 }> => {
   const config = await discover(provider);
-  // The callback address exactly as registered, with what the provider
-  // added to it; nothing from the request's own Host header.
+  // The callback URL exactly as registered plus the provider's query; never
+  // the request's Host header.
   const currentUrl = new URL(callbackUrlFor(provider));
   currentUrl.search = query;
 
@@ -496,11 +489,10 @@ export const finishAtProvider = async (
     throw new Error('The provider sent no ID token.');
   }
 
-  // Some providers (Authelia, by default) give the name, email and groups
-  // only from userinfo. Who someone is comes from the ID token alone;
-  // without userinfo a linked account still signs in, unless the
-  // provider has rules for who may (the caller decides). It is asked with
-  // the same timeout as every other request to the provider.
+  // Some providers (Authelia by default) give name, email and groups only via
+  // userinfo. Identity comes from the ID token alone; if userinfo fails a
+  // linked account still signs in unless the provider has claim rules (the
+  // caller decides). Uses the same timeout as other provider requests.
   let details: Record<string, unknown> = { ...claims };
   let userinfoFailed: unknown;
   if (config.serverMetadata().userinfo_endpoint && tokens.access_token) {
@@ -552,9 +544,8 @@ const meets = (claim: unknown, rule: OidcClaimRule): boolean => {
 };
 
 /**
- * The names of the claims that don't meet a provider's rules for who may
- * sign in (none when everyone may). Every rule has to hold. Claim names are
- * matched exactly, at the top level only.
+ * Names of claims failing the provider's sign-in rules (none when there are no
+ * rules). All rules must hold. Claim names match exactly, top level only.
  */
 export const failedClaims = (
   rules: OidcClaimRule[],
@@ -573,10 +564,9 @@ export const failedClaims = (
 ];
 
 /**
- * The link for this provider account at the provider's current issuer:
- * one made there, or one from before issuers were recorded. A link made
- * at an earlier issuer is someone else's: the same `sub` from a different
- * provider says nothing about who they are.
+ * The link for this provider account at the current issuer, or one from
+ * before issuers were recorded. A link from an earlier issuer belongs to
+ * someone else: the same `sub` from another provider proves nothing.
  */
 const findLink = async (
   provider: OidcProviderSettings,
@@ -593,17 +583,17 @@ const findLink = async (
 };
 
 /**
- * Removes links to a provider made at an earlier issuer that are in the
- * way of a new one: with the same `sub`, or the same person's. They can
- * never sign anyone in while the provider keeps its new issuer, and each
- * provider account, and each person, has one link per provider.
+ * Removes earlier-issuer links for this provider that block a new one (same
+ * `sub` or same user). They can't sign anyone in while the provider keeps
+ * its new issuer, and each provider account and user gets one link per
+ * provider.
  */
 const dropStaleLinks = async (
   manager: EntityManager,
   provider: OidcProviderSettings,
   { sub, userId }: { sub: string; userId?: number }
 ) => {
-  // Links with no issuer yet are the current issuer's, never stale.
+  // Links with no issuer belong to the current issuer, never stale.
   const stale = {
     provider: provider.id,
     issuer: Not(normalizeIssuer(provider.issuerUrl)),
@@ -628,10 +618,10 @@ export type SignInResult =
   | { refused: 'no-account' | 'existing-account' };
 
 /**
- * The account a provider sign-in belongs to: the one linked to this
- * provider account, or, when the provider lets new people sign up, a new
- * one. Never one found by email: an email match is refused instead, and
- * its owner links the provider from their profile.
+ * The account for a provider sign-in: the one linked to this provider
+ * account, or a new one if the provider allows sign-up. Never matched by
+ * email: an email match is refused, and its owner links the provider from
+ * their profile.
  */
 export const accountForSignIn = async (
   provider: OidcProviderSettings,
@@ -659,9 +649,8 @@ export const accountForSignIn = async (
     return { refused: 'no-account' };
   }
 
-  // Their email, when the provider has verified it and nobody here has
-  // it; otherwise a stand-in no email can be, which they can replace in
-  // their profile.
+  // Use the email if the provider verified it and no one here has it;
+  // otherwise a placeholder no real email can equal, replaceable in profile.
   if (
     identity.email &&
     (await getRepository(User).exists({ where: { email: identity.email } }))
@@ -705,8 +694,8 @@ export type LinkResult =
   | { refused: 'taken' | 'already-linked' };
 
 /**
- * Links a provider account to someone's account here: not one already
- * linked to someone else, and not a second account on the same provider.
+ * Links a provider account to a local account; refuses one linked to someone
+ * else or a second account on the same provider.
  */
 export const linkToAccount = async (
   provider: OidcProviderSettings,
@@ -749,9 +738,8 @@ export const linkToAccount = async (
 };
 
 /**
- * The providers someone could still sign in with: those they have linked
- * that are switched on (and usable, with the Application URL set), at the
- * issuer they linked.
+ * Providers the user can still sign in with: linked, enabled, usable
+ * (Application URL set), and at the issuer they linked.
  */
 export const usableProviderLinks = async (
   userId: number
@@ -763,9 +751,8 @@ export const usableProviderLinks = async (
 };
 
 /**
- * When a provider's issuer URL changes, its links that have no issuer yet
- * are tied to the old one, so a different provider at the new address can
- * never sign anyone in through them.
+ * When a provider's issuer URL changes, pins its issuer-less links to the old
+ * issuer, so a different provider at the new URL can never use them.
  */
 export const keepLinksAtIssuer = async (
   providerId: string,

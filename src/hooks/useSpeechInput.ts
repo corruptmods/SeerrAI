@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /*
- * Speaking into a search box, on a computer. The browser's own speech
- * recognition does the listening: nothing is recorded or sent by Seerr.
+ * Voice search on computers, via the browser's speech recognition; Seerr
+ * records and sends nothing.
  *
- * Phones and tablets are left out on purpose. Their keyboards already have a
- * microphone that types into any field, and the iPhone does not offer speech
- * recognition to web apps added to the Home Screen at all.
+ * Phones and tablets are excluded: their keyboards have dictation, and iOS
+ * offers no speech recognition to Home Screen web apps.
  */
 
 interface RecognitionAlternative {
@@ -57,9 +56,8 @@ const recognitionConstructor = (): RecognitionConstructor | undefined => {
 };
 
 /**
- * A phone or tablet, whose keyboard has its own microphone. Asked of the
- * device itself rather than the pointer: a touchscreen laptop is a computer,
- * and an iPad reports itself as a Mac.
+ * Whether this is a phone or tablet. Checks the device, not the pointer: a
+ * touchscreen laptop is a computer, and an iPad reports as a Mac.
  */
 export const isHandheld = (nav: {
   userAgent: string;
@@ -70,7 +68,7 @@ export const isHandheld = (nav: {
   /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent) ||
   (/Macintosh/.test(nav.userAgent) && (nav.maxTouchPoints ?? 0) > 1);
 
-/** Why listening stopped early, in terms the person can act on. */
+/** Why listening stopped early, in actionable terms. */
 export type SpeechProblem =
   | 'unsupported'
   | 'blocked'
@@ -93,12 +91,12 @@ export const problemOf = (error: string): SpeechProblem | undefined => {
     case 'network':
       return 'network';
     default:
-      // 'aborted' is someone pressing stop, or the field going away.
+      // 'aborted': stop pressed or field unmounted.
       return undefined;
   }
 };
 
-/** Everything heard so far, and whether the browser has settled on it. */
+/** The transcript so far, and whether it is final. */
 export const transcriptOf = (
   results: RecognitionEvent['results']
 ): { text: string; final: boolean } => {
@@ -112,16 +110,16 @@ export const transcriptOf = (
 };
 
 interface SpeechInputOptions {
-  /** BCP 47 language to listen for, such as en or pt-BR. */
+  /** BCP 47 language, e.g. en or pt-BR. */
   lang: string;
-  /** What has been heard so far; final once the person stops speaking. */
+  /** Transcript so far; final once speech stops. */
   onText: (text: string, final: boolean) => void;
   onProblem: (problem: SpeechProblem) => void;
 }
 
 const useSpeechInput = ({ lang, onText, onProblem }: SpeechInputOptions) => {
-  // Shown on any computer over HTTPS; a browser that cannot listen says so
-  // when the button is pressed, rather than the button silently missing.
+  // Shown on any computer over HTTPS; unsupported browsers report it on
+  // press rather than hiding the button.
   const [available, setAvailable] = useState(false);
   const [listening, setListening] = useState(false);
   const recognition = useRef<Recognition | null>(null);
@@ -131,7 +129,7 @@ const useSpeechInput = ({ lang, onText, onProblem }: SpeechInputOptions) => {
     callbacks.current = { onText, onProblem };
   });
 
-  // Checked after mounting: the server cannot know what the browser offers.
+  // After mount: the server can't know browser support.
   useEffect(() => {
     setAvailable(
       window.isSecureContext &&
@@ -141,7 +139,7 @@ const useSpeechInput = ({ lang, onText, onProblem }: SpeechInputOptions) => {
     );
   }, []);
 
-  // Leaving the page, or closing the panel, stops listening.
+  // Stop listening on unmount.
   useEffect(() => () => recognition.current?.abort(), []);
 
   const stop = useCallback(() => {
@@ -184,7 +182,7 @@ const useSpeechInput = ({ lang, onText, onProblem }: SpeechInputOptions) => {
       recognition.current = listener;
       setListening(true);
     } catch {
-      // Already listening elsewhere on the page, or refused outright.
+      // Already listening elsewhere, or refused.
       callbacks.current.onProblem('unavailable');
     }
   }, [lang]);

@@ -41,11 +41,11 @@ import Season from './Season';
 /** Where a title can be played on one media server. */
 export interface PlayLink {
   server: MediaServerKind;
-  /** The server's kind, as people know it: Plex, Jellyfin, Emby. */
+  /** Display name of the server kind: Plex, Jellyfin, Emby. */
   name: string;
   url?: string;
   url4k?: string;
-  /** Plex's app on iPhone and iPad. */
+  /** Plex's iPhone and iPad app. */
   iosUrl?: string;
   iosUrl4k?: string;
 }
@@ -55,9 +55,8 @@ export interface PlayLink {
 @Index(['mediaType', 'foreignId'], { unique: true })
 class Media {
   /**
-   * The media Seerr has for these titles. Throws when the database cannot
-   * be read: for a caller that acts on what is missing, "none" is not the
-   * same as "could not tell".
+   * The media Seerr has for these titles. Throws when the database can't be
+   * read: for callers acting on what's missing, "none" differs from "unknown".
    */
   public static async findRelatedMedia(
     user: User | undefined,
@@ -114,7 +113,9 @@ class Media {
     return relatedMedia;
   }
 
-  /** As findRelatedMedia, for display: nothing when it cannot be read. */
+  /**
+   * Like findRelatedMedia, for display: empty when the database can't be read.
+   */
   public static async getRelatedMedia(
     user: User | undefined,
     items: { tmdbId: number; mediaType: string }[],
@@ -162,16 +163,16 @@ class Media {
   public tvdbId?: number;
 
   /**
-   * A title's id outside TMDB: an artist's MusicBrainz id, for music (whose
-   * tmdbId is 0). Null for films and series.
+   * A non-TMDB id: an artist's MusicBrainz id for music (whose tmdbId is 0).
+   * Null for films and series.
    */
   @Column({ type: 'varchar', nullable: true })
   public foreignId?: string | null;
 
   /**
-   * The name of a title kept outside TMDB, as it was when last asked for:
-   * an artist's name, for music. Request cards and notifications show it
-   * without asking MusicBrainz again. Null for films and series.
+   * The name of a non-TMDB title as last requested (an artist's name, for
+   * music), so request cards and notifications don't query MusicBrainz again.
+   * Null for films and series.
    */
   @Column({ type: 'varchar', nullable: true })
   public foreignTitle?: string | null;
@@ -205,7 +206,7 @@ class Media {
   @OneToMany(() => Issue, (issue) => issue.media, { cascade: true })
   public issues: Issue[];
 
-  /** An artist's albums. Only loaded when asked for. */
+  /** An artist's albums. Only loaded when requested. */
   @OneToMany(() => MusicAlbum, (album) => album.media)
   public musicAlbums?: MusicAlbum[];
 
@@ -222,16 +223,15 @@ class Media {
   public updatedAt: Date;
 
   /**
-   * The `lastSeasonChange` column stores the date and time when the media was added to the library.
-   * It needs to be database-aware because SQLite supports `datetime` while PostgreSQL supports `timestamp with timezone (timestampz)`.
+   * When the title's seasons last changed. Database-aware: SQLite uses
+   * `datetime`, Postgres `timestamptz`.
    */
   @DbAwareColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   public lastSeasonChange: Date;
 
   /**
-   * The `mediaAddedAt` column stores the date and time when the media was added to the library.
-   * It needs to be database-aware because SQLite supports `datetime` while PostgreSQL supports `timestamp with timezone (timestampz)`.
-   * This column is nullable because it can be null when the media is not yet synced to the library.
+   * When the title was added to the library; null until synced. Database-aware:
+   * SQLite uses `datetime`, Postgres `timestamptz`.
    */
   @DbAwareColumn({
     type: 'datetime',
@@ -277,9 +277,8 @@ class Media {
   public embyMediaId4k?: string | null;
 
   /**
-   * Whether the title is anime, as set on its page by an admin: true or
-   * false stands over anime detection and override rules, and null leaves
-   * it to them (lib/animePlacement).
+   * An admin's anime setting on the title page: true or false overrides
+   * detection and override rules; null defers to them (lib/animePlacement).
    */
   @Column({ nullable: true, type: 'boolean' })
   public animeSetting?: boolean | null;
@@ -325,7 +324,7 @@ class Media {
     }
   }
 
-  /** A server's links to the title, from the ids it has for it. */
+  /** A server's links to the title, from its ids for it. */
   private playLinkFor(kind: MediaServerKind): PlayLink {
     const [idColumn, idColumn4k] = MEDIA_ID[kind];
     const id = this[idColumn];
@@ -345,9 +344,8 @@ class Media {
   }
 
   /**
-   * Play links for each connected server that has the title, and the
-   * single links (mediaUrl, iOSPlexUrl, tautulliUrl) for the primary
-   * server, which API readers have always had.
+   * Play links for each connected server with the title, plus the legacy single
+   * links (mediaUrl, iOSPlexUrl, tautulliUrl) for the primary server.
    */
   @AfterLoad()
   public setPlayLinks(): void {
@@ -387,7 +385,7 @@ class Media {
 
   @AfterLoad()
   public setServiceUrl(): void {
-    // An artist: their page in Lidarr, by their MusicBrainz id.
+    // An artist: their Lidarr page, by MusicBrainz id.
     if (this.mediaType === MediaType.MUSIC) {
       if (this.serviceId !== null && this.externalServiceSlug) {
         const server = getSettings().lidarr.find(
@@ -519,8 +517,8 @@ class Media {
       }
     }
 
-    // An artist: everything of theirs Lidarr is downloading, each item
-    // naming its album.
+    // An artist: everything of theirs Lidarr is downloading, each item naming
+    // its album.
     if (
       this.mediaType === MediaType.MUSIC &&
       this.externalServiceId != null &&
@@ -532,8 +530,7 @@ class Media {
       );
     }
 
-    // A title only waiting on its server's match has nothing in a queue to
-    // follow.
+    // A title only waiting on its server's match has no queue item to track.
     if (
       [...(this.downloadStatus ?? []), ...(this.downloadStatus4k ?? [])].some(
         (item) => !item.matching

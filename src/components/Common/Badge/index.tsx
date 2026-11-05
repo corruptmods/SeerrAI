@@ -67,9 +67,8 @@ const Badge = (
       }
       break;
     case 'deep':
-      // The accent's deep shades, as on the page you are on in the sidebar.
-      // The text is pale (Indigo's palest shade, as before) rather than the
-      // text chosen for its fill, which is dark for a light accent.
+      // The accent's deep shades, as the sidebar's current page. Text stays
+      // pale, not the fill's own text, which is dark for a light accent.
       badgeStyle.push(
         'bg-accent-chip/accent-fill border !border-accent bg-gradient-to-br from-indigo-700 to-accent-alt-700 !text-on-accent-deep'
       );

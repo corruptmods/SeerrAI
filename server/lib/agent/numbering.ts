@@ -9,12 +9,11 @@ import {
 } from '@server/lib/downloadCheck/names';
 
 /*
- * Which library episode a release is, when its name and Sonarr disagree.
- * A series Sonarr numbers by scene numbering (TheXEM) reads every name by
- * the scene's seasons: a library's S08E01 can be scene S06E15, and then a
- * release named S08E01 is read as scene S08E01, another library episode
- * altogether. A name that carries the episode's title says which it is,
- * whichever numbering it uses.
+ * Which library episode a release is when its name and Sonarr disagree.
+ * Sonarr reads names on a scene-numbered (TheXEM) series by scene seasons:
+ * library S08E01 can be scene S06E15, so a release named S08E01 is read as
+ * another episode entirely. An episode title in the name settles it in
+ * either numbering.
  */
 
 export interface NumberedEpisode {
@@ -27,7 +26,7 @@ export interface NumberedEpisode {
   sceneEpisodeNumber?: number | null;
 }
 
-/** How alike a title must be to be taken as the episode's. */
+/** Minimum likeness for a title to count as the episode's. */
 const SAME_TITLE = 0.75;
 
 /** The first season and episode a name gives: "S08E01", "8x01". */
@@ -41,9 +40,8 @@ export const numbersInName = (
 };
 
 /**
- * The library episode whose title the name carries, when exactly one is
- * clearly it. Undefined when the name has no episode title, or it fits
- * none (or several) well enough.
+ * The library episode whose title the name carries, when exactly one
+ * clearly matches; undefined otherwise.
  */
 export const episodeByTitle = <T extends NumberedEpisode>(
   name: string,
@@ -54,7 +52,7 @@ export const episodeByTitle = <T extends NumberedEpisode>(
   const named = episodes.filter(
     (ep) => ep.title && !GENERIC_EPISODE.test(normalize(ep.title))
   );
-  // The very title first: one that merely holds it is a weaker match.
+  // Exact titles first; one that merely contains it is a weaker match.
   const exact = named.filter((ep) => normalize(ep.title ?? '') === said);
   if (exact.length) return exact.length === 1 ? exact[0] : undefined;
   const scored = named
@@ -82,8 +80,8 @@ const NUMBER_WORDS: Record<string, string> = {
 };
 
 /**
- * A title as names and Sonarr both write it: words only, and a part
- * written one way ("Part Two", "Pt 2", "(2)") the same as another ("2").
+ * A title key that names and Sonarr share: words only, with a part ("Part
+ * Two", "Pt 2", "(2)") written as "2".
  */
 const titleKey = (title: string): string =>
   normalize(title)
@@ -93,7 +91,7 @@ const titleKey = (title: string): string =>
     )
     .trim();
 
-/** Each episode's title key, worked out once. */
+/** Each episode's title key, cached. */
 const keys = new WeakMap<object, string>();
 const keyOf = (ep: NumberedEpisode): string => {
   let key = keys.get(ep);
@@ -105,7 +103,7 @@ const keyOf = (ep: NumberedEpisode): string => {
   return key;
 };
 
-/** The one episode with exactly this title key, if just one has it. */
+/** The only episode with this title key, if exactly one has it. */
 const onlyWith = <T extends NumberedEpisode>(
   key: string,
   episodes: T[]
@@ -116,11 +114,9 @@ const onlyWith = <T extends NumberedEpisode>(
 };
 
 /**
- * The library episode a numbered name's title is, exactly: the words after
- * its episode number are one episode's very title, and no other's. Used
- * where the title overrules the number, so a title that only shares a
- * word or two with an episode's ("The Reckoning Begins", "Reckoning") is
- * never taken for it.
+ * The one library episode whose exact title follows a numbered name's
+ * episode number. Used where the title overrules the number, so a partial
+ * match ("The Reckoning Begins", "Reckoning") never counts.
  */
 export const episodeTitled = <T extends NumberedEpisode>(
   name: string,
@@ -152,11 +148,10 @@ export const ownTitle = (ep: NumberedEpisode): boolean => {
 };
 
 /**
- * The library episode a name without any episode number is, by its title
- * alone ("Remote Reach - Beyond the Map", a special named only so). The
- * whole of what follows the show's name, up to the release's tags, must be
- * one episode's very title, and a title of some length: "Day One
- * Interview" is not "Day One".
+ * The library episode an unnumbered name is, by title alone ("Remote Reach
+ * - Beyond the Map", a special named only so). Everything after the show's
+ * name, up to the tags, must be one episode's exact title, and long enough:
+ * "Day One Interview" is not "Day One".
  */
 export const episodeNamedIn = <T extends NumberedEpisode>(
   name: string,
@@ -192,9 +187,8 @@ const described = (ep: NumberedEpisode) =>
   })`;
 
 /**
- * What a release name says it is, against the library: the episode its
- * title is, and whether that is the episode Sonarr maps it to (when it
- * maps it to one). Empty when the name says nothing to add.
+ * What a release name is against the library: the episode its title is,
+ * and whether Sonarr maps it there. Empty when the name adds nothing.
  */
 export const nameReading = (
   name: string,
@@ -211,10 +205,9 @@ export const nameReading = (
 };
 
 /**
- * What a release found on the indexers is, by its name alone: the library
- * episode its numbers are, the one the scene's numbers would make it (for
- * a series Sonarr numbers that way), and the one its title is. Empty when
- * it says nothing about a single episode.
+ * What an indexer release is by name alone: the library episode by its
+ * numbers, by scene numbers (on a scene-numbered series), and by its title.
+ * Empty when it names no single episode.
  */
 export const indexerReading = (
   name: string,

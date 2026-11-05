@@ -9,9 +9,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * Sonarr's and Radarr's size limits, in MB a minute of what a file holds:
- * the profile's own (Sonarr v5) before the app's, and a file of several
- * episodes allowed that many times one's.
+ * Sonarr's and Radarr's size limits in MB per minute: the profile's (Sonarr
+ * v5) before the app's, and multi-episode files allowed that many times
+ * one's.
  */
 
 const MB = 1024 * 1024;

@@ -20,8 +20,8 @@ import path from 'node:path';
 import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
- * Download Check through the real API validator: the findings an admin
- * sees, their choices, and the switch in Settings.
+ * Download Check through the real API validator: findings an admin sees, their
+ * choices, and the Settings switch.
  */
 
 setupTestDb();

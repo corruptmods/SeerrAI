@@ -51,12 +51,12 @@ const authenticateQCMock = mock.method(
   async () => ({ ...defaultAuthenticateResponse })
 );
 
-// Plex accounts signing in with a password, or linked, are checked against
-// the owner's share list; everyone here is on it unless a test says not.
+// Plex accounts (password or linked) are checked against the owner's share
+// list; everyone is on it unless a test says otherwise.
 let plexShared = true;
 mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => plexShared);
 
-/** The Plex account plex.tv answers with when someone links Plex. */
+/** The account plex.tv returns when a user links Plex. */
 let plexAccount = { id: 5000, email: 'friend@seerr.dev' };
 mock.method(PlexTvAPI.prototype, 'getUser', async () => ({
   ...plexAccount,
@@ -208,7 +208,7 @@ describe('the owner and shared devices', () => {
       204
     );
 
-    // The same device, now registered by someone else.
+    // The same device, now registered by another user.
     const second = await loginAs('admin@seerr.dev', 'test1234');
     assert.strictEqual(
       (
@@ -350,7 +350,7 @@ describe('the home page rows a person hides', () => {
       [deletingSoon.id, trending.id]
     );
 
-    // Not someone else's, and not nonsense.
+    // Refused for another user, and for invalid input.
     assert.strictEqual(
       (await agent.post('/user/1/settings/discover').send({ hidden: [] }))
         .status,
@@ -377,13 +377,13 @@ describe('a person’s own Networks row', () => {
 
   it('is theirs alone, checked, and the usual list until they choose', async () => {
     const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
-    // The usual list to begin with.
+    // Starts with the default list.
     assert.strictEqual(
       (await agent.get(`/user/${userId}/settings/discover`)).body.networks,
       null
     );
 
-    // Their own: trimmed, a repeat dropped, anything extra left out.
+    // Their own: trimmed, duplicates and extra fields dropped.
     const saved = await agent.post(`/user/${userId}/settings/discover`).send({
       networks: JSON.stringify([
         { id: 2697, name: ' Acorn TV ', logoPath: '/acorn.png', x: 1 },
@@ -400,7 +400,7 @@ describe('a person’s own Networks row', () => {
       mine
     );
 
-    // Hiding rows leaves the list alone, and the list leaves hidden rows.
+    // Hidden rows and the network list are saved independently.
     await agent.post(`/user/${userId}/settings/discover`).send({ hidden: [] });
     assert.strictEqual(
       (await agent.get(`/user/${userId}/settings/discover`)).body.networks,
@@ -425,7 +425,7 @@ describe('a person’s own Networks row', () => {
       mine
     );
 
-    // None at all is kept as none; null is the usual list again.
+    // An empty list stays empty; null restores the default.
     await agent
       .post(`/user/${userId}/settings/discover`)
       .send({ networks: '[]' });
@@ -441,7 +441,7 @@ describe('a person’s own Networks row', () => {
       null
     );
 
-    // Not someone else's, and not an empty request.
+    // Refused for another user, and for an empty request.
     assert.strictEqual(
       (await agent.post('/user/1/settings/discover').send({ networks: mine }))
         .status,
@@ -486,7 +486,7 @@ describe('a person’s own sidebar', () => {
       saved.body
     );
 
-    // Nobody else's changes.
+    // Other users are unaffected.
     const admin = await loginAs('admin@seerr.dev', 'test1234');
     assert.deepStrictEqual(
       (await admin.agent.get('/user/1/settings/sidebar')).body,
@@ -511,8 +511,8 @@ describe('a person’s own sidebar', () => {
       hidden: ['calendar'],
     });
 
-    // The default order, sent in full, is kept as no order at all, so items
-    // added in later versions take their usual place.
+    // The full default order is stored as no order, so items added later
+    // take their default place.
     const reset = await agent
       .post(`/user/${userId}/settings/sidebar`)
       .send({ order: [...NAV_ITEMS], hidden: [] });
@@ -596,13 +596,13 @@ describe('a person’s own look', () => {
       (await agent.get(`/user/${userId}/settings/appearance`)).body.appearance,
       kept
     );
-    // Pages read it from the signed-in person.
+    // Pages read it from the signed-in user.
     assert.deepStrictEqual(
       (await agent.get('/auth/me')).body.settings.appearance,
       kept
     );
 
-    // Nobody else's changes.
+    // Other users are unaffected.
     const admin = await loginAs('admin@seerr.dev', 'test1234');
     assert.strictEqual(
       (await admin.agent.get('/user/1/settings/appearance')).body.appearance,
@@ -717,8 +717,8 @@ describe('settings an admin saves for someone else', () => {
 });
 
 /*
- * Someone who manages users, but is not an admin, and an admin who is not
- * the owner: only the owner changes an admin's account.
+ * A non-admin user manager and a non-owner admin: only the owner changes an
+ * admin's account.
  */
 describe("another admin's account", () => {
   const people = async () => {
@@ -765,7 +765,7 @@ describe("another admin's account", () => {
     assert.strictEqual(res.status, 403);
     assert.strictEqual(await emailOf(admin.id), 'second-admin@seerr.dev');
 
-    // Everyone else's they still manage.
+    // They still manage everyone else.
     const ok = await agent
       .post(`/user/${regular.id}/settings/main`)
       .send({ username: 'regular', email: 'regular2@seerr.dev' });
@@ -808,7 +808,7 @@ describe("another admin's account", () => {
 
   it('is changed by its owner and by the server owner', async () => {
     const { admin } = await people();
-    // A Plex account's email is Plex's; a password account's is its own.
+    // A Plex account's email comes from Plex; a password account's is its own.
     await getRepository(User).update(admin.id, { userType: UserType.LOCAL });
     const own = await loginAs('second-admin@seerr.dev', 'test1234');
     const mine = await own.agent
@@ -858,7 +858,7 @@ describe('changing your own password', () => {
     const friend = await users.findOneOrFail({
       where: { email: 'friend@seerr.dev' },
     });
-    // Signed in, then the password taken away (a Plex user never had one).
+    // Signed in, then the password removed (as for a Plex user).
     const { agent } = await loginAs('friend@seerr.dev', 'test1234');
     await users.update(friend.id, { password: null as unknown as string });
 
@@ -887,8 +887,8 @@ describe('a Trakt username made of dots', () => {
 });
 
 /*
- * Linked accounts with several media servers connected, the first one
- * named primary. Each test leaves only the primary one connected.
+ * Linked accounts with several media servers, the first named primary. Each
+ * test leaves only the primary connected.
  */
 describe('linked accounts with several media servers', () => {
   const connectServers = (...kinds: MediaServerKind[]) => {
@@ -934,7 +934,7 @@ describe('linked accounts with several media servers', () => {
         };
       }
     );
-    // Someone with a Jellyfin or Emby account is checked there at sign-in.
+    // Jellyfin and Emby accounts are checked on their server at sign-in.
     getAccount = mock.method(JellyfinAPI.prototype, 'getAccount', async () => ({
       Policy: { IsDisabled: false },
     }));
@@ -1096,7 +1096,7 @@ describe('linked accounts with several media servers', () => {
         userType: UserType.PLEX,
       })
     );
-    // An admin does it: this person has no password to sign in with.
+    // An admin acts, since this user has no password to sign in with.
     const { agent } = await loginAs('admin@seerr.dev', 'test1234');
     const unlink = (kind: string) =>
       agent.delete(`/user/${person.id}/settings/linked-accounts/${kind}`);
@@ -1107,12 +1107,12 @@ describe('linked accounts with several media servers', () => {
     assert.strictEqual(after.userType, UserType.EMBY);
     assert.strictEqual(after.avatar, '/avatarproxy/emby-two');
 
-    // The last way in stays.
+    // The last sign-in method can't be removed.
     assert.strictEqual((await unlink('emby')).status, 400);
     after = await users.findOneOrFail({ where: { id: person.id } });
     assert.strictEqual(after.embyUserId, 'emby-two');
 
-    // With a password it can go, and they have a password account.
+    // With a password it can go, leaving a password account.
     await users.update(person.id, { password: 'set' });
     assert.strictEqual((await unlink('emby')).status, 204);
     after = await users.findOneOrFail({ where: { id: person.id } });
@@ -1136,7 +1136,7 @@ describe('linked accounts with several media servers', () => {
 
     assert.strictEqual((await unlink('jellyfin')).status, 400);
     assert.strictEqual((await unlink('plex')).status, 400);
-    // Emby is read as the owner's account until another one is chosen.
+    // Emby reads as the owner's account until another is chosen.
     const refused = await unlink('emby');
     assert.strictEqual(refused.status, 400);
     assert.match(refused.body.message, /another administrator/);
@@ -1167,9 +1167,9 @@ describe('linked accounts with several media servers', () => {
 });
 
 /*
- * List activity goes to a person on their own: Discord only ever posts to
- * the channel, so it isn't offered on a person's Discord settings even when
- * the channel's saved types still include it.
+ * List activity is personal and Discord only posts to the channel, so it
+ * isn't offered in a user's Discord settings even if the channel's saved
+ * types include it.
  */
 describe('a person’s Discord notification types', () => {
   afterEach(() => {
@@ -1197,8 +1197,8 @@ describe('a person’s Discord notification types', () => {
 });
 
 /*
- * A key, which might have leaked, can't become a full sign-in: linking a
- * media server account or setting a password needs someone signed in.
+ * A possibly leaked key can't become a full sign-in: linking a media server
+ * account or setting a password needs a signed-in session.
  */
 describe('a key linking an account or setting a password', () => {
   it('is refused, personal key or the server’s', async () => {
@@ -1250,7 +1250,7 @@ describe('a key linking an account or setting a password', () => {
       });
       assert.deepStrictEqual(after, beforeAccount);
 
-      // The server's key still sets someone else's password, as upstream.
+      // The server's key can still set another user's password, as upstream.
       const res = await request(app)
         .post(`/user/${friend.id}/settings/password`)
         .set({ 'X-Api-Key': 'the-servers-own-key' })

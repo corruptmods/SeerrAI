@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * A title whose state changed here: requested, say. Rows loaded page by page
- * (useSWRInfinite) are left out when SWR is told to refresh every key that
- * matches, so they listen for this instead and reload the pages that hold it.
+ * A title whose state changed here (e.g. requested). Key-matching SWR
+ * mutations skip useSWRInfinite rows, so they listen for this and reload the
+ * pages holding it.
  */
 export interface ChangedTitle {
   tmdbId: number;
@@ -28,13 +28,13 @@ export const pageHolds = (page: unknown, title: ChangedTitle): boolean => {
       if (result?.id !== title.tmdbId) {
         return false;
       }
-      // Rows of one kind (a films row, say) may not say which kind they are.
+      // Single-type rows may omit mediaType.
       return !result.mediaType || result.mediaType === title.mediaType;
     })
   );
 };
 
-/** Calls back with each title that changes while the component is shown. */
+/** Calls back with each title that changes while mounted. */
 const useTitleChanged = (onChange: (title: ChangedTitle) => void): void => {
   const latest = useRef(onChange);
 

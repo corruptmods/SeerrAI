@@ -52,7 +52,7 @@ const MediaLists = () => {
   const { addToast } = useToasts();
   const { user } = useUser();
   const [newName, setNewName] = useState('');
-  // Playlists while music is set up and on for this person.
+  // Playlists need music set up and on for this person.
   const musicOn = useFeature('music');
   const [kind, setKind] = useState<'watch' | 'music'>('watch');
   const [isCreating, setCreating] = useState(false);
@@ -76,14 +76,11 @@ const MediaLists = () => {
         { name, kind: musicOn ? kind : 'watch' }
       );
       setNewName('');
-      // Show the list straight away rather than waiting on a refetch, then
-      // offer to share it. Both happen without a page navigation, so neither
-      // waits on a server round trip.
+      // Refresh the lists, then offer to share the new one, without navigating.
       await mutate();
       setSharing({ id: data.id, name: data.name });
     } catch (e) {
-      // Without this the button silently does nothing when the request
-      // fails, which is indistinguishable from the click not registering.
+      // Report failures, or the button appears to do nothing.
       const detail =
         (axios.isAxiosError(e) && e.response?.data?.message) ||
         (e instanceof Error ? e.message : String(e));
@@ -104,7 +101,6 @@ const MediaLists = () => {
     return <ListCardsSkeleton />;
   }
 
-  // Watch lists, then playlists, each in its section.
   const sections = (['watch', 'music'] as const)
     .map((kind) => ({
       kind,
@@ -131,9 +127,8 @@ const MediaLists = () => {
       </div>
 
       {/*
-        On a phone the name gets a line of its own, so a long one can be
-        read as it's typed, with what the list holds and Create sharing the
-        next; on a wider screen, one line. Everything the same height.
+        On a phone the name has its own line, with the kind and Create on the
+        next; wider, one line. All the same height.
       */}
       <div className="mb-6 grid max-w-2xl gap-2 sm:flex">
         <input
@@ -182,7 +177,7 @@ const MediaLists = () => {
         <div className="space-y-10">
           {sections.map((section) => (
             <section key={section.kind}>
-              {/* Headed only when both kinds are there, apart. */}
+              {/* Headings only when both kinds are shown. */}
               {sections.length > 1 && (
                 <h2 className="mb-4 flex items-center gap-2 border-b border-subtle pb-2 text-xl font-bold text-strong">
                   {section.kind === 'music' ? (

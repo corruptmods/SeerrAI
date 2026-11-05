@@ -3,10 +3,8 @@ import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 
 /**
- * The page a notification about a title opens: the film's or series' page,
- * or for music the album asked for, or the artist's page when a request
- * asked for several or for songs. Music has no TMDB id to build the
- * address from.
+ * Page a notification opens. Music uses the album for a single-album request,
+ * else the artist; it has no TMDB id.
  */
 export const mediaPagePath = (
   media: Pick<Media, 'mediaType' | 'tmdbId' | 'foreignId'>,

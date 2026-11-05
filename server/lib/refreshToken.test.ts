@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
 /*
- * Plex sign-ins are kept alive by pinging Plex with each person's token,
- * only while Seerr is connected to Plex.
+ * Plex sign-ins are kept alive by pinging Plex with each user's token, only
+ * while connected to Plex.
  */
 
 setupTestDb();
@@ -30,7 +30,7 @@ describe('Plex Refresh Token', () => {
 
     await refreshToken.run();
 
-    // The two people the test database starts with.
+    // The two users the test database starts with.
     assert.equal(pinged.mock.callCount(), 2);
   });
 

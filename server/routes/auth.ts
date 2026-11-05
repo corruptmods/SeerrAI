@@ -56,10 +56,10 @@ const passwordLimiter = new SignInLimiter('password');
 const jellyfinLimiter = new SignInLimiter('jellyfin');
 const resetLimiter = new SignInLimiter('reset');
 
-// Signing in with a passkey, and managing your own.
+// Passkey sign-in and management of your own passkeys.
 authRoutes.use('/passkey', passkeyRoutes);
 
-// Signing in, or linking an account, through a single sign-on provider.
+// Sign-in and account linking via single sign-on.
 authRoutes.use('/oidc', oidcRoutes);
 
 export const quickConnectSecret = z.object({
@@ -82,7 +82,6 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
     where: { id: req.user.id },
   });
 
-  // check if email is required in settings and if user has an valid email
   const settings = await getSettings();
   if (
     settings.notifications.agents.email.options.userEmailRequired &&
@@ -92,17 +91,16 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
     logger.warn(`User ${user.username} has no valid email address`);
   }
 
-  // Plex rejected their token during watchlist sync. Signing in again with
-  // Plex is the only fix, so say so where they will see it.
+  // Plex rejected their token during watchlist sync; only signing in with Plex
+  // again fixes it, so warn them.
   if (user.plexTokenExpiredAt) {
     user.warnings.push('plexTokenExpired');
   }
 
-  // Only the settings the app reads about the person signed in; their
-  // notification credentials stay on the server.
+  // Only the settings the app reads; notification credentials stay server-side.
   return res.status(200).json({
     ...user.toJSON(),
-    // Their own, which toJSON leaves out for anyone else's eyes.
+    // toJSON omits these for anyone but the user.
     email: user.email,
     plexId: user.plexId,
     plexTokenExpiredAt: user.plexTokenExpiredAt,
@@ -122,7 +120,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       sidebarHidden: user.settings.sidebarHidden,
       appearance: user.settings.appearance ?? null,
       seasonNote: user.settings.seasonNote ?? null,
-      // The version of their own CSS that pages load, while it is allowed.
+      // Their personal CSS version, while personal CSS is allowed.
       personalCssVersion: getSettings().appearance.personalCss
         ? cssVersion(user.settings.customCss)
         : null,
@@ -142,18 +140,17 @@ authRoutes.post('/plex', async (req, res, next) => {
     });
   }
 
-  // Before setup, signing in with Plex is how Plex is set up.
+  // Before setup, Plex sign-in is how Plex gets set up.
   if (primaryServer() && !signInAllowed('plex')) {
     return res.status(500).json({ error: 'Plex login is disabled' });
   }
   try {
-    // First we need to use this auth token to get the user's email from plex.tv
+    // Get the user's email from plex.tv.
     const plextv = new PlexTvAPI(body.authToken);
     const account = await plextv.getUser();
 
-    // Next let's see if the user already exists: by Plex account, or else
-    // by email, which only finds someone this Plex account may take over
-    // (see plexAccountMayClaim).
+    // Find the user by Plex account, else by email (only someone this Plex
+    // account may take over; see plexAccountMayClaim).
     let user = await userRepository.findOne({
       where: { plexId: account.id },
     });
@@ -207,10 +204,9 @@ authRoutes.post('/plex', async (req, res, next) => {
 
       if (
         account.id === mainUser.plexId ||
-        // The owner signing in with Plex for the first time, on a server
-        // set up with Plex, or with none set up yet. With another server
-        // primary, the owner's email says nothing about who holds this Plex
-        // account.
+        // The owner's first Plex sign-in, on a Plex-primary or not-yet-set-up
+        // server. With another server primary, the owner's email says nothing
+        // about who holds this Plex account.
         ((primaryServer() ?? 'plex') === 'plex' &&
           account.email === mainUser.email &&
           !mainUser.plexId) ||
@@ -253,14 +249,13 @@ authRoutes.post('/plex', async (req, res, next) => {
 
           const changes: Partial<User> = {
             plexToken: body.authToken,
-            // A fresh token ends any expired sign-in notice.
+            // A fresh token clears the expired sign-in notice.
             plexTokenExpiredAt: null,
             plexId: account.id,
             plexUsername: account.username,
           };
-          // Their picture, email and kind of account come from Plex only
-          // when Plex is their main account: someone who signs in with
-          // Jellyfin or Emby too keeps what they have.
+          // Avatar, email and account type come from Plex only when Plex is
+          // their main account.
           if (mainAccountOn(user, 'plex')) {
             changes.userType = UserType.PLEX;
           }
@@ -327,16 +322,15 @@ authRoutes.post('/plex', async (req, res, next) => {
       }
     }
 
-    // The owner signing in with Plex before any media server is set up
-    // (settings started afresh over an existing database): Plex becomes the
-    // primary server and the jobs start, as at a first sign-in.
+    // Owner signing in with Plex before any media server is set up (fresh
+    // settings over an existing database): Plex becomes primary and jobs start,
+    // as at first sign-in.
     if (primaryServer() === undefined && user.id === 1) {
       connectAsPrimary('plex');
       await settings.save();
       startJobs();
     }
 
-    // Set logged in session
     await startSession(req, user.id);
 
     return res.status(200).json(user?.filter() ?? {});
@@ -353,7 +347,7 @@ authRoutes.post('/plex', async (req, res, next) => {
   }
 });
 
-/** A person's avatar from their account on a Jellyfin or Emby server. */
+/** User's avatar URL on a Jellyfin or Emby server. */
 function getUserAvatarUrl(user: User, kind: JellyfinFamilyKind): string {
   return `/avatarproxy/${user[USER_ID[kind]]}?v=${user.avatarVersion}`;
 }
@@ -372,9 +366,8 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     serverType?: number;
   };
 
-  // At setup, the server being set up. After it, the server asked for
-  // (serverType), else the first connected Jellyfin or Emby server people
-  // may sign in with.
+  // During setup, the server being set up. Afterwards, serverType if given,
+  // else the first connected Jellyfin or Emby server with sign-in on.
   const settingUp = !primaryServer();
   const asked = kindOfType(body.serverType);
   const kind: JellyfinFamilyKind | undefined = settingUp
@@ -388,7 +381,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       : (connectedServers().filter(isJellyfinFamily).find(signInAllowed) ??
         jellyfinFamilyServer());
 
-  // Setup aside, only a connected server whose sign-in is on.
+  // Outside setup, only a connected server with sign-in on.
   if (!settingUp && (!kind || !signInAllowed(kind))) {
     return res.status(500).json({ error: 'Jellyfin login is disabled' });
   }
@@ -421,7 +414,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
             urlBase: body.urlBase,
           });
 
-    // Try to find deviceId that corresponds to jellyfin user, else generate a new one
+    // Reuse the user's device id, else generate one.
     let user = await userRepository.findOne({
       where: { [USERNAME[serverKind]]: body.username },
       select: { id: true, [DEVICE_ID[serverKind]]: true },
@@ -437,7 +430,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       deviceId = Buffer.from(`BOT_seerr_${body.username}`).toString('base64');
     }
 
-    // First we need to attempt to log the user in to jellyfin
+    // Authenticate against the media server.
     const jellyfinserver = new JellyfinAPI(
       hostname ?? '',
       undefined,
@@ -462,14 +455,12 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       clientIp
     );
 
-    // Next let's see if the user already exists
     user = await userRepository.findOne({
       where: { [USER_ID[serverKind]]: account.User.Id },
     });
 
     const missingAdminUser = !user && !(await userRepository.count());
     if (missingAdminUser || settingUp) {
-      // Check if user is admin on jellyfin
       if (account.User.Policy.IsAdministrator === false) {
         throw new ApiError(403, ApiErrorCode.NotAdmin);
       }
@@ -492,8 +483,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
           }
         );
 
-        // User doesn't exist, and there are no users in the database, we'll create the user
-        // with admin permissions
+        // No users in the database yet: create this one as admin.
 
         user = withNewUserDefaults(
           new User({
@@ -522,7 +512,8 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
           }
         );
 
-        // User alread exist but settings.json is not configured, we'll edit the admin user
+        // User exists but settings.json isn't configured: update the admin
+        // user.
 
         user = await userRepository.findOne({
           where: { id: 1 },
@@ -547,7 +538,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         await userRepository.save(user);
       }
 
-      // Create an API key on Jellyfin from this admin user
+      // Create a media server API key from this admin user.
       const jellyfinClient = new JellyfinAPI(
         hostname,
         account.AccessToken,
@@ -566,7 +557,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       await settings.save();
       startJobs();
     }
-    // User already exists, let's update their information
+    // Existing user: update their details.
     else if (account.User.Id === user?.[USER_ID[serverKind]]) {
       logger.info(`Found matching ${name} user; updating user with ${name}`, {
         label: 'API',
@@ -576,9 +567,8 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       const changes: Partial<User> = {
         [USERNAME[serverKind]]: account.User.Name,
       };
-      // Their picture and name come from this server only when it holds
-      // their main account; someone who signs in with another server too
-      // keeps what they have.
+      // Avatar and name come from this server only when it holds their main
+      // account.
       if (mainAccountOn(user, serverKind)) {
         changes.avatar = getUserAvatarUrl(user, serverKind);
         if (user.username === account.User.Name) {
@@ -611,8 +601,8 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         }
       );
 
-      // Their email, or else their name there, is how they sign in with a
-      // password: never one another account already has.
+      // Their email, else their server username, is their password-login name;
+      // never one another account already has.
       const email = body.email || account.User.Name;
       if (!(await emailFree(email))) {
         logger.warn(
@@ -643,7 +633,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       );
       user.avatar = getUserAvatarUrl(user, serverKind);
 
-      //initialize Jellyfin/Emby users with local login
+      // Also enable local login when a password was given.
       const passedExplicitPassword = body.password && body.password.length > 0;
       if (passedExplicitPassword) {
         await user.setPassword(body.password ?? '');
@@ -651,8 +641,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       await userRepository.save(user);
     }
 
-    // Their picture follows this server only when it holds their main
-    // account.
+    // Avatar follows this server only when it holds their main account.
     if (user && user[USER_ID[serverKind]] && mainAccountOn(user, serverKind)) {
       try {
         const { changed } = await checkAvatarChanged(user, serverKind);
@@ -673,7 +662,6 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       }
     }
 
-    // Set logged in session
     if (user) {
       await startSession(req, user.id);
     }
@@ -787,8 +775,8 @@ authRoutes.post('/jellyfin/quickconnect/initiate', async (req, res, next) => {
     });
   }
 
-  // With Jellyfin sign-in turned off, Quick Connect is only for someone
-  // already signed in linking their Jellyfin account.
+  // With Jellyfin sign-in off, Quick Connect only links Jellyfin for a
+  // signed-in user.
   if (!signInAllowed('jellyfin') && !req.user) {
     return next({
       status: 403,
@@ -888,7 +876,7 @@ authRoutes.post(
       });
     }
 
-    // The same switch as signing in with a Jellyfin password.
+    // Same switch as Jellyfin password sign-in.
     if (!signInAllowed('jellyfin')) {
       return next({
         status: 403,
@@ -926,8 +914,7 @@ authRoutes.post(
           jellyfinAuthToken: account.AccessToken,
           jellyfinDeviceId: deviceId,
         };
-        // Their picture follows Jellyfin only when it holds their main
-        // account.
+        // Avatar follows Jellyfin only when it holds their main account.
         if (mainAccountOn(user, 'jellyfin')) {
           changes.avatar = getUserAvatarUrl(user, 'jellyfin');
         }
@@ -1004,7 +991,6 @@ authRoutes.post(
         }
       }
 
-      // Set session
       await startSession(req, user.id);
 
       return res.status(200).json(user?.filter() ?? {});
@@ -1068,7 +1054,7 @@ authRoutes.post('/local', async (req, res, next) => {
 
     passwordLimiter.clear(req, body.email);
 
-    // The right password, for someone the media server no longer lets in.
+    // Right password, but the media server no longer allows this user.
     if (!(await maySignIn(user, 'password'))) {
       logger.warn('Password sign-in by someone no longer allowed to sign in', {
         label: 'API',
@@ -1081,7 +1067,6 @@ authRoutes.post('/local', async (req, res, next) => {
       });
     }
 
-    // Set logged in session
     await startSession(req, user.id);
 
     return res.status(200).json(user.filter());
@@ -1106,8 +1091,8 @@ authRoutes.post('/logout', async (req, res, next) => {
       return res.status(200).json({ status: 'ok' });
     }
 
-    // Signing out of Seerr also removes the device Seerr signed in to each
-    // connected Jellyfin or Emby server as.
+    // Signing out also removes Seerr's device from each connected Jellyfin or
+    // Emby server.
     const kinds = connectedServers().filter(isJellyfinFamily);
     const user = kinds.length
       ? await getRepository(User)
@@ -1187,7 +1172,7 @@ authRoutes.post('/reset-password', async (req, res, next) => {
   if (!resetLimiter.allow(req, res, body.email)) {
     return;
   }
-  // Counted whether or not the account exists, so the answer is the same.
+  // Counted whether or not the account exists, so responses don't reveal it.
   resetLimiter.count(req, body.email);
 
   const user = await userRepository
@@ -1201,8 +1186,7 @@ authRoutes.post('/reset-password', async (req, res, next) => {
       resetPasswordGuid: user.resetPasswordGuid,
       recoveryLinkExpirationDate: user.recoveryLinkExpirationDate,
     });
-    // Not waited for: how long the mail server takes would tell anyone
-    // asking whether the account exists.
+    // Not awaited: mail server latency would reveal whether the account exists.
     void user.sendResetPasswordEmail();
     logger.info('Sending password reset link', {
       label: 'API',
@@ -1272,7 +1256,7 @@ authRoutes.post('/reset-password/:guid', async (req, res, next) => {
     password: user.password,
     recoveryLinkExpirationDate: null,
   });
-  // Whoever knew the old password is signed out.
+  // Sign out anyone who knew the old password.
   await endSessions(user.id);
   logger.info('Successfully reset password', {
     label: 'API',

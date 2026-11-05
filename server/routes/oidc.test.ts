@@ -32,10 +32,10 @@ import path from 'node:path';
 import request from 'supertest';
 
 /*
- * Signing in and linking through a single sign-on provider, end to end: the
- * app as production assembles it (cookie parser, sessions, the OpenAPI
- * validator, the real routers) against a provider on localhost that issues
- * real codes and signed ID tokens, through the real openid-client.
+ * SSO sign-in and linking end to end: the app assembled as in production
+ * (cookie parser, sessions, OpenAPI validator, real routers) against a
+ * localhost provider issuing real codes and signed ID tokens, through the real
+ * openid-client.
  */
 
 setupTestDb();
@@ -47,8 +47,8 @@ let app: Express;
 before(async () => {
   await fake.start();
   app = express();
-  // Lets the test that runs into the sign-in limit do so from an address
-  // of its own, so the rest are not held up by it.
+  // Lets the test that hits the sign-in limit use its own address, so other
+  // tests aren't blocked.
   app.set('trust proxy', true);
   app.use(cookieParser());
   app.use(express.json());
@@ -114,7 +114,7 @@ beforeEach(() => {
   setProvider();
 });
 
-/** The cookies a response set, as name=value pairs to send back. */
+/** Cookies a response set, as name=value pairs to send back. */
 const cookiesOf = (res: request.Response): Record<string, string> => {
   const set = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
   return Object.fromEntries(
@@ -131,7 +131,7 @@ const cookieHeader = (cookies: Record<string, string>) =>
     .map(([name, value]) => `${name}=${value}`)
     .join('; ');
 
-/** Where the page the callback answers with moves on to. */
+/** Where the callback's relay page navigates to. */
 const destinationOf = (res: request.Response): URL => {
   const match = /http-equiv="refresh" content="0;url=([^"]+)"/.exec(res.text);
   assert.ok(match, `not a page that moves on: ${res.status} ${res.text}`);
@@ -147,20 +147,20 @@ const signInWithPassword = async (email: string) => {
 };
 
 interface FlowOptions {
-  /** The sign-in or link route; sign-in by default. */
+  /** Sign-in or link route; sign-in by default. */
   start?: string;
   /** Cookies the browser already has (a session). */
   cookies?: Record<string, string>;
   tamper?: { nonce?: string; state?: string };
-  /** Changes the correlation cookie before it comes back. */
+  /** Alters the correlation cookie before it's sent back. */
   correlation?: (value: string) => string | undefined;
-  /** The address the browser comes from. */
+  /** Client address. */
   from?: string;
 }
 
 /**
- * The browser's whole trip: to Seerr's start route, on to the provider,
- * signed in there as `account`, and back to Seerr's callback.
+ * The browser's full trip: Seerr's start route, the provider (signed in as
+ * `account`), back to Seerr's callback.
  */
 const goThrough = async (
   account: FakeOidcAccount,
@@ -281,8 +281,8 @@ describe('signing in with a provider', () => {
       .find((l) => l.startsWith(`${CORRELATION_COOKIE}=`));
     assert.ok(cleared);
     assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
-    // Its contents say nothing a page could use: it is httpOnly anyway,
-    // and only good with its signature.
+    // Its contents are useless to a page: httpOnly, and only valid with its
+    // signature.
     assert.equal(callback.headers['cache-control'], 'no-store');
     assert.equal(callback.headers['referrer-policy'], 'no-referrer');
   });
@@ -467,7 +467,7 @@ describe('signing in with a provider', () => {
     assert.equal(to.pathname, '/login');
     assert.equal(to.searchParams.get('sso'), 'unavailable');
 
-    // A trip started while it was on ends refused once it is off.
+    // A trip started while enabled is refused once disabled.
     setProvider();
     const { destination, cookies } = await goThrough(ALICE, {
       correlation: (value) => {
@@ -537,14 +537,14 @@ describe('signing in with a provider', () => {
     assert.equal(blocked.destination.searchParams.get('sso'), 'too-many');
     assert.equal(await signedInAs(blocked.cookies), undefined);
 
-    // Someone signing in from elsewhere is not held up.
+    // Someone signing in from elsewhere isn't blocked.
     const elsewhere = await goThrough(ALICE);
     assert.ok(await signedInAs(elsewhere.cookies));
   });
 
   it('never holds anyone up over callbacks no sign-in here started', async () => {
-    // Behind a proxy Seerr does not trust, everyone has the same address:
-    // callbacks made up by someone else must not lock them all out.
+    // Behind an untrusted proxy everyone shares an address: forged callbacks
+    // must not lock them all out.
     const from = '203.0.113.10';
     for (let i = 0; i < 12; i++) {
       for (const providerId of ['authentik', `made-up-${i}`]) {
@@ -554,7 +554,7 @@ describe('signing in with a provider', () => {
         assert.notEqual(destinationOf(res).searchParams.get('sso'), 'too-many');
       }
     }
-    // Nor a genuine cookie from a sign-in with another provider.
+    // Nor a genuine cookie from another provider's sign-in.
     const elsewhere = sealCorrelation({
       provider: 'google',
       state: 's',
@@ -736,7 +736,7 @@ describe('who can sign in', () => {
     );
     assert.equal(await signedInAs(refusedTrip.cookies), undefined);
 
-    // Without rules, a linked account still signs in as before.
+    // Without rules, a linked account still signs in.
     setProvider();
     const { cookies } = await goThrough(ALICE);
     assert.equal(await signedInAs(cookies), friend.id);
@@ -757,7 +757,7 @@ describe('who can sign in', () => {
     assert.equal(await getRepository(User).count(), users);
     assert.equal(await getRepository(OidcLink).count(), 0);
 
-    // Let in, the same person gets their account.
+    // Once allowed, the same person gets their account.
     fake.idTokenClaims = { groups: ['family', 'seerr-users'] };
     const allowed = await goThrough(ALICE);
     assert.ok(await signedInAs(allowed.cookies));
@@ -885,7 +885,7 @@ describe('linking a provider account', () => {
     });
     assert.equal(link.user.id, friend.id);
 
-    // And from then on it signs them in.
+    // From then on it signs them in.
     const { cookies } = await goThrough(ALICE);
     assert.equal(await signedInAs(cookies), friend.id);
   });
@@ -985,7 +985,7 @@ describe('a provider whose issuer URL changed', () => {
     assert.equal(destination.searchParams.get('sso'), 'no-account');
     assert.equal(await signedInAs(cookies), undefined);
 
-    // With sign-up on, the same id at the new issuer is someone new.
+    // With sign-up on, the same id at the new issuer is a new user.
     setProvider({ newUserSignUp: true });
     const again = await goThrough(ALICE);
     const id = await signedInAs(again.cookies);
@@ -1034,7 +1034,7 @@ describe('a provider whose issuer URL changed', () => {
       [false]
     );
 
-    // It is no way in, so it is never someone's last.
+    // It isn't a way in, so it's never someone's last.
     const removed = await request(app)
       .delete(
         `/api/v1/user/${friend.id}/settings/linked-accounts/oidc/authentik`
@@ -1126,7 +1126,7 @@ describe('Linked Accounts', () => {
     assert.equal(refused.status, 400);
     assert.equal(await getRepository(OidcLink).count(), 1);
 
-    // Another provider that is switched on is another way in.
+    // Another enabled provider is another way in.
     getSettings().oidc = {
       providers: [
         provider({ newUserSignUp: true }),
@@ -1154,7 +1154,7 @@ describe('Linked Accounts', () => {
   });
 
   it('counts a provider as a way in when a media server account is unlinked', async () => {
-    // Someone with a Plex account and no password.
+    // A Plex user with no password.
     const friend = await getRepository(User).findOneByOrFail({
       email: 'friend@seerr.dev',
     });

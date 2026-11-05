@@ -53,9 +53,9 @@ import {
 } from 'node:test';
 
 /*
- * The admin health page's checks, against a real database and real HTTP:
- * services that answer and one that does not, and requests, titles and users
- * in each problem state alongside ones that must not be flagged.
+ * Admin health checks against a real database and real HTTP: answering and
+ * unreachable services, and requests, titles and users in each problem state
+ * beside ones that must not be flagged.
  */
 
 setupTestDb();
@@ -64,7 +64,7 @@ const HOUR = 60 * 60 * 1000;
 const GB = 1024 ** 3;
 const DAY = 24 * HOUR;
 
-/** Films looked up on TMDB for their names. */
+/** TMDB film lookups (for names). */
 let movieLookups = 0;
 Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
   configurable: true,
@@ -87,8 +87,8 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
   },
 });
 
-// A service that answers the status calls Seerr makes, and Radarr's and
-// Sonarr's catalogues as their APIs return them.
+// Fake service answering Seerr's status calls, plus Radarr and Sonarr
+// catalogues as their APIs return them.
 let radarrMovies: unknown[] = [];
 let sonarrSeries: unknown[] = [];
 let sonarrEpisodes: unknown[] = [];
@@ -98,7 +98,7 @@ let commands: {
   movieIds?: number[];
   albumIds?: number[];
 }[] = [];
-// What the fake Radarr says on its health page, and its disks.
+// The fake Radarr's health page and disks.
 let arrHealth: unknown[] | null = [];
 let rootFolders: unknown[] = [];
 // The fake Prowlarr's indexers and their failures.
@@ -145,7 +145,7 @@ const fake = http.createServer((req, res) => {
     ['/api/providers', { data: bazarrProviders }],
   ];
   const answer = answers.find(([prefix]) => url.startsWith(prefix));
-  // null: the request gets no answer at all.
+  // null: the request gets no answer.
   if (answer && answer[1] === null) {
     req.socket.destroy();
     return;
@@ -221,7 +221,7 @@ const radarr = (id: number, name: string, portNumber: number): RadarrSettings =>
   }) as unknown as RadarrSettings;
 
 before(async () => {
-  // The match check's last report is a file other tests may have left.
+  // The match check's last report is a file other tests may leave behind.
   mock.method(plexMatchCheck, 'lastReport', async () => ({
     finishedAt: null,
     running: false,
@@ -314,7 +314,7 @@ const backdate = async (
 
 describe('services', () => {
   it('reports each configured service, answering or not, by name', async () => {
-    // The database is listed too on Postgres; it has a test of its own.
+    // On Postgres the database is listed too; it has its own test.
     const checks = (await health()).filter(
       (c) => c.group === 'services' && c.id !== 'database'
     );
@@ -516,7 +516,7 @@ describe('services', () => {
         deluge.items.map((i) => [i.title, i.href]),
         [["Deluge's Label plugin is off", '/settings/backfill']]
       );
-      // Not one Backfill uses: only whether it answers.
+      // Not used by Backfill: only checked for an answer.
       const nzbget = byId(checks, 'downloadClient:9');
       assert.equal(nzbget.status, 'ok');
       assert.match(nzbget.detail!, /NZBGet 24\.3/);
@@ -555,7 +555,7 @@ describe('media servers', () => {
       settings.jellyfin = kept.jellyfin;
       settings.emby = kept.emby;
     });
-    // Nothing answers on port 1: each is listed, as not answering.
+    // Nothing answers on port 1: each is listed as not answering.
     const nowhere = { ip: '127.0.0.1', port: 1, useSsl: false };
     settings.main.mediaServerType = MediaServerType.JELLYFIN;
     settings.plex = { ...settings.plex, ...nowhere, connected: true };
@@ -647,7 +647,7 @@ describe('Backfill', () => {
       enabled: true,
       downloadCheck: { mode: 'on' },
     };
-    // A local model server, the stand-in: the AI check asks it too.
+    // The stand-in as a local model server, so the AI check queries it.
     settings.ai = {
       enabled: true,
       provider: 'openai',
@@ -693,7 +693,7 @@ describe('Backfill', () => {
         status: 'waiting',
         title: 'Remote.Reach.Revisited.S01E02-GRP',
       });
-      // Last week's: not this week's.
+      // From last week, so not counted.
       await finding({ createdAt: new Date(Date.now() - 8 * DAY) });
 
       const runs = getRepository(AgentRun);
@@ -849,10 +849,9 @@ describe('requests, titles and users', () => {
     const media = await getRepository(Media).save(
       new Media({ tmdbId, mediaType: type, status: mediaStatus, tvdbId })
     );
-    // Saved as pending, then moved to the wanted status without the save
-    // hooks: an approved save tries to send it straight away, and with no
-    // default Radarr here that marks it failed. Approved-but-unsent really
-    // arises from a send that errors, such as Radarr being down.
+    // Saved as pending, then set to the wanted status without save hooks: an
+    // approved save sends at once and, with no default Radarr, fails.
+    // Approved-but-unsent really comes from a send error (e.g. Radarr down).
     const request = await getRepository(MediaRequest).save(
       new MediaRequest({
         type,
@@ -898,7 +897,7 @@ describe('requests, titles and users', () => {
       MediaStatus.PROCESSING,
       MediaRequestStatus.APPROVED
     );
-    // Radarr added it, and gave it an id.
+    // Radarr added it and gave it an id.
     await getRepository(Media).update(sent.media.id, { externalServiceId: 77 });
     await backdate(
       'media_request',
@@ -1092,8 +1091,8 @@ describe('requests, titles and users', () => {
   });
 
   it('keeps requests with no title out of the other checks, listed on their own', async () => {
-    // What the live page showed: every "never sent" row was a request no
-    // longer linked to a title.
+    // Seen live: every "never sent" row was a request no longer linked to a
+    // title.
     const orphan = async (status: MediaRequestStatus) => {
       const inserted = await getRepository(MediaRequest)
         .createQueryBuilder()
@@ -1298,7 +1297,7 @@ describe('requests, titles and users', () => {
               try {
                 parsed = raw ? JSON.parse(raw) : {};
               } catch {
-                // An error page rather than JSON; the status is what matters.
+                // An error page, not JSON; only the status matters.
               }
               resolve({ status: res.statusCode ?? 0, body: parsed });
             });
@@ -1676,7 +1675,7 @@ describe('requests, titles and users', () => {
     );
     assert.deepEqual([failed.body.count, failed.body.items.length], [11, 1]);
 
-    // Another check's page runs that check alone, not the twelve films'.
+    // Another check's page runs only that check: no film lookups.
     movieLookups = 0;
     const tvdb = await get('/api/v1/settings/health/checks/missingTvdb?page=2');
     assert.deepEqual([tvdb.status, movieLookups], [200, 0]);
@@ -1764,17 +1763,17 @@ describe('requests, titles and users', () => {
 describe('fixing a wrong Plex match', () => {
   const wrong: PlexMatchProblem = {
     kind: 'movie',
-    folder: 'Border Feud (2024)',
+    folder: 'Static Garden (2024)',
     reason: 'other',
     expected: {
-      title: 'Border Feud',
+      title: 'Static Garden',
       year: 2024,
       tmdbId: 846213,
       server: 'Radarr',
     },
     mediaServer: 'Plex',
     matched: {
-      title: 'Guerra Fronteriza',
+      title: 'Jardín Estático',
       year: 2024,
       key: '70',
       tmdbId: 1427986,
@@ -1803,7 +1802,7 @@ describe('fixing a wrong Plex match', () => {
             let raw = '';
             res.on('data', (c) => (raw += c));
             res.on('end', () => {
-              // This app answers errors as HTML: their status is enough.
+              // This app answers errors as HTML; only the status matters.
               let parsed: Record<string, unknown> = {};
               try {
                 parsed = JSON.parse(raw);
@@ -1820,7 +1819,7 @@ describe('fixing a wrong Plex match', () => {
     );
 
   let forgotten: string[][];
-  // Restored one by one: the file's own mock of lastReport stays.
+  // Restored one by one so the file-level lastReport mock stays.
   let mocked: { mock: { restore: () => void } }[] = [];
   const stub = <T extends object>(
     target: T,
@@ -1850,7 +1849,7 @@ describe('fixing a wrong Plex match', () => {
     });
     let item = {
       ratingKey: '70',
-      title: 'Guerra Fronteriza',
+      title: 'Jardín Estático',
       year: 2024,
       guid: 'plex://movie/wrong',
       Guid: [{ id: 'tmdb://1427986' }],
@@ -1864,7 +1863,7 @@ describe('fixing a wrong Plex match', () => {
       'findMatches',
       async (_key: string, term: string) =>
         term === 'tmdb-846213'
-          ? [{ guid: 'plex://movie/right', name: 'Border Feud', year: 2024 }]
+          ? [{ guid: 'plex://movie/right', name: 'Static Garden', year: 2024 }]
           : []
     );
     stub(
@@ -1873,7 +1872,7 @@ describe('fixing a wrong Plex match', () => {
       async (_key: string, to: { guid: string }) => {
         item = {
           ...item,
-          title: 'Border Feud',
+          title: 'Static Garden',
           guid: to.guid,
           Guid: [{ id: 'tmdb://846213' }],
         };
@@ -1909,7 +1908,7 @@ describe('fixing a wrong Plex match', () => {
     }[];
     assert.equal(fix.by, 1);
     assert.equal(fix.byName, actingAs?.displayName);
-    assert.equal(fix.to.title, 'Border Feud');
+    assert.equal(fix.to.title, 'Static Garden');
 
     const undone = await call(
       'POST',
@@ -1946,7 +1945,7 @@ describe('music', () => {
     commands = [];
     const settings = getSettings();
     settings.main.disabledFeatures = [];
-    // A default Lidarr: music is ready.
+    // A default Lidarr makes music ready.
     settings.lidarr = [
       {
         ...radarr(0, 'Lidarr', fakePort),
@@ -1955,8 +1954,8 @@ describe('music', () => {
         activeMetadataProfileName: 'Standard',
       } as unknown as LidarrSettings,
     ];
-    // Plex connected with a music library on, so a media server decides
-    // whether an album is here.
+    // Plex with a music library enabled, so the media server decides whether
+    // an album is present.
     settings.main.mediaServerType = MediaServerType.PLEX;
     settings.plex = {
       ...settings.plex,
@@ -1975,7 +1974,7 @@ describe('music', () => {
     settings.plex = { ...settings.plex, musicLibraries: [] };
   };
 
-  /** Glasswing, their albums, and a request for some of them. */
+  /** Seeds Glasswing, their albums, and a request for some of them. */
   const seed = async (
     albums: Partial<MusicAlbum>[],
     {
@@ -2048,10 +2047,10 @@ describe('music', () => {
           trackCount: 14,
           trackFileCount: 14,
         },
-        // Lidarr has nothing of it yet: not this check's.
+        // Lidarr has no files yet: not this check's concern.
         { mbId: album(2), title: 'Fog B', trackFileCount: 0 },
       ]);
-      // In Lidarr only an hour: the media server may not have scanned yet.
+      // In Lidarr only an hour: the media server may not have scanned it.
       const fresh = await getRepository(MusicAlbum).save(
         new MusicAlbum({
           mediaId: (
@@ -2075,8 +2074,8 @@ describe('music', () => {
       assert.match(check.items[0].detail!, /^14 of 14 tracks in Lidarr · /);
       assert.equal(check.items[0].href, `/music/album/${album(1)}`);
 
-      // With no music library on anywhere, Lidarr's files decide: nothing
-      // is waiting on a media server.
+      // With no music library enabled anywhere, Lidarr's files decide, so
+      // nothing waits on a media server.
       getSettings().plex.musicLibraries = [];
       assert.equal(byId(await health(), 'musicNotOnServer').count, 0);
     } finally {
@@ -2089,14 +2088,14 @@ describe('music', () => {
       const media = await seed([
         { mbId: album(1), title: 'Fog B', lidarrAlbumId: 71, trackCount: 10 },
         { mbId: album(2), title: 'Somnolent', lidarrAlbumId: 72 },
-        // Not out yet: nothing to find.
+        // Not released yet: nothing to find.
         {
           mbId: album(3),
           title: 'Next Year',
           lidarrAlbumId: 73,
           releaseDate: '2999',
         },
-        // Lidarr is getting it.
+        // Lidarr already has files for it.
         { mbId: album(4), title: 'Velvet Clay', trackFileCount: 4 },
       ]);
 
@@ -2114,7 +2113,7 @@ describe('music', () => {
         { mediaId: media.id, is4k: false, mediaType: MediaType.MUSIC }
       );
 
-      // Searching asks Lidarr for the albums it has no files for.
+      // Search asks Lidarr for the albums it has no files for.
       const searched = await new Promise<{
         status: number;
         body: { service: string; searched: number };

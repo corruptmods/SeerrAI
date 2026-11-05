@@ -19,7 +19,7 @@ type OptionType = {
   label: string;
 };
 
-/** What testing a Lidarr gives the dialog to choose from. */
+/** Options returned by a Lidarr connection test. */
 interface LidarrTestResponse {
   profiles: { id: number; name: string }[];
   metadataProfiles: { id: number; name: string }[];
@@ -95,15 +95,14 @@ interface LidarrModalProps {
 }
 
 /**
- * Adding or changing a Lidarr server, as Radarr's dialog does, with a
- * metadata profile in place of minimum availability, and no 4K or anime
- * settings (Lidarr has neither).
+ * Add/edit dialog for a Lidarr server. Like Radarr's, but with a metadata
+ * profile instead of minimum availability, and no 4K or anime settings.
  */
 const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
   const intl = useIntl();
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
-  const [isValidated, setIsValidated] = useState(lidarr ? true : false);
+  const [isValidated, setIsValidated] = useState(!!lidarr);
   const [isTesting, setIsTesting] = useState(false);
   const [testResponse, setTestResponse] = useState<LidarrTestResponse>({
     profiles: [],
@@ -317,7 +316,7 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
           isSubmitting,
           isValid,
         }) => {
-          /** A select filled from the test, with its loading and waiting words. */
+          /** Select filled from the test response, with placeholder text. */
           const profileOptions = (
             name: 'activeProfileId' | 'activeMetadataProfileId' | 'rootFolder',
             loading: string,

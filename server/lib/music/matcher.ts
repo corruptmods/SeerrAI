@@ -10,26 +10,22 @@ import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
- * Which artist and album (MusicBrainz ids) an album on a media server is.
+ * Maps media server albums to MusicBrainz artist and album ids.
  *
- * Lidarr is asked first, since it costs nothing against MusicBrainz's limit
- * of a request a second: its artists with their folders, and their albums
- * with every release's id. Then MusicBrainz answers kept from before, and
- * last MusicBrainz itself, in the background and at most MB_CALL_CAP times
- * a run.
+ * Lidarr first (free against MusicBrainz's 1 req/s limit): artists with
+ * folders, albums with release ids. Then cached MusicBrainz answers, then
+ * MusicBrainz itself in the background, at most MB_CALL_CAP calls a run.
  *
- * Artist, in order: the server's MusicBrainz id for it; its folder against
- * Lidarr's; its name, when exactly one Lidarr artist has it.
- * Album: the server's release-group id (Jellyfin, Emby); a release id (or,
- * from Plex, an id that is either) turned into its album; then, within the
- * artist, the folder name, then the title and year. Only a single match
- * counts.
+ * Artist: server's MusicBrainz id; folder vs Lidarr's; name if exactly one
+ * Lidarr artist has it. Album: server's release-group id (Jellyfin, Emby);
+ * a release id (or Plex's either-kind id) resolved to its album; then, in
+ * the artist, folder name, then title and year. Only unique matches count.
  */
 
-/** Calls to MusicBrainz one run may make to place albums. */
+/** Max MusicBrainz calls per run for placing albums. */
 export const MB_CALL_CAP = 200;
 
-/** A name or title, compared without case, accents, "the" or punctuation. */
+/** Normalises a name: no case, accents, leading "the" or punctuation. */
 export const normalizeName = (value?: string | null): string =>
   (value ?? '')
     .normalize('NFKD')
@@ -39,13 +35,13 @@ export const normalizeName = (value?: string | null): string =>
     .replace(/^\s*the\s+/, '')
     .replace(/[^\p{L}\p{N}]/gu, '');
 
-/** The last folder of a path, either kind of slash, as written. */
+/** Last path segment, either slash, as written. */
 export const folderName = (path?: string | null): string | undefined => {
   const parts = (path ?? '').split(/[\\/]/).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : undefined;
 };
 
-/** A path without its last part: the folder a file or folder is in. */
+/** Path without its last segment. */
 export const parentPath = (path?: string | null): string | undefined => {
   const parts = (path ?? '').split(/[\\/]/);
   while (parts.length && !parts[parts.length - 1]) parts.pop();
@@ -54,7 +50,7 @@ export const parentPath = (path?: string | null): string | undefined => {
   return parent || undefined;
 };
 
-/** Folders compared as Match Check does: the last one, in lower case. */
+/** Folder key as Match Check compares it: last segment, lowercase. */
 const folderKey = (path?: string | null): string | undefined =>
   folderName(path)?.toLowerCase();
 
@@ -63,7 +59,7 @@ const yearOf = (date?: string | null): number | undefined => {
   return Number.isFinite(year) && year > 0 ? year : undefined;
 };
 
-/** An artist as Lidarr has it. */
+/** A Lidarr artist. */
 export interface IndexArtist {
   serverId: number;
   id: number;
@@ -73,7 +69,7 @@ export interface IndexArtist {
   monitored: boolean;
 }
 
-/** An album as Lidarr has it, with its files. */
+/** A Lidarr album with file stats. */
 export interface IndexAlbum {
   serverId: number;
   id: number;
@@ -82,7 +78,7 @@ export interface IndexAlbum {
   title: string;
   albumType?: string;
   secondaryTypes: string[];
-  /** As MusicBrainz writes dates: just the day. */
+  /** YYYY-MM-DD. */
   releaseDate?: string;
   monitored: boolean;
   trackCount: number;
@@ -104,8 +100,8 @@ const toIndexAlbum = (
   secondaryTypes: album.secondaryTypes ?? [],
   releaseDate: album.releaseDate ? album.releaseDate.slice(0, 10) : undefined,
   monitored: !!album.monitored,
-  // Lidarr counts an unmonitored album's tracks as only those with a file
-  // (a song taken from it would make it whole): its total is the album's.
+  // Lidarr counts only tracks with files for an unmonitored album, so one
+  // taken song would look complete; use the album's total.
   trackCount: album.monitored
     ? (album.statistics?.trackCount ?? 0)
     : Math.max(
@@ -119,9 +115,8 @@ const toIndexAlbum = (
 });
 
 /**
- * What every Lidarr has: all artists, and albums either all at once (a full
- * scan) or artist by artist as matching needs them. `complete` is false
- * once any Lidarr failed to answer.
+ * Index of every Lidarr's artists, plus albums loaded all at once (full
+ * scan) or per artist on demand. `complete` is false once any Lidarr fails.
  */
 export class LidarrIndex {
   public complete = true;
@@ -133,7 +128,7 @@ export class LidarrIndex {
   private albums = new Map<string, IndexAlbum>();
   private byRelease = new Map<string, string>();
   private albumsByArtist = new Map<string, IndexAlbum[]>();
-  /** Artists whose albums are loaded, by Lidarr and Lidarr's artist id. */
+  /** Loaded artists, keyed by server id and Lidarr artist id. */
   private loaded = new Set<string>();
 
   constructor(servers: LidarrSettings[], { full }: { full: boolean }) {
@@ -190,13 +185,13 @@ export class LidarrIndex {
     push(this.byName, normalizeName(entry.name) || undefined);
   }
 
-  /** Takes in an album Lidarr has, such as one just added to it. */
+  /** Adds a Lidarr album, e.g. one just added. */
   public addAlbum(serverId: number, album: LidarrAlbum, artistMbid: string) {
     if (!isMbid(album.foreignAlbumId)) return;
     const entry = toIndexAlbum(serverId, album, artistMbid);
     const known = this.albums.get(entry.mbid);
-    // An album in two Lidarrs: the one with more of it counts. The same
-    // Lidarr's newer answer replaces its older one.
+    // Across Lidarrs, the one with more files wins; the same Lidarr's newer
+    // entry replaces its older one.
     if (
       !known ||
       known.serverId === entry.serverId ||
@@ -214,20 +209,20 @@ export class LidarrIndex {
     this.albumsByArtist.set(entry.artistMbid, list);
   }
 
-  /** Lidarr's artist in this folder, when only one is. */
+  /** The only Lidarr artist with this folder, if unique. */
   public artistByFolder(path?: string): IndexArtist | undefined {
     const key = folderKey(path);
     const found = key ? this.byFolder.get(key) : undefined;
     return unique(found);
   }
 
-  /** Lidarr's artist of this name, when only one has it. */
+  /** The only Lidarr artist with this name, if unique. */
   public artistByName(name?: string): IndexArtist | undefined {
     const key = normalizeName(name);
     return key ? unique(this.byName.get(key)) : undefined;
   }
 
-  /** The artist's name as Lidarr has it (MusicBrainz's own). */
+  /** Artist name from Lidarr (MusicBrainz's spelling). */
   public artistName(mbid: string): string | undefined {
     return this.artists.get(mbid)?.[0]?.name || undefined;
   }
@@ -241,26 +236,24 @@ export class LidarrIndex {
     return this.album(mbid);
   }
 
-  /** Every album loaded so far. */
   public allAlbums(): IndexAlbum[] {
     return [...this.albums.values()];
   }
 
-  /** One Lidarr's artists. */
   public artistsOf(serverId: number): IndexArtist[] {
     return [...this.artists.values()]
       .flat()
       .filter((artist) => artist.serverId === serverId);
   }
 
-  /** One Lidarr's albums of an artist, among those loaded. */
+  /** Loaded albums of an artist on one Lidarr. */
   public loadedAlbumsOf(serverId: number, artistMbid: string): IndexAlbum[] {
     return (this.albumsByArtist.get(artistMbid) ?? []).filter(
       (album) => album.serverId === serverId
     );
   }
 
-  /** An artist's albums, from each Lidarr that has the artist. */
+  /** An artist's albums from every Lidarr that has them. */
   public async albumsOf(artistMbid: string): Promise<IndexAlbum[]> {
     for (const artist of this.artists.get(artistMbid) ?? []) {
       await this.loadArtist(artist.serverId, artist.id, artistMbid);
@@ -268,10 +261,7 @@ export class LidarrIndex {
     return this.albumsByArtist.get(artistMbid) ?? [];
   }
 
-  /**
-   * One Lidarr artist's albums, by Lidarr's id: asked once a run. Throws
-   * when Lidarr does not answer.
-   */
+  /** Loads a Lidarr artist's albums once per run. Throws when Lidarr fails. */
   public async loadArtist(
     serverId: number,
     lidarrArtistId: number,
@@ -302,49 +292,48 @@ export class LidarrIndex {
 const unique = <T>(list?: T[]): T | undefined =>
   list && list.length === 1 ? list[0] : undefined;
 
-/** An album as one media server lists it. */
+/** An album as a media server lists it. */
 export interface ServerAlbum {
   kind: MediaServerKind;
-  /** The album's id on the server. */
+  /** Server item id. */
   itemId: string;
   title: string;
   year?: number;
   addedAt?: Date;
-  /** The album's folder on disk. */
+  /** Album folder on disk. */
   path?: string;
-  /** How many of its tracks the server lists, when it says. */
+  /** Track count the server lists, if given. */
   trackCount?: number;
   artistItemId?: string;
   artistName?: string;
-  /** The artist's MusicBrainz id, as the server has it. */
+  /** Artist MusicBrainz id from the server. */
   artistMbid?: string;
-  /** The artist's folder on disk. */
+  /** Artist folder on disk. */
   artistPath?: string;
-  /** The album's MusicBrainz release-group id (Jellyfin, Emby). */
+  /** MusicBrainz release-group id (Jellyfin, Emby). */
   releaseGroupId?: string;
-  /** One release's MusicBrainz id (Jellyfin, Emby). */
+  /** MusicBrainz release id (Jellyfin, Emby). */
   releaseId?: string;
-  /** Plex's MusicBrainz id: a release's or the album's, by agent. */
+  /** Plex's MusicBrainz id: release or release group, depending on agent. */
   releaseOrGroupId?: string;
 }
 
-/** Where an album on a server belongs. */
+/** Match result for a server album. */
 export interface AlbumMatch {
   album: ServerAlbum;
   artistMbid: string;
-  /** Null when the artist is known but the album could not be placed. */
+  /** Null when the artist is known but the album isn't. */
   albumMbid: string | null;
-  /** The album in Lidarr, when Lidarr has it. */
+  /** Lidarr's album, if any. */
   lidarr?: IndexAlbum;
   /**
-   * The artist is the one the server files the album under, so the
-   * server's artist item is theirs. Not so for an album credited first to
-   * someone else.
+   * True when the server files the album under this artist, so the
+   * server's artist item is theirs. False when first credited to another.
    */
   serversArtist: boolean;
 }
 
-/** An album Seerr already keeps, to match folders and titles against. */
+/** A stored album to match folders and titles against. */
 export interface KnownAlbum {
   mbid: string;
   title: string;
@@ -352,12 +341,12 @@ export interface KnownAlbum {
   folder?: string | null;
 }
 
-/** What a release or ambiguous id turned out to be. */
+/** Result of resolving a release or ambiguous id. */
 type Resolved =
   | { albumMbid: string; artistMbid?: string }
-  /** MusicBrainz knows no such release or album. */
+  /** Unknown to MusicBrainz. */
   | null
-  /** Not known yet: MusicBrainz could not be asked this run. */
+  /** Unresolved: MusicBrainz unavailable or cap reached this run. */
   | 'later';
 
 const statusOf = (e: unknown): number | undefined =>
@@ -367,9 +356,9 @@ const firstArtist = (group?: MbReleaseGroup | null): string | undefined =>
   group?.['artist-credit']?.[0]?.artist?.id;
 
 /**
- * Turns release ids (and Plex's ids that may be either) into albums, at
- * most MB_CALL_CAP calls to MusicBrainz a run. What is not reached is left
- * for the next run, not stored as unmatched.
+ * Resolves release ids (and Plex's either-kind ids) to albums, within
+ * MB_CALL_CAP calls a run. Unreached ids wait for the next run rather than
+ * being stored as unmatched.
  */
 export class ReleaseResolver {
   public calls = 0;
@@ -381,7 +370,7 @@ export class ReleaseResolver {
     this.cap = cap;
   }
 
-  /** Reads what MusicBrainz said before about these ids, in one go. */
+  /** Preloads cached MusicBrainz answers for these ids. */
   public async preload(ids: string[]): Promise<void> {
     const keys = [
       ...new Set(
@@ -398,7 +387,7 @@ export class ReleaseResolver {
         try {
           this.kept.set(row.key, JSON.parse(row.data));
         } catch {
-          // A broken row is asked for again.
+          // Unparseable rows are refetched.
         }
       }
     }
@@ -454,7 +443,7 @@ export class ReleaseResolver {
   }
 }
 
-/** The one known album with this folder or title, if only one. */
+/** The unique known album matching this folder, else title and year. */
 export const matchByFolderOrTitle = (
   album: Pick<ServerAlbum, 'path' | 'title' | 'year'>,
   candidates: KnownAlbum[]
@@ -490,11 +479,11 @@ export const matchByFolderOrTitle = (
   );
 };
 
-/** Places server albums, giving up on none quietly: see the counts. */
+/** Matches server albums; failures are tallied in the counters. */
 export class AlbumMatcher {
-  /** Albums whose artist could not be told. */
+  /** Albums with no identifiable artist. */
   public unknownArtist = 0;
-  /** Albums left for the next run: MusicBrainz could not be asked. */
+  /** Albums deferred to next run because MusicBrainz was unavailable. */
   public later = 0;
 
   constructor(
@@ -503,7 +492,7 @@ export class AlbumMatcher {
     private known: (artistMbid: string) => Promise<KnownAlbum[]>
   ) {}
 
-  /** The artist an album is by: the server's id, else Lidarr's artist. */
+  /** Artist id from the server, else from Lidarr by folder or name. */
   private artistOf(album: ServerAlbum): string | undefined {
     if (isMbid(album.artistMbid)) {
       return album.artistMbid;
@@ -520,7 +509,7 @@ export class AlbumMatcher {
       try {
         await this.index.albumsOf(artist);
       } catch {
-        // Lidarr not answering leaves the other ways of matching.
+        // Other matching methods still apply if Lidarr fails.
       }
     }
 

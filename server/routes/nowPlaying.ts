@@ -8,11 +8,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * What Siri's "Fix this show" and "Fix this movie" shortcuts call: what is
- * playing for the person, their report of what's wrong with it, and their
- * yes or no when a fix would replace files. Every answer has `say`, the
- * sentence Siri speaks, refusals included. A Siri key works here and
- * nowhere else.
+ * Endpoints for Siri's "Fix this show" and "Fix this movie" shortcuts: what's
+ * playing for the person, their problem report, and their yes or no when a fix
+ * would replace files. Every response has `say`, the sentence Siri speaks,
+ * refusals included. A Siri key works here and nowhere else.
  */
 const nowPlayingRoutes = Router();
 

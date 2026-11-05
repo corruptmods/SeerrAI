@@ -76,7 +76,7 @@ const messages = defineMessages('components.MediaLists.ListDetail', {
     'Watch sync can’t see what {names} watched (no media server account), so it won’t suggest removals.',
 });
 
-/** The order you last chose, on this device, for every list. */
+/** The last chosen sort, per device, shared by every list. */
 const SORT_KEY = 'list-sort';
 
 const ListDetail = () => {
@@ -93,9 +93,8 @@ const ListDetail = () => {
     rouletteCandidates,
   } = useListDetail(router.query.listId as string);
 
-  // Each viewer's own position in the series here, from the server's watch
-  // history (Tautulli for Plex, Jellyfin or Emby themselves). Absent
-  // entries simply show nothing, so a slow or missing answer costs nothing.
+  // The viewer's series progress from watch history (Tautulli for Plex,
+  // else Jellyfin or Emby). Missing entries show nothing.
   const { data: progress } = useSWR<Record<number, SeriesProgress>>(
     router.query.listId && data?.kind !== 'music'
       ? `/api/v1/list/${router.query.listId}/progress`
@@ -115,8 +114,8 @@ const ListDetail = () => {
   >(null);
   const [sort, setSort] = useState<ListSort>(DEFAULT_LIST_SORT);
 
-  // Read after mounting: the server renders the default order, and storage
-  // can be unavailable (private browsing), in which case the default stays.
+  // Read after mount: the server renders the default order, and storage can
+  // be unavailable.
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(SORT_KEY);
@@ -133,7 +132,7 @@ const ListDetail = () => {
     try {
       window.localStorage.setItem(SORT_KEY, next);
     } catch {
-      // Still sorted for this visit.
+      // Not saved; still sorted for this visit.
     }
   };
 
@@ -142,7 +141,7 @@ const ListDetail = () => {
   }
 
   if (!data) {
-    // A list that was deleted, or that the viewer was taken off, is a 404.
+    // Deleted, or the viewer was removed from it: a 404.
     return (
       <ErrorPage
         statusCode={
@@ -152,8 +151,7 @@ const ListDetail = () => {
     );
   }
 
-  // Says what went wrong, and reloads the list so the page shows what is
-  // really saved rather than what was tried.
+  // Reports the error and reloads, so the page shows what is saved.
   const showFailure = (e: unknown) => {
     const detail =
       (axios.isAxiosError(e) && e.response?.data?.message) ||
@@ -250,8 +248,8 @@ const ListDetail = () => {
     setRenaming(true);
   };
 
-  // autoFocus is discouraged for accessibility, but focusing a field the user
-  // just asked for is the expected behaviour — do it via the ref instead.
+  // Focus via ref, as autoFocus is discouraged for a11y; the user just asked
+  // for this field.
   const focusNameInput = (input: HTMLInputElement | null) => {
     if (input && document.activeElement !== input) {
       input.focus();

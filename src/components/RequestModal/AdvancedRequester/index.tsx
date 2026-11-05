@@ -68,15 +68,15 @@ interface AdvancedRequesterProps {
   type: 'movie' | 'tv';
   tmdbId?: number;
   is4k: boolean;
-  /** Whether anime detection says the title is anime. */
+  /** Anime detection's verdict. */
   isAnime?: boolean;
-  /** The title's own anime setting, which stands over rules and detection. */
+  /** The title's anime setting; overrides rules and detection. */
   animeSetting?: boolean | null;
-  /** The type already on the request being edited. */
+  /** Series type of the request being edited. */
   requestSeriesType?: SeriesType | null;
-  /** Anime or not as ticked in the dialog; null while left be. */
+  /** The dialog's Anime tick; null while untouched. */
   animeChoice?: boolean | null;
-  /** Told a matching rule's series type, which the dialog's tick starts from. */
+  /** Receives a matching rule's series type, which seeds the dialog's tick. */
   onRuleSeriesType?: (seriesType: SeriesType | null) => void;
   defaultOverrides?: RequestOverrides;
   requestUser?: User;
@@ -135,9 +135,8 @@ const AdvancedRequester = ({
   const [ignoreQuota, setIgnoreQuota] = useState<boolean>(
     defaultOverrides?.ignoreQuota ?? false
   );
-  // Whether it goes as anime, as the dialog's Anime tick shows it (see
-  // AnimeChoice): the tick, else the request's own type when editing, the
-  // title's setting, a matching rule, then detection.
+  // Same precedence as AnimeChoice: tick, edited request's type, title
+  // setting, matching rule, detection.
   const [ruleSeriesType, setRuleSeriesType] = useState<SeriesType | null>(null);
   const anime =
     animeChoice ??
@@ -145,8 +144,8 @@ const AdvancedRequester = ({
       ? requestSeriesType === 'anime'
       : (animeSetting ??
         (ruleSeriesType ? ruleSeriesType === 'anime' : isAnime)));
-  // A series always takes the anime tags; a movie only when there are any,
-  // as it is sent (lib/radarrRouting).
+  // Movies fall back to standard tags when there are no anime ones, matching
+  // lib/radarrRouting.
   const kindTags = (server: ServiceCommonServer, value: boolean) =>
     value && (type === 'tv' || server.activeAnimeTags?.length)
       ? server.activeAnimeTags
@@ -333,10 +332,7 @@ const AdvancedRequester = ({
     defaultOverrides?.ignoreQuota,
   ]);
 
-  /**
-   * Starts the request from that kind of title's folder, profiles and tags:
-   * the server's anime ones, where it has them, or its standard ones.
-   */
+  /** Applies the server's anime (where set) or standard folder, profiles, tags. */
   const applyKindDefaults = (value: boolean) => {
     if (!serverData) {
       return;
@@ -369,8 +365,7 @@ const AdvancedRequester = ({
     setSelectedTags(kindTags(server, value) ?? []);
   };
 
-  // Ticking or unticking Anime starts from that kind's folder, profiles and
-  // tags; they can still be changed after.
+  // Re-apply kind defaults when the Anime tick changes.
   const previousChoice = useRef(animeChoice);
   useEffect(() => {
     if (previousChoice.current === animeChoice) {
@@ -429,8 +424,7 @@ const AdvancedRequester = ({
               tags: selectedTags.length > 0 ? selectedTags : undefined,
               serviceId: selectedServer ?? undefined,
               requestId: requestId ?? undefined,
-              // Rules match as the request will be sent: as anime or not
-              // as ticked.
+              // Match rules against the series type as it will be sent.
               seriesType:
                 animeChoice === null
                   ? (requestSeriesType ?? undefined)
@@ -442,9 +436,8 @@ const AdvancedRequester = ({
           if (cancelled) {
             return;
           }
-          // A rule that makes this anime (or not) against detection starts
-          // from that kind's settings; its own folder, profile and tags
-          // then apply on top.
+          // A rule overriding detection applies that kind's defaults first;
+          // the rule's own folder, profile and tags go on top.
           setRuleSeriesType(override.seriesType ?? null);
           onRuleSeriesType?.(override.seriesType ?? null);
           if (
@@ -495,8 +488,7 @@ const AdvancedRequester = ({
     defaultOverrides?.folder,
     defaultOverrides?.profile,
     defaultOverrides?.tags,
-    // Ticked or unticked, a rule for anime (or not) may now apply, on top
-    // of the kind's own folder, profile and tags.
+    // A different tick can match a different rule.
     animeChoice,
     requestSeriesType,
   ]);

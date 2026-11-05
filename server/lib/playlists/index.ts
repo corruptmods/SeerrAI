@@ -38,47 +38,42 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
 
 /*
  * Playlists linked to Spotify or Apple Music. Each song is matched to a
- * MusicBrainz recording (in the background, at MusicBrainz's pace): by its
- * ISRC, as Deezer lists the song, when MusicBrainz has the code, else by
- * its title, artist and length. It is then requested as a song for whoever
- * linked the playlist, within their song limit. What their limit can't
- * take waits and is requested as it frees up; or, with Settings → Music
- * set to have admins approve big imports, an import of more songs than
- * allowed at once waits for an admin, as requests that don't count against
- * the limit. Linked playlists are read again daily for songs added since.
- * No AI is involved.
+ * MusicBrainz recording in the background: by Deezer's ISRC when
+ * MusicBrainz has it, else by title, artist and length. It's then requested
+ * for whoever linked the playlist, within their song limit; overflow waits
+ * until the limit frees up. With "admins approve big imports" on (Settings
+ * → Music), an oversized import instead waits for an admin, outside the
+ * limit. Linked playlists are re-read daily. No AI is involved.
  */
 
 const LABEL = 'Playlists';
-/** Songs matched in one go before the requests are made. */
+/** Songs matched per pass before requests are made. */
 export const MATCH_PER_PASS = 40;
-/** How often a linked playlist is read again. */
+/** Re-read interval for linked playlists. */
 const READ_EVERY_MS = 23 * 60 * 60_000;
 /**
- * How long a song MusicBrainz didn't know waits before it is looked for
- * again: music is added there all the time, though a song only on Spotify
- * or YouTube may never be.
+ * Retry delay for songs MusicBrainz lacks: music is added constantly,
+ * though streaming-only songs may never be.
  */
 export const UNMATCHED_RETRY_MS = 7 * 24 * 60 * 60_000;
-/** How close a version's length must be to the playlist's to be it. */
+/** Max length difference between a version and the playlist song. */
 const LENGTH_SLACK_MS = 8000;
 
 export class PlaylistLinkError extends Error {}
 
 /**
- * Whether a version can be requested: on a single or EP of the artist's,
- * or, while songs may be taken from albums, on one of their albums. One
- * only on others' compilations ("Now That's…") can't be.
+ * True when a version is on the artist's single or EP, or on their album
+ * while taking songs from albums is possible. Compilation-only versions
+ * aren't.
  */
 const fetchable = (version: SongVersion): boolean =>
   !!version.releaseGroups &&
   (!!singleFor(version) || (!songFetchProblem() && !!albumFor(version)));
 
 /**
- * The version of a song a playlist means: nearest its length, else best
- * known; among those that can be requested, when any can. Never a take the
- * playlist's title doesn't name (live, acoustic, a remix…): one can be
- * nearer its length than the song itself. None when there are only those.
+ * The version a playlist means: nearest in length, else best known,
+ * preferring requestable ones. Never a take the title doesn't name (live,
+ * remix…), even if nearer in length. Undefined if only those exist.
  */
 export const versionFor = (
   song: Song,
@@ -114,9 +109,9 @@ class Playlists {
   private again = false;
 
   /**
-   * Links a playlist to a Spotify or Apple Music playlist and reads its
-   * songs, requested for `user`. Throws PlaylistLinkError, or
-   * PlaylistSourceError when it can't be read.
+   * Links a Spotify or Apple Music playlist and reads its songs, requested
+   * for `user`. Throws PlaylistLinkError, or PlaylistSourceError if
+   * unreadable.
    */
   public async link(list: MediaList, text: string, user: User): Promise<void> {
     if (list.kind !== 'music') {
@@ -142,19 +137,17 @@ class Playlists {
   }
 
   /**
-   * Tries a song once more, now: one MusicBrainz didn't know, that couldn't
-   * be requested, or whose request was deleted, is looked for again; one
-   * whose request failed (its album couldn't be got) has its request tried
-   * again.
+   * Retries a song now: unmatched, unrequestable or orphaned songs are
+   * matched again; a failed request is retried.
    */
   public async retry(song: MediaListSong): Promise<void> {
     if (
       (song.state === 'requested' || song.state === 'approval') &&
       song.requestId
     ) {
-      // Its request was deleted, or was someone else's that the song only
-      // followed: looked up again and asked for afresh, in the owner's name.
-      // What it was matched to may be why it was deleted.
+      // Request deleted, or someone else's that the song followed: rematch
+      // and request afresh in the owner's name (the old match may be why it
+      // was deleted).
       const request = await getRepository(MediaRequest).findOne({
         where: { id: song.requestId },
         relations: { requestedBy: true },
@@ -171,7 +164,7 @@ class Playlists {
       await this.retryRequest(song.requestId);
       return;
     }
-    // Held back by a setting: asked for again, if it now allows.
+    // Held back by a setting: try again in case it now allows.
     if (song.state === 'waiting') {
       this.kick();
       return;
@@ -184,7 +177,7 @@ class Playlists {
     this.kick();
   }
 
-  /** A failed request tried again, as Retry on the request does. */
+  /** Retries a failed request, as the request's Retry button does. */
   private async retryRequest(requestId: number): Promise<void> {
     await requestLock.dispatch(requestKey(requestId), async () => {
       const repo = getRepository(MediaRequest);
@@ -193,22 +186,22 @@ class Playlists {
         relations: { requestedBy: true, modifiedBy: true },
       });
       if (request?.status !== MediaRequestStatus.FAILED) return;
-      // As Retry on the request: never one of something blocklisted.
+      // Like Retry: never for blocklisted media.
       if (
         request.media?.status === MediaStatus.BLOCKLISTED ||
         request.media?.status4k === MediaStatus.BLOCKLISTED
       ) {
         return;
       }
-      // Told once; a second failure after this is told again.
+      // Release the failure notice so a second failure notifies again.
       await releaseDelivery(request.id, Notification.MEDIA_FAILED);
-      // Approving it again takes its failed songs up again.
+      // Re-approving picks up its failed songs.
       request.status = MediaRequestStatus.APPROVED;
       await repo.save(request);
     });
   }
 
-  /** Unlinks it: its songs stay, and nothing new is read. */
+  /** Unlinks the source; existing songs stay. */
   public async unlink(list: MediaList): Promise<void> {
     await getRepository(MediaList).update(list.id, {
       sourceUrl: null,
@@ -220,7 +213,7 @@ class Playlists {
     });
   }
 
-  /** Songs new to the list, at the end of it, to be matched. */
+  /** Appends new songs for matching. Returns how many were added. */
   private async addSongs(
     listId: number,
     songs: SourceSong[],
@@ -266,8 +259,8 @@ class Playlists {
   }
 
   /**
-   * The hourly job: linked playlists not read for a day are read again,
-   * and what waits is matched and requested as limits allow.
+   * Hourly job: re-reads playlists due a read, requeues stale unmatched
+   * songs, then matches and requests within limits.
    */
   public async sync(now = Date.now()): Promise<void> {
     await getRepository(MediaListSong).update(
@@ -313,14 +306,14 @@ class Playlists {
         await getRepository(MediaList).update(list.id, {
           sourceProblem: problem,
         });
-        // Told once, as it starts: it is read again each day until it can be.
+        // Notify only when the problem starts; reads continue daily.
         if (!list.sourceProblem) await tellUnreadable(list, problem);
       }
     }
     this.kick();
   }
 
-  /** Matches and requests what is waiting, in the background. */
+  /** Matches and requests waiting songs in the background. */
   public kick(): void {
     if (this.running) {
       this.again = true;
@@ -346,7 +339,7 @@ class Playlists {
     })();
   }
 
-  /** Settles once nothing is being matched or requested (for tests). */
+  /** For tests: resolves once matching and requesting are idle. */
   public async settled(): Promise<void> {
     while (this.running) await new Promise((r) => setTimeout(r, 10));
   }
@@ -361,8 +354,7 @@ class Playlists {
     });
     for (const song of songs.slice(0, MATCH_PER_PASS)) {
       const pick = (s: Song) => versionFor(s, song.length, song.title);
-      // The song as the stores list it, for its ISRC. Deezer not answering
-      // is no reason to wait: the song is matched by name meanwhile.
+      // Deezer listing for the ISRC. If Deezer fails, match by name.
       let catalog: CatalogSong | null | undefined;
       if (catalogOn()) {
         catalog = await catalogSong(
@@ -379,15 +371,14 @@ class Playlists {
       }
       let found: Song | null = null;
       try {
-        // The very recording, when MusicBrainz has its code; a code on only
-        // another take of it (a live one, mislabelled) is passed over.
+        // Exact recording by ISRC; ignore a code only on another take (a
+        // mislabelled live one).
         if (catalog?.isrc) {
           found = await songByIsrc(catalog.isrc, song.artistName, pick);
           if (found && !pick(found)) found = null;
         }
-        // A code MusicBrainz has only on others' compilations (a playlist
-        // takes songs from "Now That's…"): the artist's own recording of
-        // it, found by name, when one as long can be requested.
+        // An ISRC only on others' compilations: prefer the artist's own
+        // recording by name, if requestable and the same length.
         const byCode = found && pick(found);
         if (
           byCode &&
@@ -408,7 +399,7 @@ class Playlists {
         }
         found ??= await songNamed(song.title, song.artistName, pick);
       } catch (e) {
-        // MusicBrainz is unreachable: tried again on the next pass.
+        // MusicBrainz unreachable: retry next pass.
         logger.debug('Could not match a playlist song', {
           label: LABEL,
           errorMessage: describe(e),
@@ -416,13 +407,12 @@ class Playlists {
         return false;
       }
       const version = found ? pick(found) : undefined;
-      // Deezer's listing, when it was asked: kept as it last said.
+      // Store Deezer's latest answer, when it was asked.
       const listed =
         catalog === undefined
           ? {}
           : { isrc: catalog?.isrc ?? null, catalog: catalog ?? null };
-      // Only while it is still being found: taken off the playlist
-      // meanwhile, it stays off.
+      // Only if still matching, so a song removed meanwhile stays removed.
       await repo.update(
         { id: song.id, state: 'matching' },
         version
@@ -440,16 +430,15 @@ class Playlists {
     return songs.length > MATCH_PER_PASS;
   }
 
-  /** Requests matched songs, for each person, as their limit and settings allow. */
+  /** Requests matched songs per user within their limit and settings. */
   private async requestWaiting(): Promise<void> {
     const repo = getRepository(MediaListSong);
     let waiting = await repo.find({
       where: { state: In(['matched', 'waiting']) },
       order: { listId: 'ASC', position: 'ASC' },
     });
-    // A big import waiting for an admin goes as one batch: none of a
-    // playlist's songs is asked for while others of it are still being
-    // found, or each pass of them would be too few to need approval.
+    // With approval for big imports, hold a playlist until it's fully
+    // matched, or each pass would be too small to need approval.
     if (getSettings().music.playlists.overLimit === 'approve') {
       const finding = new Set(
         (
@@ -508,7 +497,7 @@ class Playlists {
     }
     const { overLimit, approveOver } = settings.playlists;
     const fresh = songs.filter((s) => s.state === 'matched');
-    // A big import waits for an admin as one batch, when that is chosen.
+    // A big import goes to an admin as one batch, when so configured.
     if (overLimit === 'approve' && fresh.length > approveOver) {
       await this.send(user, fresh, true);
       songs = songs.filter((s) => s.state === 'waiting');
@@ -523,7 +512,7 @@ class Playlists {
     if (now.length) await this.send(user, now, false);
   }
 
-  /** Requests songs, one request per artist, and notes what became of each. */
+  /** Requests songs, one request per artist, and records each outcome. */
   private async send(
     user: User,
     songs: MediaListSong[],
@@ -550,9 +539,8 @@ class Playlists {
   }
 
   /**
-   * Songs already here or on their way: one on its way in someone else's
-   * request follows that request (and is asked for afresh should it be
-   * declined); the rest are here.
+   * Marks songs already covered: those in another open request follow it
+   * (and are re-requested if it's declined); the rest are here.
    */
   private async markCovered(songs: MediaListSong[]): Promise<void> {
     if (!songs.length) return;
@@ -606,7 +594,7 @@ class Playlists {
         null,
         request.id
       );
-      // The rest were here already, or on their way.
+      // The rest were already here or requested.
       await this.markCovered(
         songs.filter((s) => !asked.has(s.recordingMbid as string))
       );
@@ -623,8 +611,8 @@ class Playlists {
         e instanceof UnrequestableSongError ||
         e instanceof BlocklistedMediaError
       ) {
-        // One song spoils the group: it is found by halves, the rest asked
-        // for in as few requests as that leaves.
+        // One bad song fails the group: bisect to isolate it and request the
+        // rest in as few requests as possible.
         if (songs.length > 1) {
           const half = Math.ceil(songs.length / 2);
           for (const part of [songs.slice(0, half), songs.slice(half)]) {
@@ -634,7 +622,7 @@ class Playlists {
           await this.mark(songs, 'failed', e.message.slice(0, 250));
         }
       } else {
-        // MusicBrainz or Lidarr unreachable: tried again on the next pass.
+        // MusicBrainz or Lidarr unreachable: retry next pass.
         logger.warn('Could not request songs from a playlist', {
           label: LABEL,
           errorMessage: describe(e),
@@ -645,7 +633,7 @@ class Playlists {
 }
 
 const playlists = new Playlists();
-/** Tells a playlist's owner its service can no longer be read. */
+/** Notifies the owner that the playlist source can't be read. */
 const tellUnreadable = async (list: MediaList, problem: string) => {
   try {
     const owner = await getRepository(User).findOne({

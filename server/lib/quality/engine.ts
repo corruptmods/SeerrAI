@@ -43,11 +43,11 @@ import axios from 'axios';
 import { IsNull } from 'typeorm';
 
 /*
- * Settings → Quality's work on a server: applying a preview, undoing an
- * apply, and noticing when someone changed one of Seerr AI's profiles in
- * Radarr or Sonarr itself. Only what Seerr AI created is ever written, and
- * the default delay profile; nothing is written to a server an admin
- * hasn't chosen to manage. What applying would change is lib/quality/plan.
+ * Settings → Quality's server writes: applying a preview, undoing an apply,
+ * and detecting edits to Seerr AI's items made in Radarr or Sonarr. Only
+ * items Seerr AI created, plus the default delay profile, are ever written;
+ * nothing is written to a server an admin hasn't chosen to manage. The
+ * preview lives in lib/quality/plan.
  */
 
 export { QualityError, allServers, configFor } from '@server/lib/quality/plan';
@@ -75,7 +75,7 @@ export const preview = async (
 const busy = new Set<string>();
 const keyOf = (ref: QualityServerRef) => `${ref.kind}:${ref.serverId}`;
 
-/** One apply, undo or keep at a time on a server. */
+/** Runs one apply, undo or keep at a time per server. */
 const withLock = async <T>(
   ref: QualityServerRef,
   work: () => Promise<T>
@@ -126,7 +126,7 @@ const saveRow = async (
   }
 };
 
-/** Changes a server's saved choices without touching the rest. */
+/** Updates a server's saved choices, leaving other settings alone. */
 const updateSaved = async (
   ref: QualityServerRef,
   change: (saved: QualityServerSettings) => QualityServerSettings
@@ -141,13 +141,13 @@ const updateSaved = async (
 };
 
 export interface ApplyOptions {
-  /** Titles on one of the admin's own profiles to move onto a preset's. */
+  /** Titles on the admin's own profiles to move onto a preset's profile. */
   move?: { fromProfileId: number; preset: PresetKey }[];
-  /** Puts back profiles and formats someone chose to keep as edited. */
+  /** Restores profiles and formats previously kept as edited. */
   restoreKept?: boolean;
-  /** The preview's token: nothing is changed unless it still holds. */
+  /** The preview's token; nothing changes unless it still holds. */
   token?: string;
-  /** A TRaSH Guides update applied on its own. */
+  /** An automatic TRaSH Guides update. */
   trash?: boolean;
   userId?: number | null;
 }
@@ -186,7 +186,7 @@ const running = new Map<
   { step: ApplyStep; done: Done; total: number; titlesDone: number }
 >();
 
-/** How far an apply on a server has got; null when none is running. */
+/** Progress of the running apply on a server, or null. */
 export const applyProgress = (ref: QualityServerRef): ApplyProgress | null => {
   const live = running.get(keyOf(ref));
   if (!live) return null;
@@ -250,14 +250,14 @@ const writeFormats = async (plan: Plan, done: Done) => {
   }
 };
 
-/** Writes the profiles; answers each preset's profile id. */
+/** Writes the profiles; returns each preset's profile id. */
 const writeProfiles = async (
   plan: Plan,
   done: Done
 ): Promise<Map<PresetKey, number>> => {
   const { ctx, desired, rows, formatIds } = plan;
   const ref = ctx.ref;
-  // The formats as they are now, with any just created.
+  // Re-read formats to include any just created.
   const formats = await ctx.arr.formats();
   const names = namesOf(formats);
   const profileIds = new Map<PresetKey, number>();
@@ -343,7 +343,7 @@ const writeDelay = async (plan: Plan, done: Done) => {
   done.updated += 1;
 };
 
-/** The request settings an apply changed, as they were before it. */
+/** Request settings as they were before an apply changed them. */
 interface RequestDefaults {
   main?: { id: number; name: string };
   anime?: { id?: number; name?: string };
@@ -351,7 +351,7 @@ interface RequestDefaults {
 
 /**
  * Points new requests to this server (its Services settings) at the
- * presets' profiles, as the preview showed.
+ * presets' profiles, as previewed.
  */
 const writeRequests = async (
   plan: Plan,
@@ -394,9 +394,8 @@ const writeRequests = async (
 };
 
 /**
- * Puts the request settings an apply changed back as they were, where
- * they still send requests to one of Seerr AI's profiles (an admin may
- * have chosen another since).
+ * Restores request settings an apply changed, only where they still point
+ * at a Seerr AI profile (an admin may have chosen another since).
  */
 const restoreRequests = async (
   ref: QualityServerRef,
@@ -424,7 +423,7 @@ const restoreRequests = async (
   return changed;
 };
 
-/** Moves titles off the admin's own profiles, as the preview offered. */
+/** Moves titles off the admin's own profiles, as previewed. */
 const moveOwnTitles = async (
   plan: Plan,
   move: NonNullable<ApplyOptions['move']>,
@@ -451,7 +450,7 @@ const moveOwnTitles = async (
   }
 };
 
-/** Keeps an apply in History, so it can be undone; null when it did nothing. */
+/** Records an apply in History for Undo; null when it did nothing. */
 const record = async (
   ref: QualityServerRef,
   done: Done,
@@ -476,7 +475,7 @@ const record = async (
   return entry.id;
 };
 
-/** TRaSH Guides' own score of each TRaSH format an admin moved. */
+/** TRaSH Guides' score for each TRaSH format an admin moved. */
 const trashRawOf = (
   desired: DesiredState,
   config: QualityServerSettings
@@ -492,7 +491,7 @@ const trashRawOf = (
   return out;
 };
 
-/** Applies a server's choices: the preview, made so. */
+/** Applies a server's choices as previewed. */
 export const apply = async (
   ref: QualityServerRef,
   options: ApplyOptions = {}
@@ -510,15 +509,14 @@ export const apply = async (
       (plan.config.appliedChoices !== choicesOf(plan.config, plan.fillGaps) ||
         plan.preview.changes.some((c) => c.action === 'put-back'))
     ) {
-      // Choices saved but not applied, or something changed in the app
-      // since the last check: those wait for an admin's preview.
+      // Unapplied saved choices or app-side changes need an admin's preview.
       throw new QualityError(
         'stale',
         'There are changes besides TRaSH Guides; they wait for an admin.'
       );
     }
     const done: Done = { befores: [], moved: [], created: 0, updated: 0 };
-    // Each item to write counts one, and moving titles one more.
+    // Progress: one per item written, plus one for moving titles.
     const writes = plan.preview.changes.filter(
       (c) =>
         c.action !== 'unchanged' &&
@@ -536,12 +534,11 @@ export const apply = async (
     };
     running.set(keyOf(ref), live);
     try {
-      // Formats first: the profiles score them by their ids.
+      // Formats first: profiles reference them by id.
       await writeFormats(plan, done);
       live.step = 'profiles';
       const profileIds = await writeProfiles(plan, done);
-      // A TRaSH Guides update never changes the delay profile, nor where
-      // requests go.
+      // A TRaSH Guides update never changes the delay profile or requests.
       if (!options.trash) {
         live.step = 'delay';
         await writeDelay(plan, done);
@@ -554,7 +551,7 @@ export const apply = async (
         live.titlesDone = 1;
       }
     } catch (e) {
-      // What was done before it failed can still be undone.
+      // Record partial work so it can still be undone.
       const applyId = await record(ref, done, options).catch(() => null);
       logger.warn('Quality profiles only partly applied', {
         label: LABEL,
@@ -568,8 +565,7 @@ export const apply = async (
     }
 
     const applyId = await record(ref, done, options);
-    // Only what this apply decides; the choices may have been saved anew
-    // meanwhile, and stay as saved.
+    // Save only what this apply decides; choices saved meanwhile stay.
     const { config, desired, trash, fillGaps } = plan;
     const usesTrash = Object.values(config.presets).includes('trash');
     await updateSaved(ref, (saved) => ({
@@ -607,9 +603,9 @@ const inUseBySettings = (ref: QualityServerRef): Set<number> => {
 };
 
 /**
- * A profile as it was, scoring every format the server has now (the apps
- * take nothing less): formats made since score 0, and the blocked release
- * groups format as it is scored everywhere.
+ * A profile as it was, scored against every format the server has now (the
+ * apps require all): formats created since score 0, and the blocked release
+ * groups format gets its usual score.
  */
 const withFormatsNow = (
   profile: ArrQualityProfile,
@@ -642,14 +638,14 @@ export interface UndoResult {
   movedBack: number;
 }
 
-/** Puts back what one apply changed. Only the newest one, each server. */
+/** Reverts one apply. Only the newest apply per server can be undone. */
 export const undo = async (applyId: number): Promise<UndoResult> => {
   const repo = getRepository(QualityApply);
   const found = await repo.findOne({ where: { id: applyId } });
   if (!found) throw new QualityError('not-found', 'There is no such apply.');
   const ref = { kind: found.serverKind, serverId: found.serverId };
   return withLock(ref, async () => {
-    // Read again: another apply or undo may have finished meanwhile.
+    // Re-read: another apply or undo may have finished meanwhile.
     const entry = await repo.findOne({ where: { id: applyId } });
     if (!entry) throw new QualityError('not-found', 'There is no such apply.');
     if (entry.undoneAt) {
@@ -693,8 +689,8 @@ export const undo = async (applyId: number): Promise<UndoResult> => {
     );
     let titles: ArrTitle[] | undefined;
 
-    // Titles first, so a profile they were moved onto is free to go. Only
-    // those still on one of Seerr AI's, back to a profile that is there.
+    // Titles first, so profiles they were moved onto can be deleted. Only
+    // titles still on a Seerr AI profile move back, to a profile that exists.
     if (entry.moved.length) {
       titles = await arr.titles();
       const onOurs = new Set(
@@ -717,7 +713,7 @@ export const undo = async (applyId: number): Promise<UndoResult> => {
       }
     }
 
-    // Where requests go first, so a profile it pointed them at is free.
+    // Request settings first, so a profile they point at can be deleted.
     for (const item of entry.befores) {
       if (item.itemKind !== 'requests' || !item.before) continue;
       const put = await restoreRequests(
@@ -761,7 +757,7 @@ export const undo = async (applyId: number): Promise<UndoResult> => {
         try {
           await arr.deleteProfile(item.arrId);
         } catch (e) {
-          // Radarr and Sonarr refuse a profile something else uses.
+          // Radarr and Sonarr refuse to delete a profile in use.
           if (!gone(e)) {
             result.keptInUse.push(name);
             continue;
@@ -804,8 +800,8 @@ export const undo = async (applyId: number): Promise<UndoResult> => {
     }
     entry.undoneAt = new Date();
     await repo.save(entry);
-    // The server no longer has the choices last applied: nothing is
-    // applied on its own until an admin applies again.
+    // The last-applied choices are gone; nothing auto-applies until an
+    // admin applies again.
     await updateSaved(ref, (saved) => ({
       ...saved,
       appliedChoices: undefined,
@@ -836,21 +832,21 @@ export interface ServerState {
   is4k: boolean;
   status: ServerStatus;
   version?: string;
-  /** Seerr AI's items someone changed or removed in Radarr or Sonarr. */
+  /** Seerr AI items changed or removed in Radarr or Sonarr. */
   changed: { name: string; removed: boolean }[];
   kept: string[];
   /**
-   * TRaSH formats an admin moved whose TRaSH Guides score has changed since
-   * it was applied: the admin's choice stays, and this says so.
+   * TRaSH formats an admin moved whose TRaSH Guides score changed since
+   * apply; the admin's choice stays and is flagged here.
    */
   clashes: string[];
   appliedAt?: string;
   sizesOnProfile?: boolean;
-  /** Why it could not be reached. */
+  /** Why the server couldn't be reached. */
   error?: string;
 }
 
-/** Seerr AI's items changed or removed in the app, and those kept so. */
+/** Seerr AI items changed or removed in the app, and those kept as edited. */
 const driftOf = (plan: Plan) => {
   const formatNames = namesOf(plan.ctx.formats);
   const changed: { row: QualityManaged; name: string; removed: boolean }[] = [];
@@ -884,10 +880,10 @@ const driftOf = (plan: Plan) => {
 
 const states = new Map<string, ServerState>();
 
-/** The last state each server was seen in (for Health), by kind:id. */
+/** Last seen state of each server, for Health. */
 export const lastStates = (): ServerState[] => [...states.values()];
 
-/** Where one server stands: managed or not, in step, changed elsewhere. */
+/** One server's status: managed or not, in sync, changed elsewhere. */
 export const stateOf = async (ref: QualityServerRef): Promise<ServerState> => {
   const server = serverSettingsOf(ref);
   if (!server) throw new QualityError('not-found', 'There is no such server.');
@@ -931,8 +927,8 @@ export const stateOf = async (ref: QualityServerRef): Promise<ServerState> => {
       const pending = plan.preview.changes.some(
         (c) => c.action !== 'unchanged' && c.action !== 'kept'
       );
-      // Only a newer TRaSH Guides on choices already applied; choices
-      // saved since wait for an admin's preview.
+      // A newer TRaSH Guides counts only on applied choices; choices saved
+      // since wait for an admin's preview.
       const trashUpdate =
         Object.values(config.presets).includes('trash') &&
         !!plan.trash?.commit &&
@@ -973,8 +969,8 @@ export const stateOf = async (ref: QualityServerRef): Promise<ServerState> => {
 };
 
 /**
- * Keeps changes someone made in Radarr or Sonarr to Seerr AI's items:
- * they are left as they are, and skipped, until someone puts them back.
+ * Keeps edits made in Radarr or Sonarr to Seerr AI's items: they're left as
+ * is and skipped until someone restores them.
  */
 export const keepChanges = async (ref: QualityServerRef): Promise<number> =>
   withLock(ref, async () => {

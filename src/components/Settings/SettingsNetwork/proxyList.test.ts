@@ -6,10 +6,7 @@ import {
   proxyListToText,
 } from './proxyList';
 
-/*
- * Also Trust These Proxies on Settings → Network: typed as one line, saved
- * as a list.
- */
+// Also Trust These Proxies: typed as one line, saved as a list.
 
 describe('the Also Trust These Proxies field', () => {
   it('takes entries separated by commas, spaces or both', () => {

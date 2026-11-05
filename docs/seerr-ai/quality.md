@@ -49,8 +49,8 @@ Each preset has its own, on its row under **Presets**:
 
 | Choice | Sonarr v5: the most an episode takes, a minute | Radarr: the biggest film |
 |---|---|---|
-| **Smaller files** | SD 10 MB, 720p 15, 1080p 25, 1080p Remux 80, 2160p 60, 2160p Remux 200, Anime 20 | SD 2 GB, 720p 4, 1080p 8, 1080p Remux 30, 2160p 20, 2160p Remux 60, Anime 6 |
-| **Balanced** (to start) | SD 20 MB, 720p 40, 1080p 80, 1080p Remux 250, 2160p 200, 2160p Remux 600, Anime 60 | SD 5 GB, 720p 10, 1080p 20, 1080p Remux 60, 2160p 60, 2160p Remux 120, Anime 15 |
+| **Smaller files** | SD 10 MB, 720p 15, 1080p 25, 1080p Remux 80, 2160p 60, 2160p Remux 200, Anime 20 | SD 1.5 GB, 720p 3, 1080p 6, 1080p Remux 25, 2160p 15, 2160p Remux 50, Anime 4 |
+| **Balanced** (to start) | SD 20 MB, 720p 40, 1080p 80, 1080p Remux 250, 2160p 200, 2160p Remux 600, Anime 60 | SD 3 GB, 720p 6, 1080p 12, 1080p Remux 45, 2160p 35, 2160p Remux 80, Anime 10 |
 | **Best quality** | No limit of Seerr AI's (a TRaSH Guides preset keeps TRaSH Guides' sizes) | No limit |
 | **Your own limit** | Any whole number of MB a minute, up to 1000 | Any whole number of GB, up to 1000 |
 

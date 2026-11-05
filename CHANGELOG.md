@@ -4,6 +4,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Coming next
 
+### Changed
+
+- Radarr's Smaller files and Balanced sizes match what films are: Balanced takes a usual Blu-ray encode (12 GB for 1080p, from 20), Smaller files a web release (6 GB, from 8), and the other resolutions come down with them. Your own limit and Best quality are unchanged.
+
 ### Fixed
 
 - A season pack still fetching its torrent's details no longer shows as downloading episodes that haven't aired yet (S1E1–E10 when four had aired), and the download list shows it once instead of once per episode.

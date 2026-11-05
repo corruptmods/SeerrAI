@@ -257,30 +257,32 @@ export const sizeFormat = (gb: number): SeerrFormat =>
   ]);
 
 /**
- * Radarr: the largest film each preset takes, in GB. Room is left for a
- * long film: one over it is never taken.
+ * Radarr: the largest film each preset takes, in GB. Balanced takes a
+ * usual Blu-ray encode (a 1080p one runs about 8 to 15); Smaller files, a
+ * web release (4 to 8). Room is left for a long film: one over it is never
+ * taken.
  */
 export const FILM_CAPS_GB: Record<
   Exclude<FileSize, 'best'>,
   Record<PresetKey, number>
 > = {
   small: {
-    sd: 2,
-    '720p': 4,
-    '1080p': 8,
-    '1080p-remux': 30,
-    '2160p': 20,
-    '2160p-remux': 60,
-    anime: 6,
+    sd: 1.5,
+    '720p': 3,
+    '1080p': 6,
+    '1080p-remux': 25,
+    '2160p': 15,
+    '2160p-remux': 50,
+    anime: 4,
   },
   balanced: {
-    sd: 5,
-    '720p': 10,
-    '1080p': 20,
-    '1080p-remux': 60,
-    '2160p': 60,
-    '2160p-remux': 120,
-    anime: 15,
+    sd: 3,
+    '720p': 6,
+    '1080p': 12,
+    '1080p-remux': 45,
+    '2160p': 35,
+    '2160p-remux': 80,
+    anime: 10,
   },
 };
 

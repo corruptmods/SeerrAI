@@ -423,7 +423,7 @@ describe("Seerr AI's own presets", () => {
     assert.equal(score('seerr:upscaled'), NEVER);
     assert.equal(score('seerr:language'), NEVER);
     assert.equal(score('seerr:burned-in'), LAST_RESORT);
-    assert.equal(score('seerr:size-20'), NEVER);
+    assert.equal(score('seerr:size-12'), NEVER);
     // Repack's 5 is rounded to the band: it can't beat usenet.
     assert.equal(score('seerr:repack'), 0);
     assert.equal(p1080.minUpgradeFormatScore, 100);
@@ -1287,7 +1287,7 @@ describe('applying only what was previewed, and undoing it whole', () => {
     });
     const second = await apply(RADARR);
     assert.ok(
-      radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 8 GB')
+      radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 6 GB')
     );
     // And one the admin made meanwhile.
     radarr.state.formats.push({
@@ -1297,7 +1297,7 @@ describe('applying only what was previewed, and undoing it whole', () => {
     });
     await undo(second.applyId as number);
     assert.ok(
-      !radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 8 GB')
+      !radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 6 GB')
     );
     const profile = radarr.state.profiles.find(
       (p) => p.name === 'Seerr AI · 1080p'
@@ -1442,7 +1442,7 @@ describe('what it does', () => {
     assert.ok(d.never.some((f) => f.key === 'seerr:x265-hd'));
     assert.ok(d.lastResort.some((f) => f.key === 'seerr:burned-in'));
     assert.ok(d.nothing.some((f) => f.key === 'seerr:repack'));
-    assert.equal(d.sizeCapGb, 20);
+    assert.equal(d.sizeCapGb, 12);
     assert.equal(d.preferredProtocol, 'usenet');
   });
 

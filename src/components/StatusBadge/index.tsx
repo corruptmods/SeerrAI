@@ -12,6 +12,7 @@ import {
   episodeSpan,
   isDownloadBusy,
   isOneRelease,
+  releasesOf,
   summarizeDownloads,
 } from '@app/utils/downloadSummary';
 import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
@@ -220,7 +221,12 @@ const StatusBadge = ({
       />
     ) : (
       <ul>
-        {downloadItem.map((status, index) => (
+        {/* A series lists each release once: a pack is one download, not one
+            per episode it brings. */}
+        {(mediaType === 'tv'
+          ? releasesOf(downloadItem)
+          : downloadItem.map((item) => ({ item, episodes: 1 }))
+        ).map(({ item: status, episodes }, index) => (
           <li
             key={`dl-status-${status.externalId}-${index}`}
             className="border-b border-gray-700 last:border-b-0"
@@ -229,6 +235,7 @@ const StatusBadge = ({
               downloadItem={status}
               title={Array.isArray(title) ? title[index] : title}
               is4k={is4k}
+              pack={episodes > 1}
             />
           </li>
         ))}

@@ -174,6 +174,50 @@ const trackedItem = (
 };
 
 /** How stale progress may get while someone is looking at it. */
+/**
+ * Sonarr's queue, without the episodes a pack can't hold yet. Until its
+ * torrent's file list is in, Sonarr lists a season pack under every episode
+ * of the season, those still to air (or with no air date) too, so the season
+ * would show ten episodes downloading when four have aired. A single
+ * episode's own download is kept whatever its date, as is a pack none of
+ * whose episodes has aired.
+ */
+export const airedEpisodesOf = <
+  T extends {
+    downloadId?: string;
+    episode?: { airDateUtc?: string | null };
+  },
+>(
+  items: T[],
+  now = Date.now()
+): T[] => {
+  const perRelease = new Map<string, number>();
+  for (const item of items) {
+    if (item.downloadId) {
+      perRelease.set(
+        item.downloadId,
+        (perRelease.get(item.downloadId) ?? 0) + 1
+      );
+    }
+  }
+  const aired = (item: T) => {
+    const at = item.episode?.airDateUtc
+      ? Date.parse(item.episode.airDateUtc)
+      : NaN;
+    return !Number.isNaN(at) && at <= now;
+  };
+  const releasesWithAired = new Set(
+    items.filter(aired).map((item) => item.downloadId)
+  );
+  return items.filter(
+    (item) =>
+      !item.downloadId ||
+      (perRelease.get(item.downloadId) ?? 0) < 2 ||
+      !releasesWithAired.has(item.downloadId) ||
+      aired(item)
+  );
+};
+
 const LIVE_REFRESH_MS = 5_000;
 
 /**
@@ -1058,8 +1102,9 @@ class DownloadTracker {
             this.queueAnswered('Sonarr', server);
 
             const before = this.sonarrServers[server.id] ?? [];
-            this.sonarrServers[server.id] = queueItems.map((item) =>
-              trackedItem(item, MediaType.TV, item.seriesId, item.episode)
+            this.sonarrServers[server.id] = airedEpisodesOf(queueItems).map(
+              (item) =>
+                trackedItem(item, MediaType.TV, item.seriesId, item.episode)
             );
             const sharing = settings.sonarr
               .filter(

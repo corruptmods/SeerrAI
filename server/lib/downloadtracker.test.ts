@@ -1,6 +1,10 @@
 import { MediaType } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
-import { downloadStageOf, withLiveProgress } from '@server/lib/downloadtracker';
+import {
+  airedEpisodesOf,
+  downloadStageOf,
+  withLiveProgress,
+} from '@server/lib/downloadtracker';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -250,5 +254,29 @@ describe('a queue item brought up to date by its download client', () => {
   it('is the queue item as it was without a reading', () => {
     const plain = item('downloading');
     assert.equal(withLiveProgress(plain, undefined, now), plain);
+  });
+});
+
+describe('airedEpisodesOf', () => {
+  const now = Date.parse('2026-11-05T03:00:00Z');
+  const item = (downloadId: string, airDateUtc?: string | null) => ({
+    downloadId,
+    episode: { airDateUtc },
+  });
+
+  it('leaves out the episodes a season pack lists before they have aired', () => {
+    const pack = [
+      item('pack', '2026-10-09T02:00:00Z'),
+      item('pack', '2026-10-30T02:00:00Z'),
+      item('pack', '2026-11-06T03:00:00Z'),
+      item('pack', null),
+    ];
+    assert.deepEqual(airedEpisodesOf(pack, now), pack.slice(0, 2));
+  });
+
+  it("keeps an episode's own download, and a pack with nothing aired yet", () => {
+    const own = item('one', '2026-11-12T03:00:00Z');
+    const early = [item('early', '2026-11-12T03:00:00Z'), item('early')];
+    assert.deepEqual(airedEpisodesOf([own, ...early], now), [own, ...early]);
   });
 });

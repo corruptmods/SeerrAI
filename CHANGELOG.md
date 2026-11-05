@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Fixed
+
+- A season pack still fetching its torrent's details no longer shows as downloading episodes that haven't aired yet (S1E1–E10 when four had aired), and the download list shows it once instead of once per episode.
+
 ## 2.4.1 (4 November 2026)
 
 Songs Lidarr can't find taken from albums, discography packs and Soulseek, Backfill held to Sonarr's and Radarr's size limits, search on the Requests page, more notifications to choose, and posters that show sooner.

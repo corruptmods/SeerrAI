@@ -15,7 +15,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Settings → Logs no longer offers a next page on the last page.
 - Plex scans finish anime films matched by HAMA before they report done, and a failure there is logged instead of lost.
 - A TVDB season with no translation in your language falls back to its original language, as intended.
-- Email to a user without a PGP key goes out once, unencrypted, as intended.
+- Email to a user without a PGP key skips the encryption step instead of running it empty.
 - A season pack still fetching its torrent's details no longer shows as downloading episodes that haven't aired yet (S1E1–E10 when four had aired), and the download list shows it once instead of once per episode.
 
 ## 2.4.1 (4 November 2026)

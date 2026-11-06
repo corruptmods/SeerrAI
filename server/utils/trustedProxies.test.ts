@@ -4,6 +4,7 @@ import {
   CLOUDFLARE_PROXIES,
   LOCAL_PROXIES,
   isProxyAddress,
+  proxyTrust,
   trustedProxies,
 } from '@server/utils/trustedProxies';
 import express from 'express';
@@ -24,7 +25,7 @@ const CLOUDFLARE_ADDRESS = '172.68.1.5';
 const appFor = (network: NetworkSettings) => {
   const app = express();
   if (network.trustProxy) {
-    app.set('trust proxy', trustedProxies(network));
+    app.set('trust proxy', proxyTrust(network));
   }
   app.get('/', (req, res) => {
     res.json({ ip: req.ip });
@@ -38,6 +39,21 @@ const ipFor = async (forwardedFor?: string) => {
     req.set('X-Forwarded-For', forwardedFor);
   }
   return (await req).body.ip as string;
+};
+
+/**
+ * The address Express takes a request to come from when it connects from
+ * `peer`, which tests can't connect from.
+ */
+const ipVia = (peer: string, forwardedFor?: string) => {
+  const req = Object.create(
+    appFor(getSettings().network).request
+  ) as express.Request;
+  Object.assign(req, {
+    headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
+    socket: { remoteAddress: peer },
+  });
+  return req.ip;
 };
 
 beforeEach(() => {
@@ -137,11 +153,39 @@ describe('an address or range of a proxy', () => {
 describe('the address a request is taken to come from', () => {
   it('is the one a proxy on this machine or network passes on', async () => {
     assert.equal(await ipFor('198.51.100.7'), '198.51.100.7');
-    // Two local proxies, one behind the other.
+    assert.equal(ipVia('172.18.0.2', '198.51.100.7'), '198.51.100.7');
+    assert.equal(ipVia('192.168.1.2', '198.51.100.7'), '198.51.100.7');
+    assert.equal(ipVia('fd00::2', '198.51.100.7'), '198.51.100.7');
+    // One on this machine behind it, such as Tailscale Serve.
     assert.equal(
-      await ipFor('198.51.100.7, 10.0.0.2, 172.17.0.1'),
+      ipVia('172.17.0.1', '198.51.100.7, 127.0.0.1'),
       '198.51.100.7'
     );
+  });
+
+  it('is that of a visitor on the local network or Tailscale, whatever they wrote', async () => {
+    assert.equal(await ipFor('198.51.100.9, 192.168.1.50'), '192.168.1.50');
+    assert.equal(
+      ipVia('172.18.0.2', '198.51.100.9, 192.168.1.50'),
+      '192.168.1.50'
+    );
+    assert.equal(
+      ipVia('172.18.0.2', '198.51.100.9, 100.101.1.2'),
+      '100.101.1.2'
+    );
+    assert.equal(ipVia('172.18.0.2', '198.51.100.9, fd00::50'), 'fd00::50');
+    assert.equal(
+      ipVia('172.18.0.2', '198.51.100.9, 169.254.1.50'),
+      '169.254.1.50'
+    );
+  });
+
+  it('is passed on through a local proxy behind another once that one is listed', async () => {
+    const forwarded = '198.51.100.7, 10.0.0.2, 172.17.0.1';
+    assert.equal(await ipFor(forwarded), '172.17.0.1');
+
+    getSettings().network.trustedProxies = ['172.17.0.0/16', '10.0.0.2'];
+    assert.equal(await ipFor(forwarded), '198.51.100.7');
   });
 
   it('is never one the person sending the request made up', async () => {
@@ -149,7 +193,7 @@ describe('the address a request is taken to come from', () => {
     // it actually saw.
     assert.equal(await ipFor('203.0.113.1, 198.51.100.7'), '198.51.100.7');
     assert.equal(
-      await ipFor('203.0.113.1, 203.0.113.2, 198.51.100.7, 10.0.0.2'),
+      ipVia('10.0.0.2', '203.0.113.1, 203.0.113.2, 198.51.100.7'),
       '198.51.100.7'
     );
   });
@@ -158,14 +202,11 @@ describe('the address a request is taken to come from', () => {
     assert.match(await ipFor(), /127\.0\.0\.1|::1/);
   });
 
-  it('is passed on by a proxy reached over Tailscale', async () => {
-    assert.equal(await ipFor('fake, 203.0.113.9, 100.64.1.2'), '203.0.113.9');
-    assert.equal(
-      await ipFor('fake, 203.0.113.9, 100.127.255.254'),
-      '203.0.113.9'
-    );
+  it('is passed on by a proxy reached over Tailscale', () => {
+    assert.equal(ipVia('100.64.1.2', 'fake, 203.0.113.9'), '203.0.113.9');
+    assert.equal(ipVia('100.127.255.254', 'fake, 203.0.113.9'), '203.0.113.9');
     // Just outside the shared address space: an internet address.
-    assert.equal(await ipFor('fake, 203.0.113.9, 100.128.0.1'), '100.128.0.1');
+    assert.equal(ipVia('100.128.0.1', 'fake, 203.0.113.9'), '100.128.0.1');
   });
 
   it("is Cloudflare's own unless Trust Cloudflare is on", async () => {
@@ -178,6 +219,8 @@ describe('the address a request is taken to come from', () => {
       await ipFor('fake, 203.0.113.9, 2606:4700:10::6816:1'),
       '203.0.113.9'
     );
+    // In front of a local reverse proxy.
+    assert.equal(ipVia('172.18.0.2', forwarded), '203.0.113.9');
   });
 
   it('is passed on by a proxy the admin listed', async () => {
@@ -189,6 +232,7 @@ describe('the address a request is taken to come from', () => {
 
     getSettings().network.trustedProxies = ['198.51.100.20'];
     assert.equal(await ipFor(forwarded), '203.0.113.9');
+    assert.equal(ipVia('172.18.0.2', forwarded), '203.0.113.9');
   });
 
   it('is the connection whatever the header says with proxy support off', async () => {

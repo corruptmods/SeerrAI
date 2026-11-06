@@ -15,6 +15,7 @@ import {
 } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import { UserSettings } from '@server/entity/UserSettings';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import playlists, { versionFor } from '@server/lib/playlists';
@@ -650,6 +651,60 @@ describe('a linked playlist', () => {
     const lantern = view.songs.find((s) => s.title === 'Lantern Song')!;
     assert.equal(lantern.state, 'failed');
     assert.match(lantern.problem ?? '', /one at a time/);
+  });
+
+  it('asks for nothing while Music is turned off, for everyone or for whoever linked it', async () => {
+    const list = await makePlaylist();
+    const queued = (sourceId: string, state: 'matched' | 'waiting') =>
+      new MediaListSong({
+        listId: list.id,
+        sourceId,
+        position: 0,
+        title: 'Lantern Song',
+        artistName: 'Glasswing',
+        state,
+        problem: state === 'waiting' ? 'limit' : null,
+        recordingMbid: LANTERN,
+        artistMbid: ARTIST,
+        requestForId: user.id,
+      });
+    const [matched, waiting] = await getRepository(MediaListSong).save([
+      queued('trk1', 'matched'),
+      queued('trk2', 'waiting'),
+    ]);
+    const main = getSettings().main;
+    main.disabledFeatures = ['music'];
+    try {
+      await playlists.retry(waiting);
+      playlists.kick();
+      await playlists.settled();
+      assert.equal(await getRepository(MediaRequest).count(), 0);
+      assert.equal(
+        (await getRepository(MediaListSong).findOneByOrFail({ id: matched.id }))
+          .state,
+        'matched'
+      );
+    } finally {
+      main.disabledFeatures = [];
+    }
+
+    await getRepository(UserSettings).save(
+      new UserSettings({ user, disabledFeatures: ['music'] })
+    );
+    playlists.kick();
+    await playlists.settled();
+    assert.equal(await getRepository(MediaRequest).count(), 0);
+    const held = await getRepository(MediaListSong).find({
+      where: { listId: list.id },
+      order: { id: 'ASC' },
+    });
+    assert.deepEqual(
+      held.map((s) => [s.state, s.problem]),
+      [
+        ['waiting', 'Music is turned off.'],
+        ['waiting', 'Music is turned off.'],
+      ]
+    );
   });
 
   it('brings in only new songs when read again, and not ones taken off', async () => {

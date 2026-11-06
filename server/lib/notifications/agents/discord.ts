@@ -113,7 +113,7 @@ class DiscordAgent
     if (payload.request) {
       fields.push({
         name: intl.formatMessage(globalMessages.requestedBy),
-        value: payload.request.requestedBy.displayName,
+        value: escapeMarkdown(payload.request.requestedBy.displayName),
         inline: true,
       });
 
@@ -164,14 +164,14 @@ class DiscordAgent
         name: intl.formatMessage(globalMessages.commentFrom, {
           userName: payload.comment.user.displayName,
         }),
-        value: payload.comment.message,
+        value: escapeMarkdown(payload.comment.message),
         inline: false,
       });
     } else if (payload.issue) {
       fields.push(
         {
           name: intl.formatMessage(globalMessages.reportedBy),
-          value: payload.issue.createdBy.displayName,
+          value: escapeMarkdown(payload.issue.createdBy.displayName),
           inline: true,
         },
         {
@@ -236,7 +236,9 @@ class DiscordAgent
     return {
       title: event ? `${event}: ${payload.subject}` : payload.subject,
       url,
-      description: payload.message,
+      description: payload.message
+        ? escapeMarkdown(payload.message)
+        : undefined,
       color,
       timestamp: new Date().toISOString(),
       fields,

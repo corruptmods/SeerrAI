@@ -49,7 +49,7 @@ class NtfyAgent
 
     const event = eventText(payload, intl);
     const title = event ? `${event} - ${payload.subject}` : payload.subject;
-    let message = payload.message ?? '';
+    let message = payload.message ? escapeMarkdown(payload.message) : '';
 
     if (payload.request) {
       message += `${message ? '\n\n' : ''}**${intl.formatMessage(globalMessages.requestedBy)}:** ${this.escapeMarkdown(payload.request.requestedBy.displayName)}`;
@@ -88,7 +88,7 @@ class NtfyAgent
         intl.formatMessage(globalMessages.commentFrom, {
           userName: payload.comment.user.displayName,
         })
-      )}:**\n${payload.comment.message}`;
+      )}:**\n${escapeMarkdown(payload.comment.message)}`;
     } else if (payload.issue) {
       message += `\n\n**${intl.formatMessage(globalMessages.reportedBy)}:** ${this.escapeMarkdown(payload.issue.createdBy.displayName)}`;
       message += `\n**${intl.formatMessage(globalMessages.issueType)}:** ${IssueTypeName[payload.issue.issueType]}`;

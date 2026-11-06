@@ -216,6 +216,62 @@ describe('registering for push notifications', () => {
   });
 });
 
+describe("someone else's push devices", () => {
+  const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/harbour-lights';
+
+  const deviceFor = (user: User) =>
+    getRepository(UserPushSubscription).save(
+      new UserPushSubscription({
+        user,
+        endpoint: ENDPOINT,
+        p256dh: 'p256dh-key',
+        auth: 'auth-key',
+        userAgent: 'test',
+      })
+    );
+
+  it("stay the owner's and admins' own, even from user managers", async () => {
+    const { admin, regular } = await people();
+    const users = getRepository(User);
+    await deviceFor(await users.findOneByOrFail({ id: 1 }));
+    const { agent } = await loginAs('friend@seerr.dev');
+
+    for (const id of [1, admin.id]) {
+      assert.equal(
+        (await agent.get(`/user/${id}/pushSubscriptions`)).status,
+        403
+      );
+      const path = `/user/${id}/pushSubscription/${encodeURIComponent(ENDPOINT)}`;
+      assert.equal((await agent.get(path)).status, 403);
+      assert.equal((await agent.delete(path)).status, 403);
+    }
+    assert.equal(await getRepository(UserPushSubscription).count(), 1);
+
+    // An ordinary user's are still theirs to manage.
+    await getRepository(UserPushSubscription).clear();
+    await deviceFor(regular);
+    const listed = await agent.get(`/user/${regular.id}/pushSubscriptions`);
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.length, 1);
+  });
+
+  it('are seen by the owner, and by each person for themselves', async () => {
+    const { admin } = await people();
+    await deviceFor(admin);
+    const owner = await loginAs('admin@seerr.dev');
+    assert.equal(
+      (await owner.agent.get(`/user/${admin.id}/pushSubscriptions`)).body
+        .length,
+      1
+    );
+    const own = await loginAs('friend@seerr.dev');
+    assert.equal(
+      (await own.agent.get(`/user/${own.id}/pushSubscriptions`)).status,
+      200
+    );
+  });
+});
+
 describe('importing Plex users', () => {
   it('leaves a password account with a Plex friend’s email alone', async () => {
     getSettings().main.mediaServerType = MediaServerType.PLEX;
@@ -621,6 +677,34 @@ describe('a name to show for someone', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.displayName, `User #${nameless.id}`);
     assert.doesNotMatch(JSON.stringify(res.body), /nameless@seerr\.dev/);
+  });
+});
+
+describe('sorting people by name', () => {
+  it('orders someone without a name by the name shown, not their email', async () => {
+    const users = getRepository(User);
+    const nameless = await users.save(
+      new User({
+        email: 'aaaa@example.invalid',
+        avatar: '',
+        permissions: Permission.REQUEST,
+        userType: UserType.LOCAL,
+      })
+    );
+    const { agent, id } = await loginAs('friend@seerr.dev');
+    const order = async () =>
+      (
+        await agent
+          .get('/user')
+          .query({ sort: 'displayname', includeIds: `${id},${nameless.id}` })
+      ).body.results.map((u: User) => u.id);
+
+    // "Static Garden" sorts before "User #n", whatever the hidden email.
+    await users.update(id, { username: 'Static Garden' });
+    const before = await order();
+    assert.deepEqual(before, [id, nameless.id]);
+    await users.update(nameless.id, { email: 'zzzz@example.invalid' });
+    assert.deepEqual(await order(), before);
   });
 });
 

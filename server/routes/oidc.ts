@@ -214,8 +214,9 @@ oidcRoutes.get<{ providerId: string }>(
       cause?: string,
       details: Record<string, unknown> = {}
     ) => {
-      if (started && outcome !== 'unavailable') {
-        limiter.count(req, providerId);
+      // Counted on arrival; an unavailable provider is nobody's failure.
+      if (started && outcome === 'unavailable') {
+        limiter.refund(req, providerId);
       }
       logger.warn(
         linking ? 'Single sign-on link refused' : 'Single sign-on refused',
@@ -236,7 +237,7 @@ oidcRoutes.get<{ providerId: string }>(
       );
     };
 
-    if (started && limiter.retryAfter(req, providerId)) {
+    if (started && limiter.reserve(req, providerId)) {
       return relay(
         res,
         linking

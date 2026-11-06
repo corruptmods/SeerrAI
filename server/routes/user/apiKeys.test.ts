@@ -573,6 +573,17 @@ describe('using a personal API key', () => {
     assert.equal((await asKey(other.secret)).status, 200);
   });
 
+  it('checks at most ten wrong secrets for one key sent all at once', async () => {
+    const { agent, id } = await signIn('friend@seerr.dev');
+    const { secret } = await makeKey(agent, id);
+    const forged = `${secret.slice(0, 13)}${'C'.repeat(43)}`;
+    const statuses = await Promise.all(
+      Array.from({ length: 30 }, () => asKey(forged).then((res) => res.status))
+    );
+    assert.equal(statuses.filter((status) => status === 401).length, 10);
+    assert.equal(statuses.filter((status) => status === 429).length, 20);
+  });
+
   it('records when it was last used, at most once a minute', async () => {
     const { agent, id } = await signIn('friend@seerr.dev');
     const { secret, key } = await makeKey(agent, id);

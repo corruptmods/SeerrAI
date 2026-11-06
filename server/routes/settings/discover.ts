@@ -68,7 +68,7 @@ discoverSettingRoutes.post('/add', async (req, res) => {
   return res.json(newSlider);
 });
 
-discoverSettingRoutes.get('/reset', async (_req, res) => {
+discoverSettingRoutes.post('/reset', async (_req, res) => {
   const sliderRepository = getRepository(DiscoverSlider);
 
   await sliderRepository.clear();

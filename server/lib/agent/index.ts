@@ -1026,6 +1026,7 @@ class Agent {
       at: new Date().toISOString(),
       kind: 'reply',
       text: `${user.displayName}: ${said}`,
+      decision: false,
     });
     // Replying instead of approving drops the proposal. An approval a failed
     // run never got to is dropped too: it was approved for then, not for
@@ -1124,7 +1125,12 @@ class Agent {
     if (!run) return;
     const at = new Date().toISOString();
     for (const note of notes) {
-      run.steps.push({ at, kind: 'reply', text: `${note.by}: ${note.text}` });
+      run.steps.push({
+        at,
+        kind: 'reply',
+        text: `${note.by}: ${note.text}`,
+        decision: false,
+      });
     }
     this.tellRun(
       run,
@@ -1202,6 +1208,7 @@ class Agent {
         at: new Date().toISOString(),
         kind: 'reply',
         text: decisionText(user.displayName, approved, headlines),
+        decision: true,
       });
       if (approved) {
         const decision: Decision = {
@@ -1511,6 +1518,8 @@ class Agent {
         kind,
         text: text.slice(0, 2000),
         ...(tool ? { tool } : {}),
+        // What an admin says while it works is never a decision.
+        ...(kind === 'reply' ? { decision: false } : {}),
       });
       trimSteps(run);
     };

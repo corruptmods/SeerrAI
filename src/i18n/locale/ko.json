@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare 신뢰",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "리버스 프록시 앞에 Cloudflare 프록시 (주황 구름)가 있으면 켜세요.",
   "components.Settings.SettingsNetwork.trustedProxies": "다음 프록시도 신뢰",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI 앞의 다른 프록시 (예: 임대 서버). 로컬 프록시는 항상 신뢰합니다.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI 앞에 있는 다른 프록시(예: 임대 서버에 있는 프록시, 다른 프록시 뒤의 로컬 프록시). Seerr AI에 연결하는 로컬 프록시는 항상 신뢰합니다.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry}은(는) 주소나 범위가 아닙니다. 예: 203.0.113.5 또는 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr 추가",
   "components.Settings.SettingsProwlarr.apiKey": "API 키",

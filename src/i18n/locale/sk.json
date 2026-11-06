@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Dôverovať Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Zapnite, ak je proxy Cloudflare (oranžový obláčik) pred vašou reverznou proxy.",
   "components.Settings.SettingsNetwork.trustedProxies": "Dôverovať aj týmto proxy",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Ďalšie proxy pred Seerr AI, napríklad na prenajatom serveri. Miestnym sa verí vždy.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Ďalšie proxy pred Seerr AI, napríklad na prenajatom serveri, alebo miestna proxy za inou. Miestna proxy, ktorá sa pripája k Seerr AI, je vždy dôveryhodná.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} nie je adresa ani rozsah, napríklad 203.0.113.5 alebo 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Pridať Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Kľúč API",

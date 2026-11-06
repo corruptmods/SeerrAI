@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Confiar no Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Ative se o proxy da Cloudflare (nuvem laranja) estiver na frente do seu proxy reverso.",
   "components.Settings.SettingsNetwork.trustedProxies": "Confiar também nestes proxies",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Outros proxies na frente do Seerr AI, como um num servidor alugado. Os locais são sempre confiáveis.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Outros proxies na frente do Seerr AI, como um em um servidor alugado ou um local atrás de outro. O local que se conecta ao Seerr AI é sempre confiável.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} não é um endereço nem uma faixa, como 203.0.113.5 ou 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Adicionar Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Chave de API",

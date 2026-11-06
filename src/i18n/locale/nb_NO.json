@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Stol på Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Slå på hvis Cloudflares proxy (den oransje skyen) står foran reverse proxyen din.",
   "components.Settings.SettingsNetwork.trustedProxies": "Stol også på disse proxyene",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andre proxyer foran Seerr AI, for eksempel en på en leid server. Lokale stoles alltid på.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andre proxyer foran Seerr AI, for eksempel en på en leid server eller en lokal proxy bak en annen. Den lokale som kobler til Seerr AI, er alltid klarert.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} er ikke en adresse eller et område, for eksempel 203.0.113.5 eller 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Legg til Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API-nøkkel",

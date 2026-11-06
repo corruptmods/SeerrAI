@@ -682,6 +682,68 @@ describe("the manage panel's remove-file action", () => {
   });
 });
 
+describe('the status of a blocklisted title', () => {
+  const blocklisted = (tmdbId: number) =>
+    getRepository(Media).save(
+      new Media({
+        tmdbId,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.BLOCKLISTED,
+        status4k: MediaStatus.BLOCKLISTED,
+        serviceId: 0,
+        externalServiceId: 78,
+      })
+    );
+  const statusesOf = async (id: number) => {
+    const media = await getRepository(Media).findOneOrFail({ where: { id } });
+    return [media.status, media.status4k];
+  };
+
+  it('is not changed by someone who manages requests', async () => {
+    actingAs = await makeUser(
+      'bl-requests',
+      Permission.MANAGE_REQUESTS | Permission.REQUEST
+    );
+    const media = await blocklisted(4242);
+    for (const is4k of [false, true]) {
+      const { status, body } = await call<{ message: string }>(
+        'POST',
+        `/api/v1/media/${media.id}/unknown`,
+        { is4k }
+      );
+      assert.equal(status, 409);
+      assert.match(body.message, /Remove it from the blocklist first/);
+    }
+    assert.deepEqual(await statusesOf(media.id), [
+      MediaStatus.BLOCKLISTED,
+      MediaStatus.BLOCKLISTED,
+    ]);
+
+    // Any other title's status still changes.
+    const other = await seedHeldMovie(4343, admin);
+    const { status } = await call('POST', `/api/v1/media/${other.id}/unknown`, {
+      is4k: false,
+    });
+    assert.equal(status, 200);
+    assert.equal((await statusesOf(other.id))[0], MediaStatus.UNKNOWN);
+  });
+
+  it('stays blocklisted when its file is removed', async () => {
+    actingAs = await makeUser('bl-files', Permission.MANAGE_REQUESTS);
+    const media = await blocklisted(4444);
+    const { status } = await call(
+      'DELETE',
+      `/api/v1/media/${media.id}/file?is4k=false`
+    );
+    assert.equal(status, 204);
+    assert.deepEqual(removals, [{ tmdbId: 4444, addImportExclusion: false }]);
+    assert.deepEqual(await statusesOf(media.id), [
+      MediaStatus.BLOCKLISTED,
+      MediaStatus.BLOCKLISTED,
+    ]);
+  });
+});
+
 describe('scans after blocklisting', () => {
   class ProbeScanner extends BaseScanner<unknown> {
     constructor() {

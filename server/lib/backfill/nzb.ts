@@ -36,11 +36,26 @@ const decode = (value: string): string =>
     return ENTITIES[entity.toLowerCase()] ?? whole;
   });
 
+const BARE_NAME = /^[^\s"/\\]+\.[a-z0-9]{2,4}$/i;
+
+/**
+ * The quoted file name in a subject, else the first word ending in one
+ * (after any folder or quote in it). Word by word, so time stays linear.
+ */
 export const nameFromSubject = (subject: string): string | undefined => {
   const quoted = subject.match(/"([^"]+\.[a-z0-9]{2,4})"/i);
   if (quoted) return quoted[1].trim();
-  const bare = subject.match(/([^\s"/\\]+\.[a-z0-9]{2,4})(?=\s|$)/i);
-  return bare?.[1];
+  for (const word of subject.split(/\s+/)) {
+    const tail = word.slice(
+      Math.max(
+        word.lastIndexOf('"'),
+        word.lastIndexOf('/'),
+        word.lastIndexOf('\\')
+      ) + 1
+    );
+    if (BARE_NAME.test(tail)) return tail;
+  }
+  return undefined;
 };
 
 /** More than any real post has; later files are ignored. */

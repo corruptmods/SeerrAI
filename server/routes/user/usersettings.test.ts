@@ -792,6 +792,45 @@ describe("another admin's account", () => {
     assert.strictEqual(after.userType, UserType.PLEX);
   });
 
+  it('keeps its notification settings from user managers', async () => {
+    const { admin, regular } = await people();
+    const users = getRepository(User);
+    for (const id of [1, admin.id, regular.id]) {
+      const user = await users.findOneOrFail({
+        where: { id },
+        relations: { settings: true },
+      });
+      user.settings = new UserSettings({
+        ...user.settings,
+        user,
+        pushbulletAccessToken: `token-${id}`,
+      });
+      await users.save(user);
+    }
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+
+    for (const id of [1, admin.id]) {
+      const res = await agent.get(`/user/${id}/settings/notifications`);
+      assert.strictEqual(res.status, 403);
+      assert.doesNotMatch(JSON.stringify(res.body), /token-/);
+    }
+    const theirs = await agent.get(
+      `/user/${regular.id}/settings/notifications`
+    );
+    assert.strictEqual(theirs.status, 200);
+    assert.strictEqual(
+      theirs.body.pushbulletAccessToken,
+      `token-${regular.id}`
+    );
+
+    const owner = await loginAs('admin@seerr.dev', 'test1234');
+    const byOwner = await owner.agent.get(
+      `/user/${admin.id}/settings/notifications`
+    );
+    assert.strictEqual(byOwner.status, 200);
+    assert.strictEqual(byOwner.body.pushbulletAccessToken, `token-${admin.id}`);
+  });
+
   it('cannot be demoted by a user manager', async () => {
     const { admin } = await people();
     const { agent } = await loginAs('friend@seerr.dev', 'test1234');
@@ -1256,6 +1295,93 @@ describe('a key linking an account or setting a password', () => {
         .set({ 'X-Api-Key': 'the-servers-own-key' })
         .send({ newPassword: 'a-new-password' });
       assert.strictEqual(res.status, 204);
+    } finally {
+      settings.main.personalApiKeys = before.access;
+      settings.main.apiKey = before.serverKey;
+    }
+  });
+
+  it('refuses an email change made with a key', async () => {
+    const settings = getSettings();
+    const before = {
+      access: settings.main.personalApiKeys,
+      serverKey: settings.main.apiKey,
+    };
+    settings.main.personalApiKeys = 'everyone';
+    settings.main.apiKey = 'the-servers-own-key';
+    try {
+      const users = getRepository(User);
+      const friend = await users.findOneByOrFail({ email: 'friend@seerr.dev' });
+      // A Plex account's email comes from Plex; a password account's is its own.
+      await users.update(friend.id, { userType: UserType.LOCAL });
+      const { key, publicId, secretHash } = makeKey();
+      await getRepository(UserApiKey).save(
+        new UserApiKey({ userId: friend.id, publicId, secretHash, name: 'x' })
+      );
+      const save = (headers: Record<string, string>, body: object) =>
+        request(app)
+          .post(`/user/${friend.id}/settings/main`)
+          .set(headers)
+          .send(body);
+      const asFriend: Record<string, string>[] = [
+        { 'X-Api-Key': key },
+        { 'X-Api-Key': 'the-servers-own-key', 'X-Api-User': String(friend.id) },
+      ];
+
+      for (const headers of asFriend) {
+        const res = await save(headers, {
+          username: 'friend',
+          email: 'static-garden@example.invalid',
+        });
+        assert.strictEqual(res.status, 403);
+        assert.strictEqual(
+          (await users.findOneByOrFail({ id: friend.id })).email,
+          'friend@seerr.dev'
+        );
+
+        // Everything else still saves with a key.
+        const kept = await save(headers, {
+          username: 'Lantern Song',
+          email: 'friend@seerr.dev',
+        });
+        assert.strictEqual(kept.status, 200);
+        assert.strictEqual(
+          (await users.findOneByOrFail({ id: friend.id })).username,
+          'Lantern Song'
+        );
+
+        // Leaving the email out, or sending it in other case, keeps it.
+        await users.update(friend.id, {
+          userType: UserType.JELLYFIN,
+          jellyfinUsername: 'glasswing',
+        });
+        for (const body of [
+          { username: 'Glasswing' },
+          { username: 'Glasswing', email: 'Friend@Seerr.dev' },
+        ]) {
+          const same = await save(headers, body);
+          assert.strictEqual(same.status, 200);
+          assert.strictEqual(
+            (await users.findOneByOrFail({ id: friend.id })).email,
+            'friend@seerr.dev'
+          );
+        }
+        await users.update(friend.id, {
+          userType: UserType.LOCAL,
+          jellyfinUsername: null,
+        });
+      }
+
+      // The server's key can still change another user's, as an admin would.
+      const byServer = await save(
+        { 'X-Api-Key': 'the-servers-own-key' },
+        { username: 'friend', email: 'harbour-lights@example.invalid' }
+      );
+      assert.strictEqual(byServer.status, 200);
+      assert.strictEqual(
+        (await users.findOneByOrFail({ id: friend.id })).email,
+        'harbour-lights@example.invalid'
+      );
     } finally {
       settings.main.personalApiKeys = before.access;
       settings.main.apiKey = before.serverKey;

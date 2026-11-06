@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Lita på Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Slå på om Cloudflares proxy (det orange molnet) står framför din omvända proxy.",
   "components.Settings.SettingsNetwork.trustedProxies": "Lita också på de här proxyservrarna",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andra proxyservrar framför Seerr AI, som en på en hyrd server. Lokala är alltid betrodda.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andra proxyservrar framför Seerr AI, till exempel en på en hyrd server eller en lokal bakom en annan. Den lokala som ansluter till Seerr AI är alltid betrodd.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} är inte en adress eller ett intervall, till exempel 203.0.113.5 eller 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Lägg till Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API-nyckel",

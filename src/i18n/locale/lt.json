@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Pasitikėti Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Įjunkite, jei Cloudflare tarpinis serveris (oranžinis debesis) yra prieš jūsų atvirkštinį tarpinį serverį.",
   "components.Settings.SettingsNetwork.trustedProxies": "Taip pat pasitikėti šiais įgaliotaisiais serveriais",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Kiti tarpiniai serveriai prieš Seerr AI, pvz., nuomojamame serveryje. Vietiniais pasitikima visada.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Kiti tarpiniai serveriai prieš Seerr AI, pvz., nuomojamame serveryje arba vietinis už kito. Vietiniu, kuris jungiasi prie Seerr AI, visada pasitikima.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} nėra adresas ar diapazonas, pavyzdžiui, 203.0.113.5 ar 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Pridėti Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API raktas",

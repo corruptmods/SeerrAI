@@ -48,7 +48,7 @@ import { isPgsql } from '@server/utils/dbType';
 import { initializeDnsCache } from '@server/utils/dnsCache';
 import { rollBackOnRelease } from '@server/utils/nestedTransaction';
 import restartFlag from '@server/utils/restartFlag';
-import { trustedProxies } from '@server/utils/trustedProxies';
+import { proxyTrust } from '@server/utils/trustedProxies';
 import '@server/utils/userAgent';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -245,7 +245,7 @@ app
 
     const server = express();
     if (settings.network.trustProxy) {
-      server.set('trust proxy', trustedProxies(settings.network));
+      server.set('trust proxy', proxyTrust(settings.network));
     }
     // Compress text responses (pages, scripts, styles, API JSON). Brotli where
     // accepted: level 5 is about as fast as gzip and much smaller; top levels

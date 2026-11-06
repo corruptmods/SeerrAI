@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Довіряти Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Увімкніть, якщо проксі Cloudflare (помаранчева хмарка) стоїть перед вашим зворотним проксі.",
   "components.Settings.SettingsNetwork.trustedProxies": "Також довіряти цим проксі",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Інші проксі перед Seerr AI, наприклад на орендованому сервері. Локальним довіряють завжди.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Інші проксі перед Seerr AI, наприклад на орендованому сервері або локальний за іншим. Локальному проксі, що підключається до Seerr AI, довіряють завжди.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} — не адреса й не діапазон, наприклад 203.0.113.5 або 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Додати Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Ключ API",

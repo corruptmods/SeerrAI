@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare vertrouwen",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Zet aan als de proxy van Cloudflare (oranje wolk) voor je reverse proxy zit.",
   "components.Settings.SettingsNetwork.trustedProxies": "Ook deze proxy's vertrouwen",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andere proxy’s voor Seerr AI, zoals een op een gehuurde server. Lokale worden altijd vertrouwd.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andere proxy's vóór Seerr AI, zoals een op een gehuurde server of een lokale achter een andere. De lokale die verbinding maakt met Seerr AI wordt altijd vertrouwd.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} is geen adres of bereik, zoals 203.0.113.5 of 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr toevoegen",
   "components.Settings.SettingsProwlarr.apiKey": "API-sleutel",

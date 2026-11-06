@@ -143,6 +143,7 @@ const UserSettings = ({ children }: UserSettingsProps) => {
             ? '/settings/notifications/discord'
             : '/settings/notifications/pushbullet',
       regex: /\/settings\/notifications/,
+      hidden: currentUser?.id !== user.id && cannotManageThem,
     },
     {
       text: intl.formatMessage(messages.menuLibraries),

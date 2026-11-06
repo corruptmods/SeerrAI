@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "信任 Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "若 Cloudflare 代理（橘色雲朵）位於您的反向代理伺服器之前，請開啟。",
   "components.Settings.SettingsNetwork.trustedProxies": "同時信任這些代理伺服器",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI 前方的其他代理伺服器，例如租用伺服器上的代理。本機代理一律受信任。",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI 前面的其他代理，例如租用伺服器上的代理，或位於另一個代理之後的本機代理。連線到 Seerr AI 的本機代理一律受信任。",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} 不是位址或位址範圍，例如 203.0.113.5 或 203.0.113.0/24。",
   "components.Settings.SettingsProwlarr.addProwlarr": "新增 Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API 金鑰",

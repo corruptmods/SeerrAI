@@ -149,6 +149,9 @@ playlistRoutes.post<{ listId: string; songId: string }>(
         message: 'Only the playlist’s owner can try its songs again.',
       });
     }
+    if (!musicAllowed(req.user)) {
+      return next({ status: 403, message: 'Music is turned off.' });
+    }
     const song = await getRepository(MediaListSong).findOne({
       where: { id: Number(req.params.songId), listId: access.list.id },
     });

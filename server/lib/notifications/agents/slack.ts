@@ -1,7 +1,10 @@
 import { IssueStatus, IssueTypeName } from '@server/constants/issue';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
-import { declineReasonOf } from '@server/lib/notifications/declineReason';
+import {
+  declineReasonOf,
+  escapeSlack,
+} from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
@@ -15,12 +18,15 @@ import { BaseAgent } from './agent';
 interface EmbedField {
   type: 'plain_text' | 'mrkdwn';
   text: string;
+  /** No auto links or mentions. */
+  verbatim?: boolean;
 }
 
 interface TextItem {
   type: 'plain_text' | 'mrkdwn';
   text: string;
   emoji?: boolean;
+  verbatim?: boolean;
 }
 
 interface Element {
@@ -79,7 +85,8 @@ class SlackAgent
     if (payload.request) {
       fields.push({
         type: 'mrkdwn',
-        text: `*${intl.formatMessage(globalMessages.requestedBy)}*\n${payload.request.requestedBy.displayName}`,
+        text: `*${intl.formatMessage(globalMessages.requestedBy)}*\n${escapeSlack(payload.request.requestedBy.displayName)}`,
+        verbatim: true,
       });
 
       let status = '';
@@ -112,13 +119,15 @@ class SlackAgent
     } else if (payload.comment) {
       fields.push({
         type: 'mrkdwn',
-        text: `*${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}*\n${payload.comment.message}`,
+        text: `*${intl.formatMessage(globalMessages.commentFrom, { userName: escapeSlack(payload.comment.user.displayName) })}*\n${escapeSlack(payload.comment.message)}`,
+        verbatim: true,
       });
     } else if (payload.issue) {
       fields.push(
         {
           type: 'mrkdwn',
-          text: `*${intl.formatMessage(globalMessages.reportedBy)}*\n${payload.issue.createdBy.displayName}`,
+          text: `*${intl.formatMessage(globalMessages.reportedBy)}*\n${escapeSlack(payload.issue.createdBy.displayName)}`,
+          verbatim: true,
         },
         {
           type: 'mrkdwn',
@@ -169,7 +178,8 @@ class SlackAgent
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: payload.message,
+          text: escapeSlack(payload.message),
+          verbatim: true,
         },
         accessory:
           embedPoster && payload.image

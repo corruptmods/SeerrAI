@@ -139,6 +139,9 @@ export const namesArtist = (title: string, artist: string): boolean =>
     return !!by && timesIn(` ${form(title)} `, by) > 0;
   });
 
+/** Longer than any real file path; longer ones are not matched. */
+const MAX_PATH = 1024;
+
 /** A file's folder path joined into one name. */
 const foldersOf = (path: string): string =>
   path.replace(/\\/g, '/').split('/').slice(0, -1).join(' ');
@@ -155,7 +158,9 @@ export const fileInCatalog = <T extends ReleaseFile>(
 ): T | undefined => {
   const own = ` ${words(album)} ${words(artist)} ${words(track)} `;
   const usable = files.filter(
-    (file) => !otherVersion(` ${words(foldersOf(file.path))} `, own)
+    (file) =>
+      file.path.length <= MAX_PATH &&
+      !otherVersion(` ${words(foldersOf(file.path))} `, own)
   );
   const inAlbum = usable.filter((file) =>
     FORMS.some((form) =>
@@ -176,7 +181,7 @@ const nameOf = (path: string): string =>
  * - 03 - Song" → "song"), or ''.
  */
 const titleOfFile = (path: string, form: Form = words): string => {
-  const parts = nameOf(path).split(/\s+-\s+/);
+  const parts = nameOf(path).replace(/\s+/g, ' ').split(' - ');
   let numbered = -1;
   parts.forEach((part, index) => {
     if (/^(\d{1,2}\s+)?[a-d]?\d{1,3}$/.test(words(part))) numbered = index;
@@ -238,7 +243,11 @@ export const fileForTrack = <T extends ReleaseFile>(
     files.filter((f) => /\.cue$/i.test(f.path)).map((f) => base(f.path))
   );
   const audio = files.filter(
-    (f) => isAudio(f.path) && f.size >= 200 * 1024 && !sheets.has(base(f.path))
+    (f) =>
+      f.path.length <= MAX_PATH &&
+      isAudio(f.path) &&
+      f.size >= 200 * 1024 &&
+      !sheets.has(base(f.path))
   );
   const readings = FORMS.map((form) => {
     const by = form(artist);

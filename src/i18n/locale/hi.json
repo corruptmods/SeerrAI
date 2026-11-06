@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare पर भरोसा करें",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "अगर Cloudflare का प्रॉक्सी (नारंगी बादल) आपके रिवर्स प्रॉक्सी के आगे है तो चालू करें।",
   "components.Settings.SettingsNetwork.trustedProxies": "इन प्रॉक्सी पर भी भरोसा करें",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI के आगे के दूसरे प्रॉक्सी, जैसे किराए के सर्वर पर एक। लोकल पर हमेशा भरोसा होता है।",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI के आगे अन्य प्रॉक्सी, जैसे किराए के सर्वर पर कोई, या किसी दूसरे के पीछे लोकल प्रॉक्सी। Seerr AI से जुड़ने वाली लोकल प्रॉक्सी पर हमेशा भरोसा किया जाता है।",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} कोई पता या रेंज नहीं है, जैसे 203.0.113.5 या 203.0.113.0/24।",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr जोड़ें",
   "components.Settings.SettingsProwlarr.apiKey": "API कुंजी",

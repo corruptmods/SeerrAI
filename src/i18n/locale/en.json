@@ -3383,7 +3383,7 @@
   "components.Settings.SettingsNetwork.trustProxy": "Enable Proxy Support",
   "components.Settings.SettingsNetwork.trustProxyLocalTip": "Trust a reverse proxy on this machine, your local network or Tailscale for people’s addresses.",
   "components.Settings.SettingsNetwork.trustedProxies": "Also Trust These Proxies",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Other proxies in front of Seerr AI, such as one on a rented server. Local ones are always trusted.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Other proxies in front of Seerr AI, such as one on a rented server, or a local proxy behind another. The local one connecting to Seerr AI is always trusted.",
   "components.Settings.SettingsNetwork.validationApiRequestTimeout": "You must provide a valid timeout value",
   "components.Settings.SettingsNetwork.validationDnsCacheMaxTtl": "You must provide a valid maximum TTL",
   "components.Settings.SettingsNetwork.validationDnsCacheMinTtl": "You must provide a valid minimum TTL",

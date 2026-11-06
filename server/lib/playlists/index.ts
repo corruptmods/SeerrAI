@@ -13,6 +13,7 @@ import {
 } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import { featureEnabled } from '@server/lib/features';
 import type { CatalogSong } from '@server/lib/music/catalogSong';
 import { catalogOn, catalogSong } from '@server/lib/music/catalogSong';
 import { songByIsrc, songNamed } from '@server/lib/music/charts';
@@ -315,6 +316,8 @@ class Playlists {
 
   /** Matches and requests waiting songs in the background. */
   public kick(): void {
+    // Songs wait while Music is off for everyone.
+    if (!featureEnabled('music')) return;
     if (this.running) {
       this.again = true;
       return;
@@ -486,6 +489,10 @@ class Playlists {
   }
 
   private async requestFor(user: User, songs: MediaListSong[]): Promise<void> {
+    if (!featureEnabled('music', user)) {
+      await this.mark(songs, 'waiting', 'Music is turned off.');
+      return;
+    }
     const settings = getSettings().music;
     if (!settings.songRequests) {
       await this.mark(

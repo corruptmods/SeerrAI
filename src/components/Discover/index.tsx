@@ -254,7 +254,7 @@ const Discover = () => {
 
   const resetSliders = async () => {
     try {
-      await axios.get('/api/v1/settings/discover/reset');
+      await axios.post('/api/v1/settings/discover/reset');
 
       addToast(intl.formatMessage(messages.resetsuccess), {
         appearance: 'success',

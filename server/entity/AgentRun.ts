@@ -58,6 +58,8 @@ export interface AgentStep {
     | 'followUp';
   tool?: string;
   text: string;
+  /** On a reply: an admin's approval or decline of a proposal. */
+  decision?: boolean;
 }
 
 /**

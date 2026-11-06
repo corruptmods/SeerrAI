@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare vertrauen",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Schalt un, wann dem Cloudflare säi Proxy (orange Wollek) virun Ärem Reverse Proxy ass.",
   "components.Settings.SettingsNetwork.trustedProxies": "Och dëse Proxyen vertrauen",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Aner Proxyen virum Seerr AI, z. B. een op engem gelounte Server. Lokal gëtt ëmmer vertraut.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Aner Proxyen virun Seerr AI, z. B. een op engem gelounte Server oder e lokalen hannert engem aneren. Dem lokalen, deen sech mat Seerr AI verbënnt, gëtt ëmmer vertraut.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ass keng Adress a kee Beräich, wéi 203.0.113.5 oder 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr dobäisetzen",
   "components.Settings.SettingsProwlarr.apiKey": "API-Schlëssel",

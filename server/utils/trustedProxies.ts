@@ -15,6 +15,11 @@ import net from 'node:net';
  * count failed passwords per address, so that would allow unlimited guessing
  * with a new address each time. Trusting only known proxies uses the last
  * address a trusted proxy added: the one it actually saw.
+ *
+ * Local addresses other than loopback are trusted only as the proxy that
+ * connects to Seerr AI: further along the list a local address is as likely a
+ * visitor on the local network or Tailscale as another proxy. A local proxy
+ * behind another one is listed under Also Trust These Proxies.
  */
 export const LOCAL_PROXIES = [
   'loopback',
@@ -74,12 +79,12 @@ export const isProxyAddress = (entry: string): boolean => {
 };
 
 /**
- * Every proxy trusted with Enable Proxy Support on: the local ones,
- * Cloudflare's if Trust Cloudflare is on, then the admin's list. An entry
- * Express would reject (possible only by hand-editing settings.json, since
- * saving validates) is skipped with a warning so the server still starts.
+ * Cloudflare's proxies if Trust Cloudflare is on, then the admin's list. An
+ * entry Express would reject (possible only by hand-editing settings.json,
+ * since saving validates) is skipped with a warning so the server still
+ * starts.
  */
-export const trustedProxies = (
+const otherProxies = (
   network: Pick<NetworkSettings, 'trustCloudflare' | 'trustedProxies'>
 ): string[] => {
   const listed = (network.trustedProxies ?? []).filter((entry) => {
@@ -92,9 +97,34 @@ export const trustedProxies = (
     });
     return false;
   });
-  return [
-    ...LOCAL_PROXIES,
-    ...(network.trustCloudflare ? CLOUDFLARE_PROXIES : []),
-    ...listed,
-  ];
+  return [...(network.trustCloudflare ? CLOUDFLARE_PROXIES : []), ...listed];
+};
+
+/**
+ * Every proxy trusted with Enable Proxy Support on: the local ones,
+ * Cloudflare's if Trust Cloudflare is on, then the admin's list.
+ */
+export const trustedProxies = (
+  network: Pick<NetworkSettings, 'trustCloudflare' | 'trustedProxies'>
+): string[] => [...LOCAL_PROXIES, ...otherProxies(network)];
+
+type ProxyTrust = (address: string, hop: number) => boolean;
+
+const compileTrust = (list: string[]): ProxyTrust =>
+  express().set('trust proxy', list).get('trust proxy fn');
+
+/**
+ * Express's "trust proxy" with Enable Proxy Support on. Hop 0, the address
+ * connecting to Seerr AI, is trusted if in trustedProxies(); addresses further
+ * along X-Forwarded-For only on loopback, Cloudflare's (with Trust Cloudflare)
+ * or the admin's list.
+ */
+export const proxyTrust = (
+  network: Pick<NetworkSettings, 'trustCloudflare' | 'trustedProxies'>
+): ProxyTrust => {
+  const others = otherProxies(network);
+  const connecting = compileTrust([...LOCAL_PROXIES, ...others]);
+  const further = compileTrust(['loopback', ...others]);
+  return (address, hop) =>
+    hop === 0 ? connecting(address, hop) : further(address, hop);
 };

@@ -19,6 +19,13 @@ export const declineReasonOf = (
 export const escapeMarkdown = (text: string): string =>
   text.replace(/[!-/:-@[-`{-~]/g, '\\$&');
 
+/**
+ * Escapes text for Slack's mrkdwn, so it can't link or mention ("<url|text>",
+ * "<!channel>").
+ */
+export const escapeSlack = (text: string): string =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 /** Escapes text for HTML. */
 export const escapeHtml = (text: string): string =>
   text.replace(

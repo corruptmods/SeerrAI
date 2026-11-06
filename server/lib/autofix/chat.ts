@@ -292,6 +292,9 @@ export const readFix = (
   return { ...fix, kind, seasonNumber, episodeNumber };
 };
 
+const MUSIC_FIXES =
+  'For music, I can search again for an album’s missing tracks or an artist’s missing albums. For anything else, ask an admin.';
+
 /**
  * Music fixes: re-search an album's missing tracks, an album that never
  * came, or an artist's missing albums. Other fix kinds are video-only.
@@ -305,8 +308,7 @@ const fixMusicFromChat = async (
   const shown = found.albums.length + found.artists.length ? found : undefined;
   if (kind !== 'missing') {
     return {
-      reply:
-        'For music, I can search again for an album’s missing tracks or an artist’s missing albums. For anything else, ask an admin.',
+      reply: MUSIC_FIXES,
       results: [],
       ...(shown && { music: shown }),
     };
@@ -464,6 +466,10 @@ export const confirmFix = async (
   });
   if (!media) {
     return { reply: 'That title is no longer on the server.', results: [] };
+  }
+  // Files are replaced only for films and series.
+  if (media.mediaType === MediaType.MUSIC) {
+    return { reply: MUSIC_FIXES, results: [] };
   }
   const refused = await refuseToFile(user, media, fix, []);
   if (refused) {

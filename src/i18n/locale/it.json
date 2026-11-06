@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Considera attendibile Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Attivalo se il proxy di Cloudflare (nuvola arancione) sta davanti al tuo reverse proxy.",
   "components.Settings.SettingsNetwork.trustedProxies": "Considera attendibili anche questi proxy",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Altri proxy davanti a Seerr AI, come uno su un server a noleggio. Quelli locali sono sempre fidati.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Altri proxy davanti a Seerr AI, come uno su un server noleggiato o uno locale dietro un altro. Quello locale che si collega a Seerr AI è sempre attendibile.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} non è un indirizzo né un intervallo, come 203.0.113.5 o 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Aggiungi Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Chiave API",

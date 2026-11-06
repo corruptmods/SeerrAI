@@ -323,6 +323,10 @@ const decodeLabel = (label: string) => {
 /** A magnet's placeholder name until its file list is in: "<HASH>.meta". */
 const isMeta = (name: string) => /^[0-9a-f]{40}\.meta$/i.test(name);
 
+/** One slash between parts, none at the end. */
+const tidyPath = (path: string) =>
+  path.replace(/\/{2,}/g, '/').replace(/(?<=.)\/$/, '');
+
 const parentOf = (path: string) => path.replace(/\/+[^/]*\/*$/, '') || '/';
 const lastPart = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() ?? '';
@@ -356,6 +360,31 @@ export const rtorrentRemovals = (
     folders: [...folders].sort((a, b) => b.length - a.length),
     refused: names.filter((name) => !inside(name)),
   };
+};
+
+/**
+ * Where each torrent's data is: a multi-file torrent's folder, a single
+ * file's path. Magnets still fetching their file list have none yet.
+ */
+const rtorrentDataRoots = (
+  torrents: Pick<RtorrentInfo, 'name' | 'directory' | 'isMultiFile'>[]
+): string[] =>
+  torrents
+    .filter((t) => !isMeta(t.name) && t.directory)
+    .map((t) =>
+      tidyPath(t.isMultiFile ? t.directory : `${t.directory}/${t.name}`)
+    )
+    .filter((root) => root.length > 1);
+
+/** True when a path is, holds or is inside one of these data roots. */
+const inDataOf = (roots: string[], path: string): boolean => {
+  const tidy = tidyPath(path);
+  return roots.some(
+    (root) =>
+      tidy === root ||
+      tidy.startsWith(`${root}/`) ||
+      root.startsWith(`${tidy}/`)
+  );
 };
 
 export const rtorrentTorrent = (info: RtorrentInfo): ClientTorrent => {
@@ -546,12 +575,16 @@ class RtorrentAPI implements TorrentClient {
 
   /**
    * Removes the torrent, then deletes its files one by one and a multi-file
-   * torrent's emptied folders; never anything else.
+   * torrent's emptied folders; never anything else, nor anything another
+   * torrent's data is in (a cross-seed of the same files).
    */
   public async deleteTorrent(hash: string): Promise<void> {
-    const info = await this.info(hash);
+    const all = await this.torrents();
+    const info = all.find((t) => t.hash.toLowerCase() === hash.toLowerCase());
     if (!info) return;
     const files = isMeta(info.name) ? [] : await this.getFiles(info.hash);
+    const othersData = rtorrentDataRoots(all.filter((t) => t !== info));
+    const shared = (path: string) => inDataOf(othersData, path);
     await this.call('d.erase', [info.hash]);
     const removals = rtorrentRemovals(
       info,
@@ -560,13 +593,13 @@ class RtorrentAPI implements TorrentClient {
     const failed = removals.refused.map(
       (name) => `${name} is not inside the torrent's folder`
     );
-    for (const path of removals.files) {
+    for (const path of removals.files.filter((p) => !shared(p))) {
       await this.call('execute.throw', ['', 'rm', '-f', '--', path]).catch(
         (e) => failed.push((e as Error).message)
       );
     }
     // rmdir only removes empty folders.
-    for (const dir of removals.folders) {
+    for (const dir of removals.folders.filter((d) => !shared(d))) {
       await this.call('execute.throw', ['', 'rmdir', '--', dir]).catch(
         () => undefined
       );

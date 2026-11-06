@@ -238,3 +238,32 @@ describe('a playlist shared with someone', () => {
     );
   });
 });
+
+describe('a playlist song tried again', () => {
+  it('is refused while Music is turned off', async () => {
+    const list = await makePlaylist();
+    const song = await getRepository(MediaListSong).save(
+      new MediaListSong({
+        listId: list.id,
+        sourceId: 'trk1',
+        position: 1,
+        title: 'Lantern Song',
+        artistName: 'Glasswing',
+        state: 'failed',
+        requestForId: user.id,
+      })
+    );
+    getSettings().main.disabledFeatures = ['music'];
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/v1/list/${list.id}/song/${song.id}/retry`,
+      { method: 'POST' }
+    );
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), { message: 'Music is turned off.' });
+    assert.equal(
+      (await getRepository(MediaListSong).findOneByOrFail({ id: song.id }))
+        .state,
+      'failed'
+    );
+  });
+});

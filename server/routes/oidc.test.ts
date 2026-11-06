@@ -542,6 +542,20 @@ describe('signing in with a provider', () => {
     assert.ok(await signedInAs(elsewhere.cookies));
   });
 
+  it('lets only ten failing sign-ins through when they come back together', async () => {
+    const from = '203.0.113.11';
+    await linkSub('friend@seerr.dev', ALICE.sub);
+    const outcomes = await Promise.all(
+      Array.from({ length: 15 }, () =>
+        goThrough(ALICE, { from, tamper: { nonce: 'other' } }).then(
+          ({ destination }) => destination.searchParams.get('sso')
+        )
+      )
+    );
+    assert.equal(outcomes.filter((sso) => sso === 'expired').length, 10);
+    assert.equal(outcomes.filter((sso) => sso === 'too-many').length, 5);
+  });
+
   it('never holds anyone up over callbacks no sign-in here started', async () => {
     // Behind an untrusted proxy everyone shares an address: forged callbacks
     // must not lock them all out.

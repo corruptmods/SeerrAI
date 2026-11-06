@@ -65,10 +65,12 @@ class GotifyAgent
     const event = eventText(payload, intl);
     const title = event ? `${event} - ${payload.subject}` : payload.subject;
 
-    let message = payload.message ? `${payload.message}  \n\n` : '';
+    let message = payload.message
+      ? `${escapeMarkdown(payload.message)}  \n\n`
+      : '';
 
     if (payload.request) {
-      message += `\n**${intl.formatMessage(globalMessages.requestedBy)}:** ${payload.request.requestedBy.displayName}  `;
+      message += `\n**${intl.formatMessage(globalMessages.requestedBy)}:** ${escapeMarkdown(payload.request.requestedBy.displayName)}  `;
 
       let status = '';
       switch (type) {
@@ -100,9 +102,9 @@ class GotifyAgent
         message += `\n**${intl.formatMessage(globalMessages.declineReason)}:** ${escapeMarkdown(declineReason)}  `;
       }
     } else if (payload.comment) {
-      message += `\n${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}:\n${payload.comment.message}  `;
+      message += `\n${intl.formatMessage(globalMessages.commentFrom, { userName: escapeMarkdown(payload.comment.user.displayName) })}:\n${escapeMarkdown(payload.comment.message)}  `;
     } else if (payload.issue) {
-      message += `\n\n**${intl.formatMessage(globalMessages.reportedBy)}:** ${payload.issue.createdBy.displayName}  `;
+      message += `\n\n**${intl.formatMessage(globalMessages.reportedBy)}:** ${escapeMarkdown(payload.issue.createdBy.displayName)}  `;
       message += `\n**${intl.formatMessage(globalMessages.issueType)}:** ${IssueTypeName[payload.issue.issueType]}  `;
       message += `\n**${intl.formatMessage(globalMessages.issueStatus)}:** ${
         payload.issue.status === IssueStatus.OPEN

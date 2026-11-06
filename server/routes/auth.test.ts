@@ -1322,6 +1322,133 @@ describe('guessing passwords', () => {
     assert.strictEqual(emailMock.callCount(), 10);
   });
 
+  it('checks at most ten passwords for one account sent all at once', async () => {
+    await passwordUser({
+      email: 'hurried@example.invalid',
+      username: 'hurried',
+    });
+    const statuses = await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        request(app)
+          .post('/auth/local')
+          .send({ email: 'hurried@example.invalid', password: `wrong-${i}` })
+          .then((res) => res.status)
+      )
+    );
+    assert.strictEqual(statuses.filter((status) => status === 403).length, 10);
+    assert.strictEqual(statuses.filter((status) => status === 429).length, 20);
+  });
+
+  it('asks Jellyfin about at most ten passwords for one account sent all at once', async () => {
+    configureJellyfin();
+    setMediaServerLogin(true);
+    const login = mock.method(JellyfinAPI.prototype, 'login', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      throw new ApiError(401, ApiErrorCode.InvalidCredentials);
+    });
+    try {
+      const statuses = await Promise.all(
+        Array.from({ length: 30 }, (_, i) =>
+          request(app)
+            .post('/auth/jellyfin')
+            .send({ username: 'jfhurried', password: `wrong-${i}` })
+            .then((res) => res.status)
+        )
+      );
+      assert.strictEqual(login.mock.callCount(), 10);
+      assert.strictEqual(
+        statuses.filter((status) => status === 401).length,
+        10
+      );
+      assert.strictEqual(
+        statuses.filter((status) => status === 429).length,
+        20
+      );
+    } finally {
+      login.mock.restore();
+    }
+  });
+
+  it('does not count Jellyfin sign-ins the server could not answer', async () => {
+    configureJellyfin();
+    setMediaServerLogin(true);
+    const login = mock.method(JellyfinAPI.prototype, 'login', async () => {
+      throw new ApiError(502, ApiErrorCode.ConnectionError);
+    });
+    try {
+      for (let i = 0; i < 12; i++) {
+        const res = await request(app)
+          .post('/auth/jellyfin')
+          .send({ username: 'jfoffline', password: 'secret' });
+        assert.strictEqual(res.status, 502);
+      }
+      login.mock.mockImplementation(async () => {
+        throw new ApiError(401, ApiErrorCode.InvalidCredentials);
+      });
+      const res = await request(app)
+        .post('/auth/jellyfin')
+        .send({ username: 'jfoffline', password: 'wrong' });
+      assert.strictEqual(res.status, 401);
+    } finally {
+      login.mock.restore();
+    }
+  });
+
+  describe('for one account from many addresses', () => {
+    let proxied: Express;
+    before(() => {
+      proxied = createApp();
+      proxied.set('trust proxy', true);
+    });
+
+    it('stops after fifty wrong passwords, even the right one', async () => {
+      await passwordUser({
+        email: 'targeted@example.invalid',
+        username: 'targeted',
+      });
+      const attempt = (address: string, password: string) =>
+        request(proxied)
+          .post('/auth/local')
+          .set('X-Forwarded-For', address)
+          .send({ email: 'targeted@example.invalid', password });
+
+      const statuses = await Promise.all(
+        Array.from({ length: 50 }, (_, i) =>
+          attempt(`192.0.2.${i + 1}`, 'wrong').then((res) => res.status)
+        )
+      );
+      assert.deepStrictEqual(new Set(statuses), new Set([403]));
+
+      const blocked = await attempt('192.0.2.200', 'test1234');
+      assert.strictEqual(blocked.status, 429);
+
+      // Other accounts aren't affected.
+      const other = await request(proxied)
+        .post('/auth/local')
+        .set('X-Forwarded-For', '192.0.2.200')
+        .send({ email: 'friend@seerr.dev', password: 'test1234' });
+      assert.strictEqual(other.status, 200);
+    });
+
+    it('sends at most fifty reset emails', async () => {
+      await passwordUser({
+        email: 'flooded@example.invalid',
+        username: 'flooded',
+      });
+      const reset = (address: string) =>
+        request(proxied)
+          .post('/auth/reset-password')
+          .set('X-Forwarded-For', address)
+          .send({ email: 'flooded@example.invalid' });
+
+      for (let i = 1; i <= 50; i++) {
+        assert.strictEqual((await reset(`192.0.2.${i}`)).status, 200);
+      }
+      assert.strictEqual((await reset('192.0.2.200')).status, 429);
+      assert.strictEqual(emailMock.callCount(), 50);
+    });
+  });
+
   it('answers a reset request without waiting for the email to go', async () => {
     await passwordUser({ email: 'slowmail@seerr.dev', username: 'slowmail' });
     // A mail server that never responds.
@@ -1727,6 +1854,16 @@ describe('with several media servers', () => {
       assert.strictEqual(emby.jellyfinUserId, null, 'never merged');
     });
 
+    it('refuses a sign-in the server answers without an account id', async () => {
+      connectServers('plex', 'jellyfin');
+      accounts.jellyfin = { Name: 'bob' } as { Id: string; Name: string };
+
+      const res = await signIn(MediaServerType.JELLYFIN);
+      assert.strictEqual(res.status, 401);
+      assert.strictEqual(res.body.message, ApiErrorCode.InvalidCredentials);
+      assert.strictEqual(res.headers['set-cookie'], undefined);
+    });
+
     it('follows each server’s own sign-in switch', async () => {
       connectServers('plex', 'jellyfin', 'emby');
       getSettings().emby.signIn = false;
@@ -1884,5 +2021,132 @@ describe('with several media servers', () => {
       .send({ email: 'leftover@seerr.dev', password: 'test1234' });
     assert.strictEqual(res.status, 200);
     assert.strictEqual(jellyfinAccountMock.mock.callCount(), 0);
+  });
+});
+
+describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
+  const ADDRESS = {
+    ip: 'media.example.invalid',
+    port: 8920,
+    urlBase: '/media',
+    useSsl: true,
+  };
+  let login: ReturnType<typeof mock.method<JellyfinAPI, 'login'>>;
+  let apiToken: ReturnType<typeof mock.method<JellyfinAPI, 'createApiToken'>>;
+  let serverName: ReturnType<typeof mock.method<JellyfinAPI, 'getServerName'>>;
+
+  beforeEach(async () => {
+    login = mock.method(JellyfinAPI.prototype, 'login', async () => ({
+      User: {
+        Id: 'media-admin',
+        Name: 'harbour',
+        ServerId: 'media-server',
+        ServerName: 'Harbour Lights',
+        Configuration: { GroupedFolders: [] },
+        Policy: { IsAdministrator: true },
+      },
+      AccessToken: 'media-token',
+    }));
+    apiToken = mock.method(
+      JellyfinAPI.prototype,
+      'createApiToken',
+      async () => 'media-api-key'
+    );
+    serverName = mock.method(
+      JellyfinAPI.prototype,
+      'getServerName',
+      async () => 'Harbour Lights'
+    );
+    // clear() issues TRUNCATE, which Postgres refuses while other tables
+    // reference users; delete works on both engines.
+    await getRepository(User).createQueryBuilder().delete().execute();
+  });
+
+  afterEach(async () => {
+    login.mock.restore();
+    apiToken.mock.restore();
+    serverName.mock.restore();
+    await schedule.gracefulShutdown();
+    scheduledJobs.length = 0;
+    const settings = getSettings();
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = false;
+      settings[kind].signIn = true;
+    }
+    Object.assign(settings.jellyfin, {
+      ip: 'jellyfin.local',
+      port: 8096,
+      urlBase: '',
+      useSsl: false,
+    });
+    settings.emby.ip = '';
+  });
+
+  for (const kind of ['jellyfin', 'emby'] as const) {
+    it(`keeps the ${kind} server's address when its administrator signs in`, async () => {
+      connectServers(kind);
+      const server = getSettings()[kind];
+      Object.assign(server, ADDRESS);
+
+      const res = await request(app)
+        .post('/auth/jellyfin')
+        .send({
+          username: 'harbour',
+          password: 'secret',
+          email: 'harbour@example.invalid',
+          serverType: typeOfKind(kind),
+        });
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.id, 1);
+      assert.deepStrictEqual(
+        {
+          ip: server.ip,
+          port: server.port,
+          urlBase: server.urlBase,
+          useSsl: server.useSsl,
+        },
+        ADDRESS
+      );
+      assert.strictEqual(server.apiKey, 'media-api-key');
+
+      // Later sign-ins still can't name another server.
+      const elsewhere = await request(app)
+        .post('/auth/jellyfin')
+        .send({
+          username: 'glasswing',
+          password: 'secret',
+          hostname: '192.0.2.10',
+          port: 9,
+          serverType: typeOfKind(kind),
+        });
+      assert.strictEqual(elsewhere.status, 500);
+      assert.strictEqual(login.mock.callCount(), 1);
+    });
+  }
+
+  it('never takes a server address from sign-in after setup, even with none saved', async () => {
+    connectServers('jellyfin');
+    getSettings().jellyfin.ip = '';
+
+    const named = await request(app).post('/auth/jellyfin').send({
+      username: 'glasswing',
+      password: 'secret',
+      hostname: '192.0.2.10',
+      port: 9,
+      serverType: MediaServerType.JELLYFIN,
+    });
+    assert.strictEqual(named.status, 500);
+    assert.strictEqual(
+      named.body.error,
+      'Jellyfin hostname already configured'
+    );
+
+    const unnamed = await request(app).post('/auth/jellyfin').send({
+      username: 'glasswing',
+      password: 'secret',
+      serverType: MediaServerType.JELLYFIN,
+    });
+    assert.strictEqual(unnamed.status, 500);
+    assert.strictEqual(login.mock.callCount(), 0);
   });
 });

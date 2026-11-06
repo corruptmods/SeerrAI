@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Confia en Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Activeu-ho si el servidor intermediari de Cloudflare (núvol taronja) és davant del vostre servidor intermediari invers.",
   "components.Settings.SettingsNetwork.trustedProxies": "Confia també en aquests servidors intermediaris",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Altres servidors intermediaris davant de Seerr AI, com un en un servidor llogat. Els locals sempre són de confiança.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Altres servidors intermediaris davant de Seerr AI, com un en un servidor llogat o un de local darrere d'un altre. El local que es connecta a Seerr AI sempre és de confiança.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} no és una adreça ni un interval, com ara 203.0.113.5 o 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Afegeix Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Clau de l'API",

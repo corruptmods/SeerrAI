@@ -40,7 +40,7 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
     'Turn on if Cloudflare’s proxy (orange cloud) is in front of your reverse proxy.',
   trustedProxies: 'Also Trust These Proxies',
   trustedProxiesTip:
-    'Other proxies in front of Seerr AI, such as one on a rented server. Local ones are always trusted.',
+    'Other proxies in front of Seerr AI, such as one on a rented server, or a local proxy behind another. The local one connecting to Seerr AI is always trusted.',
   validationTrustedProxy:
     '{entry} is not an address or range, such as 203.0.113.5 or 203.0.113.0/24.',
   proxyEnabled: 'HTTP(S) Proxy',

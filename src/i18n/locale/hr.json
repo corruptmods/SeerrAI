@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Vjeruj Cloudflareu",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Uključite ako je Cloudflareov proxy (narančasti oblak) ispred vašeg obrnutog proxyja.",
   "components.Settings.SettingsNetwork.trustedProxies": "Vjeruj i ovim proxyjima",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Drugi proxyji ispred Seerr AI, npr. na unajmljenom poslužitelju. Lokalnima se uvijek vjeruje.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Ostali proxyji ispred Seerr AI-ja, npr. na unajmljenom poslužitelju ili lokalni iza drugog. Lokalnom koji se spaja na Seerr AI uvijek se vjeruje.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} nije adresa ni raspon, npr. 203.0.113.5 ili 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Dodaj Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API ključ",

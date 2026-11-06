@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare vertrauen",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Einschalten, wenn der Proxy von Cloudflare (orange Wolke) vor deinem Reverse-Proxy sitzt.",
   "components.Settings.SettingsNetwork.trustedProxies": "Auch diesen Proxys vertrauen",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Weitere Proxys vor Seerr AI, etwa einer auf einem gemieteten Server. Lokale werden immer vertraut.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Weitere Proxys vor Seerr AI, etwa einer auf einem gemieteten Server oder ein lokaler hinter einem anderen. Dem lokalen, der sich mit Seerr AI verbindet, wird immer vertraut.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ist weder eine Adresse noch ein Bereich, etwa 203.0.113.5 oder 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr hinzufügen",
   "components.Settings.SettingsProwlarr.apiKey": "API-Schlüssel",

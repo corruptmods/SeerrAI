@@ -52,9 +52,9 @@ import { z } from 'zod';
 
 const authRoutes = Router();
 
-const passwordLimiter = new SignInLimiter('password');
-const jellyfinLimiter = new SignInLimiter('jellyfin');
-const resetLimiter = new SignInLimiter('reset');
+const passwordLimiter = new SignInLimiter('password', { capAccount: true });
+const jellyfinLimiter = new SignInLimiter('jellyfin', { capAccount: true });
+const resetLimiter = new SignInLimiter('reset', { capAccount: true });
 
 // Passkey sign-in and management of your own passkeys.
 authRoutes.use('/passkey', passkeyRoutes);
@@ -389,9 +389,11 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
   const server = jellyfinFamily(serverKind);
   const name = serverName(serverKind);
 
+  // Only setup chooses the server's address; afterwards sign-in uses the one in
+  // settings.
   if (!body.username) {
     return res.status(500).json({ error: 'You must provide an username' });
-  } else if (server.ip !== '' && body.hostname) {
+  } else if ((!settingUp || server.ip !== '') && body.hostname) {
     return res
       .status(500)
       .json({ error: 'Jellyfin hostname already configured' });
@@ -399,9 +401,11 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     return res.status(500).json({ error: 'No hostname provided.' });
   }
 
-  if (!jellyfinLimiter.allow(req, res, body.username)) {
+  if (!jellyfinLimiter.take(req, res, body.username)) {
     return;
   }
+  // Counted until the credentials prove right.
+  let counted = true;
 
   try {
     const hostname =
@@ -454,6 +458,11 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       body.password,
       clientIp
     );
+    if (!account?.User?.Id) {
+      throw new ApiError(401, ApiErrorCode.InvalidCredentials);
+    }
+    jellyfinLimiter.clear(req, body.username);
+    counted = false;
 
     user = await userRepository.findOne({
       where: { [USER_ID[serverKind]]: account.User.Id },
@@ -549,10 +558,12 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
 
       server.name = await jellyfinserver.getServerName();
       server.serverId = account.User.ServerId;
-      server.ip = body.hostname ?? '';
-      server.port = body.port ?? 8096;
-      server.urlBase = body.urlBase ?? '';
-      server.useSsl = body.useSsl ?? false;
+      if (body.hostname) {
+        server.ip = body.hostname;
+        server.port = body.port ?? 8096;
+        server.urlBase = body.urlBase ?? '';
+        server.useSsl = body.useSsl ?? false;
+      }
       server.apiKey = apiKey;
       await settings.save();
       startJobs();
@@ -665,10 +676,12 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     if (user) {
       await startSession(req, user.id);
     }
-    jellyfinLimiter.clear(req, body.username);
 
     return res.status(200).json(user?.filter() ?? {});
   } catch (e) {
+    if (counted && e.errorCode !== ApiErrorCode.InvalidCredentials) {
+      jellyfinLimiter.refund(req, body.username);
+    }
     switch (e.errorCode) {
       case ApiErrorCode.InvalidUrl:
         logger.error(
@@ -708,7 +721,6 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         });
 
       case ApiErrorCode.InvalidCredentials:
-        jellyfinLimiter.count(req, body.username);
         logger.warn(
           'Failed sign-in attempt from user with incorrect Jellyfin credentials',
           {
@@ -1020,9 +1032,11 @@ authRoutes.post('/local', async (req, res, next) => {
       error: 'You must provide both an email address and a password.',
     });
   }
-  if (!passwordLimiter.allow(req, res, body.email)) {
+  if (!passwordLimiter.take(req, res, body.email)) {
     return;
   }
+  // Counted until the password proves right or wrong.
+  let pending = true;
   try {
     const user = await userRepository
       .createQueryBuilder('user')
@@ -1038,8 +1052,9 @@ authRoutes.post('/local', async (req, res, next) => {
       .where('user.email = :email', { email: body.email.toLowerCase() })
       .getOne();
 
-    if (!user || !(await user.passwordMatch(body.password))) {
-      passwordLimiter.count(req, body.email);
+    const matches = !!user && (await user.passwordMatch(body.password));
+    pending = false;
+    if (!user || !matches) {
       logger.warn('Failed sign-in attempt using invalid Seerr password', {
         label: 'API',
         ip: req.ip,
@@ -1071,6 +1086,9 @@ authRoutes.post('/local', async (req, res, next) => {
 
     return res.status(200).json(user.filter());
   } catch (e) {
+    if (pending) {
+      passwordLimiter.refund(req, body.email);
+    }
     logger.error('Something went wrong authenticating with Seerr password', {
       label: 'API',
       errorMessage: e.message,
@@ -1169,11 +1187,10 @@ authRoutes.post('/reset-password', async (req, res, next) => {
     });
   }
 
-  if (!resetLimiter.allow(req, res, body.email)) {
+  // Counted whether or not the account exists, so responses don't reveal it.
+  if (!resetLimiter.take(req, res, body.email)) {
     return;
   }
-  // Counted whether or not the account exists, so responses don't reveal it.
-  resetLimiter.count(req, body.email);
 
   const user = await userRepository
     .createQueryBuilder('user')

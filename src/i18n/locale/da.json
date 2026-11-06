@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Hav tillid til Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Slå til, hvis Cloudflares proxy (den orange sky) står foran din reverse proxy.",
   "components.Settings.SettingsNetwork.trustedProxies": "Hav også tillid til disse proxyer",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andre proxyer foran Seerr AI, fx en på en lejet server. Lokale er altid betroede.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Andre proxyer foran Seerr AI, f.eks. en på en lejet server eller en lokal proxy bag en anden. Den lokale, der forbinder til Seerr AI, er altid betroet.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} er ikke en adresse eller et interval, fx 203.0.113.5 eller 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Tilføj Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API-nøgle",

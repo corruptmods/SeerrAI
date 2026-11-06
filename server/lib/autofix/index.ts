@@ -22,6 +22,7 @@ import {
   pickReplacement,
 } from '@server/lib/autofix/releases';
 import {
+  approvedOf,
   carryOutSeason,
   planDetails,
   planHeadline,
@@ -338,6 +339,7 @@ const serviceOf = (media: Media) =>
     : { serverId: media.serviceId, id: media.externalServiceId };
 
 const sonarrFor = (media: Media) => {
+  if (media.mediaType !== MediaType.TV) return undefined;
   const { serverId, id } = serviceOf(media);
   const server = getSettings().sonarr.find((s) => s.id === serverId);
   return server && id
@@ -346,6 +348,7 @@ const sonarrFor = (media: Media) => {
 };
 
 const radarrFor = (media: Media) => {
+  if (media.mediaType !== MediaType.MOVIE) return undefined;
   const { serverId, id } = serviceOf(media);
   const server = getSettings().radarr.find((s) => s.id === serverId);
   return server && id
@@ -374,6 +377,14 @@ const NO_BAZARR = (what: string): Omit<FixResult, 'kind'> => ({
   skipped: true,
   message: `Bazarr is not set up, so ${what}.`,
 });
+
+/** Music is on Lidarr: only its missing tracks and albums are searched for. */
+const MUSIC_ONLY_MISSING: Omit<FixResult, 'kind'> = {
+  ok: false,
+  skipped: true,
+  message:
+    'For music, only missing tracks or albums can be searched for again here. For anything else, ask an admin.',
+};
 
 const ASK_SEASON: Omit<FixResult, 'kind'> = {
   ok: false,
@@ -507,6 +518,9 @@ class AutoFix {
   }
 
   public async run(req: FixRequest): Promise<FixResult> {
+    if (req.media.mediaType === MediaType.MUSIC && req.kind !== 'missing') {
+      return { kind: req.kind, ...MUSIC_ONLY_MISSING };
+    }
     const refund = this.take('fix', req.user, MAX_FIXES_PER_DAY);
     if (!refund) {
       return {
@@ -1266,10 +1280,7 @@ class AutoFix {
           headline: planHeadline(plan),
           title,
           details: planDetails(plan),
-          params: {
-            season,
-            ...(plan.pack ? { prefer: plan.pack.title } : {}),
-          },
+          params: { season, ...approvedOf(plan) },
         },
         reporter: req.user,
         issueId: req.issueId,

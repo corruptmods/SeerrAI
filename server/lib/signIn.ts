@@ -25,6 +25,10 @@ import { In, Like } from 'typeorm';
  */
 export const startSession = (req: Request, userId: number): Promise<void> =>
   new Promise((resolve, reject) => {
+    // They just got in, so an earlier "no longer allowed" is out of date.
+    if (stillAllowed.get(userId)?.ok === false) {
+      stillAllowed.delete(userId);
+    }
     if (!req.session) {
       resolve();
       return;
@@ -61,17 +65,22 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * passkey stands in for the password and follows the password switch, unless
  * the account has an SSO link: then the passkey is proof on its own, and SSO
  * users keep it when passwords are off.
+ *
+ * `signedIn` asks whether someone already signed in may stay so: as for a
+ * password, and a Jellyfin or Emby server Seerr has no API key for is no
+ * answer either.
  */
 export const maySignIn = async (
   user: Pick<
     User,
     'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
   >,
-  how: 'passkey' | 'password'
+  how: 'passkey' | 'password' | 'signedIn'
 ): Promise<boolean> => {
   const settings = getSettings();
+  const asPassword = how !== 'passkey';
 
-  if (how === 'password' && user.id === 1) {
+  if (asPassword && user.id === 1) {
     return true;
   }
 
@@ -84,7 +93,7 @@ export const maySignIn = async (
     (linked.length > 0 && live.length === 0)
   ) {
     return (
-      how === 'password' ||
+      asPassword ||
       settings.main.localLogin !== false ||
       user.id === 1 ||
       (await getRepository(OidcLink).exists({
@@ -110,7 +119,7 @@ export const maySignIn = async (
       const answer =
         kind === 'plex'
           ? await plexLetsIn(user, how)
-          : await jellyfinLetsIn(user, kind);
+          : await jellyfinLetsIn(user, kind, how);
       if (answer) {
         return true;
       }
@@ -125,7 +134,7 @@ export const maySignIn = async (
 
   // A password is the way in while a media server is down, so an unreachable
   // server doesn't lock out someone who typed one.
-  if (how === 'password') {
+  if (asPassword) {
     return unknown;
   }
   if (failure) {
@@ -137,7 +146,7 @@ export const maySignIn = async (
 /** Whether the owner still shares their Plex server with the user. */
 const plexLetsIn = async (
   user: Pick<User, 'plexId'>,
-  how: 'passkey' | 'password'
+  how: 'passkey' | 'password' | 'signedIn'
 ): Promise<boolean | undefined> => {
   const owner = await getRepository(User).findOneOrFail({
     select: { id: true, plexToken: true, plexId: true },
@@ -154,7 +163,11 @@ const plexLetsIn = async (
   }
   // Refuse only when Plex says the server is no longer shared: Plex down, or
   // the owner's Plex sign-in lapsed, is no answer.
-  return stillSharedOnPlex(owner.plexToken ?? '', user.plexId);
+  return stillSharedOnPlex(
+    owner.plexToken ?? '',
+    user.plexId,
+    how === 'signedIn'
+  );
 };
 
 /**
@@ -163,12 +176,16 @@ const plexLetsIn = async (
  */
 const jellyfinLetsIn = async (
   user: Pick<User, 'jellyfinUserId' | 'embyUserId'>,
-  kind: JellyfinFamilyKind
-): Promise<boolean> => {
+  kind: JellyfinFamilyKind,
+  how: 'passkey' | 'password' | 'signedIn'
+): Promise<boolean | undefined> => {
   const accountId = user[USER_ID[kind]];
   const { apiKey } = jellyfinFamily(kind);
-  if (!accountId || !apiKey) {
+  if (!accountId) {
     return false;
+  }
+  if (!apiKey) {
+    return how === 'signedIn' ? undefined : false;
   }
   const account = await new JellyfinAPI(
     hostnameFor(kind),
@@ -179,21 +196,59 @@ const jellyfinLetsIn = async (
   return !!account && !account.Policy?.IsDisabled;
 };
 
+/** How long the owner's Plex share list is reused across users. */
+const PLEX_USERS_EVERY_MS = 60 * 1000;
+type SharedUsers = Awaited<
+  ReturnType<PlexTvAPI['getUsers']>
+>['MediaContainer']['User'];
+let plexUsersCache:
+  | { token: string; at: number; users: Promise<SharedUsers> }
+  | undefined;
+
+/**
+ * The owner's Plex share list. Background checks of people already signed in
+ * share one fetch; a sign-in always asks Plex afresh.
+ */
+const plexUsers = (
+  ownerToken: string,
+  reuse: boolean
+): Promise<SharedUsers> => {
+  const now = Date.now();
+  if (
+    reuse &&
+    plexUsersCache?.token === ownerToken &&
+    now - plexUsersCache.at < PLEX_USERS_EVERY_MS
+  ) {
+    return plexUsersCache.users;
+  }
+  const users = new PlexTvAPI(ownerToken)
+    .getUsers()
+    .then((response) => response.MediaContainer.User);
+  plexUsersCache = { token: ownerToken, at: now, users };
+  // A failed fetch is not reused.
+  users.catch(() => {
+    if (plexUsersCache?.users === users) {
+      plexUsersCache = undefined;
+    }
+  });
+  return users;
+};
+
 /**
  * Whether the server is still shared with this Plex account; undefined when
  * Plex is unreachable.
  */
 const stillSharedOnPlex = async (
   ownerToken: string,
-  plexId: number
+  plexId: number,
+  reuse: boolean
 ): Promise<boolean | undefined> => {
   const machineId = getSettings().plex.machineId;
   if (!ownerToken || !machineId) {
     return undefined;
   }
   try {
-    const users = (await new PlexTvAPI(ownerToken).getUsers()).MediaContainer
-      .User;
+    const users = await plexUsers(ownerToken, reuse);
     const shared = users.find((u) => parseInt(u.$.id) === plexId);
     return !!shared?.Server?.some(
       (server) => server.$.machineIdentifier === machineId
@@ -203,10 +258,88 @@ const stillSharedOnPlex = async (
   }
 };
 
+/** How long a "may still sign in" answer is trusted. */
+const STILL_ALLOWED_EVERY_MS = 10 * 60 * 1000;
+/** After this long without an answer, the media server counts as unreachable. */
+const STILL_ALLOWED_TIMEOUT_MS = 10 * 1000;
+
+/** Whether each user may still sign in, and when that was asked. */
+const stillAllowed = new Map<number, { ok: boolean; at: number }>();
+/** Answers being fetched, so concurrent requests ask the media server once. */
+const stillAllowedPending = new Map<number, Promise<boolean>>();
+
+/** For tests: forgets every "may still sign in" answer. */
+export const resetSignInMemoryForTests = (): void => {
+  stillAllowed.clear();
+  stillAllowedPending.clear();
+  plexUsersCache = undefined;
+};
+
 /**
- * Signs a user out everywhere after a password change or passkey removal:
- * whoever knew the old password or held the device must not stay signed in.
- * `keep` is the session the change came from, when it was their own.
+ * Whether someone already signed in, by session or personal key, may still
+ * be, asked again every few minutes. A media server that is unreachable, slow
+ * to answer or can't be asked counts as yes, so an outage signs nobody out.
+ */
+export const stillMaySignIn = (
+  user: Pick<
+    User,
+    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+  >
+): Promise<boolean> => {
+  const known = stillAllowed.get(user.id);
+  if (known && Date.now() - known.at < STILL_ALLOWED_EVERY_MS) {
+    return Promise.resolve(known.ok);
+  }
+  const pending = stillAllowedPending.get(user.id);
+  if (pending) {
+    return pending;
+  }
+
+  const at = Date.now();
+  let timer: NodeJS.Timeout | undefined;
+  const answer = Promise.race([
+    maySignIn(user, 'signedIn').catch(() => true),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(true), STILL_ALLOWED_TIMEOUT_MS);
+    }),
+  ])
+    .then((ok) => {
+      if (stillAllowedPending.get(user.id) === answer) {
+        stillAllowed.set(user.id, { ok, at });
+      }
+      return ok;
+    })
+    .finally(() => {
+      clearTimeout(timer);
+      if (stillAllowedPending.get(user.id) === answer) {
+        stillAllowedPending.delete(user.id);
+      }
+    });
+  stillAllowedPending.set(user.id, answer);
+  return answer;
+};
+
+/**
+ * As stillMaySignIn, without waiting on the media server: answers from the
+ * last check (yes when there is none yet) and refreshes it in the background,
+ * so a slow media server never delays a signed-in request.
+ */
+export const stillMaySignInNow = (
+  user: Parameters<typeof stillMaySignIn>[0]
+): boolean => {
+  const known = stillAllowed.get(user.id);
+  if (!known || Date.now() - known.at >= STILL_ALLOWED_EVERY_MS) {
+    void stillMaySignIn(user);
+  }
+  return known?.ok ?? true;
+};
+
+/**
+ * Signs a user out everywhere after a password change, or after a passkey,
+ * single sign-on link or media server account is removed: whoever knew the
+ * old password or held the device or account must not stay signed in. Also
+ * once the media server stops letting them in. `keep` is the session the
+ * change came from, when it was their own.
  *
  * Sessions are ended as the session store does (marked destroyed, not
  * deleted), so an in-flight request on one can't write it back.

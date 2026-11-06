@@ -71,7 +71,14 @@ export const bazarrIdOf = (
   }
   const settings = getSettings();
   const servers =
-    media.mediaType === MediaType.MOVIE ? settings.radarr : settings.sonarr;
+    media.mediaType === MediaType.MOVIE
+      ? settings.radarr
+      : media.mediaType === MediaType.TV
+        ? settings.sonarr
+        : undefined;
+  if (!servers) {
+    return undefined;
+  }
   const followed = followedServer(servers);
   if (!followed) {
     return undefined;

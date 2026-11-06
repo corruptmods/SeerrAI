@@ -67,6 +67,67 @@ export interface SeasonPlan {
   left: ArrEpisode[];
 }
 
+/** A release as Sonarr identifies it for a grab. */
+interface ReleaseId {
+  guid: string;
+  indexerId: number;
+}
+
+/** The releases an admin approved: a pack, or one per episode. */
+export type ApprovedReleases =
+  | { pack: ReleaseId }
+  | { singles: (ReleaseId & { episodeId: number })[] };
+
+const idOf = (release: ArrRelease): ReleaseId => ({
+  guid: release.guid,
+  indexerId: release.indexerId,
+});
+
+const isReleaseId = (value: unknown): value is ReleaseId =>
+  !!value &&
+  typeof (value as ReleaseId).guid === 'string' &&
+  Number.isInteger((value as ReleaseId).indexerId);
+
+const sameRelease = (release: ArrRelease, id: ReleaseId) =>
+  release.guid === id.guid && release.indexerId === id.indexerId;
+
+/** The releases a plan would grab, to keep with its proposal. */
+export const approvedOf = (plan: SeasonPlan): ApprovedReleases =>
+  plan.pack
+    ? { pack: idOf(plan.pack) }
+    : {
+        singles: plan.singles.map((s) => ({
+          episodeId: s.episode.id,
+          ...idOf(s.release),
+        })),
+      };
+
+/** The approved releases kept with a proposal, if it names them. */
+export const approvedFrom = (
+  params: Record<string, unknown>
+): ApprovedReleases | undefined => {
+  const { pack, singles } = params;
+  if (isReleaseId(pack)) {
+    return { pack: { guid: pack.guid, indexerId: pack.indexerId } };
+  }
+  const isSingle = (s: unknown): s is ReleaseId & { episodeId: number } =>
+    isReleaseId(s) &&
+    Number.isInteger((s as { episodeId?: unknown }).episodeId);
+  if (Array.isArray(singles) && singles.length && singles.every(isSingle)) {
+    return {
+      singles: singles.map((s) => ({
+        episodeId: s.episodeId,
+        guid: s.guid,
+        indexerId: s.indexerId,
+      })),
+    };
+  }
+  return undefined;
+};
+
+const NO_LONGER_OFFERED =
+  'The approved release is no longer offered, so nothing was grabbed or removed.';
+
 /** Outcome of a season replacement. */
 export interface SeasonOutcome {
   ok: boolean;
@@ -175,14 +236,64 @@ const fewAtOnce = async <T, R>(
 };
 
 /**
- * Plans a season replacement without changing anything. `prefer` is a pack
- * chosen earlier (on approval), reused if still offered and allowed.
+ * The approved releases, found again in fresh searches by guid and indexer,
+ * or undefined if any is gone. Episodes not approved keep their files.
+ */
+const planApproved = async (
+  api: FixSonarr,
+  approved: ApprovedReleases,
+  base: Pick<
+    SeasonPlan,
+    'seriesId' | 'seasonNumber' | 'name' | 'episodes' | 'old'
+  >,
+  packs: ArrRelease[],
+  found: ArrRelease[],
+  usable: (release: ArrRelease) => boolean
+): Promise<SeasonPlan | undefined> => {
+  if ('pack' in approved) {
+    const pack = packs.find((r) => sameRelease(r, approved.pack));
+    return pack ? { ...base, pack, singles: [], left: [] } : undefined;
+  }
+  const byId = new Map(base.episodes.map((ep) => [ep.id, ep]));
+  if (
+    !approved.singles.length ||
+    approved.singles.some((s) => !byId.has(s.episodeId))
+  ) {
+    return undefined;
+  }
+  const releases = await fewAtOnce(
+    approved.singles,
+    async (s) =>
+      found.find((r) => !r.fullSeason && sameRelease(r, s)) ??
+      (await api.releases(s.episodeId).catch(() => [])).find(
+        (r) => !r.fullSeason && sameRelease(r, s) && acceptedBut(r) && usable(r)
+      )
+  );
+  if (releases.some((r) => !r)) return undefined;
+  const singles = approved.singles
+    .map((s, i) => ({
+      episode: byId.get(s.episodeId) as ArrEpisode,
+      release: releases[i] as ArrRelease,
+    }))
+    .sort((a, b) => a.episode.episodeNumber - b.episode.episodeNumber);
+  const coming = new Set(approved.singles.map((s) => s.episodeId));
+  return {
+    ...base,
+    singles,
+    left: base.episodes.filter((ep) => !coming.has(ep.id)),
+  };
+};
+
+/**
+ * Plans a season replacement without changing anything. With `approved`
+ * (on approval), takes exactly those releases, or nothing if any of them is
+ * no longer offered and allowed.
  */
 export const planSeason = async (
   api: FixSonarr,
   seriesId: number,
   seasonNumber: number,
-  prefer?: string
+  approved?: ApprovedReleases
 ): Promise<SeasonPlan | { nothing: string; noFiles?: ArrEpisode[] }> => {
   const [all, facts, history] = await Promise.all([
     api.episodes(seriesId),
@@ -241,10 +352,15 @@ export const planSeason = async (
     const mapped = (r.mappedEpisodeInfo ?? []).map((m) => m.id);
     return !mapped.length || [...ids].every((id) => mapped.includes(id));
   });
-  const chosen =
-    (prefer && packs.find((r) => sameTitle(r.title, prefer))) ||
-    best(packs, oldGroups);
   const base = { seriesId, seasonNumber, name, episodes, old };
+  if (approved) {
+    return (
+      (await planApproved(api, approved, base, packs, found, (r) =>
+        allowed(r, old, original)
+      )) ?? { nothing: NO_LONGER_OFFERED }
+    );
+  }
+  const chosen = best(packs, oldGroups);
   if (chosen) return { ...base, pack: chosen, singles: [], left: [] };
 
   // No pack: one release per episode, from the season search, then per-episode
@@ -344,7 +460,7 @@ export const planDetails = (plan: SeasonPlan): string[] => {
             ', '
           )} failed, so it is never taken again, and the current files are removed so the new ones import.`
       : 'Once it is grabbed, the current files are removed so the new ones import.',
-    'Until the new files import, those episodes cannot be played. If nothing can be grabbed then, nothing is removed.'
+    'Until the new files import, those episodes cannot be played. If what is shown here is no longer offered or cannot be grabbed then, nothing is removed.'
   );
   return lines;
 };

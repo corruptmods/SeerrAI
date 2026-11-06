@@ -1981,6 +1981,8 @@ describe('Auto-fix: music from AI Search', () => {
   const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
   const GROUP = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
   let commands: { name: string; options: Record<string, unknown> }[];
+  /** On Lidarr 0 as artist 31; Sonarr 0 has a series 31 too. */
+  let artist: Media;
 
   beforeEach(async () => {
     commands = [];
@@ -2026,7 +2028,7 @@ describe('Auto-fix: music from AI Search', () => {
       offset: 0,
       artists: [{ id: ARTIST, name: 'Glasswing', score: 100 }],
     }));
-    const artist = await getRepository(Media).save(
+    artist = await getRepository(Media).save(
       new Media({
         mediaType: MediaType.MUSIC,
         tmdbId: 0,
@@ -2112,5 +2114,72 @@ describe('Auto-fix: music from AI Search', () => {
     assert.match(res.body.reply, /missing tracks/);
     assert.equal(res.body.fix, undefined);
     assert.deepEqual(commands, []);
+  });
+
+  it('leaves a music issue that is not about missing tracks alone, touching no series', async () => {
+    episodes = [1, 2, 3].map((n) => episode(n, { seriesId: 31 }));
+    releases = [
+      release({ guid: 'alt-2', title: 'Lantern.Song.S01E02.1080p-NEWGRP' }),
+    ];
+    const asked: number[] = [];
+    mock.method(FixSonarr.prototype, 'episodes', async (seriesId: number) => {
+      asked.push(seriesId);
+      return episodes;
+    });
+    actingAs = member;
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.VIDEO,
+      message: 'no sound',
+      mediaId: artist.id,
+      problemSeason: 1,
+      problemEpisode: 2,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    await autofix.idle();
+    assert.deepEqual(asked, []);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
+    const comments = await getRepository(IssueComment).find({
+      where: { issue: { id: res.body.id } },
+    });
+    assert.ok(!comments.some((c) => c.message.startsWith('Automatic fix:')));
+
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: artist,
+      seasonNumber: 1,
+      user: admin,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.skipped, true);
+    assert.deepEqual(asked, []);
+  });
+
+  it('does not file a chat fix that replaces files for music', async () => {
+    const asked: number[] = [];
+    mock.method(FixSonarr.prototype, 'episodes', async (seriesId: number) => {
+      asked.push(seriesId);
+      return episodes;
+    });
+    actingAs = member;
+    const res = await call('POST', '/api/v1/ai/fix', {
+      kind: 'broken',
+      mediaId: artist.id,
+      seasonNumber: 1,
+      episodeNumber: 1,
+      message: 'it stutters',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /missing tracks/);
+    assert.equal(res.body.fix, undefined);
+    await autofix.idle();
+    assert.equal(
+      await getRepository(Issue).count({
+        where: { media: { id: artist.id } },
+      }),
+      0
+    );
+    assert.deepEqual(asked, []);
+    assert.deepEqual(deleted, []);
   });
 });

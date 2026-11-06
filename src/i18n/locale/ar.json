@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "الوثوق بـ Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "فعّله إن كان وكيل Cloudflare (السحابة البرتقالية) أمام الوكيل العكسي.",
   "components.Settings.SettingsNetwork.trustedProxies": "الوثوق أيضًا بهؤلاء الوكلاء",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "وكلاء آخرون أمام Seerr AI، مثل واحد على خادم مستأجر. المحليون موثوقون دائمًا.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "وكلاء آخرون أمام Seerr AI، مثل وكيل على خادم مستأجر، أو وكيل محلي خلف وكيل آخر. الوكيل المحلي المتصل بـ Seerr AI موثوق دائمًا.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ليس عنوانًا أو نطاقًا، مثل 203.0.113.5 أو 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "إضافة Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "مفتاح API",

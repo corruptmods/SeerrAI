@@ -1,6 +1,8 @@
 import SlskdAPI, { slskdNewEnough } from '@server/api/slskd';
 import { defaultLidarr, lidarrApi } from '@server/lib/music/access';
 import { songPace } from '@server/lib/music/songPace';
+import type { ServiceAddress } from '@server/lib/savedSecret';
+import { keptSecret } from '@server/lib/savedSecret';
 import type { MusicSettings, SoulseekSettings } from '@server/lib/settings';
 import {
   MUSICBRAINZ_URL,
@@ -190,11 +192,38 @@ const checkSoulseek = async (
   return { version, signedIn };
 };
 
-/** Uses the entered key, or the saved one when blank. */
-const withKey = (body: z.infer<typeof soulseekBody>): SoulseekSettings => ({
-  ...body,
-  apiKey: body.apiKey || getSettings().music.soulseek?.apiKey || '',
-});
+/** An slskd address as savedSecret compares them; undefined if unreadable. */
+const slskdAddress = (url?: string): ServiceAddress | undefined => {
+  try {
+    const parsed = new URL(url ?? '');
+    const useSsl = parsed.protocol === 'https:';
+    return {
+      hostname: parsed.hostname,
+      port: Number(parsed.port) || (useSsl ? 443 : 80),
+      useSsl,
+      urlBase: `${parsed.pathname}${parsed.search}`,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+/** Uses the entered key, or the saved one when blank at the same address. */
+const withKey = (body: z.infer<typeof soulseekBody>): SoulseekSettings => {
+  const saved = getSettings().music.soulseek;
+  const address = slskdAddress(body.url);
+  return {
+    ...body,
+    apiKey: address
+      ? keptSecret(
+          body.apiKey,
+          address,
+          slskdAddress(saved?.url),
+          saved?.apiKey
+        )
+      : body.apiKey,
+  };
+};
 
 /** Song fetch pace: each limit and how much of it is in use. */
 musicSettingsRoutes.get('/pace', async (_req, res, next) => {
@@ -214,8 +243,12 @@ musicSettingsRoutes.post('/soulseek/test', async (req, res, next) => {
   if (!parsed.success || !parsed.data.url) {
     return next({ status: 400, message: 'Check slskd’s address.' });
   }
+  const soulseek = withKey(parsed.data);
+  if (!soulseek.apiKey) {
+    return next({ status: 400, message: 'Enter slskd’s API key.' });
+  }
   try {
-    return res.status(200).json(await checkSoulseek(withKey(parsed.data)));
+    return res.status(200).json(await checkSoulseek(soulseek));
   } catch (e) {
     return next({
       status: 400,

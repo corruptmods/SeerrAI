@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Tin cậy Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Bật nếu proxy của Cloudflare (đám mây cam) nằm trước reverse proxy của bạn.",
   "components.Settings.SettingsNetwork.trustedProxies": "Tin cậy thêm các proxy này",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Các proxy khác phía trước Seerr AI, ví dụ một proxy trên máy chủ thuê. Proxy cục bộ luôn được tin.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Các proxy khác đứng trước Seerr AI, chẳng hạn một proxy trên máy chủ thuê hoặc một proxy cục bộ đứng sau proxy khác. Proxy cục bộ kết nối tới Seerr AI luôn được tin cậy.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} không phải địa chỉ hay dải địa chỉ, ví dụ 203.0.113.5 hoặc 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Thêm Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Khóa API",

@@ -298,6 +298,33 @@ describe('Backfill: torrents and NZBs', () => {
     assert.deepEqual(files, [{ index: 0, name: 'show.s01e01.mkv', size: 5 }]);
   });
 
+  it('reads a subject with a very long unspaced run at once', () => {
+    const started = performance.now();
+    const files = parseNzb(
+      `<nzb><file subject="${'a'.repeat(1_000_000)}"><segment bytes="5">a@b</segment></file></nzb>`
+    );
+    assert.ok(performance.now() - started < 50);
+    assert.deepEqual(files, []);
+  });
+
+  it('reads an unquoted file name from a subject, after any folder', () => {
+    const named = (subject: string) =>
+      parseNzb(
+        `<nzb><file subject="${subject}"><segment bytes="5">a@b</segment></file></nzb>`
+      )[0]?.name;
+    assert.equal(
+      named('[01/12] - Harbour.Lights.S01E01.1080p.mkv yEnc (1/50)'),
+      'Harbour.Lights.S01E01.1080p.mkv'
+    );
+    assert.equal(
+      named('Glasswing/Static.Garden/03.Lantern.flac (1/2)'),
+      '03.Lantern.flac'
+    );
+    assert.equal(named('Static.Garden.part01.rar'), 'Static.Garden.part01.rar');
+    assert.equal(named('Lantern.flac/ yEnc'), undefined);
+    assert.equal(named('no name here'), undefined);
+  });
+
   it('reads a magnet link’s hash, hex or base32', () => {
     assert.equal(
       magnetHash(

@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Încredere în Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Activați dacă proxy-ul Cloudflare (norul portocaliu) e în fața reverse proxy-ului.",
   "components.Settings.SettingsNetwork.trustedProxies": "Încredere și în aceste proxy-uri",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Alte proxy-uri în fața Seerr AI, de ex. unul pe un server închiriat. Cele locale sunt mereu de încredere.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Alte proxy-uri în fața Seerr AI, de exemplu unul pe un server închiriat sau unul local în spatele altuia. Cel local care se conectează la Seerr AI este întotdeauna de încredere.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} nu este o adresă sau un interval, de exemplu 203.0.113.5 sau 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Adaugă Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Cheie API",

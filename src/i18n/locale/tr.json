@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare’e Güven",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Cloudflare proxy’si (turuncu bulut) ters proxy’nizin önündeyse açın.",
   "components.Settings.SettingsNetwork.trustedProxies": "Bu Proxy’lere de Güven",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI önündeki diğer proxy’ler, örneğin kiralık bir sunucudaki. Yerel olanlara her zaman güvenilir.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI'ın önündeki diğer proxy'ler; örneğin kiralık bir sunucudaki ya da başka birinin arkasındaki yerel bir proxy. Seerr AI'a bağlanan yerel proxy'ye her zaman güvenilir.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} bir adres veya aralık değil; örneğin 203.0.113.5 ya da 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr Ekle",
   "components.Settings.SettingsProwlarr.apiKey": "API anahtarı",

@@ -1,6 +1,6 @@
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import type { LidarrAlbum } from '@server/api/servarr/lidarr';
-import type { AgentAction, AgentRun } from '@server/entity/AgentRun';
+import type { AgentAction, AgentRun, AgentStep } from '@server/entity/AgentRun';
 import type { User } from '@server/entity/User';
 import type { ProposedChange } from '@server/lib/agent/changes';
 import type { ConverseTool } from '@server/lib/ai/providers';
@@ -88,12 +88,13 @@ export const decisionText = (
   headlines: string
 ): string => `${by} ${approved ? 'approved' : 'declined'}: ${headlines}`;
 
-/** Whether a reply step is a decision rather than an admin's message. */
-const isDecision = (text: string | undefined): boolean => {
-  const said = text ?? '';
-  const end = said.indexOf(': ');
-  return end > 0 && / (approved|declined)$/.test(said.slice(0, end));
-};
+/**
+ * Whether a reply step is a decision rather than an admin's message. Steps
+ * saved before decisions were marked are told by their text, any that could
+ * be one counting as one.
+ */
+const isDecision = (step: AgentStep): boolean =>
+  step.decision ?? / (approved|declined): /.test(step.text ?? '');
 
 /**
  * Whether an admin is in the conversation: they asked, or replied since.
@@ -103,7 +104,7 @@ const isDecision = (text: string | undefined): boolean => {
  */
 export const adminPresent = (run: AgentRun): boolean =>
   run.trigger === 'ask' ||
-  run.steps.some((step) => step.kind === 'reply' && !isDecision(step.text));
+  run.steps.some((step) => step.kind === 'reply' && !isDecision(step));
 
 /** Someone reported the files bad and asked for them to be replaced. */
 export const replaceReported = (run: AgentRun): boolean =>

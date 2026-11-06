@@ -3,6 +3,8 @@ import type { ArrEpisode, ArrHistoryRecord } from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
 import type { SeasonOutcome, SeasonPlan } from '@server/lib/autofix/season';
 import {
+  approvedFrom,
+  approvedOf,
   carryOutSeason,
   planDetails,
   planHeadline,
@@ -350,8 +352,8 @@ export const describeChange = (input: ChangeInput): Promise<ProposedChange> => {
 
 /**
  * A proposal to replace every file of a season: the release to grab, then
- * the old downloads marked failed, then the files removed. Worked out again
- * from Sonarr on approval.
+ * the old downloads marked failed, then the files removed. Kept with the
+ * releases shown, which are the only ones taken on approval.
  */
 export const seasonChange = (
   plan: SeasonPlan,
@@ -362,10 +364,7 @@ export const seasonChange = (
   headline: planHeadline(plan),
   title,
   details: [...planDetails(plan), ...(reason ? [`Why: ${reason}`] : [])],
-  params: {
-    season: plan.seasonNumber,
-    ...(plan.pack ? { prefer: plan.pack.title } : {}),
-  },
+  params: { season: plan.seasonNumber, ...approvedOf(plan) },
 });
 
 /** A season's replacement, or why there is none. */
@@ -384,8 +383,8 @@ export const describeSeasonReplace = async (
 
 /**
  * Replaces an approved season. Searches again (Sonarr only grabs from a
- * recent search), preferring the release shown; nothing is removed unless
- * a replacement is grabbed.
+ * recent search) and takes only the releases shown; nothing is grabbed or
+ * removed if any of them is gone.
  */
 export const applySeasonChange = async (
   change: ProposedChange
@@ -395,19 +394,21 @@ export const applySeasonChange = async (
   if (!title || !Number.isInteger(season)) {
     throw new ChangeError('Nothing to replace.');
   }
+  const approved = approvedFrom(change.params);
+  if (!approved) {
+    return {
+      ok: false,
+      message:
+        'This approval does not name the releases to take, so nothing was grabbed or removed. Ask for the season to be replaced again.',
+      episodeIds: [],
+    };
+  }
   const api = sonarrOf(title);
-  const prefer =
-    typeof change.params.prefer === 'string' ? change.params.prefer : undefined;
-  const plan = await planSeason(api, title.arrId, season, prefer);
+  const plan = await planSeason(api, title.arrId, season, approved);
   if ('nothing' in plan) {
     return { ok: false, message: plan.nothing, episodeIds: [] };
   }
-  const outcome = await carryOutSeason(api, plan);
-  const instead =
-    prefer && plan.pack && plan.pack.title !== prefer
-      ? `${prefer} was no longer offered, so the next best release was taken. `
-      : '';
-  return { ...outcome, message: `${instead}${outcome.message}` };
+  return carryOutSeason(api, plan);
 };
 
 // ---- applying --------------------------------------------------------------

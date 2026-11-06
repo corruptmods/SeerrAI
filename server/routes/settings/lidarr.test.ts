@@ -8,6 +8,7 @@ import serviceRoutes from '@server/routes/service';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
 import { MUSIC_FIXTURE_IDS } from '@server/utils/seedTestDb';
+import type { AxiosInstance } from 'axios';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import assert from 'node:assert/strict';
@@ -654,5 +655,62 @@ describe('Soulseek', () => {
     const tested = await call('POST', '/settings/music/soulseek/test', slskd);
     assert.equal(tested.status, 200);
     assert.deepEqual(tested.body, { version: '0.26.2', signedIn: false });
+  });
+
+  it('uses the saved key only at the saved address', async () => {
+    await call('POST', '/settings/lidarr', server());
+    assert.equal(
+      (await call('PUT', '/settings/music/soulseek', slskd)).status,
+      200
+    );
+    const asked: { url?: string; key?: unknown }[] = [];
+    mock.restoreAll();
+    mock.method(
+      SlskdAPI.prototype,
+      'getApplication',
+      function (this: SlskdAPI) {
+        const { defaults } = (this as unknown as { axios: AxiosInstance })
+          .axios;
+        asked.push({
+          url: defaults.baseURL,
+          key: defaults.headers['X-API-Key'],
+        });
+        return answer();
+      }
+    );
+
+    const blank = { ...slskd, apiKey: '' };
+    assert.equal(
+      (await call('POST', '/settings/music/soulseek/test', blank)).status,
+      200
+    );
+    const moved = { ...blank, url: 'http://192.0.2.7:5030' };
+    const tested = await call('POST', '/settings/music/soulseek/test', moved);
+    assert.equal(tested.status, 400);
+    assert.match(tested.body['message'], /API key/);
+    const saved = await call('PUT', '/settings/music/soulseek', moved);
+    assert.equal(saved.status, 400);
+    assert.deepEqual(asked, [
+      {
+        url: 'http://192.168.1.5:5030/api/v0',
+        key: 'a-key-long-enough-for-slskd',
+      },
+    ]);
+    assert.equal(getSettings().music.soulseek?.url, 'http://192.168.1.5:5030');
+
+    // Its own key is used at a new address.
+    assert.equal(
+      (
+        await call('PUT', '/settings/music/soulseek', {
+          ...moved,
+          apiKey: 'another-key-for-slskd',
+        })
+      ).status,
+      200
+    );
+    assert.deepEqual(asked[1], {
+      url: 'http://192.0.2.7:5030/api/v0',
+      key: 'another-key-for-slskd',
+    });
   });
 });

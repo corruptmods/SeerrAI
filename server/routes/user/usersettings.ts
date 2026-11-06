@@ -167,13 +167,31 @@ userSettingsRoutes.post<
     }
 
     const oldEmail = user.email;
+    // The email receives password reset links, so as with a password, a key
+    // can't change it: never a personal key, and the server's key only for
+    // another user. Leaving it out, or the same address in other case, keeps it.
+    const byKey =
+      req.authMethod === 'personalKey' ||
+      (req.authMethod !== 'session' && req.user?.id === user.id);
+    const sameEmail = (a?: string, b?: string) =>
+      (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
     user.username = req.body.username;
     if (user.userType !== UserType.PLEX) {
       user.email =
-        req.body.email ||
-        user.jellyfinUsername ||
-        user.embyUsername ||
-        user.email;
+        byKey && (!req.body.email || sameEmail(req.body.email, oldEmail))
+          ? oldEmail
+          : req.body.email ||
+            user.jellyfinUsername ||
+            user.embyUsername ||
+            user.email;
+    }
+
+    if (byKey && !sameEmail(oldEmail, user.email)) {
+      return next({
+        status: 403,
+        message:
+          'An email address can only be changed while signed in, not with a key.',
+      });
     }
 
     const existingUser = await userRepository.findOne({
@@ -574,6 +592,11 @@ const unlinkAccount = async (
   }
 
   await userRepository.update(user.id, changes);
+  // Whoever signed in through that account must not stay signed in.
+  await endSessions(
+    user.id,
+    req.user?.id === user.id ? req.sessionID : undefined
+  );
   return { status: 204 };
 };
 
@@ -871,6 +894,11 @@ userSettingsRoutes.delete<{ id: string; providerId: string }>(
     }
 
     await links.delete(link.id);
+    // Whoever signed in through that account must not stay signed in.
+    await endSessions(
+      user.id,
+      req.user?.id === user.id ? req.sessionID : undefined
+    );
     return res.status(204).send();
   }
 );
@@ -941,6 +969,15 @@ userSettingsRoutes.get<{ id: string }, UserSettingsNotificationsResponse>(
 
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
+      }
+
+      // As for changing them: only the owner sees the owner's or another
+      // admin's, which hold their notification service tokens.
+      if (!mayEditUser(req.user, user)) {
+        return next({
+          status: 403,
+          message: "You do not have permission to view this user's settings.",
+        });
       }
 
       return res.status(200).json({

@@ -19,6 +19,7 @@ import type {
 import { featureEnabled } from '@server/lib/features';
 import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import {
+  mayEditUser,
   mayManageUser,
   plexAccountMayClaim,
   plexProfileChanges,
@@ -51,6 +52,7 @@ import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { pageOf } from '@server/utils/pagination';
 import { isOwnProfileOrAdmin } from '@server/utils/profileMiddleware';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import { findIndex, sortBy } from 'lodash';
@@ -133,13 +135,14 @@ router.get('/', async (req, res, next) => {
         query = query.orderBy('user.updatedAt', sortDirection);
         break;
       case 'displayname':
+        // The name everyone sees (User.displayName), never the email.
         query = query
           .addSelect(
             `CASE WHEN (user.username IS NULL OR user.username = '') THEN (
                 CASE WHEN (user.plexUsername IS NULL OR user.plexUsername = '') THEN (
                   CASE WHEN (user.jellyfinUsername IS NULL OR user.jellyfinUsername = '') THEN (
                     CASE WHEN (user.embyUsername IS NULL OR user.embyUsername = '') THEN
-                      "user"."email"
+                      LOWER('User #' || user.id)
                     ELSE
                       LOWER(user.embyUsername)
                     END)
@@ -444,9 +447,35 @@ router.get(
   }
 );
 
+/**
+ * Push subscriptions follow notification settings: only the owner sees or
+ * removes the owner's or another admin's.
+ */
+const mayEditPushSubscriptions = async (
+  req: Request<{ id: string }>,
+  _res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = await getRepository(User).findOne({
+      where: { id: Number(req.params.id) },
+    });
+    if (user && !mayEditUser(req.user, user)) {
+      return next({
+        status: 403,
+        message: "You do not have permission to manage this user's devices.",
+      });
+    }
+    return next();
+  } catch (e) {
+    return next({ status: 500, message: e.message });
+  }
+};
+
 router.get<{ id: string }>(
   '/:id/pushSubscriptions',
   isOwnProfileOrAdmin(),
+  mayEditPushSubscriptions,
   async (req, res, next) => {
     try {
       const userPushSubRepository = getRepository(UserPushSubscription);
@@ -466,6 +495,7 @@ router.get<{ id: string }>(
 router.get<{ id: string; endpoint: string }>(
   '/:id/pushSubscription/:endpoint',
   isOwnProfileOrAdmin(),
+  mayEditPushSubscriptions,
   async (req, res, next) => {
     try {
       const userPushSubRepository = getRepository(UserPushSubscription);
@@ -490,6 +520,7 @@ router.get<{ id: string; endpoint: string }>(
 router.delete<{ id: string; endpoint: string }>(
   '/:id/pushSubscription/:endpoint',
   isOwnProfileOrAdmin(),
+  mayEditPushSubscriptions,
   async (req, res, next) => {
     try {
       const userPushSubRepository = getRepository(UserPushSubscription);

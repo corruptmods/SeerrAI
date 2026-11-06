@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Доверие на Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Включете, ако проксито на Cloudflare (оранжевият облак) е пред Вашето обратно прокси.",
   "components.Settings.SettingsNetwork.trustedProxies": "Доверие и на тези проксита",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Други проксита пред Seerr AI, например на нает сървър. На локалните се вярва винаги.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Други проксита пред Seerr AI, например на нает сървър, или локално прокси зад друго. Локалното, което се свързва със Seerr AI, винаги е доверено.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} не е адрес или диапазон, например 203.0.113.5 или 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Добави Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API ключ",

@@ -1063,7 +1063,7 @@ components:
           items:
             type: string
           example: ['203.0.113.5', '198.51.100.0/24']
-          description: With trustProxy on, also trust these proxy addresses or ranges (IPv4 or IPv6). Proxies on loopback, link-local and private addresses and in 100.64.0.0/10 are always trusted.
+          description: With trustProxy on, also trust these proxy addresses or ranges (IPv4 or IPv6). A proxy connecting from loopback, link-local or private addresses or from 100.64.0.0/10 is always trusted; further along X-Forwarded-For only loopback is, besides these.
         proxy:
           type: object
           properties:
@@ -9290,7 +9290,7 @@ paths:
   /settings/music/soulseek/test:
     post:
       summary: 'Test a Soulseek connection'
-      description: 'What slskd says of itself: its version, and whether it is signed in to Soulseek. Checks the downloads folder as saving does. A blank API key uses the saved one.'
+      description: 'What slskd says of itself: its version, and whether it is signed in to Soulseek. Checks the downloads folder as saving does. A blank API key uses the saved one, at the same address only.'
       tags:
         - settings
       requestBody:
@@ -10443,7 +10443,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DiscoverSlider'
   /settings/discover/reset:
-    get:
+    post:
       summary: Reset all discover sliders
       description: Resets all discovery sliders to the default values. Requires the `ADMIN` permission.
       tags:
@@ -17061,6 +17061,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MediaInfo'
+        '409':
+          description: The title is blocklisted; only removing it from the blocklist changes its status
   /media/{mediaId}/watch_data:
     get:
       summary: Get watch data

@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Luota Cloudflareen",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Kytke päälle, jos Cloudflaren välityspalvelin (oranssi pilvi) on käänteisvälityspalvelimesi edessä.",
   "components.Settings.SettingsNetwork.trustedProxies": "Luota myös näihin välityspalvelimiin",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Muut välityspalvelimet Seerr AI:n edessä, kuten vuokrapalvelimella oleva. Paikallisiin luotetaan aina.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Muut välityspalvelimet Seerr AI:n edessä, kuten vuokrapalvelimella oleva tai toisen takana oleva paikallinen. Seerr AI:hin yhdistävään paikalliseen luotetaan aina.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ei ole osoite eikä osoitealue, kuten 203.0.113.5 tai 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Lisää Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API-avain",

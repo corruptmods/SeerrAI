@@ -2227,6 +2227,44 @@ describe('reading a release of an album', () => {
     ];
     assert.equal(fileForTrack(image, 'Lantern Song', 'Glasswing'), undefined);
   });
+
+  it('reads long runs of spaces in a name quickly, and passes over overlong names', () => {
+    const spaced = [
+      {
+        index: 0,
+        path: `Glasswing/Static Garden/${' '.repeat(100_000)}x.flac`,
+        size: 9 * MB,
+      },
+      {
+        index: 1,
+        path: `Glasswing/Static Garden/${' '.repeat(1100)}03 - Lantern Song.flac`,
+        size: 9 * MB,
+      },
+      {
+        index: 2,
+        path: 'Glasswing/Static Garden/03  -   Lantern Song.flac',
+        size: 9 * MB,
+      },
+    ];
+    const started = performance.now();
+    const found = fileForTrack(spaced, 'Lantern Song', 'Glasswing');
+    const inCatalog = fileInCatalog(
+      spaced,
+      'Lantern Song',
+      'Static Garden',
+      'Glasswing'
+    );
+    assert.ok(performance.now() - started < 50);
+    assert.equal(found?.index, 2);
+    assert.equal(inCatalog?.index, 2);
+    assert.equal(
+      songsOfFile(
+        'Glasswing - Static Garden -  03  - Lantern Song.flac',
+        ''
+      )[0],
+      'lantern song'
+    );
+  });
 });
 
 describe('taking a song from Soulseek', () => {

@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Cloudflare megbízhatónak tekintése",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Kapcsolja be, ha a Cloudflare proxyja (narancs felhő) a fordított proxy előtt van.",
   "components.Settings.SettingsNetwork.trustedProxies": "Ezek a proxyk is megbízhatók",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Más proxyk a Seerr AI előtt, például egy bérelt szerveren. A helyiekben mindig megbízik.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "További proxyk a Seerr AI előtt, például egy bérelt szerveren, vagy egy helyi proxy egy másik mögött. A Seerr AI-hoz csatlakozó helyi proxy mindig megbízható.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "A(z) {entry} nem cím vagy tartomány, például 203.0.113.5 vagy 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Prowlarr hozzáadása",
   "components.Settings.SettingsProwlarr.apiKey": "API-kulcs",

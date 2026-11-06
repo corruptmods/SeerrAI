@@ -17,7 +17,7 @@ import TransmissionAPI, {
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 
 /*
  * Transmission, Deluge, NZBGet and rTorrent live progress: how each maps its
@@ -259,6 +259,72 @@ describe('reading each client’s states', () => {
       rtorrentRemovals({ directory: '', isMultiFile: 0 }, ['a.mkv']),
       { files: [], folders: [], refused: ['a.mkv'] }
     );
+  });
+
+  it('rTorrent: keeps files another torrent in the client also has', async () => {
+    const torrent = (
+      hash: string,
+      name: string,
+      directory: string,
+      isMultiFile: number
+    ) => [
+      hash.toUpperCase(),
+      name,
+      ...Array(9).fill(0),
+      directory,
+      isMultiFile,
+      'backfill',
+      '',
+      0,
+      0,
+    ];
+    const listed = [
+      torrent(HASH, 'Harbour.Lights.S02', '/dl/Harbour.Lights.S02', 1),
+      torrent(OTHER, 'Harbour.Lights.S02', '/dl/Harbour.Lights.S02', 1),
+      torrent('ef'.repeat(20), 'Lantern.Song.mkv', '/dl', 0),
+      torrent(`${'12'.repeat(20)}.meta`, `${'12'.repeat(20)}.meta`, '/dl', 0),
+    ];
+    const run: string[][] = [];
+    const api = new RtorrentAPI({
+      hostname: '127.0.0.1',
+      port: 1,
+      useSsl: false,
+      urlBase: '',
+      username: '',
+      password: '',
+    } as never);
+    const rpc = api as unknown as {
+      call: (method: string, params: unknown[]) => Promise<unknown>;
+    };
+    const calls = async (
+      method: string,
+      params: unknown[],
+      files: string[]
+    ) => {
+      if (method === 'd.multicall2') return listed;
+      if (method === 'f.multicall') return files.map((path) => [path, 1, 1, 1]);
+      if (method === 'execute.throw') run.push(params.slice(1) as string[]);
+      return 0;
+    };
+
+    mock.method(rpc, 'call', (method: string, params: unknown[]) =>
+      calls(method, params, ['Harbour.Lights.S02E01.mkv', 'Extra/a.nfo'])
+    );
+    await api.deleteTorrent(HASH);
+    assert.deepEqual(run, []);
+
+    // A single file at another torrent's path is kept; its own are not.
+    listed[0] = torrent(HASH, 'Static.Garden', '/dl/Static.Garden', 1);
+    listed[1] = torrent(OTHER, 'Lantern.Song.mkv', '/dl/Static.Garden', 0);
+    mock.restoreAll();
+    mock.method(rpc, 'call', (method: string, params: unknown[]) =>
+      calls(method, params, ['Lantern.Song.mkv', 'Glasswing.mkv'])
+    );
+    await api.deleteTorrent(HASH);
+    assert.deepEqual(run, [
+      ['rm', '-f', '--', '/dl/Static.Garden/Glasswing.mkv'],
+    ]);
+    mock.restoreAll();
   });
 });
 

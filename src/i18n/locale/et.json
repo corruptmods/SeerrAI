@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Usalda Cloudflare’i",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Lülita sisse, kui Cloudflare’i proksi (oranž pilv) on sinu pöördproksi ees.",
   "components.Settings.SettingsNetwork.trustedProxies": "Usalda ka neid proksisid",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Muud proksid Seerr AI ees, näiteks renditud serveris olev. Kohalikke usaldatakse alati.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Muud puhverserverid Seerr AI ees, näiteks renditud serveris või kohalik teise taga. Kohalikku, mis Seerr AI-ga ühendub, usaldatakse alati.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ei ole aadress ega vahemik, näiteks 203.0.113.5 või 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Lisa Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API võti",

@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Besoji Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Aktivizojeni nëse proxy i Cloudflare (reja portokalli) është përpara reverse proxy-t tuaj.",
   "components.Settings.SettingsNetwork.trustedProxies": "Besoju edhe këtyre proxy-ve",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Proxy të tjerë përpara Seerr AI, p.sh. një në server me qira. Atyre lokalë u besohet gjithmonë.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Proxy të tjerë para Seerr AI, si një në një server me qira ose një lokal pas një tjetri. Ai lokal që lidhet me Seerr AI besohet gjithmonë.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} nuk është adresë ose diapazon, si 203.0.113.5 ose 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Shto Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Çelësi API",

@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Εμπιστοσύνη στο Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Ενεργοποιήστε αν το proxy του Cloudflare (πορτοκαλί σύννεφο) είναι μπροστά από το reverse proxy σας.",
   "components.Settings.SettingsNetwork.trustedProxies": "Εμπιστοσύνη και σε αυτά τα proxy",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Άλλα proxy μπροστά από το Seerr AI, όπως ένα σε νοικιασμένο διακομιστή. Τα τοπικά είναι πάντα έμπιστα.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Άλλοι διακομιστές μεσολάβησης μπροστά από το Seerr AI, όπως ένας σε μισθωμένο διακομιστή ή ένας τοπικός πίσω από άλλον. Ο τοπικός που συνδέεται στο Seerr AI είναι πάντα αξιόπιστος.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "Το {entry} δεν είναι διεύθυνση ή εύρος, όπως 203.0.113.5 ή 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Προσθήκη Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Κλειδί API",

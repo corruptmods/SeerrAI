@@ -541,12 +541,20 @@ Do not undo these without reading why first — each was tried the other way.
   the sign-in limit only with a genuine correlation cookie for that
   provider, so made-up callbacks can't lock out an address.
 - **Enable Proxy Support trusts only known proxies.** With it on, Express
-  takes `req.ip` through loopback, link-local, private and `100.64.0.0/10`
-  (Tailscale) hops (`LOCAL_PROXIES` in `server/utils/trustedProxies.ts`),
-  plus Cloudflare's published ranges with **Trust Cloudflare** and any
-  listed under **Also Trust These Proxies**; never every hop: with every
-  hop trusted the address is whatever the sender wrote first in
-  X-Forwarded-For, and the sign-in limits count by address.
+  takes `req.ip` through a connecting hop on loopback, link-local, private
+  or `100.64.0.0/10` (Tailscale) addresses (`LOCAL_PROXIES` in
+  `server/utils/trustedProxies.ts`), further hops only on loopback, plus
+  Cloudflare's published ranges with **Trust Cloudflare** and any listed
+  under **Also Trust These Proxies** at any hop (`proxyTrust`); never every
+  hop: with every hop trusted the address is whatever the sender wrote
+  first in X-Forwarded-For, and the sign-in limits count by address. A
+  local address a proxy passes on is a visitor's, not another proxy's.
+- **Sign-in limits count an attempt when it starts.** `SignInLimiter.take`
+  checks and counts in one step before anything is awaited; outcomes that
+  aren't failures are given back (`refund`, or `clear` on success). Password, Jellyfin/Emby and
+  reset-email limits also cap one account from all addresses together
+  (50 in 15 minutes, `capAccount`). Expired counts are pruned oldest first,
+  and the counts kept are capped.
 - **Personal API keys act as their owner, and only through the header.**
   Keys (`sai_…`, `server/lib/personalApiKeys.ts`) are stored as hashes,
   checked against the owner's current permissions on every request (and

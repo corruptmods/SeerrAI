@@ -108,16 +108,16 @@ class PushoverAgent
 
     const event = eventText(payload, intl);
     const title = event ?? payload.subject;
-    let message = event ? `<b>${payload.subject}</b>` : '';
+    let message = event ? `<b>${escapeHtml(payload.subject)}</b>` : '';
     let priority = 0;
 
     const summary = payload.message
-      ? `<small>${message ? '\n' : ''}${payload.message}</small>`
+      ? `<small>${message ? '\n' : ''}${escapeHtml(payload.message)}</small>`
       : '';
     message += summary;
 
     if (payload.request) {
-      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.requestedBy)}:</b> ${payload.request.requestedBy.displayName}</small>`;
+      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.requestedBy)}:</b> ${escapeHtml(payload.request.requestedBy.displayName)}</small>`;
 
       let status = '';
       switch (type) {
@@ -157,9 +157,9 @@ class PushoverAgent
         message += `<small>\n<b>${intl.formatMessage(globalMessages.declineReason)}:</b> ${escapeHtml(declineReason)}</small>`;
       }
     } else if (payload.comment) {
-      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}:</b> ${payload.comment.message}</small>`;
+      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.commentFrom, { userName: escapeHtml(payload.comment.user.displayName) })}:</b> ${escapeHtml(payload.comment.message)}</small>`;
     } else if (payload.issue) {
-      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.reportedBy)}:</b> ${payload.issue.createdBy.displayName}</small>`;
+      message += `<small>\n\n<b>${intl.formatMessage(globalMessages.reportedBy)}:</b> ${escapeHtml(payload.issue.createdBy.displayName)}</small>`;
       message += `<small>\n<b>${intl.formatMessage(globalMessages.issueType)}:</b> ${IssueTypeName[payload.issue.issueType]}</small>`;
       message += `<small>\n<b>${intl.formatMessage(globalMessages.issueStatus)}:</b> ${
         payload.issue.status === IssueStatus.OPEN

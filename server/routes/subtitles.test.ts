@@ -17,6 +17,7 @@ import { pickStream } from '@server/lib/plexSubtitles';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import {
+  bazarrIdOf,
   forgetOffered,
   forgetWhisper,
   gapsOf,
@@ -755,6 +756,12 @@ describe('reading a title’s subtitles', () => {
     assert.deepEqual(writes, [], 'nothing was asked of Bazarr');
     assert.equal(transcriber.status('movie:990001').queued, 0);
     assert.equal(transcriber.status('movie:990001').running, false);
+  });
+
+  it('gives a music artist no Bazarr id, even under a Sonarr id', () => {
+    const on = { serviceId: 0, externalServiceId: SONARR_ID };
+    assert.equal(bazarrIdOf({ ...on, mediaType: MediaType.TV }), SONARR_ID);
+    assert.equal(bazarrIdOf({ ...on, mediaType: MediaType.MUSIC }), undefined);
   });
 
   it('says so for a title Radarr does not have', async () => {

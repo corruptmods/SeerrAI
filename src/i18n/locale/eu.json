@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Fidatu Cloudflare-z",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Aktibatu Cloudflare-ren proxya (hodei laranja) zure alderantzizko proxyaren aurrean badago.",
   "components.Settings.SettingsNetwork.trustedProxies": "Fidatu proxy hauetaz ere",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AI-ren aurreko beste proxy batzuk, adibidez alokatutako zerbitzari batean. Lokalak beti dira fidagarriak.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Seerr AIren aurreko beste proxy batzuk, adibidez alokatutako zerbitzari batean dagoena edo beste baten atzean dagoen tokiko bat. Seerr AIra konektatzen den tokikoa beti da fidagarria.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} ez da helbide bat edo barruti bat, adibidez 203.0.113.5 edo 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Gehitu Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "API gakoa",

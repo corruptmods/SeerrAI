@@ -205,6 +205,18 @@ mediaRoutes.post<
       return next({ status: 404, message: 'Media does not exist.' });
     }
 
+    // Only removing it from the blocklist changes a blocklisted title.
+    if (
+      media.status === MediaStatus.BLOCKLISTED ||
+      media.status4k === MediaStatus.BLOCKLISTED
+    ) {
+      return next({
+        status: 409,
+        message:
+          'This title is blocklisted. Remove it from the blocklist first.',
+      });
+    }
+
     const is4k = String(req.body.is4k) === 'true';
 
     switch (req.params.status) {
@@ -352,13 +364,16 @@ mediaRoutes.delete(
         throw e;
       }
 
-      if (media.mediaType === MediaType.TV) {
-        for (const season of media.seasons) {
-          season[is4k ? 'status4k' : 'status'] = MediaStatus.DELETED;
+      const statusKey = is4k ? 'status4k' : 'status';
+      // A blocklisted title stays blocklisted.
+      if (media[statusKey] !== MediaStatus.BLOCKLISTED) {
+        if (media.mediaType === MediaType.TV) {
+          for (const season of media.seasons) {
+            season[statusKey] = MediaStatus.DELETED;
+          }
         }
+        media[statusKey] = MediaStatus.DELETED;
       }
-
-      media[is4k ? 'status4k' : 'status'] = MediaStatus.DELETED;
       media.resetServiceData(is4k);
       await mediaRepository.save(media);
       await recordMediaDeletion(media.tmdbId, media.mediaType);

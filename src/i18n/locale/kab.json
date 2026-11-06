@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "Amen Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "Rmed ma yella upṛuksi n Cloudflare (asigna aččinawi) sdat upṛuksi-ik amettiwan.",
   "components.Settings.SettingsNetwork.trustedProxies": "Amen daɣen ipṛuksiyen-a",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "Ipṛuksiyen nniḍen sdat Seerr AI, am win yellan ɣef uqeddac yettwakeṛṛan. Wid idiganen ttwaḍemnen yal tikkelt.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "Iproxy niḍen zdat Seerr AI, am win yellan ɣef uqeddac i yettwakren, neɣ yiwen n uproxy adigan deffir wayeḍ. Aproxy adigan ara yeqqnen ɣer Seerr AI yettwamman yal tikkelt.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} mačči d tansa neɣ d tazmilt, am 203.0.113.5 neɣ 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "Rnu Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "Tasarut API",

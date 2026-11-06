@@ -13,7 +13,7 @@ import UserApiKey from '@server/entity/UserApiKey';
 import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
-import { maySignIn } from '@server/lib/signIn';
+import { resetSignInMemoryForTests, stillMaySignIn } from '@server/lib/signIn';
 import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
@@ -43,10 +43,6 @@ import type { Request } from 'express';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Minimum interval between "last used" writes. */
 const RECORD_USE_EVERY_MS = 60 * 1000;
-/** Cache lifetime for "could the owner still sign in?". */
-const OWNER_CHECK_EVERY_MS = 10 * 60 * 1000;
-/** Owner check timeout, after which the key is let through. */
-const OWNER_CHECK_TIMEOUT_MS = 10 * 1000;
 /** Minimum interval between logs of the same refusal for the same key. */
 const REFUSAL_LOG_EVERY_MS = 15 * 60 * 1000;
 
@@ -135,34 +131,13 @@ export const keySummary = (key: UserApiKey): ApiKeySummary => ({
 const limiter = new SignInLimiter('apiKey');
 const NO_SUCH_KEY = 'no-such-key';
 
-/** Whether each owner could still sign in, and when that was checked. */
-const ownerChecks = new Map<number, { ok: boolean; at: number }>();
 /** When each refusal was last logged. */
 const refusalsLogged = new Map<string, number>();
 
 /** For tests: clears in-memory state. */
 export const resetApiKeyMemoryForTests = (): void => {
-  ownerChecks.clear();
+  resetSignInMemoryForTests();
   refusalsLogged.clear();
-};
-
-const ownerMaySignIn = async (user: User): Promise<boolean> => {
-  const now = Date.now();
-  const known = ownerChecks.get(user.id);
-  if (known && now - known.at < OWNER_CHECK_EVERY_MS) {
-    return known.ok;
-  }
-  // As with passwords, an unreachable media server doesn't lock anyone out:
-  // Plex being down shouldn't stop a script.
-  let timer: NodeJS.Timeout | undefined;
-  const ok = await Promise.race([
-    maySignIn(user, 'password').catch(() => true),
-    new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(true), OWNER_CHECK_TIMEOUT_MS);
-    }),
-  ]).finally(() => clearTimeout(timer));
-  ownerChecks.set(user.id, { ok, at: now });
-  return ok;
 };
 
 type Refusal =
@@ -265,6 +240,11 @@ export const authenticateApiKey = async (
     logRefusal(req, 'unknown', { publicId });
     return { status: 401, message: INVALID };
   }
+  // Again, with the comparison and count below in the same step.
+  const waitingAfterLookup = waitFor(publicId);
+  if (waitingAfterLookup) {
+    return waitingAfterLookup;
+  }
   if (!keyMatches(value, key.secretHash)) {
     limiter.count(req, publicId);
     logRefusal(req, 'unknown', { publicId, keyId: key.id });
@@ -342,7 +322,8 @@ export const authenticateApiKey = async (
     };
   }
 
-  if (!(await ownerMaySignIn(user))) {
+  // As for sessions: Plex being down doesn't stop a script.
+  if (!(await stillMaySignIn(user))) {
     logRefusal(req, 'ownerCannotSignIn', details);
     return {
       status: 401,

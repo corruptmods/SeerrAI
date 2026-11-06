@@ -9,6 +9,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Pages load faster**: each page's HTML is about 400 KB smaller (49 KB for Discover, from about 450). Seerr AI's text comes as a file your browser keeps, instead of inside every page.
 - **Home page rows** are fetched as you scroll near them, so the rows at the top, and their posters, aren't kept waiting behind ones further down. Going back to the page shows the ones already fetched at once.
 - Radarr's Smaller files and Balanced sizes match what films are: Balanced takes a usual Blu-ray encode (12 GB for 1080p, from 20), Smaller files a web release (6 GB, from 8), and the other resolutions come down with them. Your own limit and Best quality are unchanged.
+- With **Enable Proxy Support** on, a local proxy behind another one now needs adding under **Also Trust These Proxies**. The proxy that connects to Seerr AI itself is still trusted on its own.
+- A blocklisted title must come off the blocklist before its status can be changed.
+- An API key can no longer change an account's email. Change it while signed in.
+- The API's Discover reset is now `POST /settings/discover/reset`.
 
 ### Fixed
 
@@ -17,6 +21,19 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - A TVDB season with no translation in your language falls back to its original language, as intended.
 - Email to a user without a PGP key skips the encryption step instead of running it empty.
 - A season pack still fetching its torrent's details no longer shows as downloading episodes that haven't aired yet (S1E1–E10 when four had aired), and the download list shows it once instead of once per episode.
+- Sign-in attempt limits count every attempt, also hold across addresses for one account, and stay quick however many are kept.
+- Someone the media server no longer lets in is signed out within minutes, and removing a single sign-on or media server link signs that account out elsewhere.
+- Only the owner sees and manages the owner's and admins' notification settings and push devices.
+- Sorting users by name no longer uses their email.
+- Jellyfin and Emby sign-in no longer changes the saved server address after setup.
+- An approved season replacement grabs only the release that was approved.
+- The admin agent tells approvals from other replies by how they were made, not by their wording.
+- Auto-fix no longer treats a music issue as a series.
+- Issue and comment text in Pushover, Gotify, ntfy, Slack and Discord notifications shows as plain text.
+- rTorrent cleanup keeps files that another torrent also uses.
+- Soulseek settings reuse the saved API key only for the same address.
+- Playlist songs wait while Music is turned off, instead of being requested.
+- Very long download and file names no longer slow the server down.
 
 ## 2.4.1 (4 November 2026)
 

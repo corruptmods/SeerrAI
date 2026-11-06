@@ -4321,7 +4321,7 @@
   "components.Settings.SettingsNetwork.trustCloudflare": "סמוך על Cloudflare",
   "components.Settings.SettingsNetwork.trustCloudflareTip": "הפעל אם הפרוקסי של Cloudflare (ענן כתום) נמצא מול ה-reverse proxy שלך.",
   "components.Settings.SettingsNetwork.trustedProxies": "סמוך גם על הפרוקסים האלה",
-  "components.Settings.SettingsNetwork.trustedProxiesTip": "פרוקסים אחרים מול Seerr AI, כמו אחד בשרת שכור. מקומיים תמיד מהימנים.",
+  "components.Settings.SettingsNetwork.trustedProxiesTip": "שרתי פרוקסי נוספים לפני Seerr AI, למשל בשרת שכור, או פרוקסי מקומי מאחורי אחר. הפרוקסי המקומי שמתחבר ל-Seerr AI תמיד מהימן.",
   "components.Settings.SettingsNetwork.validationTrustedProxy": "{entry} אינו כתובת או טווח, כמו 203.0.113.5 או 203.0.113.0/24.",
   "components.Settings.SettingsProwlarr.addProwlarr": "הוסף Prowlarr",
   "components.Settings.SettingsProwlarr.apiKey": "מפתח API",

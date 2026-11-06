@@ -467,6 +467,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
                   tmdbId: part.id,
                   posterPath: part.posterPath ?? null,
                 }))}
+                onRequested={() => revalidate()}
               />
             </div>
           )}
@@ -545,6 +546,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
               image={title.posterPath}
               backdrop={title.backdropPath}
               status={title.mediaInfo?.status}
+              outsideLibraries={title.mediaInfo?.outsideLibraries}
               summary={title.overview}
               title={title.title}
               userScore={title.voteAverage}

@@ -4,14 +4,21 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
+import Episode from '@server/entity/Episode';
 import EpisodeRequest from '@server/entity/EpisodeRequest';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import cacheManager from '@server/lib/cache';
 import downloadTracker from '@server/lib/downloadtracker';
+import libraryAccess from '@server/lib/libraryAccess';
 import { Permission } from '@server/lib/permissions';
+import { getSettings, jellyfinDefaults } from '@server/lib/settings';
 import tvRoutes from '@server/routes/tv';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
@@ -20,7 +27,7 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
-import { after, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 /*
  * The season endpoint reports which episodes active requests cover, so the
@@ -71,6 +78,7 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvSeason', {
 let server: Server;
 let port: number;
 let requester: User;
+let actingAs: User | undefined;
 
 const season = async (n: number) =>
   new Promise<
@@ -78,6 +86,7 @@ const season = async (n: number) =>
       episodeNumber: number;
       requested?: boolean;
       requested4k?: boolean;
+      available?: boolean;
       download?: { stage: string; size: number; sizeLeft: number };
     }[]
   >((resolve, reject) => {
@@ -158,6 +167,10 @@ beforeEach(async () => {
         validateSecurity: false,
       })
     );
+    app.use((req, _res, next) => {
+      (req as unknown as { user?: User }).user = actingAs;
+      next();
+    });
     app.use('/api/v1/tv', tvRoutes);
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, () => resolve(s));
@@ -272,5 +285,106 @@ describe('episodes on their way, on the season endpoint', () => {
     } finally {
       downloadTracker.setBackfillDownloads([]);
     }
+  });
+});
+
+describe('episodes of a series the viewer’s libraries don’t hold', () => {
+  beforeEach(async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.main.limitToLibraries = true;
+    settings.jellyfin = { ...jellyfinDefaults(), connected: false };
+    settings.emby = { ...jellyfinDefaults(), connected: false };
+    cacheManager.getCache('libraryaccess').flush();
+    mock.method(libraryAccess, 'server', async () => ({
+      canGiveAll: false,
+      async read() {
+        return {
+          libraries: [
+            { id: '9001', title: 'Family Shows', type: 'show' as const },
+            { id: '9002', title: 'Shows', type: 'show' as const },
+          ],
+          people: [
+            {
+              id: '501',
+              name: 'kid',
+              ref: '1',
+              all: false,
+              libraries: ['9001'],
+            },
+          ],
+          scanIds: new Map([
+            ['9001', '1'],
+            ['9002', '2'],
+          ]),
+        };
+      },
+      async write() {},
+    }));
+
+    // Static Garden, only in the Shows library.
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: TV_ID,
+        mediaType: MediaType.TV,
+        status: MediaStatus.AVAILABLE,
+        ratingKey: 'k-garden',
+        seasons: [
+          new Season({ seasonNumber: 1, status: MediaStatus.AVAILABLE }),
+        ],
+      })
+    );
+    const [first] = media.seasons;
+    await getRepository(Episode).save(
+      [1, 2].map(
+        (episodeNumber) =>
+          new Episode({
+            episodeNumber,
+            status: MediaStatus.AVAILABLE,
+            season: Promise.resolve(first),
+          })
+      )
+    );
+    await getRepository(MediaLibraryItem).save(
+      new MediaLibraryItem({
+        mediaId: media.id,
+        server: 'plex',
+        libraryId: '2',
+        is4k: false,
+        itemId: 'k-garden',
+      })
+    );
+  });
+
+  afterEach(() => {
+    mock.restoreAll();
+    getSettings().main.limitToLibraries = false;
+    actingAs = undefined;
+  });
+
+  const available = async () =>
+    (await season(1)).filter((e) => e.available).map((e) => e.episodeNumber);
+
+  it('shows none of its episodes as available', async () => {
+    actingAs = await getRepository(User).save(
+      new User({
+        email: 'garden-kid@example.invalid',
+        permissions: Permission.REQUEST,
+        plexId: 501,
+        avatar: '',
+      })
+    );
+    assert.deepEqual(await available(), []);
+  });
+
+  it('still shows them to someone who sees everything', async () => {
+    actingAs = await getRepository(User).save(
+      new User({
+        email: 'garden-admin@example.invalid',
+        permissions: Permission.ADMIN,
+        avatar: '',
+      })
+    );
+    assert.deepEqual(await available(), [1, 2]);
   });
 });

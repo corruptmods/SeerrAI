@@ -3,6 +3,7 @@ import { afterEach, before, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import { MediaType } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import {
   MEDIA_SERVER_KINDS,
@@ -11,8 +12,10 @@ import {
 } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
+import { Watchlist } from '@server/entity/Watchlist';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
@@ -823,5 +826,39 @@ describe('people on several media servers', () => {
     const sorted = await agent.get('/user').query({ sort: 'displayname' });
     assert.equal(sorted.body.results[0].displayName, 'Aardvark');
     assert.deepEqual(sorted.body.results[0].linkedServers, ['emby']);
+  });
+});
+
+describe("the order of someone's watchlist", () => {
+  it('lists it newest added first, or by title, when asked', async () => {
+    const { agent, id } = await loginAs('admin@seerr.dev');
+    const owner = await getRepository(User).findOneByOrFail({ id });
+    for (const [tmdbId, title] of [
+      [9201, 'Static Garden'],
+      [9202, 'The Harbour Lights'],
+      [9203, 'Lantern Song'],
+    ] as const) {
+      const media = await getRepository(Media).save(
+        new Media({ tmdbId, mediaType: MediaType.MOVIE })
+      );
+      await getRepository(Watchlist).save(
+        Object.assign(new Watchlist(), {
+          tmdbId,
+          mediaType: MediaType.MOVIE,
+          title,
+          requestedBy: owner,
+          media,
+        })
+      );
+    }
+    const order = async (query: string) => {
+      const res = await agent.get(`/user/${id}/watchlist${query}`);
+      assert.equal(res.status, 200);
+      return (res.body.results as { tmdbId: number }[]).map((i) => i.tmdbId);
+    };
+
+    assert.deepEqual(await order(''), [9201, 9202, 9203]);
+    assert.deepEqual(await order('?sort=added-desc'), [9203, 9202, 9201]);
+    assert.deepEqual(await order('?sort=title'), [9202, 9203, 9201]);
   });
 });

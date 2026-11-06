@@ -14,6 +14,7 @@ export type AvailableCacheIds =
   | 'github'
   | 'plextv'
   | 'plexwatchlist'
+  | 'libraryaccess'
   | 'tvdb';
 
 const DEFAULT_TTL = 300;
@@ -60,6 +61,9 @@ const PLEX_TV_MAX_KEYS = 5000;
 
 // Keyed by auth token, so one key per Plex linked user.
 const PLEX_WATCHLIST_MAX_KEYS = 500;
+
+// One key per person and media server (lib/libraryVisibility).
+const LIBRARY_ACCESS_MAX_KEYS = 2000;
 
 // Several keys per show; the largest payloads, as the extended series lookup
 // carries every episode.
@@ -305,6 +309,10 @@ class CacheManager {
     }),
     plexwatchlist: new Cache('plexwatchlist', 'Plex Watchlist', {
       max: PLEX_WATCHLIST_MAX_KEYS,
+    }),
+    libraryaccess: new Cache('libraryaccess', 'Library Access', {
+      stdTtl: 600,
+      max: LIBRARY_ACCESS_MAX_KEYS,
     }),
     tvdb: new Cache('tvdb', 'The TVDB API', {
       stdTtl: 21600,

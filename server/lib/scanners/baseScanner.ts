@@ -12,6 +12,14 @@ import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import downloadTracker from '@server/lib/downloadtracker';
+import type {
+  QualitySlot,
+  QualitySource,
+  SeenQuality,
+  StoredQuality,
+} from '@server/lib/mediaQuality';
+import { recordQuality } from '@server/lib/mediaQuality';
+import type { LibraryItems } from '@server/lib/scanners/libraryItems';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import AsyncLock from '@server/utils/asyncLock';
@@ -54,6 +62,13 @@ interface ProcessOptions {
   title?: string;
   processing?: boolean;
   hasFile?: boolean;
+  /**
+   * A movie: what this media server or Radarr saw of the side being
+   * processed (is4k). Null clears it, as for a Radarr movie with no file.
+   */
+  quality?: SeenQuality | null;
+  /** A series: what this media server saw of its episodes, by side. */
+  qualities?: Partial<Record<QualitySlot, SeenQuality>>;
 }
 
 export interface ProcessableSeason {
@@ -87,6 +102,14 @@ const serverItemOf = ({
   }
   return ratingKey ? { kind: 'plex', id: ratingKey } : undefined;
 };
+
+/**
+ * Whose quality a movie scan reports: the listing media server's, else
+ * Radarr's (the only *arr scan that passes one).
+ */
+const qualitySourceOf = (options: ProcessOptions): QualitySource | undefined =>
+  serverItemOf(options)?.kind ??
+  (options.serviceId !== undefined ? 'radarr' : undefined);
 
 /**
  * One lock shared by every scanner: Plex, Jellyfin, Emby, Radarr and Sonarr
@@ -123,6 +146,8 @@ class BaseScanner<T> {
   >();
   readonly asyncLock = sharedLock;
   readonly tmdb = new TheMovieDb();
+  /** Media server scans: records the library each title is found in. */
+  protected libraryItems?: LibraryItems;
 
   protected constructor(
     scannerName: string,
@@ -228,6 +253,20 @@ class BaseScanner<T> {
           changedExisting = true;
         }
 
+        const qualitySource = qualitySourceOf(options);
+        if (qualitySource) {
+          const quality = recordQuality(
+            existing.quality,
+            qualitySource,
+            is4k ? '4k' : 'standard',
+            options.quality
+          );
+          if (quality !== existing.quality) {
+            existing.quality = quality;
+            changedExisting = true;
+          }
+        }
+
         // Letting an abandoned entry claim these would make them scan-order dependent.
         if (!deferredReset) {
           if (
@@ -269,6 +308,7 @@ class BaseScanner<T> {
         } else {
           this.log(`Title already exists and no changes detected for ${title}`);
         }
+        await this.place(existing, item, is4k);
       } else {
         if (!processing && !hasFile) {
           return;
@@ -302,6 +342,16 @@ class BaseScanner<T> {
           newMedia.mediaAddedAt = mediaAddedAt;
         }
 
+        const qualitySource = qualitySourceOf(options);
+        if (qualitySource && (!is4k || this.enable4kMovie)) {
+          newMedia.quality = recordQuality(
+            null,
+            qualitySource,
+            is4k ? '4k' : 'standard',
+            options.quality
+          );
+        }
+
         if (item) {
           const [idColumn, idColumn4k] = MEDIA_ID[item.kind];
           newMedia[idColumn] = !is4k ? item.id : undefined;
@@ -311,6 +361,7 @@ class BaseScanner<T> {
 
         await mediaRepository.save(newMedia);
         await this.releaseElsewhere(newMedia, is4k);
+        await this.place(newMedia, item, is4k);
         this.log(`Saved new media: ${title}`);
       }
     });
@@ -556,8 +607,10 @@ class BaseScanner<T> {
 
         media.status = this.rollUpShowStatus(media, seasons, false);
         media.status4k = this.rollUpShowStatus(media, seasons, true);
+        media.quality = this.withShowQuality(media.quality, item, options);
         await mediaRepository.save(media);
         await this.releaseElsewhere(media, is4k);
+        await this.placeShow(media, item, seasons);
         this.log(`Updating existing title: ${title}`);
 
         if (
@@ -607,6 +660,7 @@ class BaseScanner<T> {
           externalServiceId4k: is4k ? externalServiceId : undefined,
           externalServiceSlug: !is4k ? externalServiceSlug : undefined,
           externalServiceSlug4k: is4k ? externalServiceSlug : undefined,
+          quality: this.withShowQuality(null, item, options),
           ...(item && {
             [MEDIA_ID[item.kind][0]]: newSeasons.some(
               (sn) =>
@@ -656,9 +710,33 @@ class BaseScanner<T> {
         });
         await mediaRepository.save(newMedia);
         await this.releaseElsewhere(newMedia, is4k);
+        await this.placeShow(newMedia, item, seasons);
         this.log(`Saved ${title}`);
       }
     });
+  }
+
+  /** A series' stored quality with what the listing media server saw. */
+  private withShowQuality(
+    stored: StoredQuality | null | undefined,
+    item: { kind: MediaServerKind } | undefined,
+    { qualities }: ProcessOptions
+  ): StoredQuality | null | undefined {
+    if (!item || !qualities) {
+      return stored;
+    }
+    const standard = recordQuality(
+      stored,
+      item.kind,
+      'standard',
+      qualities.standard ?? null
+    );
+    return recordQuality(
+      standard,
+      item.kind,
+      '4k',
+      (this.enable4kShow && qualities['4k']) || null
+    );
   }
 
   private rollUpShowStatus(
@@ -946,6 +1024,33 @@ class BaseScanner<T> {
   }
 
   private runStartedAt = 0;
+
+  /** Records the library holding this item, if it is the title's item now. */
+  private async place(
+    media: Media,
+    item: { kind: MediaServerKind; id: string } | undefined,
+    is4k: boolean
+  ) {
+    if (!item || this.libraryItems?.server !== item.kind) return;
+    if (media[MEDIA_ID[item.kind][is4k ? 1 : 0]] !== item.id) return;
+    await this.libraryItems.place(media.id, is4k, item.id);
+  }
+
+  /** place() for a series, for each quality this scan found episodes of. */
+  private async placeShow(
+    media: Media,
+    item: { kind: MediaServerKind; id: string } | undefined,
+    seasons: ProcessableSeason[]
+  ) {
+    // As for the item ids: seasons TMDB reports as empty don't count.
+    const found = seasons.filter((season) => season.totalEpisodes > 0);
+    if (found.some((season) => season.episodes > 0)) {
+      await this.place(media, item, false);
+    }
+    if (this.enable4kShow && found.some((season) => season.episodes4k > 0)) {
+      await this.place(media, item, true);
+    }
+  }
 
   /**
    * A media server item belongs to one title. When the server rematches a

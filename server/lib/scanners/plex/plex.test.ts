@@ -18,6 +18,7 @@ import {
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -350,6 +351,56 @@ describe('Plex Scanner', () => {
     });
   });
 
+  describe('series qualities', () => {
+    it('stores what the episodes are in, over all seasons', async () => {
+      configurePlexWithLibrary();
+      getTvShowImpl = async () =>
+        fakeTmdbShow(6300, [
+          {
+            id: 1,
+            air_date: '2024-01-01',
+            episode_count: 2,
+            name: 'Season 1',
+            overview: '',
+            season_number: 1,
+          },
+        ]);
+      getLibraryContentsImpl = async (id: string) =>
+        id === 'test-library-id'
+          ? { totalSize: 1, items: [fakePlexShowItem('show-6300')] }
+          : { totalSize: 0, items: [] };
+      getMetadataImpl = async (key: string) =>
+        key === 'show-6300'
+          ? fakePlexShowMetadata('show-6300', 6300, [
+              fakePlexSeasonMetadata(1, 'show-6300-s1'),
+            ])
+          : undefined;
+      getChildrenMetadataImpl = async () =>
+        [['1080', '4k'], ['720']].map(
+          (resolutions, index) =>
+            ({
+              ...fakePlexSeasonMetadata(1, `show-6300-e${index}`),
+              index: index + 1,
+              Media: resolutions.map(
+                (videoResolution) =>
+                  ({ videoResolution }) as PlexMetadata['Media'][number]
+              ),
+            }) as PlexMetadata
+        );
+
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 6300, mediaType: MediaType.TV },
+      });
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.deepEqual(media.availableQuality, {
+        resolutions: ['4K', '1080p', '720p'],
+        ranges: [],
+      });
+    });
+  });
+
   describe('movie versions', () => {
     beforeEach(() => {
       configurePlexWithLibrary([movieLibrary]);
@@ -408,6 +459,149 @@ describe('Plex Scanner', () => {
 
       assert.strictEqual(media.status, MediaStatus.AVAILABLE);
       assert.notStrictEqual(media.status4k, MediaStatus.AVAILABLE);
+    });
+
+    it('stores each side’s resolutions for the title page', async () => {
+      getSettings().radarr = [{ id: 0, is4k: true } as RadarrSettings];
+
+      const media = await scanMovie(6203, ['1080', '720', '4k']);
+
+      assert.deepEqual(media.availableQuality, {
+        resolutions: ['1080p', '720p'],
+        ranges: [],
+      });
+      assert.deepEqual(media.availableQuality4k, {
+        resolutions: ['4K'],
+        ranges: [],
+      });
+    });
+
+    it('puts a 4K version with the rest when there is no 4K Radarr', async () => {
+      const media = await scanMovie(6204, ['4k', '1080']);
+
+      assert.deepEqual(media.availableQuality?.resolutions, ['4K', '1080p']);
+      assert.equal(media.availableQuality4k, undefined);
+    });
+  });
+
+  describe('which library holds a title', () => {
+    const films: Library = {
+      id: '11',
+      name: 'Films',
+      enabled: true,
+      type: 'movie',
+    };
+    const family: Library = {
+      id: '12',
+      name: 'Family Films',
+      enabled: true,
+      type: 'movie',
+    };
+    let contents: Record<string, PlexLibraryItem[]>;
+    const resolveImdb = Object.getOwnPropertyDescriptor(
+      plexFullScanner.tmdb,
+      'resolveImdbIdForScan'
+    );
+
+    beforeEach(() => {
+      configurePlexWithLibrary([films, family]);
+      getLibrariesImpl = async () =>
+        [films, family].map((library) => ({
+          key: library.id,
+          title: library.name,
+          type: 'movie',
+          agent: 'tv.plex.agents.movie',
+        }));
+      getLibraryContentsImpl = async (id) => ({
+        totalSize: contents[id]?.length ?? 0,
+        items: contents[id] ?? [],
+      });
+      Object.defineProperty(plexFullScanner.tmdb, 'resolveImdbIdForScan', {
+        value: async () => {
+          throw new Error('TMDB is unreachable');
+        },
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      if (resolveImdb) {
+        Object.defineProperty(
+          plexFullScanner.tmdb,
+          'resolveImdbIdForScan',
+          resolveImdb
+        );
+      }
+    });
+
+    const held = async () =>
+      (
+        await getRepository(MediaLibraryItem).find({
+          relations: { media: true },
+        })
+      )
+        .map(
+          (row) =>
+            `${row.media.tmdbId} ${row.server} ${row.libraryId} ${row.is4k ? '4k' : 'std'} ${row.itemId}`
+        )
+        .sort();
+
+    it('records each library a title is in, with its item there', async () => {
+      contents = {
+        '11': [fakePlexMovieItem('501', 7001, ['1080'])],
+        '12': [
+          fakePlexMovieItem('601', 7001, ['1080']),
+          fakePlexMovieItem('602', 7002, ['1080']),
+        ],
+      };
+
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      assert.deepEqual(await held(), [
+        '7001 plex 11 std 501',
+        '7001 plex 12 std 601',
+        '7002 plex 12 std 602',
+      ]);
+    });
+
+    it('forgets a library that no longer holds a title after a full scan', async () => {
+      contents = {
+        '11': [fakePlexMovieItem('501', 7001, ['1080'])],
+        '12': [
+          fakePlexMovieItem('601', 7001, ['1080']),
+          fakePlexMovieItem('602', 7002, ['1080']),
+        ],
+      };
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      contents['12'] = [fakePlexMovieItem('602', 7002, ['1080'])];
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      assert.deepEqual(await held(), [
+        '7001 plex 11 std 501',
+        '7002 plex 12 std 602',
+      ]);
+    });
+
+    it('forgets nothing from a library whose scan had a failure', async () => {
+      contents = {
+        '11': [fakePlexMovieItem('501', 7001, ['1080'])],
+        '12': [fakePlexMovieItem('601', 7001, ['1080'])],
+      };
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      contents['12'] = [
+        {
+          ...fakePlexMovieItem('603', 7003, ['1080']),
+          guid: 'imdb://tt0000003',
+        },
+      ];
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      assert.deepEqual(await held(), [
+        '7001 plex 11 std 501',
+        '7001 plex 12 std 601',
+      ]);
     });
   });
 

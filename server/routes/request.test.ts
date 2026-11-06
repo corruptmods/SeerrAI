@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { before, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import type { RadarrMovieOptions } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
@@ -13,19 +13,23 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import OverrideRule from '@server/entity/OverrideRule';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import cacheManager from '@server/lib/cache';
+import libraryAccess from '@server/lib/libraryAccess';
 import { claimDelivery, hasDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, jellyfinDefaults } from '@server/lib/settings';
 import { checkUser } from '@server/middleware/auth';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { setupTestDb } from '@server/test/db';
@@ -667,6 +671,88 @@ describe('PUT /request/:requestId (season availability)', () => {
       saved.seasons.map((s) => s.seasonNumber),
       [1]
     );
+  });
+});
+
+describe('PUT /request/:requestId (over the quota, left for an admin)', () => {
+  beforeEach(() => {
+    getSettings().main.overQuotaRequests = true;
+  });
+
+  afterEach(() => {
+    getSettings().main.overQuotaRequests = false;
+  });
+
+  it('adds seasons beyond the limit and marks the request', async () => {
+    const owner = await seedUser('friend@seerr.dev', { tvQuotaLimit: 2 });
+    const mediaRequest = await seedTvRequest(owner, [1, 2]);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.TV,
+      seasons: [1, 2, 3],
+    });
+
+    assert.strictEqual(res.status, 200);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.strictEqual(saved.overQuota, true);
+    assert.strictEqual(saved.status, MediaRequestStatus.PENDING);
+    assert.strictEqual(saved.seasons.length, 3);
+  });
+
+  it('leaves a request within the limit unmarked', async () => {
+    const owner = await seedUser('friend@seerr.dev', { tvQuotaLimit: 3 });
+    const mediaRequest = await seedTvRequest(owner, [1, 2]);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.TV,
+      seasons: [1, 2, 3],
+    });
+
+    assert.strictEqual(res.status, 200);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.strictEqual(saved.overQuota, false);
+  });
+
+  it('reassigns a movie request to someone at their limit and marks it', async () => {
+    const owner = await seedUser('admin@seerr.dev');
+    const target = await seedUser('friend@seerr.dev', { movieQuotaLimit: 1 });
+    await seedRequest();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.MOVIE,
+        tmdbId: 55556,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    const mediaRequest = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.MOVIE,
+        status: MediaRequestStatus.PENDING,
+        media,
+        requestedBy: owner,
+        is4k: false,
+      })
+    );
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.MOVIE,
+      userId: target.id,
+    });
+
+    assert.strictEqual(res.status, 200);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.strictEqual(saved.requestedBy.id, target.id);
+    assert.strictEqual(saved.overQuota, true);
   });
 });
 
@@ -2029,6 +2115,94 @@ describe("GET /request/:requestId, the requester's own settings", () => {
   });
 });
 
+describe('requests for a title the viewer’s libraries don’t hold', () => {
+  const settings = getSettings();
+  let saved: Pick<typeof settings, 'jellyfin' | 'emby'> & {
+    type: MediaServerType;
+  };
+
+  beforeEach(() => {
+    saved = {
+      type: settings.main.mediaServerType,
+      jellyfin: settings.jellyfin,
+      emby: settings.emby,
+    };
+  });
+
+  afterEach(() => {
+    mock.restoreAll();
+    settings.main.limitToLibraries = false;
+    settings.main.mediaServerType = saved.type;
+    settings.jellyfin = saved.jellyfin;
+    settings.emby = saved.emby;
+  });
+
+  it('show it to them as not available, in the list and on its own', async () => {
+    const seeded = await seedRequest(MediaRequestStatus.COMPLETED);
+    await getRepository(Media).update(seeded.media.id, {
+      status: MediaStatus.AVAILABLE,
+      ratingKey: 'k-glasswing',
+    });
+    await getRepository(MediaLibraryItem).save(
+      new MediaLibraryItem({
+        mediaId: seeded.media.id,
+        server: 'plex',
+        libraryId: '2',
+        is4k: false,
+        itemId: 'k-glasswing',
+      })
+    );
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const friend = await getRepository(User).findOneByOrFail({
+      email: 'friend@seerr.dev',
+    });
+
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.main.limitToLibraries = true;
+    settings.jellyfin = { ...jellyfinDefaults(), connected: false };
+    settings.emby = { ...jellyfinDefaults(), connected: false };
+    cacheManager.getCache('libraryaccess').flush();
+    mock.method(libraryAccess, 'server', async () => ({
+      canGiveAll: false,
+      async read() {
+        return {
+          libraries: [
+            { id: '9001', title: 'Family Films', type: 'movie' as const },
+            { id: '9002', title: 'Films', type: 'movie' as const },
+          ],
+          people: [
+            {
+              id: String(friend.plexId),
+              name: 'friend',
+              ref: '1',
+              all: false,
+              libraries: ['9001'],
+            },
+          ],
+          scanIds: new Map([
+            ['9001', '1'],
+            ['9002', '2'],
+          ]),
+        };
+      },
+      async write() {},
+    }));
+
+    const one = await agent.get(`/request/${seeded.id}`);
+    assert.strictEqual(one.status, 200);
+    assert.strictEqual(one.body.media.status, MediaStatus.UNKNOWN);
+    assert.strictEqual(one.body.media.outsideLibraries, true);
+
+    const list = await agent.get('/request?take=10');
+    assert.strictEqual(list.status, 200);
+    const listed = list.body.results.find(
+      (r: { id: number }) => r.id === seeded.id
+    );
+    assert.strictEqual(listed.media.status, MediaStatus.UNKNOWN);
+    assert.strictEqual(listed.media.outsideLibraries, true);
+  });
+});
+
 describe('POST /request/missing', () => {
   it('requests only what nothing has yet, and says what happened to each', async () => {
     getSettings().radarr = [];
@@ -2504,6 +2678,239 @@ describe('anime movies', () => {
         [FRENCH_ANIMATION, '/anime-movies', 9],
       ]
     );
+  });
+});
+
+describe('default quality profiles and folders by profile', () => {
+  const ANIMATION = { id: 16, name: 'Animation' };
+  const GLASSWING = 99200;
+  const LANTERN_SONG = 99201;
+  const HARBOUR_LIGHTS = 99202;
+  movieDetails.set(HARBOUR_LIGHTS, {
+    genres: [{ id: 99, name: 'Documentary' }],
+    original_language: 'en',
+    release_date: '2012-02-03',
+  });
+  movieDetails.set(GLASSWING, {
+    genres: [],
+    original_language: 'en',
+    release_date: '2019-04-12',
+  });
+  movieDetails.set(LANTERN_SONG, {
+    genres: [ANIMATION],
+    original_language: 'ja',
+    release_date: '2003-08-01',
+  });
+
+  let added: RadarrMovieOptions[];
+
+  /** The friend, with these permissions and saved profiles, signed in. */
+  async function friendWith(
+    permissions: number,
+    defaultProfiles: UserSettings['defaultProfiles'] = []
+  ) {
+    const userRepo = getRepository(User);
+    const friend = await userRepo.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    friend.permissions = permissions;
+    friend.settings = Object.assign(
+      friend.settings ?? new UserSettings({ user: friend }),
+      { defaultProfiles }
+    );
+    await userRepo.save(friend);
+    return loginAs('friend@seerr.dev', 'test1234');
+  }
+
+  const sent = () =>
+    added.map((a) => [a.tmdbId, a.qualityProfileId, a.rootFolderPath]);
+
+  beforeEach(() => {
+    added = [];
+    Object.defineProperty(RadarrAPI.prototype, 'addMovie', {
+      configurable: true,
+      set() {},
+      get() {
+        return async (options: RadarrMovieOptions) => {
+          added.push(options);
+          return { id: added.length, titleSlug: `movie-${added.length}` };
+        };
+      },
+    });
+    Object.defineProperty(RadarrAPI.prototype, 'getProfiles', {
+      configurable: true,
+      set() {},
+      get() {
+        return async () => [
+          { id: 1, name: 'Any' },
+          { id: 5, name: 'Ultra' },
+          { id: 9, name: 'Anime' },
+          { id: 12, name: 'Anime Ultra' },
+        ];
+      },
+    });
+    configureRadarr([
+      {
+        id: 0,
+        isDefault: true,
+        is4k: false,
+        activeAnimeDirectory: '/anime-movies',
+        activeAnimeProfileId: 9,
+      },
+    ]);
+    getSettings().sonarr = [];
+  });
+
+  const advanced =
+    Permission.REQUEST | Permission.REQUEST_ADVANCED | Permission.AUTO_APPROVE;
+
+  it("sends a request without a profile with the requester's saved one", async () => {
+    const agent = await friendWith(advanced, [
+      { service: 'radarr', serverId: 0, profileId: 5 },
+      { service: 'radarr', serverId: 0, anime: true, profileId: 12 },
+    ]);
+    for (const mediaId of [GLASSWING, LANTERN_SONG]) {
+      const res = await agent
+        .post('/request')
+        .send({ mediaType: MediaType.MOVIE, mediaId });
+      assert.strictEqual(res.status, 201);
+    }
+
+    assert.deepStrictEqual(sent(), [
+      [GLASSWING, 5, '/movies'],
+      [LANTERN_SONG, 12, '/anime-movies'],
+    ]);
+  });
+
+  it("uses the server's profile when the saved one is gone or not theirs to choose", async () => {
+    let agent = await friendWith(advanced, [
+      { service: 'radarr', serverId: 0, profileId: 404 },
+    ]);
+    let res = await agent
+      .post('/request')
+      .send({ mediaType: MediaType.MOVIE, mediaId: GLASSWING });
+    assert.strictEqual(res.status, 201);
+
+    agent = await friendWith(Permission.REQUEST | Permission.AUTO_APPROVE, [
+      { service: 'radarr', serverId: 0, anime: true, profileId: 12 },
+    ]);
+    res = await agent
+      .post('/request')
+      .send({ mediaType: MediaType.MOVIE, mediaId: LANTERN_SONG });
+    assert.strictEqual(res.status, 201);
+
+    assert.deepStrictEqual(sent(), [
+      [GLASSWING, 1, '/movies'],
+      [LANTERN_SONG, 9, '/anime-movies'],
+    ]);
+  });
+
+  it('sends a profile to its mapped folder when the request names none', async () => {
+    getSettings().radarr[0].profileFolders = [
+      { profileId: 5, rootFolder: '/ultra' },
+    ];
+    const agent = await friendWith(advanced, [
+      { service: 'radarr', serverId: 0, profileId: 5 },
+    ]);
+    const res = await agent
+      .post('/request')
+      .send({ mediaType: MediaType.MOVIE, mediaId: GLASSWING });
+    assert.strictEqual(res.status, 201);
+
+    assert.deepStrictEqual(sent(), [[GLASSWING, 5, '/ultra']]);
+  });
+
+  it('puts a mapped profile in its folder over the one someone else picked', async () => {
+    getSettings().radarr[0].profileFolders = [
+      { profileId: 5, rootFolder: '/ultra' },
+    ];
+    const agent = await friendWith(
+      Permission.REQUEST | Permission.REQUEST_ADVANCED
+    );
+    let res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: GLASSWING,
+      profileId: 5,
+      rootFolder: '/movies',
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/ultra');
+
+    // Edited back to another folder, it stays in the mapped one.
+    res = await agent.put(`/request/${res.body.id}`).send({
+      mediaType: MediaType.MOVIE,
+      profileId: 5,
+      rootFolder: '/movies',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.rootFolder, '/ultra');
+  });
+
+  it('follows the mapping for a folder picked without a profile', async () => {
+    getSettings().radarr[0].profileFolders = [
+      { profileId: 1, rootFolder: '/standard' },
+    ];
+    const agent = await friendWith(
+      Permission.REQUEST | Permission.REQUEST_ADVANCED
+    );
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: GLASSWING,
+      rootFolder: '/movies',
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/standard');
+  });
+
+  it("keeps a request manager's own folder, but not a rule's for a mapped profile", async () => {
+    getSettings().radarr[0].profileFolders = [
+      { profileId: 5, rootFolder: '/ultra' },
+    ];
+    let agent = await friendWith(
+      Permission.REQUEST | Permission.MANAGE_REQUESTS
+    );
+    let res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: GLASSWING,
+      profileId: 5,
+      rootFolder: '/movies',
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/movies');
+
+    const friendId = await userIdOf('friend@seerr.dev');
+    await getRepository(OverrideRule).save([
+      new OverrideRule({
+        radarrServiceId: 0,
+        users: String(friendId),
+        genre: '99',
+        profileId: 5,
+        rootFolder: '/documentaries',
+      }),
+    ]);
+    agent = await friendWith(Permission.REQUEST);
+    res = await agent
+      .post('/request')
+      .send({ mediaType: MediaType.MOVIE, mediaId: HARBOUR_LIGHTS });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.profileId, 5);
+    // The rule's profile is mapped, so its folder gives way.
+    assert.strictEqual(res.body.rootFolder, '/ultra');
+  });
+
+  it('changes nothing until a mapping is set', async () => {
+    const agent = await friendWith(
+      Permission.REQUEST | Permission.REQUEST_ADVANCED
+    );
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: GLASSWING,
+      profileId: 5,
+      rootFolder: '/movies',
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/movies');
+    assert.strictEqual(res.body.profileId, 5);
   });
 });
 

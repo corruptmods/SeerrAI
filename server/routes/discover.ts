@@ -10,6 +10,7 @@ import {
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
 import { leftOutServices } from '@server/constants/streamingServices';
+import { watchlistSortOf } from '@server/constants/watchlistSort';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
@@ -1128,6 +1129,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     const itemsPerPage = 20;
     const page = req.query.page ? Number(req.query.page) : 1;
     const offset = (page - 1) * itemsPerPage;
+    const sort = watchlistSortOf(req.query.sort);
 
     const activeUser = await userRepository.findOne({
       where: { id: req.user?.id },
@@ -1139,7 +1141,8 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
       const [result, total] = await savedWatchlistPage(
         activeUser.id,
         offset,
-        itemsPerPage
+        itemsPerPage,
+        sort
       );
       if (total) {
         return res.json({
@@ -1162,7 +1165,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
 
     const plexTV = new PlexTvAPI(activeUser.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset });
+    const watchlist = await plexTV.getWatchlist({ offset, sort });
 
     return res.json({
       page,

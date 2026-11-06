@@ -1,5 +1,6 @@
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
+import ProfileFolders from '@app/components/Settings/ProfileFolders';
 import type { RadarrTestResponse } from '@app/components/Settings/SettingsServices';
 import { arrTestFailure } from '@app/components/Settings/arrTestFailure';
 import useToasts from '@app/hooks/useToasts';
@@ -250,6 +251,7 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
           syncEnabled: radarr?.syncEnabled ?? false,
           enableSearch: !radarr?.preventSearch,
           tagRequests: radarr?.tagRequests ?? false,
+          profileFolders: radarr?.profileFolders ?? [],
         }}
         validationSchema={RadarrSettingsSchema}
         onSubmit={async (values) => {
@@ -285,6 +287,7 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
               syncEnabled: values.syncEnabled,
               preventSearch: !values.enableSearch,
               tagRequests: values.tagRequests,
+              profileFolders: values.profileFolders,
             };
             if (!radarr) {
               await axios.post('/api/v1/settings/radarr', submission);
@@ -854,6 +857,13 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
                     />
                   </div>
                 </div>
+                <ProfileFolders
+                  profiles={testResponse.profiles}
+                  rootFolders={testResponse.rootFolders}
+                  value={values.profileFolders}
+                  onChange={(value) => setFieldValue('profileFolders', value)}
+                  disabled={!isValidated || isTesting}
+                />
                 <div className="form-row">
                   <label htmlFor="externalUrl" className="text-label">
                     {intl.formatMessage(messages.externalUrl)}

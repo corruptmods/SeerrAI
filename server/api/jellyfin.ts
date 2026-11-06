@@ -92,6 +92,13 @@ export interface JellyfinMediaStream {
   RealFrameRate?: number;
   Language?: string;
   DisplayTitle: string;
+  /** Jellyfin: 'SDR' or 'HDR'. */
+  VideoRange?: string;
+  /** Jellyfin: 'SDR', 'HDR10', 'HDR10Plus', 'HLG', 'DOVI', 'DOVIWithHDR10'... */
+  VideoRangeType?: string;
+  /** Emby: 'None', 'Hdr10', 'Hdr10Plus', 'HyperLogGamma', 'DolbyVision'. */
+  ExtendedVideoType?: string;
+  ExtendedVideoSubType?: string;
 }
 
 export interface JellyfinMediaSource {

@@ -2,6 +2,9 @@ import { isMbid } from '@server/api/musicbrainz';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import TheMovieDb from '@server/api/themoviedb';
+import type { ProfileService } from '@server/constants/requestDefaults';
+import { getRepository } from '@server/datasource';
+import { User } from '@server/entity/User';
 import type {
   LidarrServer,
   LidarrServerWithDetails,
@@ -9,14 +12,49 @@ import type {
   ServiceCommonServerWithDetails,
 } from '@server/interfaces/api/serviceInterfaces';
 import { lidarrApi } from '@server/lib/music/access';
+import { Permission } from '@server/lib/permissions';
+import { savedProfileFor } from '@server/lib/requestDefaults';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { requireMusic } from '@server/middleware/music';
-import type { NextFunction } from 'express';
+import type { NextFunction, Request } from 'express';
 import { Router } from 'express';
 
 const serviceRoutes = Router();
+
+/**
+ * The quality profiles saved by the person a request is for (`?requestUser=`,
+ * else whoever asks) for this server, while they may choose them. Someone
+ * else's only for those who request on others' behalf.
+ */
+const savedProfiles = async (
+  req: Request,
+  service: ProfileService,
+  server: { id: number; activeAnimeProfileId?: number }
+): Promise<{ savedProfileId?: number; savedAnimeProfileId?: number }> => {
+  const asked = Number(req.query.requestUser);
+  const forOther = Number.isInteger(asked) && asked !== req.user?.id;
+  if (
+    forOther &&
+    !req.user?.hasPermission(
+      [Permission.MANAGE_REQUESTS, Permission.MANAGE_USERS],
+      { type: 'or' }
+    )
+  ) {
+    return {};
+  }
+  const user = await getRepository(User).findOne({
+    where: { id: forOther ? asked : req.user?.id },
+  });
+  return {
+    savedProfileId: savedProfileFor(user, service, server),
+    savedAnimeProfileId:
+      service === 'lidarr'
+        ? undefined
+        : savedProfileFor(user, service, server, true),
+  };
+};
 
 /*
  * Anyone signed in reads these for the request window. Failure details
@@ -96,7 +134,9 @@ serviceRoutes.get<{ radarrId: string }>(
           activeAnimeDirectory: radarrSettings.activeAnimeDirectory,
           activeTags: radarrSettings.tags,
           activeAnimeTags: radarrSettings.animeTags,
+          profileFolders: radarrSettings.profileFolders ?? [],
         },
+        ...(await savedProfiles(req, 'radarr', radarrSettings)),
         profiles: profiles.map((profile) => ({
           id: profile.id,
           name: profile.name,
@@ -183,7 +223,9 @@ serviceRoutes.get<{ sonarrId: string }>(
             sonarrSettings.activeAnimeLanguageProfileId,
           activeTags: sonarrSettings.tags,
           activeAnimeTags: sonarrSettings.animeTags,
+          profileFolders: sonarrSettings.profileFolders ?? [],
         },
+        ...(await savedProfiles(req, 'sonarr', sonarrSettings)),
         profiles: profiles.map((profile) => ({
           id: profile.id,
           name: profile.name,
@@ -308,6 +350,8 @@ serviceRoutes.get<{ lidarrId: string }>(
 
       return res.status(200).json({
         server: lidarrServer(lidarrSettings),
+        savedProfileId: (await savedProfiles(req, 'lidarr', lidarrSettings))
+          .savedProfileId,
         profiles: profiles.map((profile) => ({
           id: profile.id,
           name: profile.name,

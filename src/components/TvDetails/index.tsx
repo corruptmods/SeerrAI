@@ -29,6 +29,7 @@ import ManageSlideOver from '@app/components/ManageSlideOver';
 import MediaSlider from '@app/components/MediaSlider';
 import PersonCard from '@app/components/PersonCard';
 import PlexMatchWarning from '@app/components/PlexMatchWarning';
+import QualityBadges from '@app/components/QualityBadges';
 import RequestButton from '@app/components/RequestButton';
 import TitleEta from '@app/components/RequestEta/TitleEta';
 import RequestModal from '@app/components/RequestModal';
@@ -639,6 +640,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         <div className="media-title">
           <div className="media-status">
             <DeletingSoonBadge tmdbId={data.id} mediaType="tv" />
+            {data.mediaInfo?.outsideLibraries && (
+              <Badge badgeType="dark">
+                {intl.formatMessage(globalMessages.notInYourLibraries)}
+              </Badge>
+            )}
             <StatusBadge
               status={data.mediaInfo?.status}
               downloadItem={data.mediaInfo?.downloadStatus}
@@ -649,6 +655,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               playLink={playLink}
               serviceUrl={data.mediaInfo?.serviceUrl}
             />
+            <QualityBadges quality={data.mediaInfo?.availableQuality} />
             {settings.currentSettings.series4kEnabled &&
               hasPermission(
                 [
@@ -660,19 +667,22 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   type: 'or',
                 }
               ) && (
-                <StatusBadge
-                  status={data.mediaInfo?.status4k}
-                  downloadItem={data.mediaInfo?.downloadStatus4k}
-                  title={data.name}
-                  is4k
-                  inProgress={
-                    (data.mediaInfo?.downloadStatus4k ?? []).length > 0
-                  }
-                  tmdbId={data.mediaInfo?.tmdbId}
-                  mediaType="tv"
-                  playLink={playLink4k}
-                  serviceUrl={data.mediaInfo?.serviceUrl4k}
-                />
+                <>
+                  <StatusBadge
+                    status={data.mediaInfo?.status4k}
+                    downloadItem={data.mediaInfo?.downloadStatus4k}
+                    title={data.name}
+                    is4k
+                    inProgress={
+                      (data.mediaInfo?.downloadStatus4k ?? []).length > 0
+                    }
+                    tmdbId={data.mediaInfo?.tmdbId}
+                    mediaType="tv"
+                    playLink={playLink4k}
+                    serviceUrl={data.mediaInfo?.serviceUrl4k}
+                  />
+                  <QualityBadges quality={data.mediaInfo?.availableQuality4k} />
+                </>
               )}
           </div>
           <h1 data-testid="media-title">

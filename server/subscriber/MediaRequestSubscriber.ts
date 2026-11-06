@@ -8,6 +8,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { mappedFolder } from '@server/constants/requestDefaults';
 import { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
@@ -16,7 +17,7 @@ import MusicAlbum from '@server/entity/MusicAlbum';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import SongRequest from '@server/entity/SongRequest';
-import type { User } from '@server/entity/User';
+import { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { lidarrApi } from '@server/lib/music/access';
 import { notifyAvailableMusic } from '@server/lib/music/completion';
@@ -30,6 +31,7 @@ import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
 import { radarrRouting } from '@server/lib/radarrRouting';
+import { requesterProfile } from '@server/lib/requestDefaults';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import {
   chosenServerFor,
@@ -676,6 +678,24 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           );
         }
 
+        // No profile on the request: the requester's saved one, then the
+        // folder that profile maps to when the request names none.
+        if (!entity.profileId) {
+          qualityProfile =
+            (await requesterProfile({
+              userId: entity.requestedBy?.id,
+              service: 'radarr',
+              server: radarrSettings,
+              anime: routing.anime,
+              profiles: () => radarr.getProfiles(),
+              users: manager.getRepository(User),
+            })) ?? qualityProfile;
+        }
+        if (!entity.rootFolder) {
+          rootFolder =
+            mappedFolder(radarrSettings, qualityProfile) ?? rootFolder;
+        }
+
         if (entity.tags && !isEqual(entity.tags, tags)) {
           tags = entity.tags;
           logger.info(`Request has override tags`, {
@@ -973,6 +993,24 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               mediaId: entity.media.id,
             }
           );
+        }
+
+        // No profile on the request: the requester's saved one, then the
+        // folder that profile maps to when the request names none.
+        if (!entity.profileId) {
+          qualityProfile =
+            (await requesterProfile({
+              userId: entity.requestedBy?.id,
+              service: 'sonarr',
+              server: sonarrSettings,
+              anime: routing.anime,
+              profiles: () => sonarr.getProfiles(),
+              users: manager.getRepository(User),
+            })) ?? qualityProfile;
+        }
+        if (!entity.rootFolder) {
+          rootFolder =
+            mappedFolder(sonarrSettings, qualityProfile) ?? rootFolder;
         }
 
         if (
@@ -1286,8 +1324,19 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       if (requesterTag !== undefined && !tags.includes(requesterTag)) {
         tags.push(requesterTag);
       }
+      // No profile on the request: the requester's saved one, if Lidarr
+      // still has it.
+      const qualityProfileId =
+        entity.profileId ||
+        (await requesterProfile({
+          userId: entity.requestedBy?.id,
+          service: 'lidarr',
+          server: lidarrSettings,
+          profiles: () => lidarr.getProfiles(),
+        })) ||
+        lidarrSettings.activeProfileId;
       const setup = {
-        qualityProfileId: entity.profileId || lidarrSettings.activeProfileId,
+        qualityProfileId,
         metadataProfileId:
           entity.metadataProfileId || lidarrSettings.activeMetadataProfileId,
         rootFolderPath: entity.rootFolder || lidarrSettings.activeDirectory,

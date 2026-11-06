@@ -1,4 +1,5 @@
 import { dismissBootScreen } from '@app/components/BootScreen';
+import { markPageReturn, watchPageReturns } from '@app/utils/pageReturn';
 import { isStandalone } from '@app/utils/pushPlatform';
 import type { NextRouter } from 'next/router';
 import { useEffect } from 'react';
@@ -50,16 +51,22 @@ const lastPage = (): string | undefined => {
   }
 };
 
-/** Returns the installed app to its last page, then reveals the app. */
+/**
+ * Returns the installed app to its last page, then reveals the app. Also
+ * follows history steps, so pages know when they are returned to.
+ */
 const useResumePage = (router: NextRouter) => {
   useEffect(() => {
     const onPage = (url: string) => remember(url);
     router.events.on('routeChangeComplete', onPage);
+    const unwatch = watchPageReturns(router.events);
 
     const back =
       isStandalone() && router.asPath === '/' ? lastPage() : undefined;
     let undo = () => undefined as void;
     if (back) {
+      // Resumed where it was, like a step back.
+      markPageReturn(back);
       router
         .replace(back)
         .catch(() => undefined)
@@ -73,6 +80,7 @@ const useResumePage = (router: NextRouter) => {
 
     return () => {
       router.events.off('routeChangeComplete', onPage);
+      unwatch();
       undo();
     };
     // Once, on app start.

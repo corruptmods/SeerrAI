@@ -1,8 +1,12 @@
 import { messages as listMessages } from '@app/components/AddToList';
 import Button from '@app/components/Common/Button';
+import { messages as importMessages } from '@app/components/MediaLists/ImportListModal';
+import { messages as requestMessages } from '@app/hooks/useBulkRequest';
 import useClickOutside from '@app/hooks/useClickOutside';
+import useFeature from '@app/hooks/useFeature';
 import { MARKERS_KEY } from '@app/hooks/useMediaMarkers';
 import useToasts from '@app/hooks/useToasts';
+import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { BookmarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkFilledIcon } from '@heroicons/react/24/solid';
@@ -26,14 +30,26 @@ interface ListSummary {
 interface AddCollectionToListProps {
   /** The collection's films, with posters. */
   movies: { tmdbId: number; posterPath?: string | null }[];
+  /** Called after films were requested, to show their new status. */
+  onRequested?: () => void;
 }
 
 /**
  * Add to List for a collection: each list shows how many of its films it
- * has; choosing one adds the rest.
+ * has; choosing one adds the rest, and requests them for anyone who has
+ * list adds requested (within import's limit).
  */
-const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
+const AddCollectionToList = ({
+  movies,
+  onRequested,
+}: AddCollectionToListProps) => {
   const intl = useIntl();
+  const { hasPermission } = useUser();
+  const requestToo =
+    useFeature('listRequests') &&
+    hasPermission([Permission.REQUEST, Permission.REQUEST_MOVIE], {
+      type: 'or',
+    });
   const { addToast } = useToasts();
   const { mutate: globalMutate } = useSWRConfig();
   const [isOpen, setOpen] = useState(false);
@@ -85,17 +101,19 @@ const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
     if (!missing.length) return;
     setPending((current) => [...current, listId]);
     try {
-      const { data } = await axios.post<{ added: number }>(
-        `/api/v1/list/${listId}/import`,
-        {
-          items: missing.map((movie) => ({
-            tmdbId: movie.tmdbId,
-            mediaType: 'movie',
-            posterPath: movie.posterPath ?? null,
-          })),
-          request: false,
-        }
-      );
+      const { data } = await axios.post<{
+        added: number;
+        requested?: number;
+        requestFailed?: number;
+        notRequested?: number;
+      }>(`/api/v1/list/${listId}/import`, {
+        items: missing.map((movie) => ({
+          tmdbId: movie.tmdbId,
+          mediaType: 'movie',
+          posterPath: movie.posterPath ?? null,
+        })),
+        request: requestToo,
+      });
       addToast(
         intl.formatMessage(messages.added, {
           count: data.added,
@@ -103,6 +121,31 @@ const AddCollectionToList = ({ movies }: AddCollectionToListProps) => {
         }),
         { appearance: 'success', autoDismiss: true }
       );
+      if (data.requested) {
+        addToast(
+          intl.formatMessage(requestMessages.requested, {
+            count: data.requested,
+          }),
+          { appearance: 'success', autoDismiss: true }
+        );
+        onRequested?.();
+      }
+      if (data.requestFailed) {
+        addToast(
+          intl.formatMessage(requestMessages.failed, {
+            count: data.requestFailed,
+          }),
+          { appearance: 'warning', autoDismiss: true }
+        );
+      }
+      if (data.notRequested) {
+        addToast(
+          intl.formatMessage(importMessages.notrequested, {
+            count: data.notRequested,
+          }),
+          { appearance: 'info', autoDismiss: false }
+        );
+      }
       await Promise.all([
         revalidateMembership(),
         revalidateLists(),

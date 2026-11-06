@@ -4,8 +4,21 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Coming next
 
+### Added
+
+- **Send Requests Over the Limit to Admins** (Settings → Users, off to start): a request past someone's limit waits for an admin, marked **Over Limit**, instead of being refused.
+- **Default Quality Profiles** in Profile → General, for people who choose profiles: one per Radarr, Sonarr and Lidarr server, and one for anime.
+- **Folders by Quality Profile** on each Radarr and Sonarr server: a request with one of those profiles goes to its folder.
+- Override rules can match a title's **Production Countries**.
+- **Show People Only What Their Libraries Hold** (Settings → General, off to start): a title only in libraries someone can't open is left out of their Recently Added and shown as **Not in your libraries**, with no Request or Play link. Run a full library scan once after turning it on.
+- **Request What's Added to Lists** (on to start, off in Profile → Settings → Features or for everyone in Settings → Features): adding a title to a list requests it.
+- Title pages show the resolutions and HDR formats a title is here in, such as 4K and Dolby Vision, from the next library scan on.
+- **Select all** for streaming services, up to 100.
+- Going back keeps a home row's sideways scroll, and a page's scroll and the titles it had loaded.
+
 ### Changed
 
+- Nightly **Database Maintenance** also clears which library held a title on a server or library that's gone, and quality applies older than the 50 that History lists.
 - **Settings → Network** applies every change as soon as you save, with no restart, so its Restart Required badges and the restart reminder are gone.
 - **Settings → Appearance** shows the default look, Server CSS and Personal CSS on your screen as you change them, and keeps them only when you save.
 - The Requests page's search and filters line up in even columns of the same height.
@@ -33,6 +46,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- On Postgres, the first account made after every account was deleted is the owner again.
 - A season on its way when its show is removed from Sonarr (or a film from Radarr) no longer stays Processing for good: it counts as deleted and can be requested again. A title removed and added back under a new Sonarr or Radarr id is found again.
 - The first Jellyfin or Emby sign-in on a server set up in `settings.json` keeps the API key already there, as long as it works, instead of making a second one.
 - A thin line no longer shows where a request's, issue's or blocklisted title's background picture ends, on screens scaled to 175% and the like.

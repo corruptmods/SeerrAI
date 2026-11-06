@@ -1,6 +1,9 @@
+import { MAX_STREAMING_SERVICES } from '@server/constants/streamingServices';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  allServicesChosen,
+  chooseAllServices,
   chooseService,
   countActiveFilters,
   nextServiceChoice,
@@ -135,6 +138,29 @@ describe('streaming services in Filters', () => {
     assert.deepEqual(services, { on: [9], notOn: [8] });
     services = chooseService(services, 8, undefined);
     assert.deepEqual(services, { on: [9], notOn: [] });
+  });
+
+  it('selects every listed service, keeping those left out', () => {
+    const listed = [8, 9, 337, 15];
+    const services = chooseAllServices({ on: [9], notOn: [337] }, listed);
+    assert.deepEqual(services, { on: [8, 9, 15], notOn: [337] });
+    assert.equal(allServicesChosen(services, listed), true);
+    assert.equal(allServicesChosen({ on: [9], notOn: [337] }, listed), false);
+  });
+
+  it('selects no more services than a filter keeps', () => {
+    const listed = Array.from(
+      { length: MAX_STREAMING_SERVICES + 20 },
+      (_, i) => i + 1
+    );
+    const services = chooseAllServices({ on: [], notOn: [] }, listed);
+    assert.equal(services.on.length, MAX_STREAMING_SERVICES);
+    assert.deepEqual(services.on.slice(0, 3), [1, 2, 3]);
+    assert.equal(allServicesChosen(services, listed), true);
+  });
+
+  it('has nothing to select when no services are listed', () => {
+    assert.equal(allServicesChosen({ on: [], notOn: [] }, []), true);
   });
 
   it('puts the services back in the address, and takes them all out', () => {

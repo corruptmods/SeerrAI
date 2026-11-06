@@ -212,6 +212,7 @@ const PersonDetails = () => {
                     bulkKey(media.mediaType, media.id),
                     media.mediaInfo?.status
                   )}
+                  outsideLibraries={media.mediaInfo?.outsideLibraries}
                   canExpand
                 />,
                 media.mediaType === 'movie' ? media.title : media.name
@@ -266,6 +267,7 @@ const PersonDetails = () => {
                     bulkKey(media.mediaType, media.id),
                     media.mediaInfo?.status
                   )}
+                  outsideLibraries={media.mediaInfo?.outsideLibraries}
                   canExpand
                 />,
                 media.mediaType === 'movie' ? media.title : media.name

@@ -3,6 +3,7 @@ import type {
   JellyfinLibraryItem,
   JellyfinLibraryItemExtended,
   JellyfinMediaSource,
+  JellyfinMediaStream,
 } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import TheMovieDb from '@server/api/themoviedb';
@@ -18,6 +19,7 @@ import {
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
@@ -59,7 +61,8 @@ let getSeasonsImpl: (
 ) => Promise<JellyfinLibraryItem[]> = async () => [];
 let getEpisodesImpl: (
   seriesID: string,
-  seasonID: string
+  seasonID: string,
+  options?: { includeMediaInfo?: boolean }
 ) => Promise<JellyfinLibraryItem[]> = async () => [];
 
 Object.defineProperty(JellyfinAPI.prototype, 'getLibraryContents', {
@@ -88,8 +91,11 @@ Object.defineProperty(JellyfinAPI.prototype, 'getSeasons', {
 
 Object.defineProperty(JellyfinAPI.prototype, 'getEpisodes', {
   get() {
-    return async (seriesID: string, seasonID: string) =>
-      getEpisodesImpl(seriesID, seasonID);
+    return async (
+      seriesID: string,
+      seasonID: string,
+      options?: { includeMediaInfo?: boolean }
+    ) => getEpisodesImpl(seriesID, seasonID, options);
   },
   set() {},
   configurable: true,
@@ -735,6 +741,163 @@ describe('Jellyfin Scanner', () => {
       assert.strictEqual(season?.status, MediaStatus.PARTIALLY_AVAILABLE);
       assert.strictEqual(season?.status4k, MediaStatus.PARTIALLY_AVAILABLE);
       assert.strictEqual(media.status, MediaStatus.PARTIALLY_AVAILABLE);
+    });
+
+    /** A read version: its frame size and HDR labels. */
+    const version = (
+      Width: number,
+      Height: number,
+      ranges: Partial<JellyfinMediaStream> = {}
+    ): JellyfinMediaSource =>
+      ({
+        Protocol: 'File',
+        Id: `source-${Width}`,
+        MediaStreams: [
+          { Codec: 'hevc', Type: 'Video', Width, Height, ...ranges },
+        ],
+      }) as unknown as JellyfinMediaSource;
+
+    it('stores what each side of a movie is in, HDR included', async () => {
+      const media = await scanMovie(6304, [
+        version(1920, 1080, { VideoRange: 'SDR', VideoRangeType: 'SDR' }),
+        version(3840, 2160, {
+          VideoRange: 'HDR',
+          VideoRangeType: 'DOVIWithHDR10',
+        }),
+      ]);
+
+      assert.deepEqual(media.availableQuality, {
+        resolutions: ['1080p'],
+        ranges: [],
+      });
+      assert.deepEqual(media.availableQuality4k, {
+        resolutions: ['4K'],
+        ranges: ['DV', 'HDR10'],
+      });
+    });
+
+    it('reads Emby’s HDR labels too', async () => {
+      const media = await scanMovie(6305, [
+        version(3840, 1600, { ExtendedVideoType: 'Hdr10Plus' }),
+      ]);
+
+      assert.deepEqual(media.availableQuality4k, {
+        resolutions: ['4K'],
+        ranges: ['HDR10+'],
+      });
+    });
+
+    it('reads what a series’ episodes are in, with no 4K Sonarr too', async () => {
+      configureJellyfinWithLibrary();
+      getTvShowImpl = async () => fakeTmdbShow(6306);
+      getLibraryContentsImpl = async (id: string) =>
+        id === 'test-library-id' ? [fakeJellyfinSeriesItem('jf-hd')] : [];
+      getItemDataImpl = async (id: string) =>
+        id === 'jf-hd' ? fakeJellyfinShowMetadata('jf-hd', '6306') : undefined;
+      getSeasonsImpl = async () => [fakeJellyfinSeason(1, 'jf-hd-s1')];
+      const asked: ({ includeMediaInfo?: boolean } | undefined)[] = [];
+      getEpisodesImpl = async (_series, _season, options) => {
+        asked.push(options);
+        return fakeJellyfinEpisodes(10).map((episode, i) => ({
+          ...episode,
+          MediaSources: [
+            i < 5
+              ? version(1920, 1080, { VideoRangeType: 'HDR10' })
+              : version(1280, 720, { VideoRangeType: 'SDR' }),
+          ],
+        }));
+      };
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      assert.deepEqual(asked, [{ includeMediaInfo: true }]);
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 6306 },
+      });
+      assert.strictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.deepEqual(media.availableQuality, {
+        resolutions: ['1080p', '720p'],
+        ranges: ['HDR10'],
+      });
+    });
+  });
+
+  describe('which library holds a title', () => {
+    afterEach(() => {
+      getSettings().radarr = [];
+      getSettings().main.mediaServerType = MediaServerType.JELLYFIN;
+    });
+
+    const held = async () =>
+      (
+        await getRepository(MediaLibraryItem).find({
+          relations: { media: true },
+        })
+      )
+        .map(
+          (row) =>
+            `${row.media.tmdbId} ${row.server} ${row.libraryId} ${row.is4k ? '4k' : 'std'} ${row.itemId}`
+        )
+        .sort();
+
+    it('records an Emby series under its library, the id without dashes or case', async () => {
+      const settings = getSettings();
+      settings.main.mediaServerType = MediaServerType.EMBY;
+      settings.emby = {
+        ...settings.emby,
+        apiKey: 'test-api-key',
+        libraries: [
+          { id: 'AB-12', name: 'Series', enabled: true, type: 'show' },
+        ],
+      };
+      getTvShowImpl = async () => fakeTmdbShow(7101);
+      getLibraryContentsImpl = async (id: string) =>
+        id === 'AB-12' ? [fakeJellyfinSeriesItem('em-series')] : [];
+      getItemDataImpl = async (id: string) =>
+        id === 'em-series'
+          ? fakeJellyfinShowMetadata('em-series', '7101')
+          : undefined;
+      getSeasonsImpl = async () => [fakeJellyfinSeason(1, 'em-series-s1')];
+      getEpisodesImpl = async () => fakeJellyfinEpisodes(4);
+
+      await runWithMockTimers(() => embyFullScanner.run());
+
+      assert.deepEqual(await held(), ['7101 emby ab12 std em-series']);
+    });
+
+    it('records a 4K-only Jellyfin movie as its 4K copy', async () => {
+      configureJellyfinWithLibrary([
+        { id: 'films', name: 'Films', enabled: true, type: 'movie' },
+      ]);
+      getSettings().radarr = [{ id: 0, is4k: true } as RadarrSettings];
+      const movie = {
+        Name: 'Harbour Lights',
+        Id: 'jf-7102',
+        Type: 'Movie' as const,
+        HasSubtitles: false,
+        LocationType: 'FileSystem' as const,
+        MediaType: 'Video',
+      };
+      getLibraryContentsImpl = async (id: string) =>
+        id === 'films' ? [movie] : [];
+      getItemDataImpl = async (id: string) =>
+        id === movie.Id
+          ? {
+              ...movie,
+              ProviderIds: { Tmdb: '7102' },
+              MediaSources: [
+                {
+                  Protocol: 'File',
+                  Id: 'source',
+                  MediaStreams: [{ Codec: 'hevc', Type: 'Video', Width: 3840 }],
+                } as unknown as JellyfinMediaSource,
+              ],
+            }
+          : undefined;
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      assert.deepEqual(await held(), ['7102 jellyfin films 4k jf-7102']);
     });
   });
 

@@ -12,6 +12,7 @@ import OverrideRule from '@server/entity/OverrideRule';
 import { User } from '@server/entity/User';
 import type { OverrideRuleResultsResponse } from '@server/interfaces/api/overrideRuleInterfaces';
 import overrideRules, {
+  formatRuleCountries,
   type OverrideRulesResult,
 } from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
@@ -73,6 +74,7 @@ overrideRuleRoutes.post<
     language?: string;
     keywords?: string;
     certification?: string | null;
+    country?: string | null;
     profileId?: number;
     rootFolder?: string;
     tags?: string;
@@ -90,6 +92,7 @@ overrideRuleRoutes.post<
       language: req.body.language,
       keywords: req.body.keywords,
       certification: certificationFor(req.body.certification),
+      country: formatRuleCountries(req.body.country),
       profileId: req.body.profileId,
       rootFolder: req.body.rootFolder,
       tags: req.body.tags,
@@ -258,6 +261,7 @@ overrideRuleRoutes.put<
     language?: string;
     keywords?: string;
     certification?: string | null;
+    country?: string | null;
     profileId?: number;
     rootFolder?: string;
     tags?: string;
@@ -284,6 +288,7 @@ overrideRuleRoutes.put<
     rule.language = req.body.language;
     rule.keywords = req.body.keywords;
     rule.certification = certificationFor(req.body.certification);
+    rule.country = formatRuleCountries(req.body.country);
     rule.profileId = req.body.profileId;
     rule.rootFolder = req.body.rootFolder;
     rule.tags = req.body.tags;

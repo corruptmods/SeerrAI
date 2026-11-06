@@ -75,6 +75,7 @@ const ListItemCard = ({
           image={item.posterPath ?? undefined}
           mediaType={item.mediaType}
           status={item.mediaInfo?.status as MediaStatus | undefined}
+          outsideLibraries={item.mediaInfo?.outsideLibraries}
           summary={undefined}
           title={item.title ?? String(item.tmdbId)}
           year={item.releaseDate}

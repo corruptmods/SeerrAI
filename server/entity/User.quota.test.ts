@@ -11,6 +11,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
@@ -270,5 +271,16 @@ describe('user request quotas', () => {
     const quota = await user.getQuota();
 
     assert.equal(quota.tv.used, 0);
+  });
+
+  it('says whether requests past a limit wait for an admin', async () => {
+    const main = getSettings().main;
+    assert.equal((await user.getQuota()).overQuotaWaits, false);
+    main.overQuotaRequests = true;
+    try {
+      assert.equal((await user.getQuota()).overQuotaWaits, true);
+    } finally {
+      main.overQuotaRequests = false;
+    }
   });
 });

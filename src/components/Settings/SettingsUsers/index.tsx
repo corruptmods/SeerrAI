@@ -49,6 +49,9 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
   musicRequestLimitLabel: 'Global Album Request Limit',
+  overQuotaRequests: 'Send Requests Over the Limit to Admins',
+  overQuotaRequestsTip:
+    'Someone over their limit can still request. It waits for an admin, is never approved automatically and is marked as over the limit',
   defaultPermissions: 'Default Permissions',
   defaultPermissionsTip: 'Initial permissions assigned to new users',
   defaultWatchlistSync: 'Watchlist Sync for New Users',
@@ -178,6 +181,7 @@ const SettingsUsers = () => {
             tvQuotaDays: data?.defaultQuotas.tv.quotaDays ?? 7,
             musicQuotaLimit: data?.defaultQuotas.music?.quotaLimit ?? 0,
             musicQuotaDays: data?.defaultQuotas.music?.quotaDays ?? 7,
+            overQuotaRequests: data?.overQuotaRequests ?? false,
             defaultPermissions: data?.defaultPermissions ?? 0,
             defaultWatchlistSyncMovies:
               data?.defaultWatchlistSyncMovies ?? false,
@@ -207,6 +211,7 @@ const SettingsUsers = () => {
                     quotaDays: values.musicQuotaDays,
                   },
                 },
+                overQuotaRequests: values.overQuotaRequests,
                 defaultPermissions: values.defaultPermissions,
                 defaultWatchlistSyncMovies: values.defaultWatchlistSyncMovies,
                 defaultWatchlistSyncTv: values.defaultWatchlistSyncTv,
@@ -453,6 +458,27 @@ const SettingsUsers = () => {
                     </div>
                   </div>
                 )}
+                <div className="form-row">
+                  <label htmlFor="overQuotaRequests" className="checkbox-label">
+                    {intl.formatMessage(messages.overQuotaRequests)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.overQuotaRequestsTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="overQuotaRequests"
+                      name="overQuotaRequests"
+                      onChange={() => {
+                        setFieldValue(
+                          'overQuotaRequests',
+                          !values.overQuotaRequests
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
                 <div
                   role="group"
                   aria-labelledby="watchlist-sync-label"

@@ -16,6 +16,7 @@ import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import { accessibleListIds, loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListActivity } from '@server/lib/listActivity';
+import { requestListAdd } from '@server/lib/listRequests';
 import { listTitle } from '@server/lib/listTitles';
 import { refreshWatchSuggestions } from '@server/lib/listWatchSync';
 import { getSeriesProgress } from '@server/lib/seriesProgress';
@@ -371,6 +372,15 @@ listRoutes.post<{ listId: string }>(
           'added',
           req.user as User
         );
+
+        // A request window adding to its "Also add to" lists sends false: it
+        // has just requested what the person chose.
+        const request =
+          req.body.request === false
+            ? undefined
+            : await requestListAdd(tmdbId, mediaType, req.user as User);
+
+        return res.status(200).json({ added: true, request });
       }
 
       return res.status(200).json({ added: true });

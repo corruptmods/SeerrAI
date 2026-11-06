@@ -12,6 +12,29 @@
 
 If Sonarr or Radarr can't find it, [Backfill](./backfill-and-agent.md) and the admin agent look further.
 
+## Request limits
+
+Admins set how many films, seasons and albums each person may request in a period (**Settings → Users**, and on each person's settings). Pending and approved requests count; declined ones don't.
+
+**Send Requests Over the Limit to Admins** (Settings → Users, off by default) lets someone past their limit still request instead of being turned away. Such a request:
+
+- waits for an admin, even for someone who is otherwise approved automatically;
+- shows **Over Limit** on its card, the request window says it will wait for an admin, and the "pending" notification to admins says it is over the requester's limit;
+- counts towards the limit like any request, and stops counting if it's declined. Approving it is the admin's choice.
+
+It applies to films, series (seasons over the limit, and seasons added by editing a request) and music. Watchlist requests, new seasons of followed series, titles requested by adding them to a list, and several requested at once are still turned away at the limit, so they can't pile up.
+
+## Quality profiles and folders
+
+People who may choose advanced request options pick a request's server, quality profile and folder in the request window. They can also save their own **Default Quality Profiles** (**Profile → Settings → General**): one per server, and one for anime where the server has an anime profile. It is picked first in the request window and used for requests made without one, such as from Siri, AI Search or the API. If the server no longer has that profile, or the person can no longer choose profiles, the server's own default is used.
+
+Admins can tie folders to profiles: **Folders by Quality Profile** on each Radarr and Sonarr server (**Settings → Services**, off until you add one). A request with one of those profiles goes to that folder, whether made in the request window or through the API:
+
+- When the request names no folder, the profile's folder is used.
+- When someone who doesn't manage requests picks another folder, the profile's folder is used instead, so an app can't send anime to the regular library. In the request window the folder follows the profile and can't be changed.
+- Request managers can still pick another folder.
+- It wins over an override rule's folder; override rules still decide for profiles without a folder.
+
 ## When will it arrive?
 
 Requests and title pages say when a title should arrive, in one line:
@@ -87,6 +110,7 @@ Seerr AI decides what counts as anime the same way everywhere (requests, scans, 
 Override rules (**Settings → Services**) send matching requests to another folder, profile or tags. Seerr AI adds:
 
 - **Age Ratings**: match titles by rating, such as G and PG, or TV-Y and TV-Y7, to send kids' titles to their own folder. Ratings are TMDB's for your Discover Region (Settings → General), or the US rating when there's none there.
+- **Production Countries**: match titles made in any of the chosen countries, such as Korea or France, to send them to their own folder or profile. TMDB's production countries are used, and a series' origin country too; a title TMDB gives no country never matches. As with every condition, anime only matches a rule that also names TMDB's anime keyword.
 - **Series Type** (Sonarr) and **Anime** (Radarr).
 - A rule on TMDB's anime keyword matches what Seerr AI counts as anime, not the keyword itself.
 

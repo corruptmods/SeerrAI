@@ -7,6 +7,7 @@ const globalMessages = defineMessages('i18n', {
   processing: 'Processing',
   unavailable: 'Unavailable',
   notrequested: 'Not Requested',
+  notInYourLibraries: 'Not in your libraries',
   requested: 'Requested',
   requesting: 'Requesting…',
   request: 'Request',

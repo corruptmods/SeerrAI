@@ -24,6 +24,7 @@ import {
   QuotaRestrictedError,
   RequestPermissionError,
   listedSeasons,
+  overQuotaWaits,
 } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import MusicAlbum from '@server/entity/MusicAlbum';
@@ -35,6 +36,7 @@ import type {
   RequestResultsResponse,
 } from '@server/interfaces/api/requestInterfaces';
 import { featureEnabled } from '@server/lib/features';
+import { limitToLibraries } from '@server/lib/libraryVisibility';
 import { musicReady } from '@server/lib/music/access';
 import { attachAlbumStatuses } from '@server/lib/music/albumStatuses';
 import {
@@ -53,6 +55,10 @@ import {
   playlistRequestGroups,
   withoutPlaylistRequests,
 } from '@server/lib/playlists/requestGroups';
+import {
+  choosesAdvancedOptions,
+  editedRequestFolder,
+} from '@server/lib/requestDefaults';
 import { defaultRegion, estimateRequest } from '@server/lib/requestEta';
 import { requestMissing } from '@server/lib/requestMissing';
 import {
@@ -88,11 +94,7 @@ const requestRoutes = Router();
  * Advanced options (server, quality profile, root folder, language profile,
  * tags) are only for those allowed them; everyone else gets the defaults.
  */
-const mayChooseAdvancedOptions = (user?: User) =>
-  !!user?.hasPermission(
-    [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
-    { type: 'or' }
-  );
+const mayChooseAdvancedOptions = choosesAdvancedOptions;
 
 /*
  * A blocklisted title must stay out of Radarr and Sonarr, so approving or
@@ -443,6 +445,12 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .getManyAndCount();
 
       await attachAlbumStatuses(requests);
+      // Shown as the viewer may see them: a title their libraries don't hold
+      // isn't available to them, nor played from here.
+      await limitToLibraries(
+        requests.map((r) => r.media),
+        req.user
+      );
 
       const settings = getSettings();
 
@@ -1083,6 +1091,7 @@ requestRoutes.get('/:requestId', async (req, res, next) => {
     }
 
     await attachAlbumStatuses([request]);
+    await limitToLibraries([request.media], req.user);
 
     return res.status(200).json(request);
   } catch (e) {
@@ -1177,6 +1186,8 @@ const editMusicRequest = async (
     };
   }
 
+  // Once over quota, a request stays marked until an admin decides.
+  let overQuota = request.overQuota;
   if (!request.ignoreQuota) {
     const quotas = await requestUser.getQuota();
     // Albums the owner's quota already counted are paid for; a new owner is
@@ -1188,7 +1199,10 @@ const editMusicRequest = async (
         ).length;
     const required = kept.length + added.length - countedAlready;
     if (quotas.music.limit && required > (quotas.music.remaining ?? 0)) {
-      return { error: { status: 403, message: 'Music Quota exceeded.' } };
+      if (!overQuotaWaits()) {
+        return { error: { status: 403, message: 'Music Quota exceeded.' } };
+      }
+      overQuota = true;
     }
   }
 
@@ -1260,6 +1274,7 @@ const editMusicRequest = async (
     rootFolder: body.rootFolder,
     tags: body.tags,
     requestedBy: { id: requestUser.id },
+    overQuota,
   });
 
   const updated = await getRepository(MediaRequest).findOneOrFail({
@@ -1377,6 +1392,16 @@ requestRoutes.put<{ requestId: string }>(
         // charged in full, not as a delta.
         const ownerChanging = requestUser.id !== previousOwnerId;
 
+        const editedFolder = () =>
+          editedRequestFolder({
+            editor: req.user,
+            type: request.type,
+            serverId: req.body.serverId,
+            is4k: request.is4k,
+            profileId: req.body.profileId,
+            rootFolder: req.body.rootFolder,
+          });
+
         // Anime flag from the request dialog: omitted keeps the current value,
         // null reverts to the title's setting and detection.
         const setChosenSeriesType = () => {
@@ -1419,16 +1444,19 @@ requestRoutes.put<{ requestId: string }>(
               const quotas = await requestUser.getQuota();
 
               if (quotas.movie.restricted) {
-                return next({
-                  status: 403,
-                  message: 'Movie Quota exceeded.',
-                });
+                if (!overQuotaWaits()) {
+                  return next({
+                    status: 403,
+                    message: 'Movie Quota exceeded.',
+                  });
+                }
+                request.overQuota = true;
               }
             }
 
             request.serverId = req.body.serverId;
             request.profileId = req.body.profileId;
-            request.rootFolder = req.body.rootFolder;
+            request.rootFolder = editedFolder() as string;
             request.tags = req.body.tags;
             setChosenSeriesType();
             request.requestedBy = requestUser as User;
@@ -1439,7 +1467,7 @@ requestRoutes.put<{ requestId: string }>(
             const mediaRepository = getRepository(Media);
             request.serverId = req.body.serverId;
             request.profileId = req.body.profileId;
-            request.rootFolder = req.body.rootFolder;
+            request.rootFolder = editedFolder() as string;
             request.languageProfileId = req.body.languageProfileId;
             request.tags = req.body.tags;
             setChosenSeriesType();
@@ -1550,10 +1578,13 @@ requestRoutes.put<{ requestId: string }>(
                     quotas.tv.limit &&
                     requiredSeasons > (quotas.tv.remaining ?? 0)
                   ) {
-                    return next({
-                      status: 403,
-                      message: 'Series Quota exceeded.',
-                    });
+                    if (!overQuotaWaits()) {
+                      return next({
+                        status: 403,
+                        message: 'Series Quota exceeded.',
+                      });
+                    }
+                    request.overQuota = true;
                   }
                 }
 

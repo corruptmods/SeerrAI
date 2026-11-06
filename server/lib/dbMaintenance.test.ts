@@ -1,3 +1,5 @@
+import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import AgentRun from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
@@ -5,7 +7,10 @@ import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import type { CheckStatus } from '@server/entity/DownloadCheck';
 import DownloadCheck from '@server/entity/DownloadCheck';
+import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MusicMetadata from '@server/entity/MusicMetadata';
+import QualityApply from '@server/entity/QualityApply';
 import { Session } from '@server/entity/Session';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
@@ -179,6 +184,8 @@ describe('database maintenance', () => {
       agentConversations: 1,
       musicMetadata: 1,
       downloadChecks: 1,
+      libraryItems: 0,
+      qualityApplies: 0,
     });
     assert.deepEqual(
       (
@@ -248,5 +255,106 @@ describe('database maintenance', () => {
     const report = await runDbMaintenance();
     assert.equal(report?.removed.backfillJobs, 0);
     assert.equal(await getRepository(BackfillJob).count(), 1);
+  });
+
+  it('forgets which library held a title on a server or library that is gone', async () => {
+    const settings = getSettings();
+    const saved = {
+      type: settings.main.mediaServerType,
+      plex: settings.plex.libraries,
+      jellyfin: { ...settings.jellyfin },
+      emby: { ...settings.emby },
+    };
+    try {
+      settings.main.mediaServerType = MediaServerType.PLEX;
+      const library = (id: string, enabled: boolean) => ({
+        id,
+        name: id,
+        enabled,
+        type: 'movie' as const,
+      });
+      // Library 1 is scanned, 2 is turned off here, 3 was removed from Plex.
+      settings.plex.libraries = [library('1', true), library('2', false)];
+      // Jellyfin is connected but its libraries were never synced; Emby isn't.
+      settings.jellyfin = {
+        ...settings.jellyfin,
+        connected: true,
+        libraries: [],
+      };
+      settings.emby = { ...settings.emby, connected: false };
+
+      const media = await getRepository(Media).save(
+        new Media({
+          tmdbId: 4401,
+          mediaType: MediaType.MOVIE,
+          status: MediaStatus.AVAILABLE,
+          ratingKey: 'glasswing',
+        })
+      );
+      const item = (server: 'plex' | 'jellyfin' | 'emby', libraryId: string) =>
+        new MediaLibraryItem({
+          mediaId: media.id,
+          server,
+          libraryId,
+          is4k: false,
+          itemId: `${server}-${libraryId}`,
+        });
+      await getRepository(MediaLibraryItem).save([
+        item('plex', '1'),
+        item('plex', '2'),
+        item('plex', '3'),
+        item('jellyfin', 'abc'),
+        item('emby', 'def'),
+      ]);
+
+      const report = await runDbMaintenance();
+      assert.equal(report?.removed.libraryItems, 2);
+      assert.deepEqual(
+        (
+          await getRepository(MediaLibraryItem).find({
+            order: { server: 'ASC', libraryId: 'ASC' },
+          })
+        ).map((row) => `${row.server}:${row.libraryId}`),
+        ['jellyfin:abc', 'plex:1', 'plex:2']
+      );
+    } finally {
+      settings.main.mediaServerType = saved.type;
+      settings.plex.libraries = saved.plex;
+      settings.jellyfin = saved.jellyfin;
+      settings.emby = saved.emby;
+    }
+  });
+
+  it('keeps the quality applies History lists, and what each server still needs', async () => {
+    const apply = (serverId: number, undone = false) =>
+      new QualityApply({
+        serverKind: 'radarr',
+        serverId,
+        userId: null,
+        summary: { created: 1, updated: 0 },
+        befores: [],
+        moved: [],
+        undoneAt: undone ? new Date() : null,
+      });
+    const repo = getRepository(QualityApply);
+    // Long ago, server 2 applied (what Undo reverts now) and then applied
+    // again and undid that. Since then server 1 has applied 51 times.
+    const [undoableOf2] = await repo.save([apply(2)]);
+    const [newestOf2] = await repo.save([apply(2, true)]);
+    const [oldestOf1] = await repo.save([apply(1)]);
+    await repo.save(
+      Array.from({ length: QualityApply.HISTORY_SHOWN }, () => apply(1))
+    );
+
+    const report = await runDbMaintenance();
+    // Server 1's oldest goes: History lists the 50 after it. Server 2 keeps
+    // both, though History no longer lists them.
+    assert.equal(report?.removed.qualityApplies, 1);
+    const left = new Set(
+      (await repo.find({ select: { id: true } })).map((r) => r.id)
+    );
+    assert.equal(left.size, QualityApply.HISTORY_SHOWN + 2);
+    assert.ok(!left.has(oldestOf1.id));
+    assert.ok(left.has(undoableOf2.id) && left.has(newestOf2.id));
   });
 });

@@ -6,7 +6,8 @@ import type { ScopedMutator } from 'swr';
  * Adds a title to several lists when requesting; returns how many succeeded.
  *
  * Failures are swallowed: the request already succeeded and shouldn't look
- * failed.
+ * failed. Adding doesn't request again: the request just made is what the
+ * person chose (seasons, 4K).
  *
  * Takes `mutate` from `useSWRConfig`: the app uses a custom cache provider,
  * and swr's global `mutate` targets the default cache, silently doing nothing.
@@ -21,7 +22,11 @@ export const addToLists = async (
 
   for (const listId of listIds) {
     try {
-      await axios.post(`/api/v1/list/${listId}/item`, { tmdbId, mediaType });
+      await axios.post(`/api/v1/list/${listId}/item`, {
+        tmdbId,
+        mediaType,
+        request: false,
+      });
       added++;
     } catch {
       // Reflected in the count.

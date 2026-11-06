@@ -1,3 +1,4 @@
+import type { UserDefaultProfile } from '@server/constants/requestDefaults';
 import type { NotificationAgentKey } from '@server/lib/settings';
 
 export interface UserSettingsGeneralResponse {
@@ -22,6 +23,8 @@ export interface UserSettingsGeneralResponse {
   watchlistSyncMovies?: boolean;
   watchlistSyncTv?: boolean;
   traktUsername?: string | null;
+  /** Quality profiles picked for one's own requests, per server. */
+  defaultProfiles?: UserDefaultProfile[];
 }
 
 export type NotificationAgentTypes = Record<NotificationAgentKey, number>;

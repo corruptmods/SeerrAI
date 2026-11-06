@@ -44,6 +44,40 @@ export const titleCertification = (
   return undefined;
 };
 
+/**
+ * Where a title was made, as ISO 3166-1 codes: TMDB's production countries
+ * and origin countries (a series' main one, newer for films).
+ */
+export const titleCountries = (
+  tmdbMedia: TmdbMovieDetails | TmdbTvDetails
+): Set<string> =>
+  new Set(
+    [
+      ...(tmdbMedia.production_countries ?? []).map(
+        (country) => country.iso_3166_1
+      ),
+      ...(tmdbMedia.origin_country ?? []),
+    ]
+      .filter((code): code is string => typeof code === 'string')
+      .map((code) => code.toUpperCase())
+  );
+
+/**
+ * A rule's countries as stored: ISO 3166-1 codes, each once, comma-separated;
+ * null for none.
+ */
+export const formatRuleCountries = (value?: string | null): string | null => {
+  const codes = [
+    ...new Set(
+      (value ?? '')
+        .split(',')
+        .map((code) => code.trim().toUpperCase())
+        .filter((code) => /^[A-Z]{2}$/.test(code))
+    ),
+  ];
+  return codes.length ? codes.join(',') : null;
+};
+
 export type OverrideRulesResult = {
   rootFolder: string | null;
   profileId: number | null;
@@ -181,6 +215,13 @@ async function overrideRules({
     ) {
       return false;
     }
+    // Any one of the rule's countries; a title with none never matches.
+    if (rule.country) {
+      const made = titleCountries(tmdbMedia);
+      if (!rule.country.split(',').some((code) => made.has(code))) {
+        return false;
+      }
+    }
     // A rating only equals the same rating in the same country's system: US
     // "PG" is not British "PG". A title without one never matches.
     if (
@@ -212,6 +253,7 @@ async function overrideRules({
       'language',
       'keywords',
       'certification',
+      'country',
     ];
     const aSpecificity = keys.filter((key) =>
       hasSpecificOverrideValue(a, key)

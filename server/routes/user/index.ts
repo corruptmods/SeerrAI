@@ -3,6 +3,7 @@ import TautulliAPI from '@server/api/tautulli';
 import { ApiErrorCode } from '@server/constants/error';
 import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import { UserType } from '@server/constants/user';
+import { watchlistSortOf } from '@server/constants/watchlistSort';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -1220,6 +1221,7 @@ router.get<{ id: string }, WatchlistResponse>(
     const itemsPerPage = 20;
     const page = req.query.page ? Number(req.query.page) : 1;
     const offset = (page - 1) * itemsPerPage;
+    const sort = watchlistSortOf(req.query.sort);
 
     const user = await getRepository(User).findOneOrFail({
       where: { id: Number(req.params.id) },
@@ -1230,7 +1232,8 @@ router.get<{ id: string }, WatchlistResponse>(
       const [result, total] = await savedWatchlistPage(
         user.id,
         offset,
-        itemsPerPage
+        itemsPerPage,
+        sort
       );
       if (total) {
         return res.json({
@@ -1253,7 +1256,7 @@ router.get<{ id: string }, WatchlistResponse>(
 
     const plexTV = new PlexTvAPI(user.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset });
+    const watchlist = await plexTV.getWatchlist({ offset, sort });
 
     return res.json({
       page,

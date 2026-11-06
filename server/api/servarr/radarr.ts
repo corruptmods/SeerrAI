@@ -69,6 +69,7 @@ export interface RadarrMovie {
       subtitles?: string;
     };
     originalFilePath?: string;
+    quality?: { quality?: { name?: string; resolution?: number } };
     qualityCutoffNotMet: boolean;
   };
 }

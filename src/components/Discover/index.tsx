@@ -25,6 +25,7 @@ import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import { useFeatureCheck } from '@app/hooks/useFeature';
 import useLazyModule, { loadModule } from '@app/hooks/useLazyModule';
+import usePageReturn from '@app/hooks/usePageReturn';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -135,7 +136,11 @@ const Discover = () => {
     error: discoverError,
     mutate,
   } = useSWR<DiscoverSlider[]>('/api/v1/settings/discover');
-  const [sliders, setSliders] = useState<Partial<DiscoverSlider>[]>([]);
+  // Rows from the cache on the first render, so a step back has the page's
+  // height before the browser puts its scroll back.
+  const [sliders, setSliders] = useState<Partial<DiscoverSlider>[]>(
+    () => discoverData ?? []
+  );
   const [isEditing, setIsEditing] = useState(false);
   // Menu layout is edited in the menus themselves and saved with the page.
   const nav = useNavLayout();
@@ -175,6 +180,9 @@ const Discover = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, setNavDraft]);
   useEffect(() => () => setNavDraft(undefined), [setNavDraft]);
+  // Coming back after a reload or resume: the scroll, once the rows are laid
+  // out (each row keeps its sideways scroll itself).
+  usePageReturn('home', { isReady: () => !!discoverData || !!discoverError });
 
   const layoutChanged = () => isAdmin && !Object.is(discoverData, sliders);
   const hiddenChanged = () =>

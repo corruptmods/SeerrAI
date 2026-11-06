@@ -35,6 +35,7 @@ const messages = defineMessages('components.Settings.OverrideRuleTile', {
   language: 'Language',
   keywords: 'Keywords',
   certification: 'Age Ratings',
+  country: 'Production Countries',
   conditions: 'Conditions',
   settings: 'Settings',
 });
@@ -262,6 +263,23 @@ const OverrideRuleTiles = ({
                         </span>
                       )
                     )}
+                  </span>
+                </p>
+              )}
+              {rule.country && (
+                <p className="break-words text-sm leading-5 text-gray-300">
+                  <span className="mr-2 font-bold">
+                    {intl.formatMessage(messages.country)}
+                  </span>
+                  <span className="inline-flex flex-wrap gap-2">
+                    {rule.country.split(',').map((code) => (
+                      <span key={code}>
+                        {intl.formatDisplayName(code, {
+                          type: 'region',
+                          fallback: 'none',
+                        }) ?? code}
+                      </span>
+                    ))}
                   </span>
                 </p>
               )}

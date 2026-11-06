@@ -10,6 +10,8 @@ import type {
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { detectAnime } from '@server/lib/animeDecision';
+import type { SeenQuality } from '@server/lib/mediaQuality';
+import { combineQuality, plexVersionQuality } from '@server/lib/mediaQuality';
 import { isConnected } from '@server/lib/mediaServers';
 import type {
   MediaIds,
@@ -18,6 +20,7 @@ import type {
   StatusBase,
 } from '@server/lib/scanners/baseScanner';
 import BaseScanner from '@server/lib/scanners/baseScanner';
+import { LibraryItems } from '@server/lib/scanners/libraryItems';
 import { RecentRetries, titleKey } from '@server/lib/scanners/plex/recent';
 import type { ItemLabel } from '@server/lib/scanners/unidentified';
 import {
@@ -75,6 +78,8 @@ class PlexScanner
   private isRecentOnly = false;
   /** Titles a recently added scan couldn't place yet, to retry. */
   public readonly retries = new RecentRetries();
+  /** Titles in the current library that failed for a real reason. */
+  private failures = 0;
   /** Titles this scan skipped because Plex hasn't matched them yet. */
   private unidentified = new UnidentifiedTitles({
     server: 'Plex',
@@ -85,6 +90,7 @@ class PlexScanner
   public constructor(isRecentOnly = false) {
     super('Plex Scan', { bundleSize: 50 });
     this.isRecentOnly = isRecentOnly;
+    this.libraryItems = new LibraryItems('plex');
   }
 
   public status(): SyncStatus {
@@ -140,6 +146,7 @@ class PlexScanner
           // The next window starts when this one was requested, not when it
           // ended, so items added during the run fall in the next.
           const askedAt = Date.now();
+          await this.libraryItems?.begin(library.id);
           const libraryItems = await this.plexClient.getRecentlyAdded(
             library.id,
             library.lastScan
@@ -181,6 +188,7 @@ class PlexScanner
             },
             { sessionId }
           );
+          this.libraryItems?.end();
           this.log(
             `${library.name}: ${libraryItems.length} recently added, ${due.length} looked at again`,
             'info',
@@ -208,7 +216,10 @@ class PlexScanner
           if (!this.stillEnabled(library)) continue;
           this.currentLibrary = library;
           this.log(`Beginning to process library: ${library.name}`, 'info');
+          this.failures = 0;
+          await this.libraryItems?.begin(library.id);
           await this.paginateLibrary(library, { sessionId });
+          await this.settleLibraryItems(library);
         }
       }
       const skipped = this.unidentified.summary();
@@ -227,7 +238,30 @@ class PlexScanner
         errorMessage: e.message,
       });
     } finally {
+      this.libraryItems?.end();
       this.endRun(sessionId);
+    }
+  }
+
+  /**
+   * After a full pass of a library, forgets titles it no longer holds. A pass
+   * with failures or one stopped part-way through forgets nothing: a title it
+   * missed would otherwise look gone from the library.
+   */
+  private async settleLibraryItems(library: Library): Promise<void> {
+    if (
+      this.failures > 0 ||
+      !getSettings().plex.libraries.find((l) => l.id === library.id)?.enabled
+    ) {
+      this.libraryItems?.end();
+      return;
+    }
+    const forgotten = (await this.libraryItems?.prune()) ?? 0;
+    if (forgotten) {
+      this.log(
+        `${library.name} no longer holds ${forgotten} title(s) it held`,
+        'info'
+      );
     }
   }
 
@@ -313,6 +347,7 @@ class PlexScanner
           item: e.item,
         });
       } else {
+        this.failures += 1;
         this.log('Failed to process Plex media', 'error', {
           errorMessage: e.message,
           item: labelOf(plexitem),
@@ -382,13 +417,27 @@ class PlexScanner
       ratingKey: plexitem.ratingKey,
       title: plexitem.title,
     };
+    const qualityOf = (is4k: boolean) =>
+      combineQuality(
+        plexitem.Media.filter(
+          (media) => !has4k || (media.videoResolution === '4k') === is4k
+        ).map(plexVersionQuality)
+      );
 
     if (hasStandard) {
-      await this.processMovie(tmdbId, { ...details, is4k: false });
+      await this.processMovie(tmdbId, {
+        ...details,
+        is4k: false,
+        quality: qualityOf(false),
+      });
     }
 
     if (has4k) {
-      await this.processMovie(tmdbId, { ...details, is4k: true });
+      await this.processMovie(tmdbId, {
+        ...details,
+        is4k: true,
+        quality: qualityOf(true),
+      });
     }
   }
 
@@ -454,6 +503,10 @@ class PlexScanner
 
     const seasons = tvShow.seasons;
     const processableSeasons: ProcessableSeason[] = [];
+    const seen: Record<'standard' | '4k', (SeenQuality | undefined)[]> = {
+      standard: [],
+      '4k': [],
+    };
 
     const settings = getSettings();
     const filteredSeasons = settings.main.enableSpecialEpisodes
@@ -482,6 +535,14 @@ class PlexScanner
             ).length
           : 0;
 
+        for (const media of episodes.flatMap((episode) => episode.Media)) {
+          seen[
+            this.enable4kShow && media.videoResolution === '4k'
+              ? '4k'
+              : 'standard'
+          ].push(plexVersionQuality(media));
+        }
+
         processableSeasons.push({
           seasonNumber: season.season_number,
           episodes: totalStandard,
@@ -506,6 +567,10 @@ class PlexScanner
         mediaAddedAt: new Date(metadata.addedAt * 1000),
         ratingKey: ratingKey,
         title: metadata.title,
+        qualities: {
+          standard: combineQuality(seen.standard),
+          '4k': combineQuality(seen['4k']),
+        },
       }
     );
   }

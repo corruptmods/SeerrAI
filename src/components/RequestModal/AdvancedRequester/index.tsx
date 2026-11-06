@@ -18,6 +18,7 @@ import {
 } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import { shownEmail } from '@server/constants/oidc';
+import { mappedFolder } from '@server/constants/requestDefaults';
 import type { SeriesType } from '@server/constants/seriesType';
 import type {
   ServiceCommonServer,
@@ -52,6 +53,7 @@ const messages = defineMessages('components.RequestModal.AdvancedRequester', {
   notagoptions: 'No tags.',
   ignoreQuotaTitle: 'Bypass User Quota',
   ignoreQuotaDescription: 'Won’t count against the user’s quota.',
+  folderFromProfile: 'Set by the quality profile.',
 });
 
 export type RequestOverrides = {
@@ -155,12 +157,21 @@ const AdvancedRequester = ({
     currentHasPermission([Permission.MANAGE_REQUESTS]) &&
     ((type === 'movie' ? quota?.movie.limit : quota?.tv.limit) ?? 0) > 0;
 
+  const [selectedUser, setSelectedUser] = useState<User | null>(
+    requestUser ?? null
+  );
+  const selectedUserId = selectedUser?.id;
+  // Read for the person the request is for, with their saved profiles.
+  const profileUserId = selectedUserId ?? requestUser?.id ?? currentUser?.id;
+
   const { data: serverData, isValidating } =
     useSWR<ServiceCommonServerWithDetails>(
       selectedServer !== null
         ? `/api/v1/service/${
             type === 'movie' ? 'radarr' : 'sonarr'
-          }/${selectedServer}`
+          }/${selectedServer}${
+            profileUserId !== undefined ? `?requestUser=${profileUserId}` : ''
+          }`
         : null,
       {
         refreshInterval: 0,
@@ -168,11 +179,39 @@ const AdvancedRequester = ({
         revalidateOnFocus: false,
       }
     );
+  const managesRequests = currentHasPermission(Permission.MANAGE_REQUESTS);
 
-  const [selectedUser, setSelectedUser] = useState<User | null>(
-    requestUser ?? null
-  );
-  const selectedUserId = selectedUser?.id;
+  /**
+   * The profile for anime or not: the request user's saved one where the
+   * server still has it, else the server's.
+   */
+  const kindProfile = (
+    details: ServiceCommonServerWithDetails,
+    value: boolean
+  ): number => {
+    const saved = value ? details.savedAnimeProfileId : details.savedProfileId;
+    if (saved && details.profiles.some((p) => p.id === saved)) {
+      return saved;
+    }
+    return value && details.server.activeAnimeProfileId
+      ? details.server.activeAnimeProfileId
+      : details.server.activeProfileId;
+  };
+
+  /** The folder a profile maps to, if the server has that folder. */
+  const profileFolder = (
+    details: ServiceCommonServerWithDetails | undefined,
+    profileId: number
+  ): string | undefined => {
+    const mapped = mappedFolder(details?.server, profileId);
+    return mapped && details?.rootFolders.some((f) => f.path === mapped)
+      ? mapped
+      : undefined;
+  };
+  // Someone who doesn't manage requests gets a mapped profile's folder.
+  const lockedFolder = managesRequests
+    ? undefined
+    : profileFolder(serverData, selectedProfile);
   const previousSelectedUserIdRef = useRef<number | undefined>(selectedUserId);
 
   const { data: userData } = useSWR<UserResultsResponse>(
@@ -238,18 +277,15 @@ const AdvancedRequester = ({
   useEffect(() => {
     if (serverData) {
       const defaultProfile = serverData.profiles.find(
-        (profile) =>
-          profile.id ===
-          (anime && serverData.server.activeAnimeProfileId
-            ? serverData.server.activeAnimeProfileId
-            : serverData.server.activeProfileId)
+        (profile) => profile.id === kindProfile(serverData, anime)
       );
       const defaultFolder = serverData.rootFolders.find(
         (folder) =>
           folder.path ===
-          (anime && serverData.server.activeAnimeDirectory
-            ? serverData.server.activeAnimeDirectory
-            : serverData.server.activeDirectory)
+          ((defaultProfile && profileFolder(serverData, defaultProfile.id)) ??
+            (anime && serverData.server.activeAnimeDirectory
+              ? serverData.server.activeAnimeDirectory
+              : serverData.server.activeDirectory))
       );
       const defaultLanguage = serverData.languageProfiles?.find(
         (language) =>
@@ -338,14 +374,12 @@ const AdvancedRequester = ({
       return;
     }
     const server = serverData.server;
-    const profile =
-      value && server.activeAnimeProfileId
-        ? server.activeAnimeProfileId
-        : server.activeProfileId;
+    const profile = kindProfile(serverData, value);
     const folder =
-      value && server.activeAnimeDirectory
+      profileFolder(serverData, profile) ??
+      (value && server.activeAnimeDirectory
         ? server.activeAnimeDirectory
-        : server.activeDirectory;
+        : server.activeDirectory);
     const language =
       value && server.activeAnimeLanguageProfileId
         ? server.activeAnimeLanguageProfileId
@@ -375,6 +409,24 @@ const AdvancedRequester = ({
     applyKindDefaults(anime);
   }, [animeChoice]);
 
+  // A profile mapped to a folder takes it along. An edited request's own
+  // folder stays until its profile changes.
+  const profileSeen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!serverData || selectedProfile === -1) {
+      return;
+    }
+    const first = profileSeen.current === null;
+    profileSeen.current = selectedProfile;
+    if (first && defaultOverrides?.folder) {
+      return;
+    }
+    const mapped = profileFolder(serverData, selectedProfile);
+    if (mapped) {
+      setSelectedFolder(mapped);
+    }
+  }, [selectedProfile, serverData]);
+
   useEffect(() => {
     const selectedUserChanged =
       previousSelectedUserIdRef.current !== selectedUserId;
@@ -388,7 +440,8 @@ const AdvancedRequester = ({
   useEffect(() => {
     if (selectedServer !== null || selectedUser) {
       onChange({
-        folder: selectedFolder !== '' ? selectedFolder : undefined,
+        folder:
+          lockedFolder ?? (selectedFolder !== '' ? selectedFolder : undefined),
         profile: selectedProfile !== -1 ? selectedProfile : undefined,
         server: selectedServer ?? undefined,
         user: selectedUser ?? undefined,
@@ -399,6 +452,7 @@ const AdvancedRequester = ({
     }
   }, [
     selectedFolder,
+    lockedFolder,
     selectedServer,
     selectedProfile,
     selectedUser,
@@ -449,7 +503,12 @@ const AdvancedRequester = ({
           ) {
             applyKindDefaults(override.seriesType === 'anime');
           }
-          if (!defaultOverrides?.folder && override.rootFolder) {
+          // A rule's folder gives way to a mapped profile's.
+          if (
+            !defaultOverrides?.folder &&
+            override.rootFolder &&
+            !profileFolder(serverData, override.profileId ?? selectedProfile)
+          ) {
             setSelectedFolder(override.rootFolder);
           }
           if (!defaultOverrides?.profile && override.profileId) {
@@ -614,11 +673,14 @@ const AdvancedRequester = ({
                 <select
                   id="folder"
                   name="folder"
-                  value={selectedFolder}
+                  value={lockedFolder ?? selectedFolder}
                   onChange={(e) => setSelectedFolder(e.target.value)}
                   onBlur={(e) => setSelectedFolder(e.target.value)}
                   className="border-gray-700 bg-gray-800"
-                  disabled={isValidating || !serverData}
+                  disabled={isValidating || !serverData || !!lockedFolder}
+                  aria-describedby={
+                    lockedFolder ? 'folder-from-profile' : undefined
+                  }
                 >
                   {(isValidating || !serverData) && (
                     <option value="">
@@ -655,6 +717,14 @@ const AdvancedRequester = ({
                       </option>
                     ))}
                 </select>
+                {lockedFolder && (
+                  <p
+                    id="folder-from-profile"
+                    className="mt-1 text-sm text-gray-400"
+                  >
+                    {intl.formatMessage(messages.folderFromProfile)}
+                  </p>
+                )}
               </div>
             )}
             {type === 'tv' &&

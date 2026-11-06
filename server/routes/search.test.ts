@@ -115,6 +115,20 @@ stub('searchTvShows', async ({ page = 1 }: { page?: number }) => {
     results: (seriesPages[page] ?? []).map(untyped),
   };
 });
+let peoplePages: Record<number, { id: number; name: string }[]> = {};
+stub('searchPerson', async ({ page = 1 }: { page?: number }) => {
+  asked.push('person');
+  return {
+    page,
+    total_pages: Object.keys(peoplePages).length || 1,
+    total_results: Object.values(peoplePages).flat().length,
+    results: (peoplePages[page] ?? []).map((person) => ({
+      ...person,
+      popularity: 1,
+      profile_path: `/p${person.id}.jpg`,
+    })),
+  };
+});
 stub('getByExternalId', async () => ({
   movie_results: [untyped(film(1))],
   tv_results: [untyped(series(2))],
@@ -166,6 +180,7 @@ beforeEach(() => {
   collectionPagesAsked = [];
   filmPages = {};
   seriesPages = {};
+  peoplePages = {};
   asked = [];
 });
 
@@ -294,6 +309,33 @@ describe('GET /search for one kind of title', () => {
     assert.deepEqual(shown(body.results), ['tv:2', 'tv:4']);
     assert.deepEqual(asked, ['tv']);
     assert.equal(body.totalResults, 2);
+  });
+
+  it('finds people only, with their pictures', async () => {
+    peoplePages = {
+      1: [
+        { id: 31, name: 'Ada Glasswing' },
+        { id: 32, name: 'Rowan Glasswing' },
+      ],
+      2: [{ id: 33, name: 'Tamsin Glasswing' }],
+    };
+    const { status, body } = await search(1, '&type=person');
+
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.deepEqual(shown(body.results), ['person:31', 'person:32']);
+    assert.deepEqual(asked, ['person']);
+    assert.equal(body.totalPages, 2);
+    const first = body.results[0] as unknown as {
+      name: string;
+      profilePath?: string;
+      knownFor: unknown[];
+    };
+    assert.equal(first.name, 'Ada Glasswing');
+    assert.equal(first.profilePath, '/p31.jpg');
+    assert.deepEqual(first.knownFor, []);
+
+    const second = await search(2, '&type=person');
+    assert.deepEqual(shown(second.body.results), ['person:33']);
   });
 
   it('searches everything without a type, or with type=all', async () => {

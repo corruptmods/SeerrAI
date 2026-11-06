@@ -6,7 +6,11 @@ import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import OverrideRule from '@server/entity/OverrideRule';
 import { User } from '@server/entity/User';
-import overrideRules, { titleCertification } from '@server/lib/overrideRules';
+import overrideRules, {
+  formatRuleCountries,
+  titleCertification,
+  titleCountries,
+} from '@server/lib/overrideRules';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
@@ -390,5 +394,133 @@ describe("an override rule naming TMDB's anime keyword", () => {
       } as TmdbMovieDetails),
       null
     );
+  });
+});
+
+describe('an override rule on production countries', () => {
+  const madeIn = (codes: string[], origin?: string[]) =>
+    ({
+      ...film({}),
+      production_countries: codes.map((iso_3166_1) => ({
+        iso_3166_1,
+        name: iso_3166_1,
+      })),
+      ...(origin ? { origin_country: origin } : {}),
+    }) as TmdbMovieDetails;
+
+  it('sends a film made in any chosen country where the rule says', async () => {
+    await rule({ radarrServiceId: 0, country: 'KR,FR', rootFolder: '/world' });
+
+    assert.equal(await movieFolder(madeIn(['FR'])), '/world');
+    assert.equal(await movieFolder(madeIn(['US', 'KR'])), '/world');
+    assert.equal(await movieFolder(madeIn(['US'])), null);
+  });
+
+  it('never matches a title with no country', async () => {
+    await rule({ radarrServiceId: 0, country: 'FR', rootFolder: '/world' });
+
+    assert.equal(await movieFolder(madeIn([])), null);
+  });
+
+  it("matches a series by its origin country as well as where it's made", async () => {
+    await rule({ sonarrServiceId: 0, country: 'GB', rootFolder: '/british' });
+
+    const folderFor = async (tmdbMedia: TmdbTvDetails) =>
+      (
+        await overrideRules({
+          mediaType: MediaType.TV,
+          is4k: false,
+          tmdbMedia,
+          requestUser: requester,
+          serviceId: 0,
+        })
+      ).rootFolder;
+
+    assert.equal(
+      await folderFor({
+        ...series({}),
+        origin_country: ['GB'],
+        production_countries: [],
+      } as TmdbTvDetails),
+      '/british'
+    );
+    assert.equal(
+      await folderFor({
+        ...series({}),
+        origin_country: ['US'],
+        production_countries: [{ iso_3166_1: 'GB', name: 'United Kingdom' }],
+      } as TmdbTvDetails),
+      '/british'
+    );
+    assert.equal(
+      await folderFor({
+        ...series({}),
+        origin_country: ['US'],
+        production_countries: [],
+      } as TmdbTvDetails),
+      null
+    );
+  });
+
+  it('needs every other condition of the rule to match too', async () => {
+    await rule({
+      radarrServiceId: 0,
+      country: 'FR',
+      genre: '99',
+      rootFolder: '/french-documentaries',
+    });
+
+    assert.equal(await movieFolder(madeIn(['FR'])), null);
+    assert.equal(
+      await movieFolder({
+        ...madeIn(['FR']),
+        genres: [{ id: 99, name: 'Documentary' }],
+      }),
+      '/french-documentaries'
+    );
+  });
+
+  it('counts as a condition when choosing the most specific rule', async () => {
+    await rule({
+      radarrServiceId: 0,
+      users: String(requester.id),
+      rootFolder: '/friend',
+    });
+    await rule({
+      radarrServiceId: 0,
+      users: String(requester.id),
+      country: 'JP',
+      rootFolder: '/friend-japan',
+    });
+
+    assert.equal(await movieFolder(madeIn(['JP'])), '/friend-japan');
+    assert.equal(await movieFolder(madeIn(['DE'])), '/friend');
+  });
+});
+
+describe("a title's production countries", () => {
+  it('combine where it was made and its origin countries', () => {
+    assert.deepEqual(
+      [
+        ...titleCountries({
+          ...film({}),
+          production_countries: [{ iso_3166_1: 'FR', name: 'France' }],
+          origin_country: ['BE', 'FR'],
+        } as TmdbMovieDetails),
+      ],
+      ['FR', 'BE']
+    );
+  });
+});
+
+describe("a rule's countries as saved", () => {
+  it('are two-letter codes in capitals, each once', () => {
+    assert.equal(formatRuleCountries(' jp, KR,jp,,Korea,K1 '), 'JP,KR');
+  });
+
+  it('are none when nothing valid is given', () => {
+    assert.equal(formatRuleCountries(''), null);
+    assert.equal(formatRuleCountries(null), null);
+    assert.equal(formatRuleCountries('Nowhere'), null);
   });
 });

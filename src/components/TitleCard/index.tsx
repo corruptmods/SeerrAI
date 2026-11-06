@@ -23,6 +23,7 @@ import {
   tmdbImageSrc,
 } from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
+import { cardRequestable } from '@app/utils/outsideLibraries';
 import { withProperties } from '@app/utils/typeHelpers';
 import {
   ArrowDownTrayIcon,
@@ -54,6 +55,11 @@ interface TitleCardProps {
   userScore?: number;
   mediaType: MediaType;
   status?: MediaStatus;
+  /**
+   * A media server has it, but not in the viewer's libraries: nothing to
+   * request (lib/libraryVisibility).
+   */
+  outsideLibraries?: boolean;
   canExpand?: boolean;
   inProgress?: boolean;
   isAddedToWatchlist?: number | boolean;
@@ -83,6 +89,7 @@ const TitleCard = ({
   year,
   title,
   status,
+  outsideLibraries = false,
   mediaType,
   isAddedToWatchlist = false,
   actionSlot,
@@ -375,10 +382,7 @@ const TitleCard = ({
     type: 'or',
   });
 
-  const requestable =
-    !currentStatus ||
-    currentStatus === MediaStatus.UNKNOWN ||
-    currentStatus === MediaStatus.DELETED;
+  const requestable = cardRequestable(currentStatus, outsideLibraries);
 
   return (
     <CardShell

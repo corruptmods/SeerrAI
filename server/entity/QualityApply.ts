@@ -31,6 +31,12 @@ export interface QualityMovedTitle {
  */
 @Entity()
 export class QualityApply {
+  /**
+   * Applies History lists, newest first. Nightly maintenance removes older
+   * ones, except each server's newest and the newest Undo can still revert.
+   */
+  public static readonly HISTORY_SHOWN = 50;
+
   @PrimaryGeneratedColumn()
   public id: number;
 

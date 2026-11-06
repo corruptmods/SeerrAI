@@ -6,6 +6,7 @@ import {
   UserSelector,
 } from '@app/components/Selector';
 import CertificationPicker from '@app/components/Settings/OverrideRule/CertificationPicker';
+import CountryPicker from '@app/components/Settings/OverrideRule/CountryPicker';
 import type { DVRTestResponse } from '@app/components/Settings/SettingsServices';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -41,6 +42,10 @@ const messages = defineMessages('components.Settings.OverrideRuleModal', {
     'Matches any chosen rating, for the Discover Region ({region}), else the US rating. Unrated titles never match.',
   certificationTipUs:
     'Matches any chosen rating, for the Discover Region ({region}). Unrated titles never match.',
+  countries: 'Production Countries',
+  countriesTip:
+    'Matches if the title was made in any chosen country, as TMDB lists it.',
+  selectCountries: 'Select countries',
   rootfolder: 'Root Folder',
   selectRootFolder: 'Select root folder',
   qualityprofile: 'Quality Profile',
@@ -188,6 +193,7 @@ const OverrideRuleModal = ({
           language: rule?.language,
           keywords: rule?.keywords,
           certification: rule?.certification,
+          country: rule?.country,
           profileId: rule?.profileId,
           rootFolder: rule?.rootFolder,
           tags: rule?.tags,
@@ -201,6 +207,7 @@ const OverrideRuleModal = ({
               language: values.language || null,
               keywords: values.keywords || null,
               certification: values.certification || null,
+              country: values.country || null,
               profileId: Number(values.profileId) || null,
               rootFolder: values.rootFolder || null,
               tags: values.tags || null,
@@ -254,7 +261,8 @@ const OverrideRuleModal = ({
                   !values.genre &&
                   !values.language &&
                   !values.keywords &&
-                  !values.certification) ||
+                  !values.certification &&
+                  !values.country) ||
                 (!values.rootFolder &&
                   !values.profileId &&
                   !values.tags &&
@@ -508,6 +516,27 @@ const OverrideRuleModal = ({
                           {intl.formatMessage(messages.selectService)}
                         </p>
                       )}
+                    </div>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label htmlFor="country" className="text-label">
+                    {intl.formatMessage(messages.countries)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.countriesTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <CountryPicker
+                        inputId="country"
+                        value={values.country}
+                        placeholder={intl.formatMessage(
+                          messages.selectCountries
+                        )}
+                        isDisabled={!isValidated || isTesting}
+                        onChange={(value) => setFieldValue('country', value)}
+                      />
                     </div>
                   </div>
                 </div>

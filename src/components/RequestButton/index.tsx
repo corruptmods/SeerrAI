@@ -7,6 +7,7 @@ import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { outsideLibraries } from '@app/utils/outsideLibraries';
 import { oneAfterAnother } from '@app/utils/requestActions';
 import {
   ArrowDownTrayIcon,
@@ -378,8 +379,10 @@ const RequestButton = ({
     }
   }
 
-  // Standard request button
+  // Standard request button. Not for a title the server has outside the
+  // viewer's libraries: a request would bring nothing they can watch.
   if (
+    !outsideLibraries(media) &&
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
@@ -404,6 +407,7 @@ const RequestButton = ({
     });
   } else if (
     mediaType === 'tv' &&
+    !outsideLibraries(media) &&
     (!activeRequest || activeRequest.requestedBy.id !== user?.id) &&
     hasPermission([Permission.REQUEST, Permission.REQUEST_TV], {
       type: 'or',
@@ -425,6 +429,7 @@ const RequestButton = ({
 
   // 4K request button
   if (
+    !outsideLibraries(media, true) &&
     (!media ||
       media.status4k === MediaStatus.UNKNOWN ||
       (media.status4k === MediaStatus.DELETED && !active4kRequest)) &&
@@ -451,6 +456,7 @@ const RequestButton = ({
     });
   } else if (
     mediaType === 'tv' &&
+    !outsideLibraries(media, true) &&
     (!active4kRequest || active4kRequest.requestedBy.id !== user?.id) &&
     hasPermission([Permission.REQUEST_4K, Permission.REQUEST_4K_TV], {
       type: 'or',

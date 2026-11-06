@@ -533,6 +533,7 @@ export class User {
       : 0;
 
     return {
+      overQuotaWaits: !!getSettings().main.overQuotaRequests,
       movie: {
         days: movieQuotaDays,
         limit: movieQuotaLimit,

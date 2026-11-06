@@ -7,6 +7,7 @@ const AiTitleCard = ({ result }: { result: MovieResult | TvResult }) => (
     id={result.id}
     image={result.posterPath}
     status={result.mediaInfo?.status}
+    outsideLibraries={result.mediaInfo?.outsideLibraries}
     summary={result.overview}
     title={result.mediaType === 'movie' ? result.title : result.name}
     userScore={result.voteAverage}

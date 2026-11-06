@@ -1,3 +1,4 @@
+import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
 import Tag from '@app/components/Common/Tag';
@@ -7,6 +8,8 @@ import type {
   ServiceChoice,
 } from '@app/components/Discover/filters';
 import {
+  allServicesChosen,
+  chooseAllServices,
   chooseService,
   nextServiceChoice,
   serviceChoiceOf,
@@ -66,7 +69,15 @@ const messages = defineMessages('components.Selector', {
   serviceCleared: 'No longer filtering by {service}',
   clearOn: 'Stop showing only what’s on {service}',
   clearNotOn: 'Stop leaving out {service}',
+  selectAllServices: 'Select all',
+  deselectAllServices: 'Deselect all',
+  allServicesOn: 'Selected all services',
+  allServicesCleared: 'No longer filtering by service',
+  moreServices: '+{count} more',
 });
+
+/** Chosen services named before the rest are only counted. */
+const CHIPS_SHOWN = 12;
 
 type SingleVal = {
   label: string;
@@ -479,6 +490,19 @@ export const WatchProviderSelector = ({
     );
   };
 
+  const listedIds = orderedData.map((provider) => provider.id);
+  const nothingChosen = !services.on.length && !services.notOn.length;
+
+  const selectAll = () => {
+    setServices(chooseAllServices(services, listedIds));
+    setAnnouncement(intl.formatMessage(messages.allServicesOn));
+  };
+
+  const deselectAll = () => {
+    setServices({ on: [], notOn: [] });
+    setAnnouncement(intl.formatMessage(messages.allServicesCleared));
+  };
+
   const tile = (provider: WatchProviderDetails) => {
     const choice = serviceChoiceOf(services, provider.id);
     const label = describe(provider.name, choice);
@@ -542,7 +566,7 @@ export const WatchProviderSelector = ({
             choice === 'on' ? messages.onServices : messages.notOnServices
           )}
         </span>
-        {ids.map((id) => (
+        {ids.slice(0, CHIPS_SHOWN).map((id) => (
           <button
             type="button"
             key={`chosen-${choice}-${id}`}
@@ -566,6 +590,13 @@ export const WatchProviderSelector = ({
             <XMarkIcon className="h-4 w-4 flex-none" />
           </button>
         ))}
+        {ids.length > CHIPS_SHOWN && (
+          <span className="text-sm text-muted">
+            {intl.formatMessage(messages.moreServices, {
+              count: ids.length - CHIPS_SHOWN,
+            })}
+          </span>
+        )}
       </div>
     );
   };
@@ -597,6 +628,26 @@ export const WatchProviderSelector = ({
           {intl.formatMessage(messages.notOnServices)}
         </span>
         <span id={hintId}>{intl.formatMessage(messages.servicesHint)}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          buttonSize="sm"
+          disabled={isLoading || allServicesChosen(services, listedIds)}
+          onClick={selectAll}
+        >
+          <CheckCircleIcon />
+          <span>{intl.formatMessage(messages.selectAllServices)}</span>
+        </Button>
+        <Button
+          type="button"
+          buttonSize="sm"
+          disabled={nothingChosen}
+          onClick={deselectAll}
+        >
+          <XMarkIcon />
+          <span>{intl.formatMessage(messages.deselectAllServices)}</span>
+        </Button>
       </div>
       {chosen('on')}
       {chosen('notOn')}

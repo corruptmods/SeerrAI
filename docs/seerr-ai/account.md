@@ -10,6 +10,10 @@ An email you set on your own account (**Profile → Settings → General**) coun
 
 Until it's confirmed, the address isn't kept for you: if someone later signs in with Plex or single sign-on using that email, it moves to their account, and you lose password sign-in until an admin sets an email for you. Without email notifications set up, ask an admin to set your email instead.
 
+## Default quality profiles
+
+If you may choose advanced request options, **Profile → Settings → General** has **Default Quality Profiles**: for each server, the quality profile your requests use, and one for anime where the server has an anime profile. It's picked first in the request window, and used for requests you make elsewhere, such as Siri or AI Search. **Server default** leaves it to the server. See [Quality profiles and folders](./requests-and-downloads.md#quality-profiles-and-folders).
+
 ## Passkeys
 
 Sign in with Face ID, Touch ID, Windows Hello or a security key instead of a password.

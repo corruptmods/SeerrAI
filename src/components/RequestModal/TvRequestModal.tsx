@@ -12,7 +12,9 @@ import FailedRequestAlert, {
 } from '@app/components/RequestModal/FailedRequestAlert';
 import FollowNewSeasons from '@app/components/RequestModal/FollowNewSeasons';
 import followByDefault from '@app/components/RequestModal/FollowNewSeasons/followByDefault';
-import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
+import QuotaDisplay, {
+  OverQuotaAlert,
+} from '@app/components/RequestModal/QuotaDisplay';
 import RequestListPicker from '@app/components/RequestModal/RequestListPicker';
 import SearchByNameModal from '@app/components/RequestModal/SearchByNameModal';
 import type { FutureSeasonsState } from '@app/components/TvDetails/FutureSeasonsButton';
@@ -192,6 +194,8 @@ const TvRequestModal = ({
     (quota?.tv.remaining ?? 0) -
     selectedSeasons.length +
     (editRequest?.seasons ?? []).length;
+  // The limit stops picking, unless requests past it wait for an admin.
+  const limitBlocks = !!quota?.tv.limit && !quota?.overQuotaWaits;
 
   // 202: every season asked for is already requested or available. Not an
   // error; refetch so the list shows what covers them.
@@ -455,7 +459,7 @@ const TvRequestModal = ({
 
     // Quota used up.
     if (
-      quota?.tv.limit &&
+      limitBlocks &&
       currentlyRemaining <= 0 &&
       !isSelectedSeason(seasonNumber)
     ) {
@@ -522,6 +526,20 @@ const TvRequestModal = ({
     (season) => !getAllRequestedSeasons().includes(season)
   );
 
+  // Past the limit while requests past it wait for an admin.
+  const pastLimit =
+    (!!quota?.tv.limit &&
+      !!quota.overQuotaWaits &&
+      !requestOverrides?.ignoreQuota &&
+      (quota.tv.remaining ?? 0) -
+        (settings.currentSettings.partialRequestsEnabled
+          ? selectedSeasons.length
+          : unrequestedSeasons.length) +
+        (editRequest?.seasons ?? []).length <
+        0) ||
+    (!!editRequest?.overQuota &&
+      editRequest.status === MediaRequestStatus.PENDING);
+
   // On by default for every season or just the newest; a user choice sticks.
   const follow =
     followChoice ??
@@ -535,10 +553,7 @@ const TvRequestModal = ({
 
   const toggleAllSeasons = (): void => {
     // Quota too small for every season.
-    if (
-      quota?.tv.limit &&
-      (quota?.tv.remaining ?? 0) < unrequestedSeasons.length
-    ) {
+    if (limitBlocks && (quota?.tv.remaining ?? 0) < unrequestedSeasons.length) {
       return;
     }
 
@@ -686,8 +701,8 @@ const TvRequestModal = ({
         editRequest
           ? false
           : !settings.currentSettings.partialRequestsEnabled &&
-              quota?.tv.limit &&
-              unrequestedSeasons.length > quota.tv.limit &&
+              limitBlocks &&
+              unrequestedSeasons.length > (quota?.tv.limit ?? 0) &&
               !requestOverrides?.ignoreQuota
             ? true
             : unrequestedSeasons.length === 0 ||
@@ -738,6 +753,7 @@ const TvRequestModal = ({
           unrequestedSeasons.length > (quota?.tv.remaining ?? 0)
         ) &&
         getAllRequestedSeasons().length < getAllSeasons().length &&
+        !pastLimit &&
         !editRequest && (
           <div className="mt-6">
             <Alert
@@ -746,6 +762,7 @@ const TvRequestModal = ({
             />
           </div>
         )}
+      {pastLimit && <OverQuotaAlert />}
       {(quota?.tv.limit ?? 0) > 0 && (
         <QuotaDisplay
           mediaType="tv"
@@ -754,7 +771,7 @@ const TvRequestModal = ({
             !settings.currentSettings.partialRequestsEnabled &&
             unrequestedSeasons.length > (quota?.tv.remaining ?? 0)
               ? 0
-              : currentlyRemaining
+              : Math.max(0, currentlyRemaining)
           }
           userOverride={
             requestOverrides?.user && requestOverrides.user.id !== user?.id
@@ -795,8 +812,8 @@ const TvRequestModal = ({
                           }
                         }}
                         className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                          limitBlocks &&
                           quota?.tv.remaining &&
-                          quota.tv.limit &&
                           quota.tv.remaining < unrequestedSeasons.length
                             ? 'opacity-50'
                             : ''
@@ -890,7 +907,7 @@ const TvRequestModal = ({
                                 }}
                                 className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                                   mediaSeason ||
-                                  (quota?.tv.limit &&
+                                  (limitBlocks &&
                                     currentlyRemaining <= 0 &&
                                     !isSelectedSeason(season.seasonNumber)) ||
                                   (!!seasonRequest &&

@@ -1,5 +1,6 @@
 import type { QualityProfile, RootFolder, Tag } from '@server/api/servarr/base';
 import type { LanguageProfile } from '@server/api/servarr/sonarr';
+import type { ProfileFolder } from '@server/constants/requestDefaults';
 
 export interface ServiceCommonServer {
   id: number;
@@ -14,10 +15,16 @@ export interface ServiceCommonServer {
   activeAnimeLanguageProfileId?: number;
   activeTags: number[];
   activeAnimeTags?: number[];
+  /** Root folders some quality profiles always go to (Radarr and Sonarr). */
+  profileFolders?: ProfileFolder[];
 }
 
 export interface ServiceCommonServerWithDetails {
   server: ServiceCommonServer;
+  /** The request user's saved quality profile here, while they may choose. */
+  savedProfileId?: number;
+  /** Likewise for anime, where the server has an anime profile. */
+  savedAnimeProfileId?: number;
   profiles: QualityProfile[];
   rootFolders: Partial<RootFolder>[];
   languageProfiles?: LanguageProfile[];
@@ -52,6 +59,8 @@ export interface LidarrArtistSummary {
 
 export interface LidarrServerWithDetails {
   server: LidarrServer;
+  /** The request user's saved quality profile here, while they may choose. */
+  savedProfileId?: number;
   profiles: QualityProfile[];
   metadataProfiles: LidarrMetadataProfileSummary[];
   rootFolders: Partial<RootFolder>[];

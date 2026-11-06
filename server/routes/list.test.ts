@@ -19,6 +19,7 @@ import {
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import { User } from '@server/entity/User';
+import { UserSettings } from '@server/entity/UserSettings';
 import notificationManager from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -1073,6 +1074,238 @@ describe('watch lists', () => {
       );
 
       assert.equal(status, 404);
+    });
+  });
+
+  describe('requesting what is added', () => {
+    type Added = {
+      added: boolean;
+      request?: { outcome: string; message?: string };
+    };
+
+    const requestsFor = (tmdbId: number) =>
+      getRepository(MediaRequest).find({
+        where: { media: { tmdbId } },
+        relations: { requestedBy: true, seasons: true },
+      });
+
+    // Requests need the TMDB details a request is made from.
+    beforeEach(() => {
+      const details = (id: number, extra: object) => ({
+        id,
+        poster_path: `/r${id}.jpg`,
+        external_ids: { tvdb_id: id + 90000 },
+        ...extra,
+      });
+      Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
+        configurable: true,
+        set() {},
+        get() {
+          return async ({ movieId }: { movieId: number }) =>
+            details(movieId, { title: `Glasswing ${movieId}` });
+        },
+      });
+      Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
+        configurable: true,
+        set() {},
+        get() {
+          return async ({ tvId }: { tvId: number }) =>
+            details(tvId, {
+              name: `Static Garden ${tvId}`,
+              seasons: [
+                { season_number: 0, episode_count: 3 },
+                { season_number: 1, episode_count: 8 },
+              ],
+            });
+        },
+      });
+    });
+
+    /** The member, after their settings changed. */
+    const reloaded = (user: User) =>
+      getRepository(User).findOneOrFail({ where: { id: user.id } });
+
+    it('requests a title new to the list in the name of whoever added it, once', async () => {
+      actingAs = member;
+      const id = await createList();
+      const other = await createList('Other List');
+
+      const first = await call<Added>('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9101,
+        mediaType: 'movie',
+      });
+      assert.equal(first.status, 200);
+      assert.deepEqual(first.body.request, { outcome: 'requested' });
+
+      // Again on this list, and on another: nothing new.
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9101,
+        mediaType: 'movie',
+      });
+      const second = await call<Added>('POST', `/api/v1/list/${other}/item`, {
+        tmdbId: 9101,
+        mediaType: 'movie',
+      });
+      assert.notEqual(second.body.request?.outcome, 'requested');
+
+      const requests = await requestsFor(9101);
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].requestedBy.id, member.id);
+      assert.equal(requests[0].is4k, false);
+    });
+
+    it('requests once, without a failure, when a title is added to two lists at once', async () => {
+      actingAs = member;
+      const id = await createList();
+      const other = await createList('Other List');
+
+      const added = await Promise.all(
+        [id, other].map((list) =>
+          call<Added>('POST', `/api/v1/list/${list}/item`, {
+            tmdbId: 9102,
+            mediaType: 'movie',
+          })
+        )
+      );
+      assert.equal((await requestsFor(9102)).length, 1);
+      // The second sees the first's request instead of reporting a failure.
+      assert.deepEqual(added.map(({ body }) => body.request?.outcome).sort(), [
+        'here',
+        'requested',
+      ]);
+    });
+
+    it('requests a series with every season but specials, as import does', async () => {
+      actingAs = member;
+      const id = await createList();
+
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9103,
+        mediaType: 'tv',
+      });
+      const [request] = await requestsFor(9103);
+      assert.deepEqual(
+        request.seasons.map((season) => season.seasonNumber),
+        [1]
+      );
+    });
+
+    it('skips what is already in the library or blocklisted', async () => {
+      actingAs = member;
+      const id = await createList();
+      for (const [tmdbId, status] of [
+        [9104, MediaStatus.AVAILABLE],
+        [9105, MediaStatus.BLOCKLISTED],
+      ]) {
+        await getRepository(Media).save(
+          new Media({ tmdbId, mediaType: MediaType.MOVIE, status })
+        );
+        const { body } = await call<Added>('POST', `/api/v1/list/${id}/item`, {
+          tmdbId,
+          mediaType: 'movie',
+        });
+        assert.equal(body.added, true);
+        assert.equal(body.request?.outcome, 'here');
+        assert.equal((await requestsFor(tmdbId)).length, 0);
+      }
+    });
+
+    it('only adds for someone who cannot request, without an error', async () => {
+      actingAs = await makeUser('list-viewer', Permission.NONE);
+      const id = await createList();
+
+      const { status, body } = await call<Added>(
+        'POST',
+        `/api/v1/list/${id}/item`,
+        { tmdbId: 9106, mediaType: 'movie' }
+      );
+      assert.equal(status, 200);
+      assert.deepEqual(body, { added: true });
+      assert.equal((await requestsFor(9106)).length, 0);
+    });
+
+    it('only adds when the person or an admin turned it off', async () => {
+      actingAs = member;
+      const id = await createList();
+      await getRepository(UserSettings).save(
+        new UserSettings({ user: member, disabledFeatures: ['listRequests'] })
+      );
+      actingAs = await reloaded(member);
+
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9107,
+        mediaType: 'movie',
+      });
+      assert.equal((await requestsFor(9107)).length, 0);
+
+      actingAs = owner;
+      const owned = await createList('Owned');
+      getSettings().main.disabledFeatures = ['listRequests'];
+      try {
+        await call('POST', `/api/v1/list/${owned}/item`, {
+          tmdbId: 9108,
+          mediaType: 'movie',
+        });
+      } finally {
+        getSettings().main.disabledFeatures = [];
+      }
+      assert.equal((await requestsFor(9108)).length, 0);
+    });
+
+    it('only adds when asked not to request, as after requesting', async () => {
+      actingAs = member;
+      const id = await createList();
+      const { body } = await call<Added>('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9109,
+        mediaType: 'movie',
+        request: false,
+      });
+      assert.deepEqual(body, { added: true });
+      assert.equal((await requestsFor(9109)).length, 0);
+    });
+
+    it('keeps the title on the list and says why when the quota is reached', async () => {
+      actingAs = member;
+      const id = await createList();
+      await getRepository(User).update(member.id, {
+        movieQuotaLimit: 1,
+        movieQuotaDays: 7,
+      });
+      actingAs = await reloaded(member);
+
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 9110,
+        mediaType: 'movie',
+      });
+      const { status, body } = await call<Added>(
+        'POST',
+        `/api/v1/list/${id}/item`,
+        { tmdbId: 9111, mediaType: 'movie' }
+      );
+      assert.equal(status, 200);
+      assert.equal(body.added, true);
+      assert.deepEqual(body.request, {
+        outcome: 'failed',
+        message: 'Your request limit has been reached.',
+      });
+      assert.equal(
+        await getRepository(MediaListItem).countBy({
+          listId: id,
+          tmdbId: 9111,
+        }),
+        1
+      );
+      assert.equal((await requestsFor(9111)).length, 0);
+    });
+
+    it('leaves an import to its own option', async () => {
+      actingAs = member;
+      const id = await createList();
+      await call('POST', `/api/v1/list/${id}/import`, {
+        items: [{ tmdbId: 9112, mediaType: 'movie' }],
+        request: false,
+      });
+      assert.equal((await requestsFor(9112)).length, 0);
     });
   });
 

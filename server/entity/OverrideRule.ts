@@ -38,6 +38,13 @@ class OverrideRule {
   @Column({ type: 'varchar', nullable: true })
   public certification?: string | null;
 
+  /**
+   * Production countries the title must have one of, as ISO 3166-1 codes:
+   * "JP,KR". TMDB's production countries, and a series' origin countries.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public country?: string | null;
+
   @Column({ type: 'int', nullable: true })
   public profileId?: number;
 

@@ -8,7 +8,9 @@ import AnimeChoice, {
 import FailedRequestAlert, {
   failedMessages,
 } from '@app/components/RequestModal/FailedRequestAlert';
-import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
+import QuotaDisplay, {
+  OverQuotaAlert,
+} from '@app/components/RequestModal/QuotaDisplay';
 import RequestListPicker from '@app/components/RequestModal/RequestListPicker';
 import useIsAnime from '@app/hooks/useIsAnime';
 import useToasts from '@app/hooks/useToasts';
@@ -339,6 +341,7 @@ const MovieRequestModal = ({
             username: editRequest.requestedBy.displayName,
           })
         )}
+        {!isFailed && editRequest.overQuota && <OverQuotaAlert />}
         {data && (
           <AnimeChoice
             checked={animeChoice.anime}
@@ -389,6 +392,9 @@ const MovieRequestModal = ({
     { type: 'or' }
   );
 
+  // Past the limit: refused, or left for an admin when the server allows it.
+  const pastLimit = !!quota?.movie.restricted && !requestOverrides?.ignoreQuota;
+
   return (
     <Modal
       showCloseButton
@@ -396,10 +402,7 @@ const MovieRequestModal = ({
       backgroundClickable
       onCancel={onCancel}
       onOk={sendRequest}
-      okDisabled={
-        isUpdating ||
-        (quota?.movie.restricted && !requestOverrides?.ignoreQuota)
-      }
+      okDisabled={isUpdating || (pastLimit && !quota?.overQuotaWaits)}
       title={intl.formatMessage(
         is4k ? messages.requestmovie4ktitle : messages.requestmovietitle
       )}
@@ -422,6 +425,7 @@ const MovieRequestModal = ({
           />
         </div>
       )}
+      {pastLimit && quota?.overQuotaWaits && <OverQuotaAlert />}
       {(quota?.movie.limit ?? 0) > 0 && (
         <QuotaDisplay
           mediaType="movie"

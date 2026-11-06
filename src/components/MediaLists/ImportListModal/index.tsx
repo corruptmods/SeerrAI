@@ -1,6 +1,7 @@
 import Modal from '@app/components/Common/Modal';
 import PosterBackground from '@app/components/Common/PosterBackground';
 import { RESOLVE_BATCH_SIZE, SEARCH_BATCH_SIZE } from '@app/constants/lists';
+import useFeature from '@app/hooks/useFeature';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -11,50 +12,53 @@ import axios from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
-const messages = defineMessages('components.MediaLists.ImportListModal', {
-  title: 'Import a written list',
-  titleTrakt: 'Import titles or a Trakt list',
-  instructions:
-    'Paste your list below — one title per line. Bullets, numbering and years are fine.',
-  placeholder: 'The Matrix (1999)\nPractical Magic\nPerson of Interest',
-  placeholderTrakt:
-    'The Matrix (1999)\nPractical Magic\nPerson of Interest\n\nor a Trakt link, like\nhttps://trakt.tv/users/name/lists/favorites',
-  traktAdminHint:
-    'Trakt links work here once Trakt has a Client ID in Settings → Services.',
-  find: 'Find matches',
-  review: 'Check these matches before adding them.',
-  nomatch: 'No match found',
-  skip: 'Skip',
-  add: 'Add {count}',
-  back: 'Back',
-  nothingfound: 'Nothing recognisable in that text.',
-  truncated: 'Only the first 100 lines were read.',
-  searchagain: 'Search again',
-  searchplaceholder: 'Search for the right title',
-  alsorequest: 'Also request anything not already in the library',
-  notrequested:
-    'Added to the list. {count, plural, one {# title wasn’t} other {# titles weren’t}} requested (20 at most per import); request them from the list.',
-  matching: 'Matching titles…',
-  collection:
-    ' — Collection, {count} {count, plural, one {film} other {films}}',
-  series: ' — Series',
-  movie: ' — Movie',
-  instructionsTrakt:
-    'Paste titles, one per line, or a link to a public Trakt list or watchlist.',
-  readingTrakt: 'Reading the Trakt list…',
-  truncatedTrakt: 'Only the first 500 titles were read.',
-  traktNotSetUp:
-    'Trakt is not set up here yet. An admin can add it in Settings → Services.',
-  traktPrivate:
-    'That Trakt list or watchlist is private. Make it public on Trakt, then try again.',
-  traktNotFound: 'Trakt has no such user or list. Check the link.',
-  traktBadKey:
-    'Trakt did not accept this server’s Client ID. An admin can check it in Settings → Services.',
-  traktLimited:
-    'Trakt is limiting requests just now. Try again in a few minutes.',
-  traktUnreachable: 'Could not reach Trakt. Try again in a while.',
-  notTrakt: 'That isn’t a link to a Trakt list or watchlist.',
-});
+export const messages = defineMessages(
+  'components.MediaLists.ImportListModal',
+  {
+    title: 'Import a written list',
+    titleTrakt: 'Import titles or a Trakt list',
+    instructions:
+      'Paste your list below — one title per line. Bullets, numbering and years are fine.',
+    placeholder: 'The Matrix (1999)\nPractical Magic\nPerson of Interest',
+    placeholderTrakt:
+      'The Matrix (1999)\nPractical Magic\nPerson of Interest\n\nor a Trakt link, like\nhttps://trakt.tv/users/name/lists/favorites',
+    traktAdminHint:
+      'Trakt links work here once Trakt has a Client ID in Settings → Services.',
+    find: 'Find matches',
+    review: 'Check these matches before adding them.',
+    nomatch: 'No match found',
+    skip: 'Skip',
+    add: 'Add {count}',
+    back: 'Back',
+    nothingfound: 'Nothing recognisable in that text.',
+    truncated: 'Only the first 100 lines were read.',
+    searchagain: 'Search again',
+    searchplaceholder: 'Search for the right title',
+    alsorequest: 'Also request anything not already in the library',
+    notrequested:
+      'Added to the list. {count, plural, one {# title wasn’t} other {# titles weren’t}} requested (20 at most per import); request them from the list.',
+    matching: 'Matching titles…',
+    collection:
+      ' — Collection, {count} {count, plural, one {film} other {films}}',
+    series: ' — Series',
+    movie: ' — Movie',
+    instructionsTrakt:
+      'Paste titles, one per line, or a link to a public Trakt list or watchlist.',
+    readingTrakt: 'Reading the Trakt list…',
+    truncatedTrakt: 'Only the first 500 titles were read.',
+    traktNotSetUp:
+      'Trakt is not set up here yet. An admin can add it in Settings → Services.',
+    traktPrivate:
+      'That Trakt list or watchlist is private. Make it public on Trakt, then try again.',
+    traktNotFound: 'Trakt has no such user or list. Check the link.',
+    traktBadKey:
+      'Trakt did not accept this server’s Client ID. An admin can check it in Settings → Services.',
+    traktLimited:
+      'Trakt is limiting requests just now. Try again in a few minutes.',
+    traktUnreachable: 'Could not reach Trakt. Try again in a while.',
+    notTrakt: 'That isn’t a link to a Trakt list or watchlist.',
+  }
+);
 
 /** A Trakt link, rather than a written list. */
 const TRAKT_LINK = /^(https?:\/\/)?(www\.|app\.)?trakt\.tv\/\S*$/i;
@@ -100,7 +104,9 @@ const ImportListModal = ({
   const [manual, setManual] = useState<Record<number, string>>({});
   const [isBusy, setBusy] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [alsoRequest, setAlsoRequest] = useState(true);
+  // Starts as the person's own choice for what they add to lists.
+  const listRequests = useFeature('listRequests');
+  const [alsoRequest, setAlsoRequest] = useState(listRequests);
   const [error, setError] = useState<string | null>(null);
 
   const describe = (e: unknown) =>

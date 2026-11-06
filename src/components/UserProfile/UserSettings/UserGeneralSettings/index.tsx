@@ -6,6 +6,7 @@ import LanguageSelector from '@app/components/LanguageSelector';
 import QuotaSelector from '@app/components/QuotaSelector';
 import RegionSelector from '@app/components/RegionSelector';
 import AccountTypeBadges from '@app/components/UserList/AccountTypeBadges';
+import DefaultProfiles from '@app/components/UserProfile/UserSettings/UserGeneralSettings/DefaultProfiles';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
@@ -103,6 +104,11 @@ const UserGeneralSettings = () => {
   });
   const { user: currentUser, hasPermission: currentHasPermission } = useUser();
   const { currentSettings } = useSettings();
+  // Default profiles count only while they may choose advanced options.
+  const choosesProfiles = hasPermission(
+    [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
+    { type: 'or' }
+  );
   const {
     data,
     error,
@@ -200,6 +206,7 @@ const UserGeneralSettings = () => {
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
           traktUsername: data?.traktUsername ?? '',
+          defaultProfiles: data?.defaultProfiles ?? [],
         }}
         validationSchema={UserGeneralSettingsSchema}
         enableReinitialize
@@ -230,6 +237,9 @@ const UserGeneralSettings = () => {
               watchlistSyncTv: values.watchlistSyncTv,
               ...(currentSettings.traktReady
                 ? { traktUsername: values.traktUsername.trim() }
+                : {}),
+              ...(choosesProfiles
+                ? { defaultProfiles: values.defaultProfiles }
                 : {}),
             });
 
@@ -722,6 +732,12 @@ const UserGeneralSettings = () => {
                     </div>
                   </div>
                 )}
+              {choosesProfiles && (
+                <DefaultProfiles
+                  value={values.defaultProfiles}
+                  onChange={(value) => setFieldValue('defaultProfiles', value)}
+                />
+              )}
               <SaveBar>
                 <div className="flex justify-end">
                   <span className="ml-3 inline-flex rounded-md shadow-sm">

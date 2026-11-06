@@ -24,6 +24,9 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   watchSuggestions: 'Finished Watching?',
   watchSuggestionsTip:
     'Offers to remove titles from a watch list once everyone on it has watched them',
+  listRequests: 'Request What’s Added to Lists',
+  listRequestsTip:
+    'Adding a title to a list requests it for you, unless it’s already here or requested',
   passkeyPrompt: 'Passkey Reminder',
   passkeyPromptTip:
     'The banner asking to add a passkey. Signing in with passkeys is unaffected',

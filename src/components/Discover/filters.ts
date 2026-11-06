@@ -1,4 +1,5 @@
 import {
+  MAX_STREAMING_SERVICES,
   leftOutServices,
   readServiceIds,
 } from '@server/constants/streamingServices';
@@ -255,6 +256,29 @@ export const chooseService = (
   if (choice === 'on') on.push(id);
   if (choice === 'notOn') notOn.push(id);
   return { on, notOn };
+};
+
+/**
+ * Select all: every listed service is shown, up to the most a filter keeps.
+ * Services left out stay left out.
+ */
+export const chooseAllServices = (
+  services: ChosenServices,
+  listed: number[]
+): ChosenServices => ({
+  on: listed
+    .filter((id) => !services.notOn.includes(id))
+    .slice(0, MAX_STREAMING_SERVICES),
+  notOn: services.notOn,
+});
+
+/** Whether select all would change anything. */
+export const allServicesChosen = (
+  services: ChosenServices,
+  listed: number[]
+): boolean => {
+  const all = chooseAllServices(services, listed).on;
+  return all.every((id) => services.on.includes(id));
 };
 
 /** URL service filters; the region is dropped when no service is chosen. */

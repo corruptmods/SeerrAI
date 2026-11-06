@@ -40,4 +40,44 @@ describe('a watchlist kept here', () => {
     assert.equal(total, 7);
     assert.deepEqual(ids(first), [1, 2, 3]);
   });
+
+  it('pages newest added first, or oldest first, when asked', async () => {
+    const [newest, total] = await savedWatchlistPage(
+      user.id,
+      0,
+      3,
+      'added-desc'
+    );
+    assert.equal(total, 7);
+    assert.deepEqual(ids(newest), [7, 6, 5]);
+    const [next] = await savedWatchlistPage(user.id, 3, 3, 'added-desc');
+    assert.deepEqual(ids(next), [4, 3, 2]);
+    const [oldest] = await savedWatchlistPage(user.id, 0, 3, 'added-asc');
+    assert.deepEqual(ids(oldest), [1, 2, 3]);
+  });
+
+  it('pages by title, leaving out a leading article', async () => {
+    const titles: Record<number, string> = {
+      1: 'Static Garden',
+      2: 'The Harbour Lights',
+      3: 'glasswing',
+      4: 'Lantern Song',
+      5: 'A Lantern Song 2',
+      6: 'Lantern Song 10',
+      7: 'Amber Fields',
+    };
+    for (const [tmdbId, title] of Object.entries(titles)) {
+      await getRepository(Watchlist).update(
+        { tmdbId: Number(tmdbId) },
+        { title }
+      );
+    }
+
+    const [first, total] = await savedWatchlistPage(user.id, 0, 4, 'title');
+    assert.equal(total, 7);
+    assert.deepEqual(ids(first), [7, 3, 2, 4]);
+    assert.equal(first[0].media.tmdbId, 7, 'with its media');
+    const [rest] = await savedWatchlistPage(user.id, 4, 4, 'title');
+    assert.deepEqual(ids(rest), [5, 6, 1]);
+  });
 });

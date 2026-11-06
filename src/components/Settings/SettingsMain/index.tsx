@@ -69,6 +69,9 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   hideAvailableTip: 'Hide available titles from Discover, not from search',
   hideRequested: 'Hide Requested Media',
   hideRequestedTip: 'Hide requested titles from Discover, not from search',
+  limitToLibraries: 'Show People Only What Their Libraries Hold',
+  limitToLibrariesTip:
+    'Recently Added, availability and play links follow each person’s media server libraries. Admins and people who manage requests or users see everything.',
   cacheImages: 'Enable Image Caching',
   cacheImagesTip:
     'Cache externally sourced images (requires a significant amount of disk space)',
@@ -194,6 +197,7 @@ const SettingsMain = () => {
             hideAvailable: data?.hideAvailable,
             hideBlocklisted: data?.hideBlocklisted,
             hideRequested: data?.hideRequested,
+            limitToLibraries: data?.limitToLibraries,
             locale: data?.locale ?? 'en',
             discoverRegion: data?.discoverRegion,
             originalLanguage: data?.originalLanguage,
@@ -220,6 +224,7 @@ const SettingsMain = () => {
                 hideAvailable: values.hideAvailable,
                 hideBlocklisted: values.hideBlocklisted,
                 hideRequested: values.hideRequested,
+                limitToLibraries: values.limitToLibraries,
                 locale: values.locale,
                 discoverRegion: values.discoverRegion,
                 streamingRegion: values.streamingRegion,
@@ -612,6 +617,29 @@ const SettingsMain = () => {
                       name="hideRequested"
                       onChange={() => {
                         setFieldValue('hideRequested', !values.hideRequested);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label htmlFor="limitToLibraries" className="checkbox-label">
+                    <span className="mr-2">
+                      {intl.formatMessage(messages.limitToLibraries)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.limitToLibrariesTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="limitToLibraries"
+                      name="limitToLibraries"
+                      onChange={() => {
+                        setFieldValue(
+                          'limitToLibraries',
+                          !values.limitToLibraries
+                        );
                       }}
                     />
                   </div>

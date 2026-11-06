@@ -9,6 +9,7 @@ export const FEATURES = [
   'whoWatched',
   'newSeasons',
   'watchSuggestions',
+  'listRequests',
   'passkeyPrompt',
   'subtitles',
   'autoFix',

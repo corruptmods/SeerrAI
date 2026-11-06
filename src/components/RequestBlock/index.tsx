@@ -5,6 +5,7 @@ import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import { songName } from '@app/components/Music/musicHelpers';
+import OverQuotaBadge from '@app/components/OverQuotaBadge';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import useRequestAction from '@app/hooks/useRequestAction';
@@ -294,6 +295,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                   {intl.formatMessage(globalMessages.pending)}
                 </Badge>
               )}
+              <OverQuotaBadge request={request} className="ml-1" />
               {request.status === MediaRequestStatus.FAILED && (
                 <Badge badgeType="danger">
                   {intl.formatMessage(globalMessages.failed)}

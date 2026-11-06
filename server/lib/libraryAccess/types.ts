@@ -13,6 +13,8 @@ export interface ServerPerson extends AccessPerson {
 export interface ServerAccess {
   libraries: AccessLibrary[];
   people: ServerPerson[];
+  /** Each library's id as the scans know it (MediaLibraryItem), by its id here. */
+  scanIds?: Map<string, string>;
 }
 
 /** Reads and changes library sharing on one media server. */

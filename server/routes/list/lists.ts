@@ -14,6 +14,7 @@ import {
 } from '@server/entity/MediaList';
 import { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
+import { limitToLibraries } from '@server/lib/libraryVisibility';
 import { loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListShared } from '@server/lib/listActivity';
 import { listTitle } from '@server/lib/listTitles';
@@ -326,6 +327,9 @@ listRoutes.get<{ listId: string }>(
           where: { tmdbId: In(tvTmdbIds), mediaType: MediaType.TV },
           relations: { seasons: true },
         });
+        // None of a series' episodes count for a viewer whose libraries
+        // don't hold it.
+        await limitToLibraries(tvMedia, req.user);
 
         // Season id -> series, to attribute one grouped count without another
         // query.
@@ -333,6 +337,9 @@ listRoutes.get<{ listId: string }>(
 
         for (const entry of tvMedia) {
           availableEpisodes.set(entry.tmdbId, 0);
+          if (entry.outsideLibraries) {
+            continue;
+          }
 
           for (const season of entry.seasons ?? []) {
             // Specials never count towards availability.

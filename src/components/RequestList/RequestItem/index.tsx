@@ -10,6 +10,7 @@ import ConfirmButton from '@app/components/Common/ConfirmButton';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import MusicRequestItem from '@app/components/Music/MusicRequest/MusicRequestItem';
+import OverQuotaBadge from '@app/components/OverQuotaBadge';
 import RequestEta, {
   describeEta,
   expectedLabel,
@@ -605,6 +606,7 @@ const RequestItem = ({
                   }
                 />
               )}
+              <OverQuotaBadge request={requestData} className="ml-2" />
             </div>
             {requestData.status === MediaRequestStatus.DECLINED &&
               requestData.declineReason && (

@@ -2,9 +2,12 @@ import dataSource, { getRepository } from '@server/datasource';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import DownloadCheck from '@server/entity/DownloadCheck';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MusicMetadata from '@server/entity/MusicMetadata';
+import QualityApply from '@server/entity/QualityApply';
 import { Session } from '@server/entity/Session';
 import agent from '@server/lib/agent';
+import { connectedServers, MEDIA_SERVER_KINDS } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isPgsql } from '@server/utils/dbType';
@@ -13,8 +16,10 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
 /*
  * Nightly pruning of rows nothing reads: ended sessions, Backfill's finished
  * downloads and spent packs past the days kept, old admin agent
- * conversations, long-expired music details. Then vacuums (Postgres) or
- * checkpoints and compacts when worth it (SQLite).
+ * conversations, long-expired music details, which library held a title on
+ * a server or library that is gone, quality applies History no longer lists.
+ * Then vacuums (Postgres) or checkpoints and
+ * compacts when worth it (SQLite).
  *
  * Never touches user data: requests, issues, history, watchlists, and packs
  * an admin rejected (Backfill must not offer those again).
@@ -48,6 +53,8 @@ export interface MaintenanceReport {
     agentConversations: number;
     musicMetadata: number;
     downloadChecks: number;
+    libraryItems: number;
+    qualityApplies: number;
   };
   /** VACUUM (ANALYZE) on Postgres; checkpoint, optimize and maybe VACUUM on SQLite. */
   vacuum: string;
@@ -121,6 +128,74 @@ const pruneMusicMetadata = async (now: number): Promise<number> => {
   return result.affected ?? 0;
 };
 
+/**
+ * Which library holds a title, for a media server no longer connected or a
+ * library its server no longer lists. Scans clear only the libraries they
+ * read, so nothing else removes these, and a stale row could hide a title
+ * from someone who can now open it. A disabled library's rows are kept: they
+ * still hide its titles from people who can't open it.
+ */
+const pruneLibraryItems = async (): Promise<number> => {
+  const settings = getSettings();
+  const connected = connectedServers();
+  const repo = getRepository(MediaLibraryItem);
+  let removed = 0;
+  for (const kind of MEDIA_SERVER_KINDS) {
+    if (!connected.includes(kind)) {
+      removed += (await repo.delete({ server: kind })).affected ?? 0;
+      continue;
+    }
+    const listed = settings[kind].libraries ?? [];
+    // Not synced from the server yet: nothing to compare with.
+    if (!listed.length) continue;
+    const result = await repo.delete({
+      server: kind,
+      libraryId: Not(
+        In(listed.map((library) => MediaLibraryItem.key(kind, library.id)))
+      ),
+    });
+    removed += result.affected ?? 0;
+  }
+  return removed;
+};
+
+/** Rows removed per delete. */
+const DELETE_CHUNK = 500;
+
+/**
+ * Quality applies older than those History lists, with the copies kept for
+ * Undo. Each server's newest apply stays (its last-applied date), and its
+ * newest not undone (what Undo reverts).
+ */
+const pruneQualityApplies = async (): Promise<number> => {
+  const repo = getRepository(QualityApply);
+  const rows = await repo.find({
+    select: { id: true, serverKind: true, serverId: true, undoneAt: true },
+    order: { id: 'DESC' },
+  });
+  if (rows.length <= QualityApply.HISTORY_SHOWN) return 0;
+  const newest = new Set<string>();
+  const undoable = new Set<string>();
+  const gone: number[] = [];
+  rows.forEach((row, index) => {
+    const server = `${row.serverKind}:${row.serverId}`;
+    let keep = index < QualityApply.HISTORY_SHOWN;
+    if (!newest.has(server)) {
+      newest.add(server);
+      keep = true;
+    }
+    if (!row.undoneAt && !undoable.has(server)) {
+      undoable.add(server);
+      keep = true;
+    }
+    if (!keep) gone.push(row.id);
+  });
+  for (let i = 0; i < gone.length; i += DELETE_CHUNK) {
+    await repo.delete({ id: In(gone.slice(i, i + DELETE_CHUNK)) });
+  }
+  return gone.length;
+};
+
 const vacuum = async (): Promise<string> => {
   if (isPgsql) {
     // Must run outside a transaction. Autovacuum lags the night's deletes
@@ -160,6 +235,8 @@ export const runDbMaintenance = async (
     const agentConversations = await agent.purge(now);
     const musicMetadata = await pruneMusicMetadata(now);
     const downloadChecks = await pruneDownloadChecks(now);
+    const libraryItems = await pruneLibraryItems();
+    const qualityApplies = await pruneQualityApplies();
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -181,6 +258,8 @@ export const runDbMaintenance = async (
         agentConversations,
         musicMetadata,
         downloadChecks,
+        libraryItems,
+        qualityApplies,
       },
       vacuum: vacuumed,
       tookMs: Date.now() - started,

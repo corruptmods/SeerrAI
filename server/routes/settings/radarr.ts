@@ -1,4 +1,5 @@
 import RadarrAPI from '@server/api/servarr/radarr';
+import { cleanProfileFolders } from '@server/constants/requestDefaults';
 import type { RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -26,6 +27,7 @@ radarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newRadarr = req.body as RadarrSettings;
+  newRadarr.profileFolders = cleanProfileFolders(newRadarr.profileFolders);
   // Never reuse a removed server's id: titles keep the id of their server.
   newRadarr.id = settings.newId('radarr');
 
@@ -99,6 +101,11 @@ radarrRoutes.put<{ id: string }, RadarrSettings, RadarrSettings>(
     settings.radarr[radarrIndex] = {
       ...req.body,
       id: Number(req.params.id),
+      // Kept when not sent, so a client that doesn't know them can't drop them.
+      profileFolders:
+        req.body.profileFolders === undefined
+          ? settings.radarr[radarrIndex].profileFolders
+          : cleanProfileFolders(req.body.profileFolders),
     } as RadarrSettings;
     await settings.save();
 

@@ -29,6 +29,11 @@ export interface QuotaResponse {
   music: QuotaStatus;
   /** Songs, when Settings → Music gives them their own limit. */
   song?: QuotaStatus;
+  /**
+   * Requests over a limit wait for an admin instead of being refused
+   * (Settings → Users).
+   */
+  overQuotaWaits: boolean;
 }
 
 export interface UserWatchDataResponse {

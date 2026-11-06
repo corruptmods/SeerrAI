@@ -85,7 +85,7 @@ The hourly **Quality Profiles Check** job compares each managed server with what
 
 ## History and Undo
 
-Each apply is listed under **History**, with who applied it. **Undo** restores what it changed, removes what it created, and moves back titles still where it put them. Undo the newest first, while the server is managed. A profile still used by titles or by a server's request settings stays, and Undo says so.
+Each apply is listed under **History**, with who applied it. History keeps the 50 newest; the nightly **Database Maintenance** job removes older ones, except each server's newest and the one its **Undo** would revert. **Undo** restores what it changed, removes what it created, and moves back titles still where it put them. Undo the newest first, while the server is managed. A profile still used by titles or by a server's request settings stays, and Undo says so.
 
 **Apply** applies exactly what the preview showed: if the server or your choices changed in between, it says so and shows the new preview instead. If an apply stops part way (the server stops answering, say), what it did is still in History, so Undo can put it back.
 

@@ -1,19 +1,24 @@
 import TheMovieDb from '@server/api/themoviedb';
 import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import { MediaList, MediaListItem } from '@server/entity/MediaList';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
+import cacheManager from '@server/lib/cache';
+import libraryAccess from '@server/lib/libraryAccess';
 import { Permission } from '@server/lib/permissions';
+import { getSettings, jellyfinDefaults } from '@server/lib/settings';
 import listRoutes from '@server/routes/list';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import http from 'node:http';
-import { after, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 const stub = (name: string, fn: (a: never) => unknown) =>
   Object.defineProperty(TheMovieDb.prototype, name, {
@@ -29,6 +34,7 @@ describe('episode progress on list items', () => {
   let server: Server;
   let port: number;
   let owner: User;
+  let acting: User | undefined;
 
   const get = <T>(path: string) =>
     new Promise<T>((resolve, reject) => {
@@ -75,7 +81,7 @@ describe('episode progress on list items', () => {
       const app = express();
       app.use(express.json());
       app.use((req, _r, n) => {
-        (req as unknown as { user: User }).user = owner;
+        (req as unknown as { user: User }).user = acting ?? owner;
         n();
       });
       app.use('/api/v1/list', listRoutes);
@@ -85,6 +91,12 @@ describe('episode progress on list items', () => {
       port = (server.address() as { port: number }).port;
     }
   });
+  afterEach(() => {
+    mock.restoreAll();
+    getSettings().main.limitToLibraries = false;
+    acting = undefined;
+  });
+
   after(() => server?.close());
 
   it('counts available episodes across seasons, excluding specials', async () => {
@@ -157,5 +169,90 @@ describe('episode progress on list items', () => {
       '5 from season 1 + 2 from season 2, specials excluded'
     );
     assert.equal(item.totalEpisodes, 13, '8 + 5, specials excluded');
+  });
+
+  it('counts no episodes of a series the viewer’s libraries don’t hold', async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.main.limitToLibraries = true;
+    settings.jellyfin = { ...jellyfinDefaults(), connected: false };
+    settings.emby = { ...jellyfinDefaults(), connected: false };
+    cacheManager.getCache('libraryaccess').flush();
+    mock.method(libraryAccess, 'server', async () => ({
+      canGiveAll: false,
+      async read() {
+        return {
+          libraries: [
+            { id: '9001', title: 'Family Shows', type: 'show' as const },
+            { id: '9002', title: 'Shows', type: 'show' as const },
+          ],
+          people: [
+            {
+              id: '501',
+              name: 'kid',
+              ref: '1',
+              all: false,
+              libraries: ['9001'],
+            },
+          ],
+          scanIds: new Map([
+            ['9001', '1'],
+            ['9002', '2'],
+          ]),
+        };
+      },
+      async write() {},
+    }));
+    acting = await getRepository(User).save(
+      new User({
+        email: 'ep-kid@example.invalid',
+        permissions: Permission.REQUEST,
+        plexId: 501,
+        avatar: '',
+      })
+    );
+    const list = await getRepository(MediaList).save(
+      new MediaList({ name: 'Harbour Lights', ownerId: acting.id })
+    );
+    await getRepository(MediaListItem).save(
+      new MediaListItem({ listId: list.id, tmdbId: 98, mediaType: 'tv' })
+    );
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 98,
+        mediaType: MediaType.TV,
+        status: MediaStatus.AVAILABLE,
+        ratingKey: 'k-lights',
+      })
+    );
+    const s1 = await getRepository(Season).save(
+      new Season({
+        seasonNumber: 1,
+        status: MediaStatus.AVAILABLE,
+        media: Promise.resolve(media),
+      } as never)
+    );
+    for (let e = 1; e <= 3; e++)
+      await getRepository(Episode).save(
+        new Episode({
+          episodeNumber: e,
+          status: MediaStatus.AVAILABLE,
+          season: Promise.resolve(s1),
+        } as never)
+      );
+    await getRepository(MediaLibraryItem).save(
+      new MediaLibraryItem({
+        mediaId: media.id,
+        server: 'plex',
+        libraryId: '2',
+        is4k: false,
+        itemId: 'k-lights',
+      })
+    );
+
+    const body = await get<{ items: { availableEpisodes?: number }[] }>(
+      `/api/v1/list/${list.id}`
+    );
+    assert.equal(body.items[0].availableEpisodes, 0);
   });
 });

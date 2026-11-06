@@ -14,6 +14,7 @@ import type {
   LibraryAccessView,
   UserLibraryAccess,
 } from '@server/interfaces/api/libraryAccessInterfaces';
+import cacheManager from '@server/lib/cache';
 import { jellyfinAccess } from '@server/lib/libraryAccess/jellyfin';
 import { plexAccess } from '@server/lib/libraryAccess/plex';
 import type {
@@ -211,6 +212,8 @@ class LibraryAccess {
       return await work();
     } finally {
       this.busy.delete(kind);
+      // What people may see follows the change at once (lib/libraryVisibility).
+      cacheManager.getCache('libraryaccess').flush();
     }
   }
 

@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import Modal from '@app/components/Common/Modal';
+import { messages as requestMessages } from '@app/hooks/useBulkRequest';
 import useClickOutside from '@app/hooks/useClickOutside';
 import { MARKERS_KEY } from '@app/hooks/useMediaMarkers';
 import useToasts from '@app/hooks/useToasts';
@@ -22,6 +23,15 @@ export const messages = defineMessages('components.AddToList', {
   failed: 'List update failed: {detail}',
   done: 'Done',
 });
+
+/** What adding a title new to a list did about requesting it. */
+export interface ListAddResult {
+  added: boolean;
+  request?: {
+    outcome: 'requested' | 'here' | 'asked' | 'failed';
+    message?: string;
+  };
+}
 
 interface ListSummary {
   kind?: 'watch' | 'music';
@@ -83,6 +93,25 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
     });
   };
 
+  /** Says whether the add requested the title, or why it couldn't. */
+  const reportRequest = async (request: ListAddResult['request']) => {
+    if (request?.outcome === 'requested') {
+      addToast(intl.formatMessage(requestMessages.requested, { count: 1 }), {
+        appearance: 'success',
+        autoDismiss: true,
+      });
+      await globalMutate(`/api/v1/${mediaType}/${tmdbId}`);
+    } else if (request?.outcome === 'failed') {
+      addToast(
+        intl.formatMessage(requestMessages.refused, {
+          count: 1,
+          reason: request.message ?? '',
+        }),
+        { appearance: 'warning', autoDismiss: true }
+      );
+    }
+  };
+
   const toggle = async (listId: number) => {
     setPending((current) => [...current, listId]);
 
@@ -92,7 +121,11 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
           `/api/v1/list/${listId}/item?tmdbId=${tmdbId}&mediaType=${mediaType}`
         );
       } else {
-        await axios.post(`/api/v1/list/${listId}/item`, { tmdbId, mediaType });
+        const { data } = await axios.post<ListAddResult>(
+          `/api/v1/list/${listId}/item`,
+          { tmdbId, mediaType }
+        );
+        await reportRequest(data.request);
       }
 
       await Promise.all([
@@ -118,8 +151,12 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
       const { data } = await axios.post<{ id: number }>('/api/v1/list', {
         name,
       });
-      await axios.post(`/api/v1/list/${data.id}/item`, { tmdbId, mediaType });
+      const { data: added } = await axios.post<ListAddResult>(
+        `/api/v1/list/${data.id}/item`,
+        { tmdbId, mediaType }
+      );
       setNewName('');
+      await reportRequest(added.request);
       await Promise.all([
         revalidateLists(),
         revalidateMembership(),

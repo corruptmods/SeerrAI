@@ -13,6 +13,11 @@ import type {
 } from '@server/api/themoviedb/interfaces';
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { detectAnime } from '@server/lib/animeDecision';
+import type { SeenQuality } from '@server/lib/mediaQuality';
+import {
+  combineQuality,
+  jellyfinSourceQuality,
+} from '@server/lib/mediaQuality';
 import {
   hostnameFor,
   isConnected,
@@ -26,6 +31,7 @@ import type {
   StatusBase,
 } from '@server/lib/scanners/baseScanner';
 import BaseScanner from '@server/lib/scanners/baseScanner';
+import { LibraryItems } from '@server/lib/scanners/libraryItems';
 import type { ItemLabel } from '@server/lib/scanners/unidentified';
 import {
   NotIdentifiedError,
@@ -49,6 +55,24 @@ const resolutionUnknown = (item: {
     MediaSource.MediaStreams?.some(
       (MediaStream) => MediaStream.Type === 'Video'
     )
+  );
+
+/** Whether a version is 4K by Seerr's rule: wider than 2000 pixels. */
+const is4kSource = (source: JellyfinMediaSource): boolean =>
+  source.MediaStreams?.some(
+    (stream) => stream.Type === 'Video' && (stream.Width ?? 0) > 2000
+  ) ?? false;
+
+/** What an item's versions are in, on the side they count for. */
+const qualityOfSources = (
+  sources: JellyfinMediaSource[] | undefined,
+  is4k: boolean,
+  split4k: boolean
+): SeenQuality | undefined =>
+  combineQuality(
+    (sources ?? [])
+      .filter((source) => !split4k || is4kSource(source) === is4k)
+      .map(jellyfinSourceQuality)
   );
 
 /** Episodes a file covers (IndexNumber..IndexNumberEnd for multi-episode). */
@@ -97,6 +121,8 @@ class JellyfinScanner
   public readonly kind: JellyfinFamilyKind;
   /** Titles this scan skipped because the server hasn't identified them. */
   private unidentified: UnidentifiedTitles;
+  /** Titles in the current library that failed for a real reason. */
+  private failures = 0;
 
   constructor({
     isRecentOnly,
@@ -105,6 +131,7 @@ class JellyfinScanner
     super(`${serverName(kind)} Sync`);
     this.isRecentOnly = isRecentOnly ?? false;
     this.kind = kind;
+    this.libraryItems = new LibraryItems(kind);
     this.unidentified = new UnidentifiedTitles({
       server: serverName(kind),
       verb: 'identified',
@@ -121,6 +148,7 @@ class JellyfinScanner
 
   /** Logs one line naming a title that failed for a real reason. */
   private failed(item: JellyfinLibraryItem, e: Error) {
+    this.failures += 1;
     const label = labelOf(item);
     this.log(
       `Failed to process ${serverName(this.kind)} item ${nameOf(label)}`,
@@ -248,6 +276,11 @@ class JellyfinScanner
           itemId: metadata.Id,
           imdbId,
           title: metadata.Name,
+          quality: qualityOfSources(
+            metadata.MediaSources,
+            false,
+            this.enable4kMovie
+          ),
         });
       }
 
@@ -259,6 +292,7 @@ class JellyfinScanner
           itemId: metadata.Id,
           imdbId,
           title: metadata.Name,
+          quality: qualityOfSources(metadata.MediaSources, true, true),
         });
       }
     } catch (e) {
@@ -383,6 +417,10 @@ class JellyfinScanner
         const jellyfinSeasons = await this.jfClient.getSeasons(Id);
 
         const processableSeasons: ProcessableSeason[] = [];
+        const seen: Record<'standard' | '4k', (SeenQuality | undefined)[]> = {
+          standard: [],
+          '4k': [],
+        };
 
         const settings = getSettings();
         const filteredSeasons = settings.main.enableSpecialEpisodes
@@ -409,23 +447,29 @@ class JellyfinScanner
             let totalStandard = 0;
             let total4k = 0;
 
-            if (!this.enable4kShow) {
-              const episodes = await this.jfClient.getEpisodes(
-                Id,
-                matchedJellyfinSeason.Id
-              );
+            // With media info: resolution for 4K, and what each is in.
+            const episodes = await this.jfClient.getEpisodes(
+              Id,
+              matchedJellyfinSeason.Id,
+              { includeMediaInfo: true }
+            );
 
+            for (const episode of episodes) {
+              seen.standard.push(
+                qualityOfSources(episode.MediaSources, false, this.enable4kShow)
+              );
+              if (this.enable4kShow) {
+                seen['4k'].push(
+                  qualityOfSources(episode.MediaSources, true, true)
+                );
+              }
+            }
+
+            if (!this.enable4kShow) {
               for (const episode of episodes) {
                 totalStandard += episodeCountOf(episode);
               }
             } else {
-              // With 4K enabled, fetch media info to check resolution.
-              const episodes = await this.jfClient.getEpisodes(
-                Id,
-                matchedJellyfinSeason.Id,
-                { includeMediaInfo: true }
-              );
-
               for (const episode of episodes) {
                 const episodeCount = episodeCountOf(episode);
 
@@ -502,6 +546,10 @@ class JellyfinScanner
             mediaServer: this.kind,
             itemId: Id,
             title: tvShow.name,
+            qualities: {
+              standard: combineQuality(seen.standard),
+              '4k': combineQuality(seen['4k']),
+            },
           }
         );
       } else {
@@ -574,6 +622,7 @@ class JellyfinScanner
             'info'
           );
           const libraryItems = await this.jfClient.getRecentlyAdded(library.id);
+          await this.libraryItems?.begin(library.id);
 
           // One entry per series, season or item.
           this.items = uniqWith(libraryItems, (mediaA, mediaB) => {
@@ -589,6 +638,7 @@ class JellyfinScanner
           });
 
           await this.loop(this.processItem.bind(this), { sessionId });
+          this.libraryItems?.end();
         }
       } else {
         for (const library of this.libraries) {
@@ -596,7 +646,10 @@ class JellyfinScanner
           this.processedAnidbSeason = new Map();
           this.log(`Beginning to process library: ${library.name}`, 'info');
           this.items = await this.jfClient.getLibraryContents(library.id);
+          this.failures = 0;
+          await this.libraryItems?.begin(library.id);
           await this.loop(this.processItem.bind(this), { sessionId });
+          await this.settleLibraryItems(library);
         }
       }
 
@@ -614,7 +667,26 @@ class JellyfinScanner
     } catch (e) {
       this.log('Sync interrupted', 'error', { errorMessage: e.message });
     } finally {
+      this.libraryItems?.end();
       this.endRun(sessionId);
+    }
+  }
+
+  /**
+   * After a full pass of a library, forgets titles it no longer holds; not
+   * after a pass with failures, where a title it missed would look gone.
+   */
+  private async settleLibraryItems(library: Library): Promise<void> {
+    if (this.failures > 0) {
+      this.libraryItems?.end();
+      return;
+    }
+    const forgotten = (await this.libraryItems?.prune()) ?? 0;
+    if (forgotten) {
+      this.log(
+        `${library.name} no longer holds ${forgotten} title(s) it held`,
+        'info'
+      );
     }
   }
 

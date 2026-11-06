@@ -7,6 +7,7 @@ import {
   MediaType,
   VARIOUS_ARTISTS_MBID,
 } from '@server/constants/media';
+import { mappedFolder } from '@server/constants/requestDefaults';
 import type { SeriesType } from '@server/constants/seriesType';
 import { toSeriesTypeFor } from '@server/constants/seriesType';
 import { getRepository } from '@server/datasource';
@@ -28,13 +29,18 @@ import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { mediaEvent } from '@server/lib/notifications/eventTitles';
 import overrideRules from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
+import { radarrRouting } from '@server/lib/radarrRouting';
+import { savedProfileFor } from '@server/lib/requestDefaults';
 import { expectedOnApproval } from '@server/lib/requestEta';
 import type { RequestServerIssue } from '@server/lib/requestServers';
 import {
   chosenServerFor,
+  defaultServerFor,
   requestServerIssue,
 } from '@server/lib/requestServers';
+import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { sonarrRouting } from '@server/lib/sonarrRouting';
 import logger from '@server/logger';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import requestLock, {
@@ -123,8 +129,26 @@ const coveredMessage = (
   return `${song.songTitle} is already requested.`;
 };
 
+/**
+ * Whether a request over its requester's quota is saved for an admin to decide
+ * (Settings → Users) instead of refused. Automatic requests (watchlists,
+ * followed series) and ones from lists or several at once are still refused,
+ * so they can't pile up.
+ */
+export const overQuotaWaits = (alwaysRefused = false): boolean =>
+  !!getSettings().main.overQuotaRequests && !alwaysRefused;
+
+/** Notification field marking a request made over its requester's quota. */
+const OVER_QUOTA_FIELD = { name: 'Quota', value: 'Over the requester’s limit' };
+
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
+  /**
+   * Refused over the quota even when such requests wait for an admin: a
+   * request made for each title added to a list, or several at once, mustn't
+   * pile up.
+   */
+  refuseOverQuota?: boolean;
   /**
    * A new season of a followed series. Skips the guard against automatic
    * requests repeating, so an earlier auto-request for other seasons doesn't
@@ -373,6 +397,16 @@ export class MediaRequest {
         canBypassQuota &&
         ((quotas.music.limit ?? 0) > 0 || (songQuota.limit ?? 0) > 0));
 
+    // Over the quota: refused, or saved for an admin when Settings → Users
+    // says so.
+    let overQuota = false;
+    const overLimit = (message: string) => {
+      if (!overQuotaWaits()) {
+        throw new QuotaRestrictedError(message);
+      }
+      overQuota = true;
+    };
+
     if (!ignoreQuota) {
       if (requestBody.ignoreQuota && !canBypassQuota) {
         throw new RequestPermissionError(
@@ -382,7 +416,7 @@ export class MediaRequest {
         (asked.length && quotas.music.restricted) ||
         (askedSongs.length && songQuota.restricted)
       ) {
-        throw new QuotaRestrictedError('Music Quota exceeded.');
+        overLimit('Music Quota exceeded.');
       }
     }
 
@@ -470,7 +504,7 @@ export class MediaRequest {
             }`
       );
     }
-    if (!ignoreQuota) {
+    if (!ignoreQuota && !overQuota) {
       const over = (quota: typeof songQuota, count: number) =>
         !!quota.limit && count > (quota.remaining ?? 0);
       const left = (quota: typeof songQuota, one: string, many: string) =>
@@ -479,13 +513,12 @@ export class MediaRequest {
         }.`;
       if (quotas.song) {
         if (over(quotas.music, wanted.length)) {
-          throw new QuotaRestrictedError(left(quotas.music, 'album', 'albums'));
-        }
-        if (over(quotas.song, songs.length)) {
-          throw new QuotaRestrictedError(left(quotas.song, 'song', 'songs'));
+          overLimit(left(quotas.music, 'album', 'albums'));
+        } else if (over(quotas.song, songs.length)) {
+          overLimit(left(quotas.song, 'song', 'songs'));
         }
       } else if (over(quotas.music, wanted.length + songs.length)) {
-        throw new QuotaRestrictedError(
+        overLimit(
           songs.length
             ? left(quotas.music, 'album or song', 'albums or songs')
             : left(quotas.music, 'album', 'albums')
@@ -581,8 +614,10 @@ export class MediaRequest {
       }
     }
 
+    // Over quota, approving it is an admin's choice.
     const autoApproved =
       !needsApproval &&
+      !overQuota &&
       user.hasPermission(
         [
           Permission.AUTO_APPROVE,
@@ -638,6 +673,7 @@ export class MediaRequest {
       ),
       isAutoRequest: false,
       ignoreQuota,
+      overQuota,
     });
 
     await requestRepository.save(request);
@@ -721,6 +757,16 @@ export class MediaRequest {
         ? quotas.movie.limit
         : quotas.tv.limit) ?? 0) > 0;
 
+    // Over the quota: refused, or saved for an admin when Settings → Users
+    // says so.
+    let overQuota = false;
+    const overLimit = (message: string) => {
+      if (!overQuotaWaits(options.isAutoRequest || options.refuseOverQuota)) {
+        throw new QuotaRestrictedError(message);
+      }
+      overQuota = true;
+    };
+
     if (!ignoreQuota) {
       if (requestBody.ignoreQuota && !canBypassQuota) {
         throw new RequestPermissionError(
@@ -730,12 +776,12 @@ export class MediaRequest {
         requestBody.mediaType === MediaType.MOVIE &&
         quotas.movie.restricted
       ) {
-        throw new QuotaRestrictedError('Movie Quota exceeded.');
+        overLimit('Movie Quota exceeded.');
       } else if (
         requestBody.mediaType === MediaType.TV &&
         quotas.tv.restricted
       ) {
-        throw new QuotaRestrictedError('Series Quota exceeded.');
+        overLimit('Series Quota exceeded.');
       }
     }
 
@@ -947,6 +993,57 @@ export class MediaRequest {
         ? ruleResult.seriesType
         : null;
     const seriesType = chosenSeriesType ?? ruleSeriesType;
+
+    // A quality profile's mapped folder (Settings → Services) wins over a
+    // rule's folder and over one picked by someone who doesn't manage
+    // requests. Without a profile or a folder, both are settled when sent.
+    const managerFolder =
+      !!requestBody.rootFolder &&
+      user.hasPermission(Permission.MANAGE_REQUESTS);
+    const targetServer = (chosenServerFor(
+      {
+        type: requestBody.mediaType,
+        serverId: requestBody.serverId,
+        is4k: requestBody.is4k,
+      },
+      settings
+    ) ??
+      defaultServerFor(
+        { type: requestBody.mediaType, is4k: requestBody.is4k },
+        settings
+      )) as RadarrSettings | SonarrSettings | undefined;
+    if (targetServer && !managerFolder && (profileId || rootFolder)) {
+      // A folder without a profile goes with the profile it will be sent
+      // with: the requester's saved one, else the server's.
+      const sentProfile = () => {
+        const routing =
+          requestBody.mediaType === MediaType.MOVIE
+            ? radarrRouting(
+                tmdbMedia,
+                targetServer as RadarrSettings,
+                seriesType,
+                media.animeSetting
+              )
+            : sonarrRouting(
+                tmdbMedia,
+                targetServer as SonarrSettings,
+                seriesType,
+                media.animeSetting
+              );
+        return (
+          savedProfileFor(
+            requestUser,
+            requestBody.mediaType === MediaType.MOVIE ? 'radarr' : 'sonarr',
+            targetServer,
+            routing.anime
+          ) ?? routing.qualityProfile
+        );
+      };
+      const mapped = mappedFolder(targetServer, profileId ?? sentProfile());
+      if (mapped) {
+        rootFolder = mapped;
+      }
+    }
     if (
       overrideRulesResult.rootFolder ||
       overrideRulesResult.profileId ||
@@ -959,42 +1056,39 @@ export class MediaRequest {
       });
     }
 
+    // Auto-approve for admins and users with an auto-approve permission,
+    // unless over quota: then approving it is an admin's choice.
+    const autoApproves = (kind: 'movie' | 'tv') =>
+      !overQuota &&
+      user.hasPermission(
+        [
+          requestBody.is4k
+            ? Permission.AUTO_APPROVE_4K
+            : Permission.AUTO_APPROVE,
+          kind === 'movie'
+            ? requestBody.is4k
+              ? Permission.AUTO_APPROVE_4K_MOVIE
+              : Permission.AUTO_APPROVE_MOVIE
+            : requestBody.is4k
+              ? Permission.AUTO_APPROVE_4K_TV
+              : Permission.AUTO_APPROVE_TV,
+          Permission.MANAGE_REQUESTS,
+        ],
+        { type: 'or' }
+      );
+
     if (requestBody.mediaType === MediaType.MOVIE) {
       await mediaRepository.save(media);
 
+      const autoApproved = autoApproves('movie');
       const request = new MediaRequest({
         type: MediaType.MOVIE,
         media,
         requestedBy: requestUser,
-        // Auto-approve for admins and users with an auto-approve permission.
-        status: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_MOVIE
-              : Permission.AUTO_APPROVE_MOVIE,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
+        status: autoApproved
           ? MediaRequestStatus.APPROVED
           : MediaRequestStatus.PENDING,
-        modifiedBy: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_MOVIE
-              : Permission.AUTO_APPROVE_MOVIE,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
-          ? user
-          : undefined,
+        modifiedBy: autoApproved ? user : undefined,
         is4k: requestBody.is4k,
         serverId: requestBody.serverId,
         profileId: profileId,
@@ -1003,6 +1097,7 @@ export class MediaRequest {
         seriesType,
         isAutoRequest: options.isAutoRequest ?? false,
         ignoreQuota,
+        overQuota,
       });
 
       await requestRepository.save(request);
@@ -1069,47 +1164,25 @@ export class MediaRequest {
         throw new NoSeasonsAvailableError('No seasons available to request');
       } else if (
         !ignoreQuota &&
+        !overQuota &&
         quotas.tv.limit &&
         finalSeasons.length > (quotas.tv.remaining ?? 0)
       ) {
-        throw new QuotaRestrictedError('Series Quota exceeded.');
+        overLimit('Series Quota exceeded.');
       }
 
       await mediaRepository.save(media);
 
+      const autoApproved = autoApproves('tv');
+      const status = autoApproved
+        ? MediaRequestStatus.APPROVED
+        : MediaRequestStatus.PENDING;
       const request = new MediaRequest({
         type: MediaType.TV,
         media,
         requestedBy: requestUser,
-        // Auto-approve for admins and users with an auto-approve permission.
-        status: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_TV
-              : Permission.AUTO_APPROVE_TV,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
-          ? MediaRequestStatus.APPROVED
-          : MediaRequestStatus.PENDING,
-        modifiedBy: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_TV
-              : Permission.AUTO_APPROVE_TV,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
-          ? user
-          : undefined,
+        status,
+        modifiedBy: autoApproved ? user : undefined,
         is4k: requestBody.is4k,
         serverId: requestBody.serverId,
         profileId: profileId,
@@ -1124,24 +1197,12 @@ export class MediaRequest {
               episodes: (requestBody.episodes?.[sn] ?? []).map(
                 (episodeNumber) => new EpisodeRequest({ episodeNumber })
               ),
-              status: user.hasPermission(
-                [
-                  requestBody.is4k
-                    ? Permission.AUTO_APPROVE_4K
-                    : Permission.AUTO_APPROVE,
-                  requestBody.is4k
-                    ? Permission.AUTO_APPROVE_4K_TV
-                    : Permission.AUTO_APPROVE_TV,
-                  Permission.MANAGE_REQUESTS,
-                ],
-                { type: 'or' }
-              )
-                ? MediaRequestStatus.APPROVED
-                : MediaRequestStatus.PENDING,
+              status,
             })
         ),
         isAutoRequest: options.isAutoRequest ?? false,
         ignoreQuota,
+        overQuota,
       });
 
       await requestRepository.save(request);
@@ -1294,6 +1355,13 @@ export class MediaRequest {
   public ignoreQuota: boolean;
 
   /**
+   * Made over the requester's quota and left for an admin to decide (Settings
+   * → Users). Counts towards the quota like any request until declined.
+   */
+  @Column({ default: false })
+  public overQuota: boolean;
+
+  /**
    * Why a pending or failed request has no server to go to (its Radarr, Sonarr
    * or Lidarr server was removed, or none exists). Computed from settings on
    * load; never stored.
@@ -1326,7 +1394,13 @@ export class MediaRequest {
         return;
       }
 
-      MediaRequest.sendNotification(this, media, Notification.MEDIA_PENDING);
+      MediaRequest.sendNotification(
+        this,
+        media,
+        Notification.MEDIA_PENDING,
+        undefined,
+        this.overQuota ? [OVER_QUOTA_FIELD] : undefined
+      );
 
       if (this.isAutoRequest) {
         MediaRequest.sendNotification(

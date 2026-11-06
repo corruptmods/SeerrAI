@@ -26,6 +26,7 @@ import PreparedEmail from '@server/lib/email';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { makeKey } from '@server/lib/personalApiKeys';
+import type { LidarrSettings, RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -680,6 +681,54 @@ describe('a person’s Trakt username', () => {
     );
 
     assert.strictEqual((await save('')).body.traktUsername, null);
+  });
+});
+
+describe('a person’s default quality profiles', () => {
+  it('are kept per server, checked, and left alone when not sent', async () => {
+    const settings = getSettings();
+    const saved = { radarr: settings.radarr, lidarr: settings.lidarr };
+    settings.radarr = [{ id: 0, name: 'Radarr' } as RadarrSettings];
+    settings.lidarr = [{ id: 2, name: 'Lidarr' } as LidarrSettings];
+    try {
+      const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+      const res = await agent.post(`/user/${userId}/settings/main`).send({
+        username: 'friend',
+        defaultProfiles: [
+          { service: 'radarr', serverId: 0, profileId: 4 },
+          { service: 'radarr', serverId: 0, anime: true, profileId: 9 },
+          { service: 'radarr', serverId: 5, profileId: 4 },
+          { service: 'sonarr', serverId: 0, profileId: 4 },
+          { service: 'lidarr', serverId: 2, profileId: 3 },
+        ],
+      });
+      assert.strictEqual(res.status, 200);
+      const expected = [
+        { service: 'radarr', serverId: 0, profileId: 4 },
+        { service: 'radarr', serverId: 0, anime: true, profileId: 9 },
+        { service: 'lidarr', serverId: 2, profileId: 3 },
+      ];
+      assert.deepStrictEqual(res.body.defaultProfiles, expected);
+
+      await agent
+        .post(`/user/${userId}/settings/main`)
+        .send({ username: 'friend', locale: 'en' });
+      assert.deepStrictEqual(
+        (await agent.get(`/user/${userId}/settings/main`)).body.defaultProfiles,
+        expected
+      );
+
+      await agent
+        .post(`/user/${userId}/settings/main`)
+        .send({ username: 'friend', defaultProfiles: [] });
+      assert.deepStrictEqual(
+        (await agent.get(`/user/${userId}/settings/main`)).body.defaultProfiles,
+        []
+      );
+    } finally {
+      settings.radarr = saved.radarr;
+      settings.lidarr = saved.lidarr;
+    }
   });
 });
 

@@ -19,7 +19,9 @@ import FailedRequestAlert, {
 } from '@app/components/RequestModal/FailedRequestAlert';
 import type { MusicOverrides } from '@app/components/RequestModal/MusicAdvancedRequester';
 import MusicAdvancedRequester from '@app/components/RequestModal/MusicAdvancedRequester';
-import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
+import QuotaDisplay, {
+  OverQuotaAlert,
+} from '@app/components/RequestModal/QuotaDisplay';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -165,10 +167,14 @@ const MusicRequestModal = ({
   const { data: servers } = useSWR<LidarrServer[]>('/api/v1/service/lidarr');
   const serverId =
     overrides.server ?? servers?.find((server) => server.isDefault)?.id;
+  // Read for the person the request is for, with their saved profile.
+  const profileUserId = overrides.userId ?? user?.id;
   const { data: serverData, error: serverError } =
     useSWR<LidarrServerWithDetails>(
       serverId !== undefined
-        ? `/api/v1/service/lidarr/${serverId}?artist=${artistMbid}`
+        ? `/api/v1/service/lidarr/${serverId}?artist=${artistMbid}${
+            profileUserId !== undefined ? `&requestUser=${profileUserId}` : ''
+          }`
         : null
     );
   const quotaUserId = overrides.userId ?? user?.id;
@@ -192,7 +198,13 @@ const MusicRequestModal = ({
     setOverrides((current) => ({
       ...current,
       server: current.server ?? serverData.server.id,
-      profile: current.profile ?? serverData.server.activeProfileId,
+      profile:
+        current.profile ??
+        (serverData.profiles.some(
+          (profile) => profile.id === serverData.savedProfileId
+        )
+          ? serverData.savedProfileId
+          : serverData.server.activeProfileId),
       metadataProfile:
         current.metadataProfile ?? serverData.server.activeMetadataProfileId,
       folder: current.folder ?? serverData.server.activeDirectory,
@@ -260,6 +272,9 @@ const MusicRequestModal = ({
     quotaLimited &&
     !overrides.ignoreQuota &&
     chosen.length > (quota?.music.remaining ?? 0);
+  // Past the limit: refused, or left for an admin when the server allows it.
+  const pastLimit =
+    (!!quota?.music.restricted && !overrides.ignoreQuota) || overQuota;
   const title =
     chosen.length === 1
       ? (albums.find((album) => album.id === chosen[0])?.title ??
@@ -592,6 +607,7 @@ const MusicRequestModal = ({
             username: editRequest.requestedBy.displayName,
           })
         )}
+        {!isFailed && editRequest.overQuota && <OverQuotaAlert />}
         {!!editRequest.songs?.length && (
           <div className="mt-4">
             <p className="text-label">
@@ -625,8 +641,7 @@ const MusicRequestModal = ({
         isUpdating ||
         variousArtists ||
         !chosen.length ||
-        (quota?.music.restricted && !overrides.ignoreQuota) ||
-        overQuota
+        (pastLimit && !quota?.overQuotaWaits)
       }
       title={intl.formatMessage(messages.requesttitle)}
       subTitle={artist?.name}
@@ -639,14 +654,17 @@ const MusicRequestModal = ({
       }
       okButtonType="primary"
     >
-      {autoApproves && !quota?.music.restricted && (
-        <div className="mt-6">
-          <Alert
-            title={intl.formatMessage(messages.requestadmin)}
-            type="info"
-          />
-        </div>
-      )}
+      {autoApproves &&
+        !quota?.music.restricted &&
+        !(pastLimit && quota?.overQuotaWaits) && (
+          <div className="mt-6">
+            <Alert
+              title={intl.formatMessage(messages.requestadmin)}
+              type="info"
+            />
+          </div>
+        )}
+      {pastLimit && quota?.overQuotaWaits && <OverQuotaAlert />}
       {quotaLimited && (
         <QuotaDisplay
           mediaType="music"
@@ -661,7 +679,9 @@ const MusicRequestModal = ({
               ? overrides.userId
               : undefined
           }
-          overLimit={overQuota ? chosen.length : undefined}
+          overLimit={
+            overQuota && !quota?.overQuotaWaits ? chosen.length : undefined
+          }
         />
       )}
       {albumList}

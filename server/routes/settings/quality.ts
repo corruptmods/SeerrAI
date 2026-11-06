@@ -195,7 +195,7 @@ const runJob = async (
 const historyOf = async () => {
   const entries = await getRepository(QualityApply).find({
     order: { id: 'DESC' },
-    take: 50,
+    take: QualityApply.HISTORY_SHOWN,
   });
   const userIds = [
     ...new Set(entries.map((e) => e.userId).filter((id) => id !== null)),

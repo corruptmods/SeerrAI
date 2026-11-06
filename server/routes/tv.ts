@@ -26,6 +26,7 @@ import {
   unsubscribe,
   unsubscribeEveryone,
 } from '@server/lib/futureSeasons';
+import { limitToLibraries } from '@server/lib/libraryVisibility';
 import mediaForViewer from '@server/lib/mediaForViewer';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
@@ -66,6 +67,7 @@ tvRoutes.get('/:id', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
     const media = await Media.getMedia(tv.id, MediaType.TV);
+    await limitToLibraries([media], req.user);
 
     const onUserWatchlist = await getRepository(Watchlist).exist({
       where: {
@@ -136,6 +138,8 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
     const mediaSeason = media?.seasons.find(
       (s) => s.seasonNumber === Number(req.params.seasonNumber)
     );
+    // A copy the viewer's libraries don't hold has no episodes for them.
+    await limitToLibraries([media], req.user);
 
     if (mediaSeason) {
       const episodeRows: Episode[] = await getRepository(Episode).find({
@@ -144,8 +148,11 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
 
       for (const row of episodeRows) {
         availability.set(row.episodeNumber, {
-          available: row.status === MediaStatus.AVAILABLE,
-          available4k: row.status4k === MediaStatus.AVAILABLE,
+          available:
+            !media?.outsideLibraries && row.status === MediaStatus.AVAILABLE,
+          available4k:
+            !media?.outsideLibraries4k &&
+            row.status4k === MediaStatus.AVAILABLE,
         });
       }
     }

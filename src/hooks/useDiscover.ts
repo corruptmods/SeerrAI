@@ -1,3 +1,4 @@
+import usePageReturn from '@app/hooks/usePageReturn';
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -33,6 +34,8 @@ interface DiscoverResult<T, S> {
   isReachingEnd: boolean;
   error: unknown;
   titles: T[];
+  /** Pages of results loaded. */
+  pagesLoaded: number;
   firstResultData?: BaseSearchResult<T> & S;
   mutate?: () => void;
 }
@@ -192,6 +195,27 @@ const useDiscover = <
     }
   }, [starting, size, setSize]);
 
+  // Coming back to the list: the pages it had, then where it was scrolled.
+  const loadedPages = data?.length ?? 0;
+  const returnPages = usePageReturn('list', {
+    pages: loadedPages,
+    isReady: (wanted) =>
+      !isLoadingInitialData &&
+      (!!error || isReachingEnd || loadedPages >= (wanted ?? 0)),
+  });
+  useEffect(() => {
+    if (
+      returnPages &&
+      returnPages > START_PAGES &&
+      loadedPages > 0 &&
+      size < returnPages &&
+      !isReachingEnd &&
+      !error
+    ) {
+      setSize(returnPages);
+    }
+  }, [returnPages, loadedPages, size, isReachingEnd, error, setSize]);
+
   // Initial pages count as loading more, so scrolling doesn't re-request page 2.
   const isLoadingMore = loadingPages || (starting && !error);
 
@@ -241,6 +265,7 @@ const useDiscover = <
     isReachingEnd,
     error: error && titles.length ? null : error,
     titles,
+    pagesLoaded: loadedPages,
     firstResultData: data?.[0],
     mutate,
   };

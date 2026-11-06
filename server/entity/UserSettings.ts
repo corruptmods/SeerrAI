@@ -1,3 +1,5 @@
+import type { UserDefaultProfile } from '@server/constants/requestDefaults';
+import { cleanDefaultProfiles } from '@server/constants/requestDefaults';
 import type { Appearance } from '@server/constants/theme';
 import { cleanAppearance } from '@server/constants/theme';
 import type { NotificationAgentTypes } from '@server/interfaces/api/userSettingsInterfaces';
@@ -47,6 +49,21 @@ const jsonNumberArrayTransformer = {
   },
   to: (v: number[] | null): string | null =>
     v?.length ? JSON.stringify(v) : null,
+};
+
+/** Saved default quality profiles as JSON; none when unreadable. */
+const defaultProfilesTransformer = {
+  from: (v: string | null): UserDefaultProfile[] => {
+    try {
+      return v ? cleanDefaultProfiles(JSON.parse(v)) : [];
+    } catch {
+      return [];
+    }
+  },
+  to: (
+    v: UserDefaultProfile[] | null | undefined
+  ): string | null | undefined =>
+    v === undefined ? undefined : v?.length ? JSON.stringify(v) : null,
 };
 
 /** A user's look as JSON; null (or anything unreadable) for none. */
@@ -178,6 +195,18 @@ export class UserSettings {
 
   @Column({ nullable: true })
   public watchlistSyncTv?: boolean;
+
+  /**
+   * Quality profiles this person picked for their own requests, per server
+   * (constants/requestDefaults). Used only while they may choose advanced
+   * request options.
+   */
+  @Column({
+    type: 'text',
+    nullable: true,
+    transformer: defaultProfilesTransformer,
+  })
+  public defaultProfiles?: UserDefaultProfile[];
 
   @Column({
     type: 'text',

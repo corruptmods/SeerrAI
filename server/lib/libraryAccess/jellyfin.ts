@@ -75,7 +75,13 @@ export const jellyfinAccess = async (
             ...(policy.IsDisabled ? { disabled: true } : {}),
           };
         });
-      return { libraries, people };
+      return {
+        libraries,
+        people,
+        scanIds: new Map(
+          folders.map((folder, i) => [libraries[i].id, folder.Id])
+        ),
+      };
     },
 
     async write(person, to) {

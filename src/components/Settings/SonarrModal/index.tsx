@@ -1,5 +1,6 @@
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
+import ProfileFolders from '@app/components/Settings/ProfileFolders';
 import type { SonarrTestResponse } from '@app/components/Settings/SettingsServices';
 import { arrTestFailure } from '@app/components/Settings/arrTestFailure';
 import useToasts from '@app/hooks/useToasts';
@@ -267,6 +268,7 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
           syncEnabled: sonarr?.syncEnabled ?? false,
           enableSearch: !sonarr?.preventSearch,
           tagRequests: sonarr?.tagRequests ?? false,
+          profileFolders: sonarr?.profileFolders ?? [],
           monitorNewItems: sonarr?.monitorNewItems ?? 'all',
         }}
         validationSchema={SonarrSettingsSchema}
@@ -311,6 +313,7 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
               syncEnabled: values.syncEnabled,
               preventSearch: !values.enableSearch,
               tagRequests: values.tagRequests,
+              profileFolders: values.profileFolders,
               monitorNewItems: values.monitorNewItems,
             };
             if (!sonarr) {
@@ -1055,6 +1058,13 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                     <div className="error">{errors.monitorNewItems}</div>
                   )}
                 </div>
+                <ProfileFolders
+                  profiles={testResponse.profiles}
+                  rootFolders={testResponse.rootFolders}
+                  value={values.profileFolders}
+                  onChange={(value) => setFieldValue('profileFolders', value)}
+                  disabled={!isValidated || isTesting}
+                />
                 <div className="form-row">
                   <label htmlFor="externalUrl" className="text-label">
                     {intl.formatMessage(messages.externalUrl)}

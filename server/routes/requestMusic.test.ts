@@ -19,6 +19,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import { UserSettings } from '@server/entity/UserSettings';
 import cacheManager from '@server/lib/cache';
 import { completeMusicRequests } from '@server/lib/music/completion';
 import notificationManager, { Notification } from '@server/lib/notifications';
@@ -462,6 +463,86 @@ describe('POST /request/music', () => {
   });
 });
 
+describe('music requests over the quota, left for an admin', () => {
+  beforeEach(() => {
+    getSettings().main.overQuotaRequests = true;
+  });
+
+  afterEach(() => {
+    getSettings().main.overQuotaRequests = false;
+  });
+
+  const limitTo = async (permissions: number, musicQuotaLimit: number) => {
+    const user = await actAs(permissions);
+    await getRepository(User).update(user.id, {
+      musicQuotaLimit,
+      musicQuotaDays: 7,
+    });
+    actingAs = await getRepository(User).findOneByOrFail({ id: user.id });
+    return user;
+  };
+
+  it('saves the request as pending and marks it, even with auto-approve', async () => {
+    await limitTo(Permission.REQUEST + Permission.AUTO_APPROVE, 1);
+
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
+
+    assert.equal(res.status, 201);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: (res.body as { id: number }).id },
+    });
+    assert.equal(request.status, MediaRequestStatus.PENDING);
+    assert.equal(request.overQuota, true);
+    assert.ok(
+      request.albums.every(
+        (album) => album.status === MediaRequestStatus.PENDING
+      )
+    );
+    assert.equal(lidarr.calls.length, 0);
+  });
+
+  it('approves a request within the quota as before', async () => {
+    await limitTo(Permission.REQUEST + Permission.AUTO_APPROVE, 2);
+
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
+
+    assert.equal(res.status, 201);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: (res.body as { id: number }).id },
+    });
+    assert.equal(request.status, MediaRequestStatus.APPROVED);
+    assert.equal(request.overQuota, false);
+  });
+
+  it('marks a request edited past the quota', async () => {
+    await limitTo(Permission.REQUEST, 1);
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
+    const id = (res.body as { id: number }).id;
+
+    const edit = await call('PUT', `/request/${id}`, {
+      mediaType: 'music',
+      albums: [STATIC_GARDEN, FOG_B],
+    });
+
+    assert.equal(edit.status, 200);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.overQuota, true);
+    assert.equal(request.albums.length, 2);
+  });
+
+  it('still refuses when the setting is off', async () => {
+    getSettings().main.overQuotaRequests = false;
+    await limitTo(Permission.REQUEST, 1);
+
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
+
+    assert.equal(res.status, 403);
+    assert.equal(await getRepository(MediaRequest).count(), 0);
+  });
+});
+
 describe('music requests in the lists', () => {
   it('are listed by default for someone with music, with their albums', async () => {
     const res = await requestMusic({ albums: [STATIC_GARDEN] });
@@ -648,6 +729,62 @@ describe('changing a music request', () => {
     );
     assert.equal((await albumRow(FOG_B)).status, MediaStatus.PROCESSING);
     assert.equal((await artistMedia()).status, MediaStatus.PROCESSING);
+  });
+});
+
+describe('a music request sent without a quality profile', () => {
+  const sendAs = async (permissions: number, savedProfile: number) => {
+    lidarr.lookupArtists.set(ARTIST, {
+      id: 0,
+      artistName: 'Glasswing',
+      foreignArtistId: ARTIST,
+      monitored: false,
+      qualityProfileId: 0,
+      metadataProfileId: 0,
+      tags: [],
+    });
+    lidarr.profiles = [
+      { id: 1, name: 'Any' },
+      { id: 5, name: 'Lossless' },
+    ];
+    const listener = await actAs(permissions);
+    await getRepository(UserSettings).save(
+      new UserSettings({
+        user: listener,
+        defaultProfiles: [
+          { service: 'lidarr', serverId: 0, profileId: savedProfile },
+        ],
+      })
+    );
+    // Two albums, so the artist is added with them.
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
+    const id = (res.body as { id: number }).id;
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    assert.equal((await call('POST', `/request/${id}/approve`)).status, 200);
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/artist'
+    );
+    return lidarr.calls.find(
+      (c) => c.method === 'POST' && c.path === '/api/v1/artist'
+    )?.body?.qualityProfileId;
+  };
+
+  it('goes with the profile the requester saved for that Lidarr', async () => {
+    assert.equal(
+      await sendAs(Permission.REQUEST + Permission.REQUEST_ADVANCED, 5),
+      5
+    );
+  });
+
+  it('goes with the server’s profile once the saved one is gone', async () => {
+    assert.equal(
+      await sendAs(Permission.REQUEST + Permission.REQUEST_ADVANCED, 9),
+      1
+    );
+  });
+
+  it('goes with the server’s profile for someone who may not choose one', async () => {
+    assert.equal(await sendAs(Permission.REQUEST, 5), 1);
   });
 });
 

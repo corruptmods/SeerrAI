@@ -1,3 +1,4 @@
+import type { WatchlistSort } from '@server/constants/watchlistSort';
 import type { PlexDevice } from '@server/interfaces/api/plexInterfaces';
 import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
@@ -153,6 +154,13 @@ interface MetadataResponse {
     Video?: PlexMetadataItem[];
   };
 }
+
+/** Plex's names for the watchlist orders. */
+const PLEX_WATCHLIST_SORTS: Record<WatchlistSort, string> = {
+  'added-desc': 'watchlistedAt:desc',
+  'added-asc': 'watchlistedAt:asc',
+  title: 'titleSort:asc',
+};
 
 /**
  * Whether a body is a real watchlist. Discover sometimes answers 200 without
@@ -377,7 +385,13 @@ class PlexTvAPI extends ExternalAPI {
   public async getWatchlist({
     offset = 0,
     size = 20,
-  }: { offset?: number; size?: number } = {}): Promise<{
+    sort,
+  }: {
+    offset?: number;
+    size?: number;
+    /** Plex's own order when none is given. */
+    sort?: WatchlistSort;
+  } = {}): Promise<{
     offset: number;
     size: number;
     totalSize: number;
@@ -396,7 +410,9 @@ class PlexTvAPI extends ExternalAPI {
     try {
       // Cache per page: one page's ETag says nothing of another's, and a 304
       // for one must not serve another.
-      const cacheKey = `${this.authToken}:${offset}:${size}`;
+      const cacheKey = `${this.authToken}:${offset}:${size}${
+        sort ? `:${sort}` : ''
+      }`;
       const watchlistCache = cacheManager.getCache('plexwatchlist');
       let cachedWatchlist =
         watchlistCache.data.get<PlexWatchlistCache>(cacheKey);
@@ -407,6 +423,7 @@ class PlexTvAPI extends ExternalAPI {
           params: {
             'X-Plex-Container-Start': offset,
             'X-Plex-Container-Size': size,
+            ...(sort && { sort: PLEX_WATCHLIST_SORTS[sort] }),
           },
           headers: cachedWatchlist?.etag
             ? { 'If-None-Match': cachedWatchlist.etag }

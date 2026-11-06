@@ -220,6 +220,37 @@ describe('an override rule on age ratings', () => {
   });
 });
 
+describe('an override rule on production countries', () => {
+  const stored = () =>
+    getRepository(OverrideRule).findOneOrFail({
+      where: { rootFolder: '/world' },
+    });
+
+  it('keeps the countries it is given, through the API', async () => {
+    assert.equal(
+      await call('POST', '/api/v1/overrideRule', {
+        radarrServiceId: 0,
+        country: ' kr , FR ',
+        rootFolder: '/world',
+      }),
+      200
+    );
+    const created = await stored();
+    assert.equal(created.country, 'KR,FR');
+
+    assert.equal(
+      await call('PUT', `/api/v1/overrideRule/${created.id}`, {
+        radarrServiceId: 0,
+        country: null,
+        genre: '99',
+        rootFolder: '/world',
+      }),
+      200
+    );
+    assert.equal((await stored()).country, null);
+  });
+});
+
 describe('the request window’s rule preview', () => {
   const previewBody = async (body: object) => {
     const res = await fetch(

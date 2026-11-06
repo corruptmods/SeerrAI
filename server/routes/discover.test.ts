@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import { Watchlist } from '@server/entity/Watchlist';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import discoverRoutes from '@server/routes/discover';
@@ -506,5 +507,54 @@ describe('leaving out streaming services', () => {
       assert.equal(res.status, 400, bad);
     }
     assert.equal(searched.length, 0);
+  });
+});
+
+describe('the order of Your Watchlist', () => {
+  beforeEach(async () => {
+    for (const [tmdbId, title] of [
+      [9101, 'Static Garden'],
+      [9102, 'Harbour Lights'],
+      [9103, 'Lantern Song'],
+    ] as const) {
+      const media = await getRepository(Media).save(
+        new Media({ tmdbId, mediaType: MediaType.MOVIE })
+      );
+      await getRepository(Watchlist).save(
+        Object.assign(new Watchlist(), {
+          tmdbId,
+          mediaType: MediaType.MOVIE,
+          title,
+          requestedBy: actingAs,
+          media,
+        })
+      );
+    }
+  });
+
+  const order = async (query: string) => {
+    const res = await get(`/watchlist${query}`);
+    assert.equal(res.status, 200, await res.clone().text());
+    const body = (await res.json()) as {
+      totalResults: number;
+      results: { tmdbId: number }[];
+    };
+    assert.equal(body.totalResults, 3);
+    return body.results.map((item) => item.tmdbId);
+  };
+
+  it('stays in the order added when none is chosen', async () => {
+    assert.deepEqual(await order(''), [9101, 9102, 9103]);
+  });
+
+  it('lists the newest added first, the oldest first or by title', async () => {
+    assert.deepEqual(await order('?sort=added-desc'), [9103, 9102, 9101]);
+    assert.deepEqual(await order('?sort=added-asc'), [9101, 9102, 9103]);
+    assert.deepEqual(await order('?sort=title'), [9102, 9103, 9101]);
+  });
+
+  it('refuses an order it does not know', async () => {
+    const res = await get('/watchlist?sort=random');
+    assert.equal(res.status, 400);
   });
 });

@@ -1,3 +1,4 @@
+import Alert from '@app/components/Common/Alert';
 import ProgressCircle from '@app/components/Common/ProgressCircle';
 import defineMessages from '@app/utils/defineMessages';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
@@ -33,7 +34,19 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
     'You need at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} left for this request.',
   requiredquotaAlbumsUser:
     'This user needs at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} left for this request.',
+  overQuota:
+    'This is over the request limit, so it waits for an admin to approve it.',
 });
+
+/** A request past the limit, which waits for an admin (Settings → Users). */
+export const OverQuotaAlert = () => {
+  const intl = useIntl();
+  return (
+    <div className="mt-6">
+      <Alert title={intl.formatMessage(messages.overQuota)} type="warning" />
+    </div>
+  );
+};
 
 interface QuotaDisplayProps {
   quota?: QuotaStatus;

@@ -20,6 +20,11 @@ import type {
 import { getAnimePlacement, setAnimeSetting } from '@server/lib/animePlacement';
 import { NoArrServerError, removeFromArr } from '@server/lib/arrRemoval';
 import { featureEnabled } from '@server/lib/features';
+import {
+  leaveOutUnreachable,
+  limitToLibraries,
+  viewerReach,
+} from '@server/lib/libraryVisibility';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
 import {
   MediaEventType,
@@ -41,8 +46,7 @@ import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { pageOf } from '@server/utils/pagination';
 import { Router } from 'express';
-import type { FindOneOptions } from 'typeorm';
-import { EntityNotFoundError, In, IsNull, Not } from 'typeorm';
+import { EntityNotFoundError } from 'typeorm';
 
 const mediaRoutes = Router();
 
@@ -51,43 +55,24 @@ mediaRoutes.get('/', async (req, res, next) => {
 
   const { pageSize, skip } = pageOf(req.query, 20);
 
-  let statusFilter = undefined;
+  let statuses: MediaStatus[] | undefined;
 
   switch (req.query.filter) {
     case 'available':
-      statusFilter = MediaStatus.AVAILABLE;
+      statuses = [MediaStatus.AVAILABLE];
       break;
     case 'partial':
-      statusFilter = MediaStatus.PARTIALLY_AVAILABLE;
+      statuses = [MediaStatus.PARTIALLY_AVAILABLE];
       break;
     case 'allavailable':
-      statusFilter = In([
-        MediaStatus.AVAILABLE,
-        MediaStatus.PARTIALLY_AVAILABLE,
-      ]);
+      statuses = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
       break;
     case 'processing':
-      statusFilter = MediaStatus.PROCESSING;
+      statuses = [MediaStatus.PROCESSING];
       break;
     case 'pending':
-      statusFilter = MediaStatus.PENDING;
+      statuses = [MediaStatus.PENDING];
       break;
-  }
-
-  let sortFilter: FindOneOptions<Media>['order'] = {
-    id: 'DESC',
-  };
-
-  switch (req.query.sort) {
-    case 'modified':
-      sortFilter = {
-        updatedAt: 'DESC',
-      };
-      break;
-    case 'mediaAdded':
-      sortFilter = {
-        mediaAddedAt: 'DESC',
-      };
   }
 
   // Films and series unless another type is requested: the consumer (Recently
@@ -95,19 +80,51 @@ mediaRoutes.get('/', async (req, res, next) => {
   const mediaType = Object.values(MediaType).find(
     (type) => type === req.query.mediaType
   );
-  const whereClause: FindOneOptions<Media>['where'] = {
-    mediaType: mediaType ?? In(VIDEO_MEDIA_TYPES),
-  };
-  if (statusFilter) whereClause.status = statusFilter;
-  if (req.query.sort === 'mediaAdded') whereClause.mediaAddedAt = Not(IsNull());
 
   try {
-    const [media, mediaCount] = await mediaRepository.findAndCount({
-      order: sortFilter,
-      where: whereClause,
-      take: pageSize,
-      skip,
-    });
+    const query = mediaRepository
+      .createQueryBuilder('media')
+      .leftJoinAndSelect('media.seasons', 'season')
+      .where('media.mediaType IN (:...mediaTypes)', {
+        mediaTypes: mediaType ? [mediaType] : VIDEO_MEDIA_TYPES,
+      });
+    if (statuses) {
+      query.andWhere('media.status IN (:...statuses)', { statuses });
+    }
+
+    switch (req.query.sort) {
+      case 'modified':
+        query.orderBy('media.updatedAt', 'DESC');
+        break;
+      case 'mediaAdded':
+        query
+          .andWhere('media.mediaAddedAt IS NOT NULL')
+          .orderBy('media.mediaAddedAt', 'DESC');
+        break;
+      default:
+        query.orderBy('media.id', 'DESC');
+    }
+
+    // Available titles the viewer's libraries don't hold are left out, so
+    // pages stay full; the rest are shown as their libraries allow.
+    const reach = await viewerReach(req.user);
+    if (
+      reach &&
+      statuses?.some(
+        (status) =>
+          status === MediaStatus.AVAILABLE ||
+          status === MediaStatus.PARTIALLY_AVAILABLE
+      )
+    ) {
+      leaveOutUnreachable(query, reach);
+    }
+
+    const [media, mediaCount] = await query
+      .take(pageSize)
+      .skip(skip)
+      .getManyAndCount();
+    await limitToLibraries(media, req.user);
+
     return res.status(200).json({
       pageInfo: {
         pages: Math.ceil(mediaCount / pageSize),

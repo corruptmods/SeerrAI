@@ -16,6 +16,7 @@ import {
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
 import { artistImageUrl } from '@app/components/Music/musicHelpers';
+import OverQuotaBadge from '@app/components/OverQuotaBadge';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import useNearScreen, { NearScreen, bothRefs } from '@app/hooks/useNearScreen';
@@ -219,6 +220,7 @@ const MusicRequestItem = ({
                 {intl.formatMessage(globalMessages.status)}
               </span>
               <MusicRequestBadge request={requestData} />
+              <OverQuotaBadge request={requestData} className="ml-2" />
             </div>
             {requestData.status === MediaRequestStatus.DECLINED &&
               requestData.declineReason && (

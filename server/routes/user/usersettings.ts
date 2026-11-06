@@ -19,6 +19,7 @@ import {
   cleanNavOrder,
   isDefaultNavOrder,
 } from '@server/constants/navigation';
+import { cleanDefaultProfiles } from '@server/constants/requestDefaults';
 import { cleanAppearance } from '@server/constants/theme';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -135,6 +136,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         watchlistSyncMovies: user.settings?.watchlistSyncMovies,
         watchlistSyncTv: user.settings?.watchlistSyncTv,
         traktUsername: user.settings?.traktUsername ?? null,
+        defaultProfiles: user.settings?.defaultProfiles ?? [],
       });
     } catch (e) {
       next({ status: 500, message: e.message });
@@ -241,9 +243,20 @@ userSettingsRoutes.post<
       });
     }
 
+    // Saved profiles for servers that exist; left out keeps them.
+    const defaultProfiles =
+      req.body.defaultProfiles === undefined
+        ? undefined
+        : cleanDefaultProfiles(req.body.defaultProfiles).filter((entry) =>
+            (getSettings()[entry.service] ?? []).some(
+              (server) => server.id === entry.serverId
+            )
+          );
+
     if (!user.settings) {
       user.settings = new UserSettings({
         user,
+        defaultProfiles,
         locale: req.body.locale,
         discoverRegion: req.body.discoverRegion,
         streamingRegion: req.body.streamingRegion,
@@ -262,6 +275,9 @@ userSettingsRoutes.post<
       if (traktUsername !== undefined) {
         user.settings.traktUsername = traktUsername || null;
       }
+      if (defaultProfiles !== undefined) {
+        user.settings.defaultProfiles = defaultProfiles;
+      }
     }
 
     const savedUser = await userRepository.save(user);
@@ -278,6 +294,7 @@ userSettingsRoutes.post<
       watchlistSyncMovies: savedUser.settings?.watchlistSyncMovies,
       watchlistSyncTv: savedUser.settings?.watchlistSyncTv,
       traktUsername: savedUser.settings?.traktUsername ?? null,
+      defaultProfiles: savedUser.settings?.defaultProfiles ?? [],
       email: savedUser.email,
     });
   } catch (e) {

@@ -61,8 +61,10 @@ const toCollectionResult = (
   backdrop_path: collection.backdrop_path ?? undefined,
 });
 
-/** Search filter: films (with their collections) or series. */
-type SearchType = 'movie' | 'tv';
+/** Search filter: films (with their collections), series or people. */
+type SearchType = 'movie' | 'tv' | 'person';
+
+const SEARCH_TYPES: SearchType[] = ['movie', 'tv', 'person'];
 
 /** Search one kind of title, or everything when none is given. */
 const searchTitles = async (
@@ -92,16 +94,27 @@ const searchTitles = async (
       })),
     };
   }
+  if (type === 'person') {
+    const found = await tmdb.searchPerson(options);
+    return {
+      ...found,
+      results: found.results.map((result) => ({
+        ...result,
+        media_type: 'person',
+        adult: result.adult ?? false,
+        known_for: result.known_for ?? [],
+      })),
+    };
+  }
   return tmdb.searchMulti(options);
 };
 
 searchRoutes.get('/', async (req, res, next) => {
   const queryString = req.query.query as string;
   const searchProvider = findSearchProvider(queryString.toLowerCase());
-  const type =
-    req.query.type === 'movie' || req.query.type === 'tv'
-      ? (req.query.type as SearchType)
-      : undefined;
+  const type = SEARCH_TYPES.includes(req.query.type as SearchType)
+    ? (req.query.type as SearchType)
+    : undefined;
   let results: TmdbSearchMultiResponse;
 
   try {
@@ -129,10 +142,10 @@ searchRoutes.get('/', async (req, res, next) => {
       const page = Number(req.query.page) || 1;
       const language = (req.query.language as string) ?? req.locale;
 
-      // Collections are films, so a series search leaves them out.
+      // Collections are films, so a series or people search leaves them out.
       const [multi, collections] = await Promise.all([
         searchTitles(tmdb, type, { query: queryString, page, language }),
-        type === 'tv'
+        type === 'tv' || type === 'person'
           ? { page, results: [], total_pages: 0, total_results: 0 }
           : searchCollections(tmdb, queryString, page, language),
       ]);

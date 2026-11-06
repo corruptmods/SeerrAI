@@ -30,15 +30,30 @@ On the **Movies** or **Series** page, open **Filters** and find **Streaming Serv
 
 The chosen services are listed under **Only on** and **Not on** with a button to clear each. So "popular films not on the services I pay for" is a few taps. The choice stays in the page's address, so Back and shared links keep it.
 
-Admins' custom streaming service rows on Discover (Customize Discover → **Create Custom Slider**) can leave services out the same way.
+**Select all** shows what's on any service listed for the region (up to 100), leaving the ones you marked **Not on** as they are; pick the few you don't want to change them. **Deselect all** clears every choice.
+
+Admins' custom streaming service rows on Discover (Customize Discover → **Create Custom Slider**) can leave services out, and select or deselect all, the same way.
+
+## Coming back where you were
+
+Open a title and go back (the browser's back, or the app's), and the page is as you left it:
+
+- **Home page rows** stay scrolled sideways where you left them, each one, for as long as the tab (or the app) stays open. A fresh visit to the home page starts every row at the beginning.
+- **Trending and the other poster pages** (Movies, Series, Upcoming, genres, studios, networks, Anime, search, recommendations, watchlists) keep their filters, the pages you had loaded (up to 10) and where you had scrolled. This also holds after the page reloaded or the installed app was closed by the phone and opened again; the titles load once more, then the page scrolls back. Scrolling yourself first stops it.
 
 ## Searching
 
-Search results start with **All**, **Movies**, **Series** and, when music is on for you, **Music**. All is films, series, collections and people. The one you pick stays in the address. Filtering the Movies or Series page offers a link to search everything for the same words.
+Search results start with **All**, **Movies**, **Series**, **People** and, when music is on for you, **Music**. All is films, series, collections and people. The one you pick stays in the address. Filtering the Movies or Series page offers a link to search everything for the same words.
+
+The order is **Best match** to start, as TMDB ranks it. **Newest first**, **Oldest first**, **Highest rated** and **Most popular** sort the results loaded so far, since TMDB's search can't sort: picking one loads the first five pages (about 100 results) and sorts those (people have only Best match and Most popular). The page then says how many it sorted, and **Load more and sort again** adds the next page. Highest rated puts titles with fewer than 10 votes after the rest; people, collections and undated titles go after the others, in TMDB's order. The order stays in the address.
 
 ## Filter any page of posters
 
 Every grid of posters (Discover pages, search, watchlists, recommendations, Suggested) has a filter box: **Filter by title, cast, character, director, studio**. It also matches networks, genres and keywords, and keeps loading more titles until it has found enough, or offers **Keep looking**.
+
+## Your Watchlist
+
+**Your Watchlist** (and someone's watchlist on their profile) can be sorted: **Default order**, **Newest added**, **Oldest added** or **Title A–Z** ("The" and "A" left out, as Plex files them). Default order is the one it always had: Plex's own order for a Plex watchlist, the order added for one kept here (Jellyfin, Emby and local accounts). Plex sorts a Plex watchlist itself. The order stays in the address. A Trakt watchlist isn't shown here; it only has its titles requested (see [Trakt watchlist](./account.md#trakt-watchlist)).
 
 ## Request several at once
 
@@ -52,12 +67,14 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting. A collection's page has its own **Add to List**: each list says how many of the films it has, and picking one adds the rest.
 
+- **Requested as you add:** a title you add to a list is also requested for you, in non-4K, a series with every season, with your own permissions and request limits. Anything already in the library, requested or blocklisted is skipped, and nothing is requested twice. If it can't be requested (say, you're at your limit), it stays on the list and you're told why. **Also add to** doesn't request again: you've just chosen what to request. A collection's **Add to List** requests its films too, at most 20 at a time, like an import. People who can't request just add. Turn it off for yourself with **Request What's Added to Lists** in **Profile → Settings → Features** (an admin can turn it off for everyone). Switch: `listRequests`.
+
 - **Sharing:** the owner shares a list with people (and can change who later). Each is invited first: **Accept** lets the list tell when everyone has finished a title and include them in Pick for the Room; **Leave List** turns it down. People on a list can add, remove and mark watched, or leave it. Only the owner renames, shares or deletes it. The list's page offers **Import** to the owner, but anyone on the list may add titles in bulk through the API, as they may add them one at a time. A list is seen only by its owner and the people it is shared with.
 - **Sections:** **To watch** (here now), **Not Available Yet**, and **Watched**.
 - **Where you are in each series:** series show "Up next S2E4 · 6 to catch up", "Not started" or "Caught up", from your own watch history (with Plex this needs Tautulli and a linked Plex account; with Jellyfin or Emby, a linked account on the server).
 - **Sorting:** recently added, oldest added, title, newest or oldest release. Remembered on each device.
 - **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Several added at once, as from a collection or an import, make one notice. Private lists send nothing.
-- **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).
+- **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions); the option starts ticked unless you turned off **Request What's Added to Lists**.
 - **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.
 

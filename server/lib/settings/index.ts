@@ -3,6 +3,7 @@ import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import type { OidcClaimRule } from '@server/constants/oidc';
 import { oidcApplicationUrl, requiredClaimsFrom } from '@server/constants/oidc';
+import type { ProfileFolder } from '@server/constants/requestDefaults';
 import type { MediaServerKind } from '@server/constants/server';
 import {
   MEDIA_SERVER_KINDS,
@@ -454,6 +455,8 @@ export interface DVRSettings {
 
 export interface RadarrSettings extends DVRSettings {
   minimumAvailability: string;
+  /** Root folders some quality profiles always go to, unless a request manager picks another. */
+  profileFolders?: ProfileFolder[];
   /** Anime movie destination, when set (lib/radarrRouting). */
   activeAnimeProfileId?: number;
   activeAnimeProfileName?: string;
@@ -589,6 +592,8 @@ export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
 export interface SonarrSettings extends DVRSettings {
   seriesType: 'standard' | 'daily' | 'anime';
+  /** Root folders some quality profiles always go to, unless a request manager picks another. */
+  profileFolders?: ProfileFolder[];
   animeSeriesType: 'standard' | 'daily' | 'anime';
   activeAnimeProfileId?: number;
   activeAnimeProfileName?: string;
@@ -693,6 +698,11 @@ export interface MainSettings {
     /** Albums. */
     music: Quota;
   };
+  /**
+   * Requests over someone's quota wait for an admin (never auto-approved)
+   * instead of being refused. Off unless turned on.
+   */
+  overQuotaRequests: boolean;
   /** Globally disabled features (constants/features). */
   disabledFeatures: string[];
   /**
@@ -705,6 +715,11 @@ export interface MainSettings {
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
+  /**
+   * Show people only what their media server libraries hold: Recently Added,
+   * availability and play links (lib/libraryVisibility). Off by default.
+   */
+  limitToLibraries: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
   newPlexLogin: boolean;
@@ -1104,12 +1119,14 @@ class Settings {
           tv: {},
           music: {},
         },
+        overQuotaRequests: false,
         disabledFeatures: [],
         animeExcludedCountries: [],
         autoImportPlexUsers: false,
         hideAvailable: false,
         hideBlocklisted: false,
         hideRequested: false,
+        limitToLibraries: false,
         localLogin: true,
         mediaServerLogin: true,
         newPlexLogin: true,

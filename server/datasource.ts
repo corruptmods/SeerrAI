@@ -19,6 +19,7 @@ import { MatchProblem, MatchWatch } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import MediaDeletion from '@server/entity/MediaDeletion';
 import MediaEvent from '@server/entity/MediaEvent';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import {
   MediaList,
   MediaListItem,
@@ -85,6 +86,7 @@ const entities = [
   Media,
   MediaDeletion,
   MediaEvent,
+  MediaLibraryItem,
   MediaList,
   MediaListItem,
   MediaListSong,

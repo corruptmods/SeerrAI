@@ -169,6 +169,39 @@ describe('Radarr, Sonarr and Maintainerr servers in settings', () => {
     });
   }
 
+  for (const [list, body] of [
+    ['radarr', radarr],
+    ['sonarr', sonarr],
+  ] as const) {
+    it(`keeps a ${list} server's folders by quality profile, cleaned`, async () => {
+      const created = await call('POST', `/${list}`, {
+        ...body('Main'),
+        profileFolders: [
+          { profileId: 7, rootFolder: ' /anime ' },
+          { profileId: 0, rootFolder: '/nowhere' },
+          { profileId: 8, rootFolder: '' },
+          { profileId: 7, rootFolder: '/anime-uhd' },
+        ],
+      });
+      assert.equal(created.status, 201);
+      const id = Number(created.body.id);
+      assert.deepEqual(getSettings()[list][0].profileFolders, [
+        { profileId: 7, rootFolder: '/anime-uhd' },
+      ]);
+
+      // Left out of an update, they stay; an empty list clears them.
+      await call('PUT', `/${list}/${id}`, body('Main'));
+      assert.deepEqual(getSettings()[list][0].profileFolders, [
+        { profileId: 7, rootFolder: '/anime-uhd' },
+      ]);
+      await call('PUT', `/${list}/${id}`, {
+        ...body('Main'),
+        profileFolders: [],
+      });
+      assert.deepEqual(getSettings()[list][0].profileFolders, []);
+    });
+  }
+
   it("never gives a new Maintainerr server a removed one's id", async () => {
     const server = (name: string) => ({
       name,

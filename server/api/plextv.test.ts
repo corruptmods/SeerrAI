@@ -41,6 +41,8 @@ const metadata = (ratingKey: string, tmdbId: number) => ({
 const apiWith = (replies: Reply[], details: Record<string, unknown> = {}) => {
   const api = new PlexTvAPI('token-a');
   const sent: (string | undefined)[] = [];
+  /** Each request's sort param. */
+  const sorts: unknown[] = [];
   const internals = api as unknown as {
     axios: { get: (...args: unknown[]) => Promise<unknown> };
     getRolling: (url: string) => Promise<unknown>;
@@ -48,6 +50,7 @@ const apiWith = (replies: Reply[], details: Record<string, unknown> = {}) => {
   internals.axios.get = async (_url, config) => {
     const headers = (config as { headers?: Record<string, string> }).headers;
     sent.push(headers?.['If-None-Match']);
+    sorts.push((config as { params?: { sort?: unknown } }).params?.sort);
     const reply = replies.shift();
     if (!reply) {
       throw new Error('no more replies');
@@ -67,7 +70,7 @@ const apiWith = (replies: Reply[], details: Record<string, unknown> = {}) => {
     }
     return details[key];
   };
-  return { api, sent };
+  return { api, sent, sorts };
 };
 
 beforeEach(() => {
@@ -183,6 +186,47 @@ describe('PlexTvAPI.getWatchlist', () => {
     assert.deepEqual(
       result.items.map((i) => i.tmdbId),
       [603]
+    );
+  });
+
+  it('asks Plex for an order only when one is chosen', async () => {
+    const { api, sorts } = apiWith(
+      [
+        { status: 200, data: watchlist('a') },
+        { status: 200, data: watchlist('a') },
+        { status: 200, data: watchlist('a') },
+        { status: 200, data: watchlist('a') },
+      ],
+      { a: metadata('a', 603) }
+    );
+    await api.getWatchlist();
+    await api.getWatchlist({ sort: 'added-desc' });
+    await api.getWatchlist({ sort: 'added-asc' });
+    await api.getWatchlist({ sort: 'title' });
+    assert.deepEqual(sorts, [
+      undefined,
+      'watchlistedAt:desc',
+      'watchlistedAt:asc',
+      'titleSort:asc',
+    ]);
+  });
+
+  it('keeps each order apart, with its own ETag', async () => {
+    const { api, sent } = apiWith(
+      [
+        { status: 200, etag: '"own"', data: watchlist('a', 'b') },
+        { status: 200, etag: '"newest"', data: watchlist('b', 'a') },
+        { status: 304 },
+      ],
+      { a: metadata('a', 603), b: metadata('b', 604) }
+    );
+    await api.getWatchlist();
+    await api.getWatchlist({ sort: 'added-desc' });
+    const again = await api.getWatchlist({ sort: 'added-desc' });
+    assert.deepEqual(sent, [undefined, undefined, '"newest"']);
+    assert.deepEqual(
+      again.items.map((i) => i.tmdbId),
+      [604, 603]
     );
   });
 

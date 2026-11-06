@@ -12,7 +12,7 @@ export interface ListItem {
   watchedAt?: string | null;
   /** When added to the list. */
   createdAt?: string;
-  mediaInfo?: { status?: number };
+  mediaInfo?: { status?: number; outsideLibraries?: boolean };
   availableEpisodes?: number;
   totalEpisodes?: number;
 }

@@ -1,6 +1,7 @@
 import FeatureSwitches, {
   withFeature,
 } from '@app/components/Common/FeatureSwitches';
+import { unusableFeatures } from '@app/components/Common/FeatureSwitches/shown';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import useSettings from '@app/hooks/useSettings';
@@ -9,7 +10,6 @@ import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import type { Feature } from '@server/constants/features';
-import { hasPermission, Permission } from '@server/lib/permissions';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -34,20 +34,7 @@ const UserFeatureSettings = () => {
   const { currentSettings } = useSettings();
   const { user: currentUser, revalidate: revalidateCurrentUser } = useUser();
   const { user, revalidate } = useUser({ id: Number(router.query.userId) });
-  // Hide admin tools the user can't use.
-  const can = (permission: Permission) =>
-    hasPermission(permission, user?.permissions ?? 0);
-  const adminTools: Feature[] = [
-    ...(can(Permission.MANAGE_REQUESTS) ? [] : ['aiDeletionReview' as const]),
-    ...(can(Permission.MANAGE_ISSUES) ? [] : ['aiIssueTriage' as const]),
-    // Siri only reports issues.
-    ...(can(Permission.CREATE_ISSUES) || can(Permission.MANAGE_ISSUES)
-      ? []
-      : ['siri' as const]),
-    ...(can(Permission.ADMIN)
-      ? []
-      : ['aiLogs' as const, 'aiBackfill' as const, 'aiAgent' as const]),
-  ];
+  const adminTools = unusableFeatures(user?.permissions ?? 0);
   const [saving, setSaving] = useState(false);
 
   const key = user ? `/api/v1/user/${user.id}/settings/features` : null;

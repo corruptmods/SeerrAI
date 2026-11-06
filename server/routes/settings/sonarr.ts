@@ -1,4 +1,5 @@
 import SonarrAPI from '@server/api/servarr/sonarr';
+import { cleanProfileFolders } from '@server/constants/requestDefaults';
 import type { SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -26,6 +27,7 @@ sonarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newSonarr = req.body as SonarrSettings;
+  newSonarr.profileFolders = cleanProfileFolders(newSonarr.profileFolders);
   // Never reuse a removed server's id: titles keep the id of their server.
   newSonarr.id = settings.newId('sonarr');
 
@@ -98,6 +100,11 @@ sonarrRoutes.put<{ id: string }>('/:id', async (req, res) => {
   settings.sonarr[sonarrIndex] = {
     ...req.body,
     id: Number(req.params.id),
+    // Kept when not sent, so a client that doesn't know them can't drop them.
+    profileFolders:
+      req.body.profileFolders === undefined
+        ? settings.sonarr[sonarrIndex].profileFolders
+        : cleanProfileFolders(req.body.profileFolders),
   } as SonarrSettings;
   await settings.save();
 

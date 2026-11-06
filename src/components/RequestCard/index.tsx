@@ -7,6 +7,7 @@ import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import MusicRequestCard from '@app/components/Music/MusicRequest/MusicRequestCard';
+import OverQuotaBadge from '@app/components/OverQuotaBadge';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import StatusBadge from '@app/components/StatusBadge';
@@ -522,6 +523,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 }
               />
             )}
+            <OverQuotaBadge request={requestData} className="ml-2 flex-none" />
           </div>
           {requestData.status === MediaRequestStatus.DECLINED &&
             requestData.declineReason && (

@@ -103,8 +103,18 @@ interface Media {
   container: string;
   videoFrameRate: string;
   videoProfile: string;
-  /** A movie's files on disk. */
-  Part?: { file?: string }[];
+  /**
+   * A movie's files on disk; their streams (with HDR markers) only in a
+   * title's own metadata, not in library listings.
+   */
+  Part?: {
+    file?: string;
+    Stream?: {
+      streamType?: number;
+      DOVIPresent?: boolean;
+      colorTrc?: string;
+    }[];
+  }[];
 }
 
 interface PlexMetadataResponse {

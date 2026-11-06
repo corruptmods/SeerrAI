@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useSWRConfig } from 'swr';
 
-const messages = defineMessages('components.Common.BulkRequest', {
+export const messages = defineMessages('components.Common.BulkRequest', {
   select: 'Select',
   done: 'Done',
   unselectable: 'Already requested or in the library',

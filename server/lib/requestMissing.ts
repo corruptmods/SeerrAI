@@ -114,12 +114,14 @@ export const requestMissing = async (
 
       await MediaRequest.request(
         { mediaId: tmdbId, mediaType: MediaType.TV, seasons },
-        user
+        user,
+        { refuseOverQuota: true }
       );
     } else {
       await MediaRequest.request(
         { mediaId: tmdbId, mediaType: MediaType.MOVIE },
-        user
+        user,
+        { refuseOverQuota: true }
       );
     }
 

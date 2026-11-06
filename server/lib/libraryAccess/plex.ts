@@ -82,7 +82,11 @@ export const plexAccess = async (): Promise<AccessServer> => {
           };
         }
       );
-      return { libraries, people };
+      return {
+        libraries,
+        people,
+        scanIds: new Map(sections.map((section) => [section.id, section.key])),
+      };
     },
 
     async write(person, to, access) {

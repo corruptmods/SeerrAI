@@ -154,3 +154,30 @@ describe('discovering titles by streaming service', () => {
     );
   });
 });
+
+describe('searching people', () => {
+  const asking = () => {
+    const tmdb = new TheMovieDb();
+    const asked: Record<string, unknown>[] = [];
+    (
+      tmdb as unknown as {
+        axios: { get: (url: string, config: { params: object }) => unknown };
+      }
+    ).axios = {
+      get: async (_url, config) => {
+        asked.push(config.params as Record<string, unknown>);
+        return { data: { page: 1, total_pages: 2, results: [] } };
+      },
+    };
+    return { tmdb, asked };
+  };
+
+  it('asks for a later page, and for the first as it always has', async () => {
+    const { tmdb, asked } = asking();
+    await tmdb.searchPerson({ query: 'Glasswing' });
+    await tmdb.searchPerson({ query: 'Glasswing', page: 2 });
+    assert.equal(asked.length, 2);
+    assert.equal('page' in asked[0], false);
+    assert.equal(asked[1].page, 2);
+  });
+});

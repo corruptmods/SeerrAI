@@ -624,7 +624,7 @@ class Playlists {
       const asked = new Set((request.songs ?? []).map((s) => s.recordingMbid));
       await this.mark(
         songs.filter((s) => asked.has(s.recordingMbid as string)),
-        needsApproval ? 'approval' : 'requested',
+        needsApproval || request.overQuota ? 'approval' : 'requested',
         null,
         request.id
       );

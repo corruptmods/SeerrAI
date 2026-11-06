@@ -32,9 +32,10 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | **Settings → Music** | The **Music** switch for everyone. **Include Music in All Search Results**. **Where Music Comes From**: **MusicBrainz Address**, **Contact Email**, **New and Popular Music** (ListenBrainz and Apple Music's charts), **Match Songs with Deezer**, **TheAudioDB API Key**, **Most Albums in One Request**. Links to music's other settings. See [Music](./music.md#setting-it-up-admins). | On; on once Lidarr is set up; public MusicBrainz; none; on; on; none; 100 |
 | **Settings → Services → Lidarr** | Music. Address, API key, quality and metadata profiles, root folder and tags for new artists; **Enable Scan** brings in what Lidarr already has; **Tag Requests** tags the artist with who asked. Music appears for everyone once one Lidarr is the default. See [Music](./music.md). | None |
 | **Settings → Media Servers → Edit → Music Libraries** | The music libraries read to find which albums are here. With none on anywhere, Lidarr's files decide. | Off until switched on |
-| **Settings → Users** | **Global Album Request Limit**: albums each person may request in a period, like seasons for series. Each person's own limit is on their settings. | Unlimited |
+| **Settings → Users** | **Global Album Request Limit**: albums each person may request in a period, like seasons for series. Each person's own limit is on their settings. **Send Requests Over the Limit to Admins**: past their limit, people can still request, and it waits for an admin (see [Request limits](./requests-and-downloads.md#request-limits)). | Unlimited; off |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
-| **Settings → Services → Override Rules** | **Age Ratings** to match on; Sonarr rules can set **Series Type**, Radarr rules **Anime**. | None; left to detection |
+| **Settings → Services → Radarr / Sonarr** | **Folders by Quality Profile**: the root folder each chosen profile always goes to (see [Quality profiles and folders](./requests-and-downloads.md#quality-profiles-and-folders)). | None |
+| **Settings → Services → Override Rules** | **Age Ratings** and **Production Countries** to match on; Sonarr rules can set **Series Type**, Radarr rules **Anime**. | None; left to detection |
 | **Settings → Services → Anime** | **Leave out anime made in**: countries whose anime-styled titles don't count as anime unless they're in Japanese. | Empty (United States on servers from before the setting) |
 | **Settings → Services** | **Anime Check** report and **Run Check**. | |
 | **Settings → Quality** | Quality profiles Seerr AI creates in Radarr and Sonarr, per server: presets from Seerr AI or TRaSH Guides, adjustments, band step; **Fill gaps with Seerr AI** and **Apply updates automatically** for TRaSH Guides. Nothing is sent to a server until it is managed and applied. See [Quality profiles](./quality.md). | Every server Not managed; Fill gaps on; Apply updates automatically off; usenet at equal quality, torrents wait 2 hours when chosen, band step 100 |
@@ -120,6 +121,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `whoWatched` | Who has watched a title, on its page (admins) |
 | `newSeasons` | Getting new seasons as they premiere (off pauses the follows) |
 | `watchSuggestions` | "Finished watching?" on lists |
+| `listRequests` | Requesting a title when you add it to a list (people who can request) |
 | `passkeyPrompt` | The banner offering to add a passkey (passkeys still work) |
 | `subtitles` | The Subtitles panel and episode subtitle tags |
 | `autoFix` | Fixing reported problems automatically |

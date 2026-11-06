@@ -7,7 +7,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Your account](./account.md)**: passkeys, linked accounts, API keys, notifications, turning features off for yourself.
 - **[Themes](./themes.md)**: light or dark, accent colours, seasonal themes, theme files.
 - **[Requests and downloads](./requests-and-downloads.md)**: when a request should arrive, what each status means, failed requests, single episodes, anime.
-- **[Discover and lists](./discover-and-lists.md)**: your home page and menu, the Anime page, leaving out streaming services, watch lists and playlists, the calendar.
+- **[Discover and lists](./discover-and-lists.md)**: your home page and menu, the Anime page, leaving out streaming services, coming back where you were, sorting search results and your watchlist, watch lists and playlists, the calendar.
 - **[Music](./music.md)**: finding and requesting albums and songs, and the charts.
 - **[Plex, Jellyfin and Emby together](./media-servers.md)**: Play on each server, linking your accounts.
 - **[Single sign-on](./single-sign-on.md)**: signing in with Authentik, Google and the like.
@@ -18,7 +18,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For admins
 
 - **[Installing and updating](./install.md)**: the image, updates, backups, trying a beta.
-- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, library sharing, removing one.
+- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, library sharing, showing people only what their libraries hold, removing one.
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.

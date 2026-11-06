@@ -48,6 +48,8 @@ export interface FakeLidarr {
     order: number;
     tags: number[];
   }[];
+  /** Lidarr's quality profiles. */
+  profiles: { id: number; name: string }[];
   /** Lidarr's download queue. */
   queue: Record<string, unknown>[];
   /** The final status of every command. */
@@ -92,6 +94,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     releaseTracks: new Map(),
     remotePathMappings: [],
     folders: new Map(),
+    profiles: [{ id: 1, name: 'Any' }],
     queue: [],
     commandStatus: 'completed',
     once: new Map(),
@@ -134,6 +137,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       }) as LidarrSettings,
     reset: () => {
       fake.calls = [];
+      fake.profiles = [{ id: 1, name: 'Any' }];
       fake.artists = [];
       fake.albums = [];
       fake.lookupArtists = new Map();
@@ -194,6 +198,9 @@ export const createFakeLidarr = (): FakeLidarr => {
           (artist) => !query.mbId || artist.foreignArtistId === query.mbId
         ),
       ];
+    }
+    if (method === 'GET' && path === '/api/v1/qualityProfile') {
+      return [200, fake.profiles];
     }
     if (method === 'GET' && path === '/api/v1/artist/lookup') {
       const found = fake.lookupArtists.get(term);

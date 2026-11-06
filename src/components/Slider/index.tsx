@@ -2,13 +2,16 @@ import TitleCard from '@app/components/TitleCard';
 import { NearRow, NearScreen, useNearObserver } from '@app/hooks/useNearScreen';
 import globalMessages from '@app/i18n/globalMessages';
 import { SCREENS_AHEAD } from '@app/utils/nearScreen';
+import { cameBack, readRowScroll, saveRowScroll } from '@app/utils/pageReturn';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useSpring } from '@react-spring/web';
 import debounce from 'lodash/debounce';
+import { useRouter } from 'next/router';
 import type { ReactNode } from 'react';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -124,8 +127,53 @@ const Slider = ({
     handleScroll();
   }, [handleScroll, isLoading]);
 
+  // Sideways scroll, kept per page and row for this tab: going back to the
+  // page puts the row where it was. A fresh visit starts at the beginning.
+  const router = useRouter();
+  const rowKey = `${router.asPath.split('#')[0]}:${sliderKey}`;
+  const returnX = useRef<number | undefined>(undefined);
+  // Where it was last put, to tell its own scroll events from the person's.
+  const placedX = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    returnX.current = cameBack() ? readRowScroll(rowKey) : undefined;
+    if (returnX.current === undefined) {
+      saveRowScroll(rowKey, 0);
+    }
+  }, [rowKey]);
+  // Before paint, as soon as there are cards; rows load as they near the
+  // screen. Only sideways, so the page's own scroll is left alone.
+  useLayoutEffect(() => {
+    const x = returnX.current;
+    const container = containerRef.current;
+    if (x === undefined || !container || itemCount === 0) {
+      return;
+    }
+    container.scrollLeft = x;
+    placedX.current = container.scrollLeft;
+    // Done once there; until then, cards still to come may make the room.
+    if (container.scrollLeft >= x - 1) {
+      returnX.current = undefined;
+    }
+  }, [rowKey, itemCount, isLoading, root]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSave = useCallback(
+    debounce((x: number) => saveRowScroll(rowKey, x), 150),
+    [rowKey]
+  );
+  useEffect(() => () => debouncedSave.flush(), [debouncedSave]);
+
   const onScroll = () => {
     debouncedScroll();
+    const x = containerRef.current?.scrollLeft ?? 0;
+    if (returnX.current !== undefined) {
+      // The person scrolled before it was back in place: leave it to them.
+      if (Math.abs(x - (placedX.current ?? 0)) <= 1) {
+        return;
+      }
+      returnX.current = undefined;
+    }
+    debouncedSave(x);
   };
 
   const [, setX] = useSpring(() => ({

@@ -169,6 +169,40 @@ describe('play links', () => {
     );
   });
 
+  it('can be built from other items, or none, server by server', () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.tautulli.externalUrl = 'https://tautulli.example.com';
+    settings.emby.connected = true;
+    const media = title();
+    media.setPlayLinks();
+
+    media.setPlayLinks({ plex: { id: '333', id4k: null }, emby: { id: null } });
+
+    assert.equal(
+      media.mediaUrl,
+      'https://app.plex.tv/desktop#!/server/machine-1/details?key=%2Flibrary%2Fmetadata%2F333'
+    );
+    assert.equal(media.mediaUrl4k, undefined);
+    assert.equal(media.iOSPlexUrl4k, undefined);
+    assert.equal(
+      media.tautulliUrl,
+      'https://tautulli.example.com/info?rating_key=333'
+    );
+    assert.equal(media.tautulliUrl4k, undefined);
+    // Emby keeps its 4K link; its standard one is gone.
+    assert.deepEqual(
+      media.playLinks?.map((link) => [link.server, !!link.url, !!link.url4k]),
+      [
+        ['plex', true, false],
+        ['emby', false, true],
+      ]
+    );
+    // The stored ids are untouched.
+    assert.equal(media.ratingKey, '111');
+    assert.equal(media.embyMediaId, 'em-1');
+  });
+
   it('are there on a title read from the database', async () => {
     getSettings().main.mediaServerType = MediaServerType.EMBY;
     await getRepository(Media).save(title());

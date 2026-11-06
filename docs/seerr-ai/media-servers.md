@@ -14,6 +14,16 @@ On a film's or series' page, the main button plays it on one server: **Play on P
 
 Elsewhere (status badges, request cards, issues) there's one Play link, on a server you have an account on.
 
+### Which quality it's in
+
+Beside **Available** (and **4K Available**) a title page shows what it's in: the resolutions (**4K**, **1080p**, **720p**, **SD**) and any HDR (**Dolby Vision**, **HDR10+**, **HDR10**, **HLG**). A series shows everything its episodes come in, across seasons. It comes from the last scan of each server that has the title, so nothing is asked of the servers when you open the page; without a 4K Radarr or Sonarr, a 4K version shows beside **Available**.
+
+- **Jellyfin and Emby** say each version's resolution and HDR.
+- **Plex** says the resolution; HDR shows when Radarr's file for the film matches it, or when Plex sent its streams.
+- **Radarr** fills in a film no server has scanned yet. Sonarr adds nothing: series come from the servers.
+
+Only what is known is shown; titles show it after their next scan. Jellyfin and Emby series scans now also read each episode's media info, without 4K too.
+
 ### Linking your other accounts
 
 If you have accounts on more than one connected server, link them so you can sign in with any of them and see your own servers first.
@@ -85,6 +95,20 @@ To change one person's libraries, open their settings: **Users → (person) → 
 
 Plex sharing goes through the owner's Plex account, so it needs the owner's Plex account linked.
 
+### Showing people only what their libraries hold
+
+**Settings → General → Show People Only What Their Libraries Hold**, off unless you turn it on. Then, for everyone but admins and people with **Manage Requests** or **Manage Users**:
+
+- **Recently Added** leaves out titles that are only in libraries they can't open, say a film only in a grown-ups' library for a child's account.
+- Title pages, cards, episode lists, lists, the Requests page and the AI show such a title as **Not in your libraries**, not as available, with no quality badges, and offer no **Request**: the file is already there, so a request would bring them nothing. To let them watch it, share the library with them.
+- **Play** links go only to libraries they can open. A title in two libraries links the copy in theirs.
+- With several servers, a title counts as theirs if any server lets them play it.
+- Requests themselves work as before, except that adding a title to a list doesn't request it once they're over their limit, even with **Send Requests Over the Limit to Admins** on.
+
+Which library holds a title comes from the library scans, so after turning it on run a **full scan** of each server once (Settings → Jobs & Cache). Until a title has been scanned it shows as before. The nightly **Database Maintenance** job forgets libraries a server no longer lists and servers no longer connected; a library turned off here keeps what it held, so its titles stay hidden from people who can't open it. People's libraries are read from plex.tv or Jellyfin/Emby and kept for 10 minutes (**Library Access** in Jobs & Cache; changes made from Seerr AI apply at once). If a server can't be read, that person sees everything as before until it can, and the log says so.
+
+It follows accounts linked to a connected server. Someone linked to none (a local or single sign-on account only, or one who unlinked theirs) opens no library, so sees nothing here as available; someone linked to Plex but not to a connected Jellyfin sees what only Jellyfin has as not in their libraries.
+
 ### Removing a server
 
 **Remove** on a card. Before you confirm, it says how many people could then sign in only with a password, and how many not at all (people with single sign-on count as fine). Then:
@@ -97,6 +121,8 @@ Plex sharing goes through the owner's Plex account, so it needs the owner's Plex
 The last server can't be removed. Removing the primary makes the next one primary.
 
 ### Known limits
+
+- **Show people only what their libraries hold** covers films and series, not music. A title moved to another library shows in its old one until that library's next full scan.
 
 - **Episodes split across servers don't add up**: episodes 1 to 5 on Plex and 6 to 10 on Jellyfin show as partly available.
 - **Open in Tautulli** in a title's Manage panel needs Plex as the primary server.

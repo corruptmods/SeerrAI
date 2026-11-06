@@ -962,6 +962,42 @@ components:
           nullable: true
           description: 'Trakt username whose public watchlist is synced, as the Plex watchlist is'
           example: 'someone'
+        defaultProfiles:
+          type: array
+          description: Quality profiles this person picked for their own requests, per server. Used for requests made without a profile, and picked first in the request window, while they may choose advanced request options and the server still has the profile. Left out, they are kept.
+          items:
+            $ref: '#/components/schemas/UserDefaultProfile'
+    UserDefaultProfile:
+      type: object
+      required:
+        - service
+        - serverId
+        - profileId
+      properties:
+        service:
+          type: string
+          enum: [radarr, sonarr, lidarr]
+        serverId:
+          type: number
+          example: 0
+        anime:
+          type: boolean
+          description: For anime, on a Radarr or Sonarr server with an anime quality profile.
+        profileId:
+          type: number
+          example: 4
+    ProfileFolder:
+      type: object
+      required:
+        - profileId
+        - rootFolder
+      properties:
+        profileId:
+          type: number
+          example: 7
+        rootFolder:
+          type: string
+          example: /anime
     MainSettings:
       type: object
       properties:
@@ -982,6 +1018,9 @@ components:
         autoImportPlexUsers:
           type: boolean
           description: Give everyone the server owner shares Plex with an account, hourly.
+        overQuotaRequests:
+          type: boolean
+          description: Let people request past their quota. Such requests wait for an admin, are never approved automatically and are marked as over quota. Off unless turned on.
         disabledFeatures:
           type: array
           description: Optional features turned off for everyone. Set through /settings/features.
@@ -1005,6 +1044,10 @@ components:
         hideRequested:
           type: boolean
           example: false
+        limitToLibraries:
+          type: boolean
+          example: false
+          description: Show people only what their media server libraries hold. Recently Added leaves out, and title pages show as not available, titles only in libraries someone can't open, with no play link for them. Admins and people who manage requests or users see everything. Off unless turned on.
         cacheImages:
           type: boolean
           example: true
@@ -1928,6 +1971,11 @@ components:
           items:
             type: number
           description: The tags anime movies are added with, when any are set.
+        profileFolders:
+          type: array
+          description: Root folders some quality profiles always go to. A request with one of these profiles goes to its folder unless a request manager picks another, over override rules and folders picked by others. Left out on an update, they are kept.
+          items:
+            $ref: '#/components/schemas/ProfileFolder'
       required:
         - name
         - hostname
@@ -2007,6 +2055,11 @@ components:
         preventSearch:
           type: boolean
           example: false
+        profileFolders:
+          type: array
+          description: Root folders some quality profiles always go to. A request with one of these profiles goes to its folder unless a request manager picks another, over override rules and folders picked by others. Left out on an update, they are kept.
+          items:
+            $ref: '#/components/schemas/ProfileFolder'
       required:
         - name
         - hostname
@@ -3078,6 +3131,11 @@ components:
           type: boolean
           example: false
           description: If true, this request will not count against the user's quota. Requires MANAGE_REQUESTS permission.
+        overQuota:
+          type: boolean
+          readOnly: true
+          example: false
+          description: Made over the requester's quota while Settings → Users lets such requests wait for an admin. Never approved automatically; counts towards the quota unless declined.
         declineReason:
           type: string
           nullable: true
@@ -3274,6 +3332,22 @@ components:
                   onlyOnAlbums:
                     type: boolean
                     description: On no single or EP of the artist's, only on albums, so it cannot be asked for on its own.
+    AvailableQuality:
+      type: object
+      readOnly: true
+      description: What a title is here in, on one side (standard or 4K), from the media servers that have it, else Radarr. Present only while that side is available and something is known; a series covers all its episodes.
+      properties:
+        resolutions:
+          type: array
+          items:
+            type: string
+            enum: [4K, 1440p, 1080p, 720p, SD]
+        ranges:
+          type: array
+          description: HDR formats; empty for SDR or when unknown.
+          items:
+            type: string
+            enum: [DV, HDR10+, HDR10, HLG, HDR]
     MediaInfo:
       type: object
       properties:
@@ -3309,6 +3383,15 @@ components:
           nullable: true
           readOnly: true
           description: Whether the title is anime as set on its page; null leaves it to override rules and anime detection.
+        quality:
+          type: object
+          nullable: true
+          readOnly: true
+          description: What each media server (plex, jellyfin, emby) and Radarr saw of the title at its last scan, by side (standard, 4k). Shown as availableQuality.
+        availableQuality:
+          $ref: '#/components/schemas/AvailableQuality'
+        availableQuality4k:
+          $ref: '#/components/schemas/AvailableQuality'
         jellyfinMediaId:
           type: string
           nullable: true
@@ -3350,6 +3433,14 @@ components:
                 type: string
               iosUrl4k:
                 type: string
+        outsideLibraries:
+          type: boolean
+          readOnly: true
+          description: With limitToLibraries on, a media server has the title but only in libraries the viewer can't open, so it is shown to them as not available and without play links. Absent otherwise.
+        outsideLibraries4k:
+          type: boolean
+          readOnly: true
+          description: As outsideLibraries, for the 4K copy.
     AnimePlacementChanges:
       type: object
       description: What would put a title where it belongs; empty when it is there.
@@ -4233,6 +4324,11 @@ components:
           nullable: true
           example: 'US:G,US:PG'
           description: Age ratings a title must have one of, each as country:rating. The title's rating is read from TMDB for the server's Discover region, or its US rating when it has none there; a title with no rating never matches. Null for no age rating condition.
+        country:
+          type: string
+          nullable: true
+          example: 'JP,KR'
+          description: Production countries a title must have one of, as ISO 3166-1 codes. Matched against TMDB's production countries and origin countries; a title with none never matches. Null for no country condition.
     Certification:
       type: object
       properties:
@@ -11834,6 +11930,9 @@ paths:
               schema:
                 type: object
                 properties:
+                  overQuotaWaits:
+                    type: boolean
+                    description: Whether a request over a limit waits for an admin instead of being refused (Settings → Users).
                   movie:
                     type: object
                     properties:
@@ -12480,6 +12579,12 @@ paths:
   /list/{listId}/item:
     post:
       summary: Add a title to a list
+      description: >-
+        A title new to the list is also requested for whoever added it (non-4K,
+        a series with every season), with their permissions and quotas, unless
+        it is already in the library, requested or blocklisted, they cannot
+        request it, or they or an admin turned off the listRequests feature.
+        The add stands whether or not the request does.
       tags:
         - list
       parameters:
@@ -12502,6 +12607,9 @@ paths:
                 mediaType:
                   type: string
                   enum: [movie, tv]
+                request:
+                  type: boolean
+                  description: False to only add it, as after requesting it.
       responses:
         '200':
           description: Title added
@@ -12509,6 +12617,21 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  added:
+                    type: boolean
+                  request:
+                    type: object
+                    description: >-
+                      Present when the title was new to the list and a request
+                      was tried.
+                    properties:
+                      outcome:
+                        type: string
+                        enum: [requested, here, asked, failed]
+                      message:
+                        type: string
+                        description: Why it could not be requested.
     delete:
       summary: Remove a title from a list
       tags:
@@ -12962,6 +13085,12 @@ paths:
             type: number
             example: 1
             default: 1
+        - in: query
+          name: sort
+          description: Newest added first, oldest added first, or by title. Without it, the watchlist's own order.
+          schema:
+            type: string
+            enum: [added-desc, added-asc, title]
       responses:
         '200':
           description: Watchlist data returned
@@ -13922,7 +14051,7 @@ paths:
   /search:
     get:
       summary: Search for movies, TV shows, people, or collections
-      description: Returns a list of movies, TV shows, people, or collections as a JSON object. With `type`, only movies (and their collections) or only TV shows.
+      description: Returns a list of movies, TV shows, people, or collections as a JSON object. With `type`, only movies (and their collections), only TV shows or only people.
       tags:
         - search
       parameters:
@@ -13947,7 +14076,7 @@ paths:
           name: type
           schema:
             type: string
-            enum: [all, movie, tv]
+            enum: [all, movie, tv, person]
             default: all
       responses:
         '200':
@@ -15472,6 +15601,12 @@ paths:
             type: number
             example: 1
             default: 1
+        - in: query
+          name: sort
+          description: Newest added first, oldest added first, or by title. Without it, the watchlist's own order.
+          schema:
+            type: string
+            enum: [added-desc, added-asc, title]
       responses:
         '200':
           description: Watchlist data returned
@@ -16727,7 +16862,7 @@ paths:
   /media:
     get:
       summary: Get media
-      description: Returns all media (can be filtered and limited) in a JSON object.
+      description: Returns all media (can be filtered and limited) in a JSON object. With limitToLibraries on, the available filters leave out titles only in libraries the viewer can't open.
       tags:
         - media
       parameters:
@@ -17207,6 +17342,11 @@ paths:
           schema:
             type: number
             example: 0
+        - in: query
+          name: requestUser
+          description: The user a request is for, to include their saved quality profile here; someone else's only for those who request on others' behalf.
+          schema:
+            type: number
       responses:
         '200':
           description: Request successful
@@ -17215,6 +17355,12 @@ paths:
               schema:
                 type: object
                 properties:
+                  savedProfileId:
+                    type: number
+                    description: The request user's saved quality profile on this server, while they may choose one.
+                  savedAnimeProfileId:
+                    type: number
+                    description: Their saved anime quality profile, where this server has an anime profile.
                   server:
                     $ref: '#/components/schemas/RadarrSettings'
                   profiles:
@@ -17247,6 +17393,11 @@ paths:
           schema:
             type: number
             example: 0
+        - in: query
+          name: requestUser
+          description: The user a request is for, to include their saved quality profile here; someone else's only for those who request on others' behalf.
+          schema:
+            type: number
       responses:
         '200':
           description: Request successful
@@ -17255,6 +17406,12 @@ paths:
               schema:
                 type: object
                 properties:
+                  savedProfileId:
+                    type: number
+                    description: The request user's saved quality profile on this server, while they may choose one.
+                  savedAnimeProfileId:
+                    type: number
+                    description: Their saved anime quality profile, where this server has an anime profile.
                   server:
                     $ref: '#/components/schemas/SonarrSettings'
                   profiles:
@@ -17310,6 +17467,11 @@ paths:
             type: number
             example: 0
         - in: query
+          name: requestUser
+          description: The user a request is for, to include their saved quality profile here; someone else's only for those who request on others' behalf.
+          schema:
+            type: number
+        - in: query
           name: artist
           description: An artist's MusicBrainz id.
           schema:
@@ -17323,6 +17485,9 @@ paths:
               schema:
                 type: object
                 properties:
+                  savedProfileId:
+                    type: number
+                    description: The request user's saved quality profile on this server, while they may choose one.
                   server:
                     $ref: '#/components/schemas/LidarrSettings'
                   profiles:

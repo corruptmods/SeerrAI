@@ -56,7 +56,7 @@ With Backfill set up, it also follows albums Lidarr couldn't find, and the admin
 
 - **Request** covers music. For music only, give someone **Request Music** instead (Users → a person → Permissions).
 - **Auto-Approve** covers music; **Auto-Approve Music** approves only music.
-- Album limits work like season limits: **Global Album Request Limit** in **Settings → Users**, and a limit on each person.
+- Album limits work like season limits: **Global Album Request Limit** in **Settings → Users**, and a limit on each person. With **Send Requests Over the Limit to Admins** on, music past the limit waits for an admin too (see [Request limits](./requests-and-downloads.md#request-limits)).
 - Each song counts as one album against that limit, unless **Settings → Music** gives songs a **Song Limit** of their own.
 
 ### What Lidarr is told

@@ -263,6 +263,68 @@ describe('Radarr Scanner', () => {
     });
   });
 
+  describe('qualities', () => {
+    const movieFile = (resolution: string, rangeType: string) =>
+      ({
+        id: 1,
+        movieId: 1,
+        size: 1,
+        dateAdded: '2024-01-01T00:00:00Z',
+        qualityCutoffNotMet: false,
+        mediaInfo: {
+          resolution,
+          videoDynamicRange: rangeType ? 'HDR' : '',
+          videoDynamicRangeType: rangeType,
+        },
+      }) as RadarrMovie['movieFile'];
+
+    it('stores what the file is in, and shows it once available', async () => {
+      configureRadarr([{ syncEnabled: true }]);
+      getMoviesImpl = async () => [
+        fakeRadarrMovie({
+          tmdbId: 560,
+          movieFile: movieFile('3840x1600', 'DV HDR10'),
+        }),
+      ];
+
+      await runWithMockTimers(() => radarrScanner.run());
+
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 560 },
+      });
+      assert.deepEqual(media.quality, {
+        radarr: {
+          standard: { resolutions: ['4K'], ranges: ['DV', 'HDR10'] },
+        },
+      });
+      assert.deepEqual(media.availableQuality, {
+        resolutions: ['4K'],
+        ranges: ['DV', 'HDR10'],
+      });
+    });
+
+    it('forgets the file once Radarr no longer has one', async () => {
+      configureRadarr([{ syncEnabled: true }]);
+      getMoviesImpl = async () => [
+        fakeRadarrMovie({
+          tmdbId: 561,
+          movieFile: movieFile('1920x1080', ''),
+        }),
+      ];
+      await runWithMockTimers(() => radarrScanner.run());
+
+      getMoviesImpl = async () => [
+        fakeRadarrMovie({ tmdbId: 561, hasFile: false, monitored: true }),
+      ];
+      await runWithMockTimers(() => radarrScanner.run());
+
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 561 },
+      });
+      assert.equal(media.quality, null);
+    });
+  });
+
   describe('orphaned movie cleanup', () => {
     it('skips cleanup when a standard server has sync disabled', async () => {
       const mediaRepository = getRepository(Media);

@@ -3,6 +3,7 @@ import RadarrAPI from '@server/api/servarr/radarr';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import { radarrFileQuality } from '@server/lib/mediaQuality';
 import type {
   RunnableScanner,
   StatusBase,
@@ -178,6 +179,10 @@ class RadarrScanner
         title: radarrMovie.title,
         processing,
         hasFile: radarrMovie.hasFile,
+        // No file: nothing to show from Radarr.
+        quality: radarrMovie.hasFile
+          ? radarrFileQuality(radarrMovie.movieFile)
+          : null,
       });
     } catch (e) {
       this.log('Failed to process Radarr media', 'error', {

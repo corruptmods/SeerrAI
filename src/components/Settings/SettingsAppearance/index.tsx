@@ -13,6 +13,7 @@ import {
   BACKGROUND_NAMES,
   CustomAccentField,
 } from '@app/components/UserProfile/UserSettings/UserAppearanceSettings';
+import { useTheme } from '@app/context/ThemeContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -28,7 +29,8 @@ import {
   THEME_BACKGROUNDS,
 } from '@server/constants/theme';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Field, Form, Formik, useFormikContext } from 'formik';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { useSWRConfig } from 'swr';
 import * as Yup from 'yup';
@@ -51,6 +53,52 @@ const messages = defineMessages('components.Settings.SettingsAppearance', {
 interface AppearanceSettings {
   default: ThemeDefaults;
 }
+
+/** The parts of a default look that count, as the form saves them. */
+const lookOf = (values: ThemeDefaults): ThemeDefaults => ({
+  mode: values.mode,
+  accent: values.accent,
+  background: values.background,
+  ...(values.accent === 'custom' && {
+    customAccent: cleanHexColour(values.customAccent),
+  }),
+  ...(values.theme && { theme: values.theme }),
+});
+
+/**
+ * Shows the default look being edited on this screen as it changes; leaving
+ * without saving puts the saved look back.
+ */
+const PreviewDefaults = ({ saved }: { saved: ThemeDefaults }) => {
+  const { values } = useFormikContext<ThemeDefaults>();
+  const { appearance, setPreview } = useTheme();
+  // This screen's own extras (spacing, corners and so on) stay as they are.
+  const [extras] = useState(() => ({
+    spacing: appearance.spacing,
+    corners: appearance.corners,
+    blur: appearance.blur,
+    solidPanels: appearance.solidPanels,
+    seasonal: appearance.seasonal,
+  }));
+  const shown = JSON.stringify(lookOf(values));
+  const kept = JSON.stringify(lookOf(saved));
+
+  useEffect(() => {
+    if (shown === kept) {
+      setPreview(null);
+      return;
+    }
+    const look = JSON.parse(shown) as ThemeDefaults;
+    // A custom accent shows once it is a whole colour.
+    if (look.accent === 'custom' && !look.customAccent) {
+      return;
+    }
+    setPreview({ ...extras, ...look });
+  }, [shown, kept, extras, setPreview]);
+  useEffect(() => () => setPreview(null), [setPreview]);
+
+  return null;
+};
 
 /**
  * Settings → Appearance: the default look for everyone without their own, and
@@ -112,9 +160,10 @@ const SettingsAppearance = () => {
                   },
                 }
               );
-              await mutate(response.data, { revalidate: false });
-              // Everyone using the default reads it from the public settings.
+              // Everyone using the default reads it from the public settings;
+              // refetched first, so the preview ends on the saved look.
               await globalMutate('/api/v1/settings/public');
+              await mutate(response.data, { revalidate: false });
               addToast(intl.formatMessage(messages.saved), {
                 appearance: 'success',
                 autoDismiss: true,
@@ -129,6 +178,7 @@ const SettingsAppearance = () => {
         >
           {({ values, errors, isSubmitting, isValid, setFieldValue }) => (
             <Form>
+              <PreviewDefaults saved={data.default} />
               <h4 className="text-lg font-semibold text-strong">
                 {intl.formatMessage(messages.defaultTheme)}
               </h4>

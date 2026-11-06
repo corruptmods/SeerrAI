@@ -5,6 +5,7 @@ import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { previewCustomCss } from '@app/utils/theme/safeMode';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import type { PersonalCssProblem } from '@server/constants/customCss';
 import { checkPersonalCss } from '@server/constants/customCss';
@@ -58,6 +59,8 @@ const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
   const key = `/api/v1/user/${userId}/settings/css`;
   const { data, mutate } = useSWR<{ css: string; allowed: boolean }>(key);
   const [css, setCss] = useState('');
+  // Only what someone types is previewed, not the text while it loads.
+  const [typed, setTyped] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -67,6 +70,24 @@ const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
   }, [data]);
 
   const checked = checkPersonalCss(css);
+
+  // Your own CSS shows as typed, once it would be accepted; leaving without
+  // saving puts the saved one back.
+  const saved = data?.css;
+  const shown = 'css' in checked ? checked.css : undefined;
+  useEffect(() => {
+    if (
+      !isOwn ||
+      !typed ||
+      saved === undefined ||
+      shown === undefined ||
+      shown === saved
+    ) {
+      return;
+    }
+    return previewCustomCss('personal', shown);
+  }, [typed, shown, saved, isOwn]);
+
   const problem = 'css' in checked ? undefined : problemText(intl, checked);
   const changed = !!data && ('css' in checked ? checked.css : css) !== data.css;
 
@@ -77,12 +98,13 @@ const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
         key,
         { css }
       );
-      await mutate(response.data, { revalidate: false });
-      setCss(response.data.css);
-      // The stylesheet URL is versioned from the user object.
+      // The stylesheet URL is versioned from the user object; load the new
+      // one before the preview ends, so nothing flickers.
       if (isOwn) {
         await revalidate();
       }
+      await mutate(response.data, { revalidate: false });
+      setCss(response.data.css);
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',
         autoDismiss: true,
@@ -123,7 +145,10 @@ const PersonalCss = ({ userId, isOwn }: { userId: number; isOwn: boolean }) => {
             id={`${id}-css`}
             rows={8}
             value={css}
-            onChange={(e) => setCss(e.target.value)}
+            onChange={(e) => {
+              setCss(e.target.value);
+              setTyped(true);
+            }}
             placeholder={intl.formatMessage(messages.placeholder)}
             spellCheck={false}
             autoComplete="off"

@@ -7,6 +7,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Changed
 
 - **Settings → Network** applies every change as soon as you save, with no restart, so its Restart Required badges and the restart reminder are gone.
+- **Settings → Appearance** shows the default look, Server CSS and Personal CSS on your screen as you change them, and keeps them only when you save.
+- The Requests page's search and filters line up in even columns of the same height.
 - **Pages load faster**: each page's HTML is about 400 KB smaller (49 KB for Discover, from about 450). Seerr AI's text comes as a file your browser keeps, instead of inside every page.
 - **Home page rows** are fetched as you scroll near them, so the rows at the top, and their posters, aren't kept waiting behind ones further down. Going back to the page shows the ones already fetched at once.
 - Radarr's Smaller files and Balanced sizes match what films are: Balanced takes a usual Blu-ray encode (12 GB for 1080p, from 20), Smaller files a web release (6 GB, from 8), and the other resolutions come down with them. Your own limit and Best quality are unchanged.

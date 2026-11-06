@@ -3,12 +3,14 @@ import { describe, it } from 'node:test';
 import vm from 'node:vm';
 import { THEME_STYLE_ID } from './index';
 import {
+  CSS_PREVIEW_ID,
   PERSONAL_CSS_ID,
   SAFE_MODE_KEY,
   SAFE_MODE_SCRIPT,
   SERVER_CSS_ID,
   THEME_SAFE_STYLE_ID,
   customCssLinks,
+  previewCustomCss,
 } from './safeMode';
 
 /*
@@ -145,5 +147,95 @@ describe('the custom stylesheets a page loads', () => {
       server: '/api/v1/style/server.css?v=abc123',
     });
     assert.deepEqual(customCssLinks(settings(null, true), undefined), {});
+  });
+});
+
+describe('custom CSS being edited', () => {
+  /** A page's head as a list, with the elements the preview touches. */
+  const head = (ids: string[], safe = false) => {
+    type Node = {
+      id: string;
+      tag: string;
+      disabled?: boolean;
+      textContent?: string;
+      after: (node: Node) => void;
+      before: (node: Node) => void;
+      remove: () => void;
+    };
+    const nodes: Node[] = [];
+    const make = (tag: string, id = ''): Node => {
+      const node: Node = {
+        id,
+        tag,
+        after: (other) => nodes.splice(nodes.indexOf(node) + 1, 0, other),
+        before: (other) => nodes.splice(nodes.indexOf(node), 0, other),
+        remove: () => {
+          const at = nodes.indexOf(node);
+          if (at >= 0) nodes.splice(at, 1);
+        },
+      };
+      return node;
+    };
+    ids.forEach((id) => nodes.push(make('link', id)));
+    const document = {
+      documentElement: { getAttribute: () => (safe ? 'on' : null) },
+      getElementById: (id: string) => nodes.find((n) => n.id === id) ?? null,
+      createElement: (tag: string) => make(tag),
+      head: { appendChild: (node: Node) => nodes.push(node) },
+    };
+    return { document, nodes };
+  };
+
+  const withDocument = (document: object, run: () => void) => {
+    const before = (globalThis as { document?: unknown }).document;
+    (globalThis as { document?: unknown }).document = document;
+    try {
+      run();
+    } finally {
+      (globalThis as { document?: unknown }).document = before;
+    }
+  };
+
+  it('stands in for the saved CSS at its place until put back', () => {
+    const page = head([SERVER_CSS_ID, PERSONAL_CSS_ID]);
+    withDocument(page.document, () => {
+      const putBack = previewCustomCss('server', 'a { color: red }');
+      assert.deepEqual(
+        page.nodes.map((n) => n.id),
+        [SERVER_CSS_ID, CSS_PREVIEW_ID.server, PERSONAL_CSS_ID]
+      );
+      assert.equal(page.nodes[0].disabled, true);
+      assert.equal(page.nodes[1].textContent, 'a { color: red }');
+
+      putBack();
+      assert.deepEqual(
+        page.nodes.map((n) => n.id),
+        [SERVER_CSS_ID, PERSONAL_CSS_ID]
+      );
+      assert.equal(page.nodes[0].disabled, false);
+    });
+  });
+
+  it('goes before personal CSS when no Server CSS is saved yet', () => {
+    const page = head([PERSONAL_CSS_ID]);
+    withDocument(page.document, () => {
+      previewCustomCss('server', 'a {}');
+      assert.deepEqual(
+        page.nodes.map((n) => n.id),
+        [CSS_PREVIEW_ID.server, PERSONAL_CSS_ID]
+      );
+    });
+  });
+
+  it('shows nothing in safe mode', () => {
+    const page = head([SERVER_CSS_ID], true);
+    withDocument(page.document, () => {
+      previewCustomCss('server', 'a {}')();
+      assert.deepEqual(
+        page.nodes.map((n) => n.id),
+        [SERVER_CSS_ID]
+      );
+      assert.equal(page.nodes[0].disabled, undefined);
+    });
   });
 });

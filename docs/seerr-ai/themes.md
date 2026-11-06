@@ -28,7 +28,7 @@ Every built-in colour, and every custom one, is checked so text stays readable.
 
 ## The server's look (admins)
 
-**Settings → Appearance** sets the default **Mode** (Dark, Light, or Match the person's device), **Accent colour** and **Dark background**, or a **Theme file**. It's for everyone who hasn't chosen their own and for the sign-in page; nobody is locked to it. The same page has the seasons and **Server CSS**.
+**Settings → Appearance** sets the default **Mode** (Dark, Light, or Match the person's device), **Accent colour** and **Dark background**, or a **Theme file**. It's for everyone who hasn't chosen their own and for the sign-in page; nobody is locked to it. Each change shows on your screen at once; it's kept for everyone only once you press **Save Changes**, and leaving the page without saving puts the saved look back. The same page has the seasons and **Server CSS**.
 
 ## What to expect in light mode
 
@@ -100,9 +100,9 @@ Success, warning, danger and information colours stay Seerr AI's own. An exporte
 
 ## Custom CSS
 
-**Settings → Appearance → Server CSS** (admins): styles for everyone, the sign-in page included, up to 64 KB. It may `@import` a stylesheet from elsewhere, such as a [theme.park](https://theme-park.dev) theme. Pages only load stylesheets and fonts from this server and the places Server CSS names, so `@import` anything an imported stylesheet pulls in too.
+**Settings → Appearance → Server CSS** (admins): styles for everyone, the sign-in page included, up to 64 KB. It may `@import` a stylesheet from elsewhere, such as a [theme.park](https://theme-park.dev) theme. What you type shows on your screen as you type it, and reaches everyone once saved; an `@import` from a new place loads only after saving. Pages only load stylesheets and fonts from this server and the places Server CSS names, so `@import` anything an imported stylesheet pulls in too.
 
-**Let people add their own CSS** (off to start) shows **Personal CSS** on everyone's Appearance page. It changes only their own screens, once signed in, up to 32 KB. Because styles are often pasted from somewhere, Personal CSS may not do anything that could send something elsewhere. It may not:
+**Let people add their own CSS** (off to start) shows **Personal CSS** on everyone's Appearance page. It changes only their own screens, once signed in, up to 32 KB, and shows as it's typed, until they leave without saving. Because styles are often pasted from somewhere, Personal CSS may not do anything that could send something elsewhere. It may not:
 
 - `@import` other stylesheets;
 - use pictures or fonts from elsewhere: `url()` only takes a path on this server (`/my-picture.png`), `#id`, or `data:image/…` / `data:font/…`; no `image-set()`;

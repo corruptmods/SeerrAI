@@ -14,9 +14,8 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  Bars3BottomLeftIcon,
+  BarsArrowDownIcon,
+  BarsArrowUpIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleStackIcon,
@@ -102,6 +101,18 @@ const RequestList = () => {
     hasPermission([Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW], {
       type: 'or',
     });
+  // Even columns: the filters share a row under the search, and sit beside
+  // the title in one row of equal widths on wide screens.
+  const filterGrid = canFilterByUser
+    ? {
+        columns:
+          'sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[repeat(5,12.5rem)]',
+        search: 'sm:col-span-2 xl:col-span-4 2xl:col-span-1',
+      }
+    : {
+        columns: 'sm:grid-cols-3 2xl:grid-cols-[repeat(4,12.5rem)]',
+        search: 'sm:col-span-3 2xl:col-span-1',
+      };
 
   const { data: userData } = useSWR<{
     results: { id: number; displayName: string }[];
@@ -257,7 +268,7 @@ const RequestList = () => {
           router.query.userId ? user?.displayName : '',
         ]}
       />
-      <div className="mb-4 flex flex-col justify-between lg:flex-row lg:items-end">
+      <div className="mb-4 flex flex-col justify-between 2xl:flex-row 2xl:items-end 2xl:gap-4">
         <Header
           subtext={
             router.pathname.startsWith('/profile') ? (
@@ -275,21 +286,21 @@ const RequestList = () => {
         >
           {intl.formatMessage(messages.requests)}
         </Header>
-        <div className="mt-2 flex flex-grow flex-col sm:flex-row lg:flex-grow-0">
-          <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
+        <div className={`mt-2 grid grid-cols-1 gap-2 ${filterGrid.columns}`}>
+          <div className={`flex min-w-0 ${filterGrid.search}`}>
             <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-sm text-gray-100">
               <MagnifyingGlassIcon className="h-6 w-6" />
             </span>
             <input
-              type="search"
+              type="text"
               aria-label={intl.formatMessage(messages.searchRequests)}
               placeholder={intl.formatMessage(messages.searchRequests)}
-              className="rounded-r-only lg:w-56"
+              className="rounded-r-only"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
-          <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
+          <div className="flex min-w-0">
             <MultiSelectFilter
               icon={<CircleStackIcon className="h-6 w-6" />}
               name="mediaType"
@@ -319,7 +330,7 @@ const RequestList = () => {
             />
           </div>
           {canFilterByUser && (
-            <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
+            <div className="flex min-w-0">
               <MultiSelectFilter
                 allLabel={intl.formatMessage(messages.allusers)}
                 icon={<UserIcon className="h-6 w-6" />}
@@ -336,7 +347,7 @@ const RequestList = () => {
               />
             </div>
           )}
-          <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
+          <div className="flex min-w-0">
             <MultiSelectFilter
               icon={<FunnelIcon className="h-6 w-6" />}
               name="filter"
@@ -377,10 +388,25 @@ const RequestList = () => {
               selected={currentFilters}
             />
           </div>
-          <div className="mb-2 flex flex-grow sm:mb-0 lg:flex-grow-0">
-            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100 sm:text-sm">
-              <Bars3BottomLeftIcon className="h-6 w-6" />
-            </span>
+          <div className="flex min-w-0">
+            <Tooltip content={intl.formatMessage(messages.sortDirection)}>
+              <button
+                type="button"
+                aria-label={intl.formatMessage(messages.sortDirection)}
+                className="inline-flex flex-none items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100 transition hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                onClick={() =>
+                  setCurrentSortDirection(
+                    currentSortDirection === 'asc' ? 'desc' : 'asc'
+                  )
+                }
+              >
+                {currentSortDirection === 'asc' ? (
+                  <BarsArrowUpIcon className="h-6 w-6" />
+                ) : (
+                  <BarsArrowDownIcon className="h-6 w-6" />
+                )}
+              </button>
+            </Tooltip>
             <select
               id="sort"
               aria-label={intl.formatMessage(globalMessages.sortBy)}
@@ -395,7 +421,7 @@ const RequestList = () => {
                 });
               }}
               value={currentSort}
-              className="rounded-none border-r-0"
+              className="rounded-r-only pr-8"
             >
               <option value="added">
                 {intl.formatMessage(messages.sortAdded)}
@@ -404,24 +430,6 @@ const RequestList = () => {
                 {intl.formatMessage(messages.sortModified)}
               </option>
             </select>
-            <Tooltip content={intl.formatMessage(messages.sortDirection)}>
-              <Button
-                buttonType="default"
-                className="z-40 mr-2 rounded-l-none border !border-gray-500 !bg-gray-800 !px-3 !text-gray-500 hover:!bg-gray-400 hover:!text-strong"
-                buttonSize="md"
-                onClick={() =>
-                  setCurrentSortDirection(
-                    currentSortDirection === 'asc' ? 'desc' : 'asc'
-                  )
-                }
-              >
-                {currentSortDirection === 'asc' ? (
-                  <ArrowUpIcon className="h-6 w-6" />
-                ) : (
-                  <ArrowDownIcon className="h-6 w-6" />
-                )}
-              </Button>
-            </Tooltip>
           </div>
         </div>
       </div>

@@ -90,3 +90,47 @@ export const applyCustomCss = (links: {
     }
   }
 };
+
+export const CSS_PREVIEW_ID = {
+  server: 'seerr-server-css-preview',
+  personal: 'seerr-personal-css-preview',
+} as const;
+
+/**
+ * Shows CSS being edited in place of the saved Server or Personal CSS, at the
+ * same point in the page so it wins as the saved one would. Returns what puts
+ * the saved one back. Nothing in safe mode.
+ */
+export const previewCustomCss = (
+  kind: 'server' | 'personal',
+  css: string
+): (() => void) => {
+  if (isSafeMode()) {
+    return () => undefined;
+  }
+  const saved = document.getElementById(
+    kind === 'server' ? SERVER_CSS_ID : PERSONAL_CSS_ID
+  ) as HTMLLinkElement | null;
+  const style = document.createElement('style');
+  style.id = CSS_PREVIEW_ID[kind];
+  style.textContent = css;
+  if (saved) {
+    saved.disabled = true;
+    saved.after(style);
+  } else {
+    // Server CSS goes before personal CSS, which wins over it.
+    const personal =
+      kind === 'server' ? document.getElementById(PERSONAL_CSS_ID) : null;
+    if (personal) {
+      personal.before(style);
+    } else {
+      document.head.appendChild(style);
+    }
+  }
+  return () => {
+    style.remove();
+    if (saved) {
+      saved.disabled = false;
+    }
+  };
+};

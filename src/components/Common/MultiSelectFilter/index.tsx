@@ -57,14 +57,14 @@ const MultiSelectFilter = ({
       : intl.formatMessage(messages.selectedcount, { count: selected.length });
 
   return (
-    <div className="relative flex" ref={containerRef}>
+    <div className="relative flex w-full min-w-0" ref={containerRef}>
       <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-sm text-gray-100">
         {icon}
       </span>
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="flex h-10 w-full min-w-0 items-center justify-between rounded-r-md border border-field-border bg-field px-3 text-left text-sm text-strong transition hover:bg-gray-600 focus:border-blue-500 focus:outline-none"
+        className="flex w-full min-w-0 items-center justify-between rounded-r-md border border-field-border bg-field px-3 py-2 text-left text-sm leading-5 text-strong transition hover:bg-gray-600 focus:border-blue-500 focus:outline-none"
         id={name}
         onClick={() => setOpen((open) => !open)}
         type="button"

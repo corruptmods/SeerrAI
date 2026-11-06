@@ -4,7 +4,7 @@ import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { safeModeHref } from '@app/utils/theme/safeMode';
+import { previewCustomCss, safeModeHref } from '@app/utils/theme/safeMode';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import { checkServerCss } from '@server/constants/customCss';
 import { PROJECT_BRANCH, PROJECT_URL } from '@server/constants/project';
@@ -61,6 +61,8 @@ const ServerCss = () => {
     '/api/v1/settings/appearance/css'
   );
   const [css, setCss] = useState('');
+  // Only what someone types is previewed, not the text while it loads.
+  const [typed, setTyped] = useState(false);
   const [personalCss, setPersonalCss] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -71,11 +73,28 @@ const ServerCss = () => {
     }
   }, [data]);
 
+  // What is typed shows straight away; leaving without saving puts the
+  // saved CSS back.
+  const saved = data?.css;
+  const checked = checkServerCss(css);
+  const shown = 'css' in checked ? checked.css : undefined;
+  useEffect(() => {
+    if (
+      !typed ||
+      saved === undefined ||
+      shown === undefined ||
+      shown === saved
+    ) {
+      return;
+    }
+    return previewCustomCss('server', shown);
+  }, [typed, shown, saved]);
+
   if (!data) {
     return null;
   }
 
-  const tooLarge = !('css' in checkServerCss(css));
+  const tooLarge = shown === undefined;
 
   const save = async () => {
     setSaving(true);
@@ -84,10 +103,11 @@ const ServerCss = () => {
         '/api/v1/settings/appearance/css',
         { css, personalCss }
       );
+      // The stylesheet URL is versioned from the public settings; load the
+      // new one before the preview ends, so nothing flickers.
+      await globalMutate('/api/v1/settings/public');
       await mutate(response.data, { revalidate: false });
       setCss(response.data.css);
-      // The stylesheet URL is versioned from the public settings.
-      await globalMutate('/api/v1/settings/public');
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',
         autoDismiss: true,
@@ -118,7 +138,10 @@ const ServerCss = () => {
         id={`${id}-css`}
         rows={9}
         value={css}
-        onChange={(e) => setCss(e.target.value)}
+        onChange={(e) => {
+          setCss(e.target.value);
+          setTyped(true);
+        }}
         placeholder={intl.formatMessage(messages.placeholder)}
         spellCheck={false}
         autoComplete="off"

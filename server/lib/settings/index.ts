@@ -1075,7 +1075,8 @@ export type ServerList =
   | 'maintainerr'
   | 'downloadClients';
 
-const SETTINGS_PATH = process.env.CONFIG_DIRECTORY
+/** Where settings.json is: in CONFIG_DIRECTORY when set, else ./config. */
+export const SETTINGS_PATH = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/settings.json`
   : path.join(__dirname, '../../../config/settings.json');
 

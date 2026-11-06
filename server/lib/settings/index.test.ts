@@ -1,6 +1,6 @@
 import { MediaServerType } from '@server/constants/server';
 import type { AllSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, SETTINGS_PATH } from '@server/lib/settings';
 import { runMigrations } from '@server/lib/settings/migrator';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -40,7 +40,7 @@ afterEach(async () => {
 
 describe('settings files', { skip: process.platform === 'win32' }, () => {
   it('saves settings.json readable only by its owner', async () => {
-    const file = path.join(process.env.CONFIG_DIRECTORY ?? '', 'settings.json');
+    const file = SETTINGS_PATH;
     await fs.writeFile(file, '{}', { mode: 0o644 });
     await fs.chmod(file, 0o644);
 
@@ -74,7 +74,7 @@ describe('settings files', { skip: process.platform === 'win32' }, () => {
     assert.equal(fixed.sessionSecret, undefined);
     assert.equal(fixed.vapidPrivate, undefined);
 
-    const file = path.join(process.env.CONFIG_DIRECTORY ?? '', 'settings.json');
+    const file = SETTINGS_PATH;
     await fs.copyFile(fixture, file);
     await getSettings().load(undefined, true);
 

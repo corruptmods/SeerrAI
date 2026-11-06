@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Päiviä ennen laskemista",
   "components.Settings.SettingsBackfill.stepDownTip": "Nimike, joka käyttää jotakin Seerr AI:n laatuesiasetusta (Asetukset → Laatu) ja jolle ei ladata mitään, siirtyy seuraavaan väljempään esiasetukseen ja palaa takaisin, kun jotain ladataan.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Tunteja Sonarrin tai Radarrin viimeisestä hausta",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Tunnit, jotka uusi jakso jätetään Sonarrille sen esityksen jälkeen",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent-paketit menevät ohjelmaan",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-paketit menevät ohjelmaan",
   "components.Settings.SettingsBackfill.when": "Kun nimike on jumissa",

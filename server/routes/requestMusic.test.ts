@@ -163,6 +163,25 @@ after(() => {
   lidarr.stop();
 });
 
+/** Lidarr's metadata service can look up Static Garden, so it can be sent. */
+const lidarrFindsStaticGarden = () =>
+  lidarr.lookupAlbums.set(STATIC_GARDEN, {
+    id: 0,
+    title: 'Static Garden',
+    foreignAlbumId: STATIC_GARDEN,
+    artistId: 0,
+    monitored: false,
+    artist: {
+      id: 0,
+      artistName: 'Glasswing',
+      foreignArtistId: ARTIST,
+      monitored: false,
+      qualityProfileId: 0,
+      metadataProfileId: 0,
+      tags: [],
+    },
+  });
+
 beforeEach(async () => {
   const settings = getSettings();
   lidarr.reset();
@@ -266,22 +285,7 @@ describe('POST /request/music', () => {
 
   it('is approved at once with Auto-Approve Music, past 32 bits, and sent to Lidarr', async () => {
     await actAs(Permission.REQUEST + Permission.AUTO_APPROVE_MUSIC);
-    lidarr.lookupAlbums.set(STATIC_GARDEN, {
-      id: 0,
-      title: 'Static Garden',
-      foreignAlbumId: STATIC_GARDEN,
-      artistId: 0,
-      monitored: false,
-      artist: {
-        id: 0,
-        artistName: 'Glasswing',
-        foreignArtistId: ARTIST,
-        monitored: false,
-        qualityProfileId: 0,
-        metadataProfileId: 0,
-        tags: [],
-      },
-    });
+    lidarrFindsStaticGarden();
 
     const res = await requestMusic({ albums: [STATIC_GARDEN] });
 
@@ -503,10 +507,14 @@ describe('music requests over the quota, left for an admin', () => {
 
   it('approves a request within the quota as before', async () => {
     await limitTo(Permission.REQUEST + Permission.AUTO_APPROVE, 2);
+    lidarrFindsStaticGarden();
 
     const res = await requestMusic({ albums: [STATIC_GARDEN] });
 
     assert.equal(res.status, 201);
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/album'
+    );
     const request = await getRepository(MediaRequest).findOneOrFail({
       where: { id: (res.body as { id: number }).id },
     });

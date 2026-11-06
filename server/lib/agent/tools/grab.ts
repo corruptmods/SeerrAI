@@ -39,9 +39,15 @@ import { mentionsShow } from '@server/lib/backfill/matcher';
 import { movieName } from '@server/lib/backfill/movies';
 import { baseName, canonicalName, isVideo } from '@server/lib/backfill/naming';
 import type { PlanEntry } from '@server/lib/backfill/plan';
-import { summarize } from '@server/lib/backfill/plan';
+import {
+  airedAWhile,
+  airedUnder,
+  qualityAllowed,
+  summarize,
+} from '@server/lib/backfill/plan';
 import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import { sizeNote } from '@server/lib/backfill/sizeLimits';
+import type { SonarrQualityProfile } from '@server/lib/backfill/sonarr';
 import { blockedGroupOf } from '@server/lib/blockedGroups';
 import { getSettings } from '@server/lib/settings';
 import { In } from 'typeorm';
@@ -51,6 +57,40 @@ import { z } from 'zod';
  * Starting a download of the chosen files through Backfill, or proposing a
  * replacement to an admin; and stopping a download it started.
  */
+
+/**
+ * On its own (no admin in the conversation) the agent takes only what the
+ * title's quality profile takes, as Backfill's own searches do. A release
+ * Sonarr or Radarr would turn down for its quality is left for an admin.
+ */
+/** On its own, an episode Sonarr still has its first hours with. */
+const tooNew = (
+  state: AgentState,
+  episodes: { hasFile: boolean; airDateUtc?: string }[]
+): boolean =>
+  !adminPresent(state.run) &&
+  episodes.some((ep) => !ep.hasFile && !airedAWhile(ep));
+
+const outsideProfile = (
+  state: AgentState,
+  profile: SonarrQualityProfile,
+  quality: PlanEntry['quality'],
+  score: number
+): void => {
+  if (adminPresent(state.run)) return;
+  const id = quality?.quality.id ?? 0;
+  const why =
+    !id || !qualityAllowed(profile, id)
+      ? `${quality?.quality.name ?? 'Its quality'} is not in the quality profile`
+      : score < profile.minFormatScore
+        ? `it scores ${score}, below the profile's minimum of ${profile.minFormatScore}`
+        : null;
+  if (why) {
+    throw new Refused(
+      `Nothing was started: ${why}. Running on your own, you take only what the profile takes; leave this one for the admin and say so in your summary.`
+    );
+  }
+};
 
 const grabInput = z.object({
   title: z.string(),
@@ -243,6 +283,12 @@ const prepareWhole = async (
       movie.originalLanguage?.name
     );
     if (problem) throw new Refused(problem);
+    outsideProfile(
+      state,
+      movieCtx.profile,
+      parsed.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
+      parsed.customFormatScore ?? 0
+    );
     Object.assign(entry, {
       // A movie's plan entry carries the movie's id, as Backfill's own do.
       episodeIds: [movie.id],
@@ -345,7 +391,18 @@ const prepareWhole = async (
     }
     const problem = languageProblem(parsed.languages, originalOf(series));
     if (problem) throw new Refused(problem);
+    outsideProfile(
+      state,
+      seriesCtx.profile,
+      info?.quality ?? UNKNOWN_QUALITY,
+      parsed.customFormatScore ?? 0
+    );
     const full = seriesCtx.episodes.find((e) => e.id === episode.id);
+    if (full && tooNew(state, [full])) {
+      throw new Refused(
+        `That episode ${airedUnder().toLowerCase()}: Sonarr gets new episodes first.`
+      );
+    }
     Object.assign(entry, {
       episodeIds: [episode.id],
       season: episode.seasonNumber,
@@ -615,6 +672,12 @@ const prepareGrab = async (
     const parsed = await ctx.radarr.parse(judgedAs).catch(() => null);
     const problem = languageProblem(parsed?.languages, original);
     if (problem) throw new Refused(problem);
+    outsideProfile(
+      state,
+      ctx.profile,
+      parsed?.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
+      parsed?.customFormatScore ?? 0
+    );
     plan.push({
       index: file.index,
       path: file.path,
@@ -742,6 +805,17 @@ const prepareGrab = async (
       if (problem) {
         // Only this file; the rest of the pack may be fine.
         throw new ToolError(`File #${file.index}: ${problem}`);
+      }
+      outsideProfile(
+        state,
+        ctx.profile,
+        parsed?.parsedEpisodeInfo?.quality ?? UNKNOWN_QUALITY,
+        parsed?.customFormatScore ?? 0
+      );
+      if (tooNew(state, episodes)) {
+        throw new Refused(
+          `File #${file.index} is for an episode that ${airedUnder().toLowerCase()}: Sonarr gets new episodes first. Leave it out.`
+        );
       }
       plan.push({
         index: file.index,

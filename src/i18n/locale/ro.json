@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Zile până la coborâre",
   "components.Settings.SettingsBackfill.stepDownTip": "Un titlu pe una dintre presetările de calitate Seerr AI (Setări → Calitate) pentru care nu se preia nimic trece la următoarea presetare, mai permisivă, și revine când se preia ceva.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Ore de la ultima căutare a lui Sonarr sau Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Ore în care un episod nou este lăsat în seama Sonarr după difuzare",
   "components.Settings.SettingsBackfill.torrentClient": "Pachetele torrent merg la",
   "components.Settings.SettingsBackfill.usenetClient": "Pachetele Usenet merg la",
   "components.Settings.SettingsBackfill.when": "Când un titlu e împotmolit",

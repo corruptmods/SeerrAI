@@ -5236,3 +5236,92 @@ describe('stopping and correcting the admin agent while it works', () => {
     assert.equal(done.summary, 'Checked the specials.');
   });
 });
+
+describe('what the admin agent takes on its own', () => {
+  // A run Backfill started after an empty search: no admin in it.
+  const onItsOwn = async () =>
+    ({
+      run: {
+        trigger: 'auto',
+        kind: 'series',
+        serverId: 0,
+        arrId: SERIES_ID,
+        title: 'Wendle the Gentle Lantern',
+        memory: {},
+        steps: [],
+        actions: [],
+      },
+      user: await admin(),
+      releases: new Map(),
+      files: new Map(),
+      series: new Map(),
+      movies: new Map(),
+      grabsToday: 0,
+      bind: () => undefined,
+      act: () => undefined,
+      ask: () => undefined,
+      propose: () => undefined,
+    }) as unknown as AgentState;
+  const grabFirst = (state: AgentState) =>
+    runTool(state, 'grab', {
+      title: `series:0:${SERIES_ID}`,
+      release: 'r1',
+      files: [{ index: 1, season: 1, episode: 1 }],
+      reason: 'a stopgap',
+    });
+  const allowDvd = () =>
+    mock.method(BackfillSonarr.prototype, 'getQualityProfile', async () => ({
+      id: 11,
+      name: 'HD',
+      upgradeAllowed: true,
+      cutoff: 2,
+      items: [{ quality: { id: 2, name: 'DVD' }, allowed: true }],
+      minFormatScore: 0,
+      cutoffFormatScore: 0,
+    }));
+
+  it('leaves a release the quality profile turns down for an admin', async () => {
+    const state = await onItsOwn();
+    await runTool(state, 'search_indexers', {
+      query: 'Wendle',
+      kind: 'series',
+    });
+    const refused = await grabFirst(state);
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /DVD is not in the quality profile/);
+    assert.match(refused.text, /leave this one for the admin/);
+  });
+
+  it('leaves an episode that aired under 12 hours ago to Sonarr', async () => {
+    allowDvd();
+    const justAired = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+      EPISODES.map((e) => (e.id === 501 ? { ...e, airDateUtc: justAired } : e))
+    );
+    const state = await onItsOwn();
+    await runTool(state, 'search_indexers', {
+      query: 'Wendle',
+      kind: 'series',
+    });
+    const refused = await grabFirst(state);
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /aired under 12 hours ago/);
+
+    const status = await runTool(state, 'title_status', {
+      title: `series:0:${SERIES_ID}`,
+    });
+    assert.match(status.text, /Aired in the last 12 hours, left to Sonarr: 1/);
+    assert.doesNotMatch(status.text, /S01E01 "Wendle's Picnic/);
+  });
+
+  it('counts an episode with no air date as not aired', async () => {
+    mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+      EPISODES.map((e) => (e.id === 502 ? { ...e, airDateUtc: undefined } : e))
+    );
+    const status = await runTool(await onItsOwn(), 'title_status', {
+      title: `series:0:${SERIES_ID}`,
+    });
+    assert.match(status.text, /Missing, monitored and aired \(1\)/);
+    assert.match(status.text, /Not aired yet: 1\./);
+  });
+});

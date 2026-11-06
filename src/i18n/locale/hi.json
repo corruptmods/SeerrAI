@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "नीचे जाने से पहले के दिन",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI के किसी क्वालिटी प्रीसेट (सेटिंग्स → क्वालिटी) पर मौजूद टाइटल के लिए अगर कुछ नहीं लिया जाता, तो वह अगले ढीले प्रीसेट पर चला जाता है, और कुछ मिलते ही वापस आ जाता है।",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sonarr या Radarr की आखिरी खोज के बाद के घंटे",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "नया एपिसोड प्रसारित होने के बाद कितने घंटे Sonarr पर छोड़ा जाए",
   "components.Settings.SettingsBackfill.torrentClient": "टोरेंट पैक यहाँ जाते हैं",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet पैक यहाँ जाते हैं",
   "components.Settings.SettingsBackfill.when": "जब कोई शीर्षक अटका हो",

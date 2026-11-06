@@ -48,6 +48,12 @@ const body = z.object({
     .int()
     .min(1)
     .max(24 * 30),
+  newEpisodeWaitHours: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 30)
+    .default(12),
   searchAfterArr: z.boolean().default(false),
   includeCutoffUnmet: z.boolean(),
   includeSpecials: z.boolean(),

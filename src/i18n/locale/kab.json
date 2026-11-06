@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Ussan send ad yader",
   "components.Settings.SettingsBackfill.stepDownTip": "Azwel yellan ɣef yiwet seg timudmin n teɣara n Seerr AI (Iɣewwaṛen → Taɣara) ur yettwaṭṭfen ara kra ad iɛeddi ɣer tmudemt d-iteddun, ifessusen ugar, syin ad d-yuɣal mi ara yettwaṭṭef kra.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Isragen seg unadi aneggaru n Sonarr neɣ n Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Isragen ideg ara yeǧǧ yiwen n usaru amaynut i Sonarr seld tuffɣa-ines",
   "components.Settings.SettingsBackfill.torrentClient": "Ikemmusen n torrent ttruḥun ɣer",
   "components.Settings.SettingsBackfill.usenetClient": "Ikemmusen n Usenet ttruḥun ɣer",
   "components.Settings.SettingsBackfill.when": "Mi ara iḥbes uzwel",

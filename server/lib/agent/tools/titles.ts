@@ -27,6 +27,7 @@ import {
   titleRef,
 } from '@server/lib/agent/tools/base';
 import backfill from '@server/lib/backfill/engine';
+import { airedAWhile, newEpisodeWaitHours } from '@server/lib/backfill/plan';
 import { musicReady } from '@server/lib/music/access';
 import { albumStatuses } from '@server/lib/music/library';
 import { rankAlbums } from '@server/lib/music/searchRank';
@@ -545,20 +546,26 @@ export const titleStatus: AgentTool = {
         kinds ? ` (${kinds}; audio: ${heard})` : ''
       }${all.some((ep) => ep.monitored) ? '' : ', not monitored'}`;
     });
+    // As Backfill counts them: aired longer ago than New episodes wait. One
+    // with no air date hasn't aired.
     const missing = episodes
-      .filter(
-        (ep) =>
-          !ep.hasFile &&
-          ep.monitored &&
-          (!ep.airDateUtc || new Date(ep.airDateUtc).getTime() <= now)
-      )
+      .filter((ep) => !ep.hasFile && ep.monitored && airedAWhile(ep))
       .sort(
         (a, b) =>
           a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber
       );
     const upcoming = episodes.filter(
       (ep) =>
-        !ep.hasFile && ep.airDateUtc && new Date(ep.airDateUtc).getTime() > now
+        !ep.hasFile &&
+        (!ep.airDateUtc || new Date(ep.airDateUtc).getTime() > now)
+    ).length;
+    const justAired = episodes.filter(
+      (ep) =>
+        !ep.hasFile &&
+        ep.monitored &&
+        !!ep.airDateUtc &&
+        new Date(ep.airDateUtc).getTime() <= now &&
+        !airedAWhile(ep)
     ).length;
     // A file about twice an episode's length linked to one episode likely
     // holds two; relink_file can fix that.
@@ -622,6 +629,9 @@ export const titleStatus: AgentTool = {
       ...missingLines,
       missing.length > MAX_LISTED_MISSING
         ? `… and ${missing.length - MAX_LISTED_MISSING} more.`
+        : '',
+      justAired
+        ? `Aired in the last ${newEpisodeWaitHours()} hours, left to Sonarr: ${justAired}. Don't fetch these.`
         : '',
       upcoming ? `Not aired yet: ${upcoming}.` : '',
       doubled.length

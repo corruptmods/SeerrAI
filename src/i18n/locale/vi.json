@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Số ngày trước khi hạ",
   "components.Settings.SettingsBackfill.stepDownTip": "Một tựa đang dùng một trong các cấu hình sẵn chất lượng của Seerr AI (Cài đặt → Chất lượng) mà không lấy được gì sẽ chuyển sang cấu hình sẵn kế tiếp dễ hơn, rồi quay lại khi đã lấy được.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Số giờ kể từ lần tìm gần nhất của Sonarr hoặc Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Số giờ để Sonarr tự lấy tập mới sau khi tập đó phát sóng",
   "components.Settings.SettingsBackfill.torrentClient": "Gói torrent được gửi đến",
   "components.Settings.SettingsBackfill.usenetClient": "Gói Usenet được gửi đến",
   "components.Settings.SettingsBackfill.when": "Khi một tựa bị kẹt",

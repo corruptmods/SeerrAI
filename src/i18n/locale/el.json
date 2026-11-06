@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Ημέρες πριν κατέβει",
   "components.Settings.SettingsBackfill.stepDownTip": "Ένας τίτλος σε ένα από τα πρότυπα ποιότητας του Seerr AI (Ρυθμίσεις → Ποιότητα) για τον οποίο δεν λαμβάνεται τίποτα περνά στο επόμενο, πιο χαλαρό πρότυπο και επιστρέφει μόλις ληφθεί κάτι.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Ώρες από την τελευταία αναζήτηση του Sonarr ή του Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Ώρες που ένα νέο επεισόδιο αφήνεται στο Sonarr μετά την προβολή του",
   "components.Settings.SettingsBackfill.torrentClient": "Τα πακέτα torrent πηγαίνουν σε",
   "components.Settings.SettingsBackfill.usenetClient": "Τα πακέτα Usenet πηγαίνουν σε",
   "components.Settings.SettingsBackfill.when": "Πότε ένας τίτλος θεωρείται κολλημένος",

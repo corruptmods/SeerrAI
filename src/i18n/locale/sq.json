@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Ditë para se të zbresë",
   "components.Settings.SettingsBackfill.stepDownTip": "Një titull në një nga paravendosjet e cilësisë së Seerr AI (Cilësimet → Cilësia), për të cilin nuk merret asgjë, kalon te paravendosja tjetër më e lirshme dhe kthehet kur merret diçka.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Orë që nga kërkimi i fundit i Sonarr ose Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Orët që një episod i ri i lihet Sonarr pasi transmetohet",
   "components.Settings.SettingsBackfill.torrentClient": "Paketat torrent shkojnë te",
   "components.Settings.SettingsBackfill.usenetClient": "Paketat Usenet shkojnë te",
   "components.Settings.SettingsBackfill.when": "Kur një titull ngec",

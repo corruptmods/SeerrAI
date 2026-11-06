@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Дни преди слизане",
   "components.Settings.SettingsBackfill.stepDownTip": "Заглавие с някой от шаблоните за качество на Seerr AI (Настройки → Качество), за което нищо не е взето, минава към следващия, по-свободен шаблон и се връща, щом нещо бъде взето.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Часове от последното търсене на Sonarr или Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Часове, през които нов епизод се оставя на Sonarr след излъчването му",
   "components.Settings.SettingsBackfill.torrentClient": "Торент пакетите отиват в",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet пакетите отиват в",
   "components.Settings.SettingsBackfill.when": "Когато заглавие е заседнало",

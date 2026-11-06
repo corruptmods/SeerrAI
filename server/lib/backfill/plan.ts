@@ -5,6 +5,25 @@ import type {
   SonarrQuality,
   SonarrQualityProfile,
 } from '@server/lib/backfill/sonarr';
+import { getSettings } from '@server/lib/settings';
+
+/**
+ * Hours a new episode is left to Sonarr after it airs (Settings → Backfill →
+ * New episodes wait). Backfill treats it as missing only after this, so
+ * Sonarr's own feeds get the first go, even for a show just requested.
+ */
+export const newEpisodeWaitHours = (): number =>
+  getSettings().backfill.newEpisodeWaitHours ?? 12;
+
+/** Aired, and long enough ago that Backfill may fetch it. */
+export const airedAWhile = (ep: { airDateUtc?: string }): boolean =>
+  !!ep.airDateUtc &&
+  new Date(ep.airDateUtc).getTime() <
+    Date.now() - newEpisodeWaitHours() * 3_600_000;
+
+/** "Aired under 12 hours ago". */
+export const airedUnder = (): string =>
+  `Aired under ${newEpisodeWaitHours()} hour${newEpisodeWaitHours() === 1 ? '' : 's'} ago`;
 
 /*
  * A pack's effect on a series, file by file, judged as Sonarr does: profile
@@ -203,6 +222,19 @@ export const decide = (
     .map((id) => episodes.get(id))
     .filter((ep): ep is SonarrEpisode => !!ep && ep.hasFile);
   const missing = entry.episodeIds.length - existing.length;
+  if (
+    missing > 0 &&
+    entry.episodeIds.every((id) => {
+      const ep = episodes.get(id);
+      return ep?.hasFile || (!!ep?.airDateUtc && !airedAWhile(ep));
+    })
+  ) {
+    return {
+      ...base,
+      action: 'skip',
+      reason: `${airedUnder()}: Sonarr gets new episodes first`,
+    };
+  }
   const next = judged(entry.quality, entry.score);
   const verdicts = [...new Set(existing.map((ep) => ep.episodeFileId))].map(
     (fileId) => {

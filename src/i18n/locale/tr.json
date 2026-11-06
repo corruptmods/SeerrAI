@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Alt ayara geçmeden önceki gün sayısı",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI’nın kalite hazır ayarlarından birinde (Ayarlar → Kalite) olup kendisi için hiçbir şey alınmayan bir yapım, bir sonraki daha esnek hazır ayara geçer; bir şey alındığında geri döner.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sonarr veya Radarr’ın son aramasından bu yana geçen saat",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Yeni bir bölümün yayınlandıktan sonra Sonarr’a bırakıldığı saat",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent paketlerinin gideceği yer",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet paketlerinin gideceği yer",
   "components.Settings.SettingsBackfill.when": "Bir yapım takıldığında",

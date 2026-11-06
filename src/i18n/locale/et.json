@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Päevi enne allapoole minekut",
   "components.Settings.SettingsBackfill.stepDownTip": "Kui Seerr AI kvaliteedimalliga (Seaded → Kvaliteet) pealkirjale midagi ei võeta, liigub see järgmisele leebemale mallile ja tuleb tagasi, kui midagi on võetud.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Tunde Sonarri või Radarri viimasest otsingust",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Tunnid, mille jooksul uus osa jäetakse pärast eetrisse jõudmist Sonarrile",
   "components.Settings.SettingsBackfill.torrentClient": "Torrentipakid lähevad",
   "components.Settings.SettingsBackfill.usenetClient": "Useneti pakid lähevad",
   "components.Settings.SettingsBackfill.when": "Kui teos on kinni jäänud",

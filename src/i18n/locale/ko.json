@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "낮추기 전까지의 일수",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI 품질 프리셋(설정 → 품질)에 있는 작품 중 아무것도 받지 못한 작품은 다음으로 느슨한 프리셋으로 옮겨지고, 무언가 받으면 다시 돌아옵니다.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sonarr나 Radarr의 마지막 검색 이후 시간",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "새 에피소드가 방영된 후 Sonarr에 맡기는 시간",
   "components.Settings.SettingsBackfill.torrentClient": "토렌트 팩을 보낼 곳",
   "components.Settings.SettingsBackfill.usenetClient": "유즈넷 팩을 보낼 곳",
   "components.Settings.SettingsBackfill.when": "작품이 막혔다고 보는 기준",

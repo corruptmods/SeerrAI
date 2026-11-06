@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dani prije spuštanja",
   "components.Settings.SettingsBackfill.stepDownTip": "Naslov na jednom od predložaka kvalitete Seerr AI (Postavke → Kvaliteta) za koji se ništa ne preuzme prelazi na sljedeći, blaži predložak, a vraća se čim se nešto preuzme.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sati od zadnje pretrage u aplikaciji Sonarr ili Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Sati koliko se nova epizoda nakon emitiranja prepušta Sonarru",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent paketi idu u",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet paketi idu u",
   "components.Settings.SettingsBackfill.when": "Kad naslov zapne",

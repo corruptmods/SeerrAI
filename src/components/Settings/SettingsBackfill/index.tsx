@@ -44,6 +44,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   includeMusic: 'Music too',
   includeMusicTip: 'Also follow albums Lidarr couldn’t find.',
   stuckAfterHours: 'Hours since Sonarr’s or Radarr’s last search',
+  newEpisodeWaitHours: 'Hours a new episode is left to Sonarr after it airs',
   searchAfterArr: 'Search right after Sonarr, Radarr or Lidarr finds nothing',
   searchAfterArrTip:
     'Titles requested in the last 3 days are searched about 20 minutes after their own search comes up empty, instead of waiting for the hours above and the next scan. Each is searched once this way.',
@@ -180,6 +181,7 @@ const SettingsBackfill = () => {
               includeMovies: values.includeMovies,
               includeMusic: values.includeMusic,
               stuckAfterHours: Number(values.stuckAfterHours),
+              newEpisodeWaitHours: Number(values.newEpisodeWaitHours),
               searchAfterArr: values.searchAfterArr,
               includeCutoffUnmet: values.includeCutoffUnmet,
               includeSpecials: values.includeSpecials,
@@ -350,24 +352,27 @@ const SettingsBackfill = () => {
               <h4 className="mt-8 text-lg font-semibold text-gray-200">
                 {intl.formatMessage(messages.when)}
               </h4>
-              {([['stuckAfterHours', messages.stuckAfterHours]] as const).map(
-                ([name, label]) => (
-                  <div className="form-row" key={name}>
-                    <label htmlFor={name} className="text-label">
-                      {intl.formatMessage(label)}
-                    </label>
-                    <div className="form-input-area">
-                      <Field
-                        id={name}
-                        name={name}
-                        type="text"
-                        inputMode="numeric"
-                        className="short"
-                      />
-                    </div>
+              {(
+                [
+                  ['stuckAfterHours', messages.stuckAfterHours],
+                  ['newEpisodeWaitHours', messages.newEpisodeWaitHours],
+                ] as const
+              ).map(([name, label]) => (
+                <div className="form-row" key={name}>
+                  <label htmlFor={name} className="text-label">
+                    {intl.formatMessage(label)}
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      id={name}
+                      name={name}
+                      type="text"
+                      inputMode="numeric"
+                      className="short"
+                    />
                   </div>
-                )
-              )}
+                </div>
+              ))}
               <div className="form-row">
                 <label htmlFor="searchAfterArr" className="checkbox-label">
                   {intl.formatMessage(messages.searchAfterArr)}

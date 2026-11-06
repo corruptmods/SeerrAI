@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Días antes de bajar",
   "components.Settings.SettingsBackfill.stepDownTip": "Un título con una de las plantillas de calidad de Seerr AI (Ajustes → Calidad) para el que no se toma nada pasa a la siguiente plantilla menos exigente, y vuelve en cuanto se toma algo.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Horas desde la última búsqueda de Sonarr o Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Horas que un episodio nuevo se deja a Sonarr después de su emisión",
   "components.Settings.SettingsBackfill.torrentClient": "Los paquetes de torrent van a",
   "components.Settings.SettingsBackfill.usenetClient": "Los paquetes de Usenet van a",
   "components.Settings.SettingsBackfill.when": "Cuando un título está atorado",

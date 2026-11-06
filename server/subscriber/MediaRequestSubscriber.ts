@@ -312,6 +312,24 @@ const reconcileMonitoringAfterRemoval = async (
  */
 const lidarrSendsAfterCommit = new WeakMap<QueryRunner, (() => void)[]>();
 
+/** Lidarr sends still running: they finish after the request is saved. */
+const lidarrSendsRunning = new Set<Promise<unknown>>();
+
+const tracked = (work: Promise<unknown>): void => {
+  const running = work.finally(() => lidarrSendsRunning.delete(running));
+  lidarrSendsRunning.add(running);
+};
+
+/**
+ * Resolves once every Lidarr send under way has finished, ones started
+ * meanwhile included, such as before the database is closed or reset.
+ */
+export const lidarrSendsSettled = async (): Promise<void> => {
+  while (lidarrSendsRunning.size) {
+    await Promise.allSettled([...lidarrSendsRunning]);
+  }
+};
+
 /**
  * Whether Lidarr refused an add because it already has the artist or album (per
  * its response body).
@@ -1230,7 +1248,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
 
     // Never rejects: failures mark the request failed with the reason.
-    const send = () => void this.dispatchToLidarr(entity, lidarrSettings);
+    const send = () => tracked(this.dispatchToLidarr(entity, lidarrSettings));
 
     // Send after the save commits. Started inside it, a quick failure was
     // written on another connection that couldn't see the new request yet
@@ -1244,22 +1262,24 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     const waiting = lidarrSendsAfterCommit.get(queryRunner) ?? [];
     waiting.push(() => {
       // Skip if the save was rolled back or the request changed since.
-      getRepository(MediaRequest)
-        .exists({
-          where: { id: entity.id, status: MediaRequestStatus.APPROVED },
-        })
-        .then((approved) => {
-          if (approved) {
-            send();
-          }
-        })
-        .catch((e) => {
-          logger.error('Could not send an approved request to Lidarr', {
-            label: 'Media Request',
-            requestId: entity.id,
-            errorMessage: e instanceof Error ? e.message : String(e),
-          });
-        });
+      tracked(
+        getRepository(MediaRequest)
+          .exists({
+            where: { id: entity.id, status: MediaRequestStatus.APPROVED },
+          })
+          .then((approved) => {
+            if (approved) {
+              send();
+            }
+          })
+          .catch((e) => {
+            logger.error('Could not send an approved request to Lidarr', {
+              label: 'Media Request',
+              requestId: entity.id,
+              errorMessage: e instanceof Error ? e.message : String(e),
+            });
+          })
+      );
     });
     lidarrSendsAfterCommit.set(queryRunner, waiting);
   }

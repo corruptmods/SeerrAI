@@ -61,6 +61,7 @@ import {
 } from '@server/lib/backfill/paths';
 import type { PlanEntry, PlanSummary } from '@server/lib/backfill/plan';
 import {
+  airedAWhile,
   multiMustWait,
   rankCandidates,
   selectEntries,
@@ -208,8 +209,8 @@ const tracksMissing = (album: LidarrAlbum): number => {
   return Math.max(0, (stats.trackCount ?? 0) - (stats.trackFileCount ?? 0));
 };
 
-const aired = (ep: { airDateUtc?: string }) =>
-  !!ep.airDateUtc && new Date(ep.airDateUtc).getTime() < Date.now();
+// Missing once a new episode has had its wait with Sonarr.
+const aired = airedAWhile;
 
 export const isMissing = (ep: SonarrEpisode, includeSpecials: boolean) =>
   ep.monitored &&

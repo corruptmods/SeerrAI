@@ -1,4 +1,5 @@
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
+import { isMissing } from '@server/lib/backfill/engine';
 import type { SeriesContext } from '@server/lib/backfill/matcher';
 import {
   judgePack,
@@ -35,6 +36,7 @@ import type {
   SonarrParseResult,
   SonarrQualityProfile,
 } from '@server/lib/backfill/sonarr';
+import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
@@ -674,6 +676,50 @@ describe('Backfill: what Sonarr would take', () => {
       selectEntries(plan, 'all').map((p) => p.index),
       [0, 1]
     );
+  });
+
+  it('leaves an episode that aired under 12 hours ago to Sonarr, and fills one aired before', () => {
+    const hoursAgo = (h: number) =>
+      new Date(Date.now() - h * 3_600_000).toISOString();
+    const fresh = new Map(episodes);
+    fresh.set(1, { ...episodes.get(1)!, airDateUtc: hoursAgo(2) });
+    const skipped = decide(entry(0, [1]), ANIME_1080P, fresh, files);
+    assert.equal(skipped.action, 'skip');
+    assert.match(skipped.reason ?? '', /Aired under 12 hours ago/);
+    assert.equal(isMissing(fresh.get(1)!, false), false);
+
+    fresh.set(1, { ...episodes.get(1)!, airDateUtc: hoursAgo(13) });
+    assert.equal(
+      decide(entry(0, [1]), ANIME_1080P, fresh, files).action,
+      'fill'
+    );
+    assert.equal(isMissing(fresh.get(1)!, false), true);
+  });
+
+  it('waits as long as New episodes wait says', (t) => {
+    const settings = getSettings();
+    const saved = settings.backfill;
+    t.after(() => {
+      settings.backfill = saved;
+    });
+    const waitFor = (hours: number) => {
+      settings.backfill = { ...saved, newEpisodeWaitHours: hours };
+    };
+    const aired = {
+      ...episodes.get(1)!,
+      airDateUtc: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    };
+    waitFor(1);
+    assert.equal(isMissing(aired, false), true);
+    waitFor(3);
+    assert.equal(isMissing(aired, false), false);
+    assert.match(
+      decide(entry(0, [1]), ANIME_1080P, new Map([[1, aired]]), files).reason ??
+        '',
+      /Aired under 3 hours ago/
+    );
+    waitFor(0);
+    assert.equal(isMissing(aired, false), true);
   });
 
   it('ranks packs of files holding several episodes last, and takes them only when nothing else fills', () => {

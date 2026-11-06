@@ -3049,6 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Počet dní pred posunom nižšie",
   "components.Settings.SettingsBackfill.stepDownTip": "Titul na niektorej z predvolieb kvality Seerr AI (Nastavenia → Kvalita), pre ktorý sa nič nestiahne, sa presunie na najbližšiu voľnejšiu predvoľbu a späť, keď sa niečo stiahne.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Počet hodín od posledného hľadania v Sonarr alebo Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Hodiny, počas ktorých sa nová epizóda po odvysielaní ponechá Sonarru",
   "components.Settings.SettingsBackfill.torrentClient": "Torrentové balíky idú do",
   "components.Settings.SettingsBackfill.usenetClient": "Usenetové balíky idú do",
   "components.Settings.SettingsBackfill.when": "Keď je titul zaseknutý",

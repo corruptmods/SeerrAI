@@ -3063,6 +3063,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Дней до понижения",
   "components.Settings.SettingsBackfill.stepDownTip": "Если для тайтла на одном из пресетов качества Seerr AI («Настройки → Качество») ничего не скачивается, он переходит на следующий, менее строгий пресет, а когда что-то скачано — возвращается.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Часов с последнего поиска в Sonarr или Radarr",
+  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Сколько часов новый эпизод оставляется Sonarr после выхода в эфир",
   "components.Settings.SettingsBackfill.torrentClient": "Торрент-паки отправляются в",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-паки отправляются в",
   "components.Settings.SettingsBackfill.when": "Когда название зависло",

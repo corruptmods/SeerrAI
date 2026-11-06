@@ -18,6 +18,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
+- **New episodes wait** (Settings → Backfill, 12 hours to start): Backfill and the admin agent leave a new episode to Sonarr that long after it airs, even for a show just requested.
+- On its own, the admin agent no longer takes a release the title's quality profile turns down; it leaves it for you.
 - Nightly **Database Maintenance** also clears which library held a title on a server or library that's gone, and quality applies older than the 50 that History lists.
 - **Settings → Network** applies every change as soon as you save, with no restart, so its Restart Required badges and the restart reminder are gone.
 - **Settings → Appearance** shows the default look, Server CSS and Personal CSS on your screen as you change them, and keeps them only when you save.
@@ -46,6 +48,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- The admin agent counted an episode with no air date as aired.
+- On iPhone, the bottom bar could sit partway up the screen after the app came back from the background.
 - On Postgres, the first account made after every account was deleted is the owner again.
 - A season on its way when its show is removed from Sonarr (or a film from Radarr) no longer stays Processing for good: it counts as deleted and can be requested again. A title removed and added back under a new Sonarr or Radarr id is found again.
 - The first Jellyfin or Emby sign-in on a server set up in `settings.json` keeps the API key already there, as long as it works, instead of making a second one.

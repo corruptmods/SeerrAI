@@ -216,6 +216,11 @@ export interface BackfillSettings {
   /** Hours after the *arr's last search before a title counts as stuck. */
   stuckAfterHours: number;
   /**
+   * Hours a new episode is left to Sonarr after it airs before Backfill may
+   * fetch it, even for a show just requested. 0 doesn't wait.
+   */
+  newEpisodeWaitHours: number;
+  /**
    * Search new requests as soon as the *arr finds nothing, not after Stuck
    * After.
    */
@@ -319,6 +324,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   includeMovies: true,
   includeMusic: true,
   stuckAfterHours: 24,
+  newEpisodeWaitHours: 12,
   searchAfterArr: false,
   includeCutoffUnmet: false,
   includeSpecials: false,

@@ -4,6 +4,7 @@ import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import useClickOutside from '@app/hooks/useClickOutside';
 import { useFeatureCheck } from '@app/hooks/useFeature';
 import useLazyModule from '@app/hooks/useLazyModule';
+import useStayAtBottom from '@app/hooks/useStayAtBottom';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -86,6 +87,8 @@ const MobileMenu = ({
   revalidateRequestsCount,
 }: MobileMenuProps) => {
   const ref = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  useStayAtBottom(barRef);
   const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
   const { hasPermission } = useUser();
@@ -265,6 +268,7 @@ const MobileMenu = ({
   return (
     // Above Discover's Save bar while arranging the menu.
     <div
+      ref={barRef}
       className={`fixed bottom-0 left-0 right-0 ${
         editing && isOpen ? 'z-[60]' : 'z-50'
       }`}

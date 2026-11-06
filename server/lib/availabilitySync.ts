@@ -198,14 +198,14 @@ class AvailabilitySync {
         // Check every media server, Radarr and Sonarr; update only the
         // version (non-4K or 4K) that is missing everywhere.
         if (media.mediaType === 'movie') {
-          const existsInRadarr = await this.mediaExistsInRadarr(media, false);
-          const existsInRadarr4k = await this.mediaExistsInRadarr(media, true);
+          const inRadarr = await this.mediaExistsInRadarr(media, false);
+          const inRadarr4k = await this.mediaExistsInRadarr(media, true);
 
           for (const is4k of [false, true]) {
             const checks = await this.checkServers(media, is4k);
+            const radarr = is4k ? inRadarr4k : inRadarr;
             const movieExists =
-              (is4k ? existsInRadarr4k : existsInRadarr) ||
-              checks.some((check) => check.exists);
+              radarr.exists || checks.some((check) => check.exists);
 
             if (movieExists) {
               logger.debug(
@@ -218,7 +218,7 @@ class AvailabilitySync {
             } else if (
               media[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE
             ) {
-              await this.mediaUpdater(media, is4k);
+              await this.mediaUpdater(media, is4k, radarr.listed);
             }
           }
         }
@@ -228,10 +228,14 @@ class AvailabilitySync {
           const checks = await this.checkServers(media, false);
           const checks4k = await this.checkServers(media, true);
 
-          const { existsInSonarr, seasonsMap: sonarrSeasonsMap } =
-            await this.mediaExistsInSonarr(media, false);
+          const {
+            existsInSonarr,
+            listed: listedInSonarr,
+            seasonsMap: sonarrSeasonsMap,
+          } = await this.mediaExistsInSonarr(media, false);
           const {
             existsInSonarr: existsInSonarr4k,
+            listed: listedInSonarr4k,
             seasonsMap: sonarrSeasonsMap4k,
           } = await this.mediaExistsInSonarr(media, true);
 
@@ -368,7 +372,7 @@ class AvailabilitySync {
                 (season) => season.status === MediaStatus.PARTIALLY_AVAILABLE
               ))
           ) {
-            await this.mediaUpdater(media, false);
+            await this.mediaUpdater(media, false, listedInSonarr);
           }
 
           if (
@@ -382,7 +386,7 @@ class AvailabilitySync {
                 (season) => season.status4k === MediaStatus.PARTIALLY_AVAILABLE
               ))
           ) {
-            await this.mediaUpdater(media, true);
+            await this.mediaUpdater(media, true, listedInSonarr4k);
           }
 
           // TODO: run seasonUpdater for each season.
@@ -590,14 +594,22 @@ class AvailabilitySync {
     return this.servers.map(serverName).join(', ');
   }
 
-  private async mediaUpdater(media: Media, is4k: boolean): Promise<void> {
+  /**
+   * Marks a version deleted. `listed`: Radarr or Sonarr still has the title
+   * (with no files), so an approved request for it is still on its way.
+   */
+  private async mediaUpdater(
+    media: Media,
+    is4k: boolean,
+    listed = false
+  ): Promise<void> {
     try {
       // An approved request still in flight keeps the external metadata.
       let isMediaProcessing = false;
 
       const requestRepository = getRepository(MediaRequest);
 
-      const request = await requestRepository
+      const requests = await requestRepository
         .createQueryBuilder('request')
         .leftJoinAndSelect('request.media', 'media')
         .where('(media.id = :id)', {
@@ -610,10 +622,27 @@ class AvailabilitySync {
             is4k: is4k,
           }
         )
-        .getOne();
+        .getMany();
 
-      if (request) {
+      // Only a title Radarr or Sonarr had (a stored id) and no longer has is
+      // known to be gone there; one never sent stays as it was.
+      const wasSent =
+        !!media[is4k ? 'externalServiceId4k' : 'externalServiceId'];
+      if (requests.length && (listed || !wasSent)) {
         isMediaProcessing = true;
+      } else if (requests.length) {
+        // Gone from Radarr or Sonarr too: nothing more will arrive. What was
+        // on its way counts as deleted with the rest, which closes its
+        // requests (MediaSubscriber), so the title can be requested again.
+        for (const season of media.seasons ?? []) {
+          const column = is4k ? 'status4k' : 'status';
+          if (
+            season[column] === MediaStatus.PROCESSING ||
+            season[column] === MediaStatus.PENDING
+          ) {
+            season[column] = MediaStatus.DELETED;
+          }
+        }
       }
 
       // Mark this version deleted; clear its columns unless processing.
@@ -717,11 +746,17 @@ class AvailabilitySync {
     }
   }
 
+  /**
+   * Whether a Radarr server of this version has the movie with its file
+   * (`exists`), or at all (`listed`). A stored id that is gone is looked up
+   * again by TMDB id, so a movie removed and added again is found.
+   */
   private async mediaExistsInRadarr(
     media: Media,
     is4k: boolean
-  ): Promise<boolean> {
+  ): Promise<{ exists: boolean; listed: boolean }> {
     let existsInRadarr = false;
+    let listed = false;
 
     const hasSameServerInBothModes = this.radarrServers.some((a) =>
       this.radarrServers.some(
@@ -742,20 +777,27 @@ class AvailabilitySync {
       try {
         let radarr: RadarrMovie | undefined;
 
-        if (media.externalServiceId && !is4k) {
-          radarr = await radarrAPI.getMovie({
-            id: media.externalServiceId,
-          });
-        }
-
-        if (media.externalServiceId4k && is4k) {
-          radarr = await radarrAPI.getMovie({
-            id: media.externalServiceId4k,
-          });
+        const storedId = is4k
+          ? media.externalServiceId4k
+          : media.externalServiceId;
+        if (storedId) {
+          radarr = await radarrAPI
+            .getMovie({ id: storedId })
+            .catch(async (e: Error) => {
+              if (!e.message.includes('404')) {
+                throw e;
+              }
+              return this.relinked(media, is4k, () =>
+                radarrAPI.getMovieByTmdbId(media.tmdbId)
+              );
+            });
         }
 
         if (radarr && radarr.tmdbId !== media.tmdbId) {
           continue;
+        }
+        if (radarr) {
+          listed = true;
         }
 
         if (radarr && radarr.hasFile) {
@@ -775,6 +817,7 @@ class AvailabilitySync {
       } catch (ex) {
         if (!ex.message.includes('404')) {
           existsInRadarr = true;
+          listed = true;
           logger.debug(
             `Failure retrieving the ${is4k ? '4K' : 'non-4K'} movie [TMDB ID ${
               media.tmdbId
@@ -790,14 +833,44 @@ class AvailabilitySync {
       if (existsInRadarr) break;
     }
 
-    return existsInRadarr;
+    return { exists: existsInRadarr, listed };
+  }
+
+  /**
+   * A title whose stored Radarr/Sonarr id is gone, looked up by its own id:
+   * if it was removed and added again, the new id is kept and it is used.
+   */
+  private async relinked<T extends { id?: number }>(
+    media: Media,
+    is4k: boolean,
+    lookup: () => Promise<T>
+  ): Promise<T | undefined> {
+    const found = await lookup().catch(() => undefined);
+    if (!found?.id) {
+      return undefined;
+    }
+    const column = is4k ? 'externalServiceId4k' : 'externalServiceId';
+    media[column] = found.id;
+    await getRepository(Media).update(media.id, { [column]: found.id });
+    logger.info(
+      `Found the ${is4k ? '4K' : 'non-4K'} ${
+        media.mediaType === 'movie' ? 'movie' : 'show'
+      } [TMDB ID ${media.tmdbId}] again under a new id.`,
+      { label: 'AvailabilitySync' }
+    );
+    return found;
   }
 
   private async mediaExistsInSonarr(
     media: Media,
     is4k: boolean
-  ): Promise<{ existsInSonarr: boolean; seasonsMap: Map<number, boolean> }> {
+  ): Promise<{
+    existsInSonarr: boolean;
+    listed: boolean;
+    seasonsMap: Map<number, boolean>;
+  }> {
     let existsInSonarr = false;
+    let listed = false;
     let preventSeasonSearch = false;
 
     // The series exists if any Sonarr server of this version has it.
@@ -812,12 +885,21 @@ class AvailabilitySync {
       try {
         let sonarr: SonarrSeries | undefined;
 
-        if (media.externalServiceId && !is4k) {
-          sonarr = await sonarrAPI.getSeriesById(media.externalServiceId);
-        }
-
-        if (media.externalServiceId4k && is4k) {
-          sonarr = await sonarrAPI.getSeriesById(media.externalServiceId4k);
+        const storedId = is4k
+          ? media.externalServiceId4k
+          : media.externalServiceId;
+        if (storedId) {
+          sonarr = await sonarrAPI
+            .getSeriesById(storedId)
+            .catch(async (e: Error) => {
+              if (!e.message.includes('404') || media.tvdbId == null) {
+                throw e;
+              }
+              const tvdbId = media.tvdbId;
+              return this.relinked(media, is4k, () =>
+                sonarrAPI.getSeriesByTvdbId(tvdbId)
+              );
+            });
         }
 
         if (sonarr && media.tvdbId != null && sonarr.tvdbId !== media.tvdbId) {
@@ -825,19 +907,21 @@ class AvailabilitySync {
         }
 
         if (sonarr) {
+          listed = true;
           const externalServiceId = is4k
             ? media.externalServiceId4k
             : media.externalServiceId;
           this.sonarrSeasonsCache[`${server.id}-${externalServiceId}`] =
             sonarr.seasons;
 
-          if (sonarr.statistics.episodeFileCount > 0) {
+          if ((sonarr.statistics?.episodeFileCount ?? 0) > 0) {
             existsInSonarr = true;
           }
         }
       } catch (ex) {
         if (!ex.message.includes('404')) {
           existsInSonarr = true;
+          listed = true;
           preventSeasonSearch = true;
           logger.debug(
             `Failure retrieving the ${is4k ? '4K' : 'non-4K'} show [TMDB ID ${
@@ -876,7 +960,7 @@ class AvailabilitySync {
       }
     }
 
-    return { existsInSonarr, seasonsMap };
+    return { existsInSonarr, listed, seasonsMap };
   }
 
   private async seasonExistsInSonarr(

@@ -33,6 +33,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A season on its way when its show is removed from Sonarr (or a film from Radarr) no longer stays Processing for good: it counts as deleted and can be requested again. A title removed and added back under a new Sonarr or Radarr id is found again.
 - The first Jellyfin or Emby sign-in on a server set up in `settings.json` keeps the API key already there, as long as it works, instead of making a second one.
 - A thin line no longer shows where a request's, issue's or blocklisted title's background picture ends, on screens scaled to 175% and the like.
 - Settings → Logs no longer offers a next page on the last page.

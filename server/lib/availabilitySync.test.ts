@@ -30,6 +30,7 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
+import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
@@ -158,6 +159,20 @@ Object.defineProperty(RadarrAPI.prototype, 'getMovie', {
   set() {},
   configurable: true,
 });
+
+/** Looking a title up again by its own id, after its stored id is gone. */
+let lookupSeriesImpl: (tvdbId: number) => Promise<SonarrSeries> = async () => {
+  throw new Error('Series not found');
+};
+SonarrAPI.prototype.getSeriesByTvdbId = async function (tvdbId: number) {
+  return lookupSeriesImpl(tvdbId);
+};
+let lookupMovieImpl: (tmdbId: number) => Promise<RadarrMovie> = async () => {
+  throw new Error('Movie not found');
+};
+RadarrAPI.prototype.getMovieByTmdbId = async function (tmdbId: number) {
+  return lookupMovieImpl(tmdbId);
+};
 
 let getTvShowImpl: (args: {
   tvId: number;
@@ -460,6 +475,12 @@ describe('AvailabilitySync', () => {
     };
     getMovieImpl = async () => {
       throw new Error('404');
+    };
+    lookupSeriesImpl = async () => {
+      throw new Error('Series not found');
+    };
+    lookupMovieImpl = async () => {
+      throw new Error('Movie not found');
     };
     getTvShowImpl = async ({ tvId }) =>
       fakeTmdbShow(
@@ -1152,6 +1173,130 @@ describe('AvailabilitySync', () => {
       );
     });
 
+    describe('a season on its way when the show leaves Sonarr', () => {
+      const seedShow = async (tmdbId: number) => {
+        const media = new Media();
+        media.tmdbId = tmdbId;
+        media.tvdbId = tmdbId + 70000;
+        media.mediaType = MediaType.TV;
+        media.status = MediaStatus.PARTIALLY_AVAILABLE;
+        media.ratingKey = `gone-${tmdbId}`;
+        media.externalServiceId = 300;
+        media.serviceId = 0;
+        media.seasons = [
+          new Season({
+            seasonNumber: 1,
+            status: MediaStatus.AVAILABLE,
+            status4k: MediaStatus.UNKNOWN,
+          }),
+          new Season({
+            seasonNumber: 2,
+            status: MediaStatus.PROCESSING,
+            status4k: MediaStatus.UNKNOWN,
+          }),
+        ];
+        await getRepository(Media).save(media);
+        const inserted = await getRepository(MediaRequest)
+          .createQueryBuilder()
+          .insert()
+          .into(MediaRequest)
+          .values({
+            status: MediaRequestStatus.APPROVED,
+            media: { id: media.id },
+            requestedBy: { id: 1 },
+            type: MediaType.TV,
+            is4k: false,
+          })
+          .callListeners(false)
+          .execute();
+        await getRepository(SeasonRequest)
+          .createQueryBuilder()
+          .insert()
+          .into(SeasonRequest)
+          .values({
+            seasonNumber: 2,
+            status: MediaRequestStatus.APPROVED,
+            request: { id: inserted.identifiers[0].id },
+          })
+          .callListeners(false)
+          .execute();
+        return media;
+      };
+      const reload = (tmdbId: number) =>
+        getRepository(Media).findOneOrFail({
+          where: { tmdbId },
+          relations: ['seasons'],
+        });
+      const requestFor = (media: Media) =>
+        getRepository(MediaRequest).findOneOrFail({
+          where: { media: { id: media.id } },
+        });
+
+      it('counts as deleted and closes its request once Sonarr has no such show', async () => {
+        configurePlex();
+        configureSonarr([{ syncEnabled: true }]);
+        const media = await seedShow(3100);
+
+        await availabilitySync.run();
+
+        const updated = await reload(3100);
+        assert.strictEqual(updated.status, MediaStatus.DELETED);
+        for (const season of updated.seasons) {
+          assert.strictEqual(season.status, MediaStatus.DELETED);
+        }
+        assert.strictEqual(updated.externalServiceId, null);
+        assert.notStrictEqual(
+          (await requestFor(media)).status,
+          MediaRequestStatus.APPROVED
+        );
+      });
+
+      it('stays on its way while Sonarr still has the show, without files yet', async () => {
+        configurePlex();
+        configureSonarr([{ syncEnabled: true }]);
+        const media = await seedShow(3101);
+        getSeriesByIdImpl = async (id: number) =>
+          ({
+            id,
+            tvdbId: 73101,
+            statistics: { episodeFileCount: 0 },
+            seasons: fakeSonarrSeasons(2, {}),
+          }) as unknown as SonarrSeries;
+
+        await availabilitySync.run();
+
+        const updated = await reload(3101);
+        assert.strictEqual(
+          updated.seasons.find((season) => season.seasonNumber === 2)?.status,
+          MediaStatus.PROCESSING
+        );
+        assert.strictEqual(updated.externalServiceId, 300);
+        assert.strictEqual(
+          (await requestFor(media)).status,
+          MediaRequestStatus.APPROVED
+        );
+      });
+
+      it('is found again when the show was added to Sonarr again under a new id', async () => {
+        configurePlex();
+        configureSonarr([{ syncEnabled: true }]);
+        await seedShow(3102);
+        lookupSeriesImpl = async (tvdbId: number) =>
+          ({
+            id: 301,
+            tvdbId,
+            statistics: { episodeFileCount: 10 },
+            seasons: fakeSonarrSeasons(2, { 1: 10 }),
+          }) as unknown as SonarrSeries;
+
+        await availabilitySync.run();
+
+        const updated = await reload(3102);
+        assert.notStrictEqual(updated.status, MediaStatus.DELETED);
+        assert.strictEqual(updated.externalServiceId, 301);
+      });
+    });
+
     it('should assume season exists when getChildrenMetadata fails for episodes (safe fallback)', async () => {
       configurePlex();
       configureSonarr([{ syncEnabled: true }]);
@@ -1611,6 +1756,9 @@ describe('AvailabilitySync', () => {
     it('should keep service metadata when deleting a 4K movie with an approved 4K request in flight', async () => {
       configurePlex();
       configureRadarr([{ is4k: true, syncEnabled: true }]);
+      // Radarr still has it, without its file yet.
+      getMovieImpl = async (id: number) =>
+        ({ id, tmdbId: 687167, hasFile: false }) as RadarrMovie;
 
       const mediaRepository = getRepository(Media);
 
@@ -1660,6 +1808,72 @@ describe('AvailabilitySync', () => {
         'req-in-flight-rk',
         'ratingKey4k must be kept while an approved 4K request is in flight'
       );
+    });
+
+    it('closes an approved request for a movie Radarr no longer has, so it can be requested again', async () => {
+      configurePlex();
+      configureRadarr([{ is4k: true, syncEnabled: true }]);
+
+      const mediaRepository = getRepository(Media);
+      const media = new Media();
+      media.tmdbId = 687169;
+      media.mediaType = MediaType.MOVIE;
+      media.status = MediaStatus.UNKNOWN;
+      media.status4k = MediaStatus.AVAILABLE;
+      media.ratingKey4k = 'gone-rk';
+      media.serviceId4k = 0;
+      media.externalServiceId4k = 513;
+      await mediaRepository.save(media);
+      await getRepository(MediaRequest)
+        .createQueryBuilder()
+        .insert()
+        .into(MediaRequest)
+        .values({
+          status: MediaRequestStatus.APPROVED,
+          media: { id: media.id },
+          requestedBy: { id: 1 },
+          type: MediaType.MOVIE,
+          is4k: true,
+        })
+        .callListeners(false)
+        .execute();
+
+      await availabilitySync.run();
+
+      const updated = await mediaRepository.findOneOrFail({
+        where: { tmdbId: 687169 },
+      });
+      assert.strictEqual(updated.status4k, MediaStatus.DELETED);
+      assert.strictEqual(updated.externalServiceId4k, null);
+      const request = await getRepository(MediaRequest).findOneOrFail({
+        where: { media: { id: media.id } },
+      });
+      assert.strictEqual(request.status, MediaRequestStatus.COMPLETED);
+    });
+
+    it('finds a movie removed from Radarr and added again under a new id', async () => {
+      configurePlex();
+      configureRadarr([{ is4k: true, syncEnabled: true }]);
+      lookupMovieImpl = async (tmdbId: number) =>
+        ({ id: 900, tmdbId, hasFile: true }) as RadarrMovie;
+
+      const mediaRepository = getRepository(Media);
+      const media = new Media();
+      media.tmdbId = 687170;
+      media.mediaType = MediaType.MOVIE;
+      media.status = MediaStatus.UNKNOWN;
+      media.status4k = MediaStatus.AVAILABLE;
+      media.serviceId4k = 0;
+      media.externalServiceId4k = 514;
+      await mediaRepository.save(media);
+
+      await availabilitySync.run();
+
+      const updated = await mediaRepository.findOneOrFail({
+        where: { tmdbId: 687170 },
+      });
+      assert.strictEqual(updated.status4k, MediaStatus.AVAILABLE);
+      assert.strictEqual(updated.externalServiceId4k, 900);
     });
 
     it('should null service metadata when deleting a 4K movie with no open request', async () => {

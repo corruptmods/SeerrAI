@@ -3066,7 +3066,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dagen voordat hij omlaag gaat",
   "components.Settings.SettingsBackfill.stepDownTip": "Een titel op een van de kwaliteitsvoorinstellingen van Seerr AI (Instellingen → Kwaliteit) waarvoor niets wordt opgehaald, gaat naar de volgende, ruimere voorinstelling, en terug zodra er iets is opgehaald.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Uren sinds de laatste zoekopdracht van Sonarr of Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Uren dat een nieuwe aflevering na uitzending aan Sonarr wordt overgelaten",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Uren dat een nieuwe aflevering of film na verschijnen aan Sonarr of Radarr wordt overgelaten",
   "components.Settings.SettingsBackfill.torrentClient": "Torrentpacks gaan naar",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-packs gaan naar",
   "components.Settings.SettingsBackfill.when": "Wanneer een titel vastzit",

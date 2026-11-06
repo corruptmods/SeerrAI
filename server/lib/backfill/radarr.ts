@@ -28,6 +28,13 @@ export interface RadarrMovieDetail {
   qualityProfileId: number;
   monitored: boolean;
   isAvailable: boolean;
+  /** 'announced', 'inCinemas' or 'released'. */
+  minimumAvailability?: string;
+  inCinemas?: string;
+  /** The date Radarr counts as released (digital or physical). */
+  releaseDate?: string;
+  digitalRelease?: string;
+  physicalRelease?: string;
   hasFile: boolean;
   movieFileId: number;
   lastSearchTime?: string;

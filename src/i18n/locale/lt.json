@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dienos iki nusileidimo",
   "components.Settings.SettingsBackfill.stepDownTip": "Pavadinimas, esantis viename iš Seerr AI kokybės šablonų (Nustatymai → Kokybė), kuriam nieko nepaimama, perkeliamas į kitą, laisvesnį šabloną, o kai kas nors paimama – grąžinamas.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Valandos nuo paskutinės Sonarr ar Radarr paieškos",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Valandos, kurias nauja serija po transliacijos paliekama Sonarr",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Valandos, kurias nauja serija ar filmas po pasirodymo paliekami Sonarr arba Radarr",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent rinkiniai siunčiami į",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet rinkiniai siunčiami į",
   "components.Settings.SettingsBackfill.when": "Kai pavadinimas įstrigo",

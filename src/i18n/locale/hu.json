@@ -3066,7 +3066,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Napok a visszalépés előtt",
   "components.Settings.SettingsBackfill.stepDownTip": "Ha a Seerr AI egyik minőségi sablonját (Beállítások → Minőség) használó címhez semmi sem töltődik le, átkerül a következő, megengedőbb sablonra, majd vissza, amint valami letöltődik.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Órák a Sonarr vagy a Radarr utolsó keresése óta",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Hány óráig marad egy új epizód a Sonarrra a vetítése után",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Hány óráig marad egy új epizód vagy film a Sonarrra vagy a Radarrra a megjelenése után",
   "components.Settings.SettingsBackfill.torrentClient": "A torrentcsomagok ide kerülnek",
   "components.Settings.SettingsBackfill.usenetClient": "A Usenet-csomagok ide kerülnek",
   "components.Settings.SettingsBackfill.when": "Mikor számít egy cím elakadtnak",

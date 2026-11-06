@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "降級前等待天數",
   "components.Settings.SettingsBackfill.stepDownTip": "使用 Seerr AI 品質預設方案（設定 → 品質）的作品若一直抓取不到任何內容，會改用下一個要求較寬鬆的預設方案，抓取到之後再改回來。",
   "components.Settings.SettingsBackfill.stuckAfterHours": "距離 Sonarr 或 Radarr 上次搜尋的小時數",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "新集數播出後留給 Sonarr 的小時數",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "新集數或電影上線後留給 Sonarr 或 Radarr 的小時數",
   "components.Settings.SettingsBackfill.torrentClient": "BT 合集傳送至",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet 合集傳送至",
   "components.Settings.SettingsBackfill.when": "當作品卡住時",

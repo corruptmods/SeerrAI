@@ -261,9 +261,9 @@ components:
           description: Albums Lidarr cannot find are followed too, once music is set up.
         stuckAfterHours:
           type: number
-        newEpisodeWaitHours:
+        newReleaseWaitHours:
           type: number
-          description: Hours a new episode is left to Sonarr after it airs before Backfill may fetch it. 0 doesn't wait.
+          description: Hours a new episode or film is left to Sonarr or Radarr once it's out before Backfill may fetch it. 0 doesn't wait.
         searchAfterArr:
           type: boolean
           description: Titles requested in the last 3 days are searched about 20 minutes after Sonarr, Radarr or Lidarr finds nothing for them.

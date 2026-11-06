@@ -23,6 +23,8 @@ import type { PlanEntry } from '@server/lib/backfill/plan';
 import {
   decide,
   dedupe,
+  filmOutAWhile,
+  filmOutSince,
   multiMustWait,
   rankCandidates,
   selectEntries,
@@ -696,6 +698,37 @@ describe('Backfill: what Sonarr would take', () => {
     assert.equal(isMissing(fresh.get(1)!, false), true);
   });
 
+  it('dates a film’s release by its Minimum Availability', () => {
+    const film = {
+      inCinemas: '2026-10-16T00:00:00Z',
+      releaseDate: '2027-01-14T00:00:00Z',
+      digitalRelease: '2027-01-14T00:00:00Z',
+      physicalRelease: '2027-02-01T00:00:00Z',
+    };
+    assert.equal(
+      filmOutSince({ ...film, minimumAvailability: 'released' }),
+      '2027-01-14T00:00:00Z'
+    );
+    assert.equal(
+      filmOutSince({ ...film, minimumAvailability: 'inCinemas' }),
+      '2026-10-16T00:00:00Z'
+    );
+    assert.equal(
+      filmOutSince({
+        minimumAvailability: 'released',
+        physicalRelease: '2027-02-01T00:00:00Z',
+        digitalRelease: '2027-01-20T00:00:00Z',
+      }),
+      '2027-01-20T00:00:00Z'
+    );
+    assert.equal(
+      filmOutSince({ ...film, minimumAvailability: 'announced' }),
+      undefined
+    );
+    // Nothing to wait from: Radarr has had it since it was added.
+    assert.equal(filmOutAWhile({ minimumAvailability: 'released' }), true);
+  });
+
   it('waits as long as its setting says', (t) => {
     const settings = getSettings();
     const saved = settings.backfill;
@@ -703,7 +736,7 @@ describe('Backfill: what Sonarr would take', () => {
       settings.backfill = saved;
     });
     const waitFor = (hours: number) => {
-      settings.backfill = { ...saved, newEpisodeWaitHours: hours };
+      settings.backfill = { ...saved, newReleaseWaitHours: hours };
     };
     const aired = {
       ...episodes.get(1)!,

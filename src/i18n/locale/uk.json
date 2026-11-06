@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Днів до зниження",
   "components.Settings.SettingsBackfill.stepDownTip": "Тайтл на одному з пресетів якості Seerr AI («Налаштування → Якість»), для якого нічого не взято, переходить на наступний, м’якший пресет, а потім повертається, щойно щось візьмуть.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Годин від останнього пошуку Sonarr чи Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Скільки годин новий епізод залишається Sonarr після виходу в ефір",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Скільки годин новий епізод або фільм залишається Sonarr чи Radarr після виходу",
   "components.Settings.SettingsBackfill.torrentClient": "Торрент-паки надсилати до",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-паки надсилати до",
   "components.Settings.SettingsBackfill.when": "Коли назва застрягла",

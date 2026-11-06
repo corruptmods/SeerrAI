@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dnevi do spusta",
   "components.Settings.SettingsBackfill.stepDownTip": "Naslov na eni od prednastavitev kakovosti Seerr AI (Nastavitve → Kakovost), za katerega se nič ne prevzame, se premakne na naslednjo ohlapnejšo prednastavitev in nazaj, ko se kaj prevzame.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Ure od zadnjega iskanja v Sonarr ali Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Ure, ko je nova epizoda po predvajanju prepuščena Sonarru",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Ure, ko je nova epizoda ali film po izidu prepuščen Sonarru ali Radarru",
   "components.Settings.SettingsBackfill.torrentClient": "Paketi torrent gredo v",
   "components.Settings.SettingsBackfill.usenetClient": "Paketi Usenet gredo v",
   "components.Settings.SettingsBackfill.when": "Ko se naslov zatakne",

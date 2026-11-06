@@ -53,7 +53,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | Download Check | Off |
 | Movies too | On |
 | Stuck after (since Sonarr's or Radarr's last search) | 24 hours |
-| Hours a new episode is left to Sonarr after it airs | 12 hours |
+| Hours a new episode or film is left to Sonarr or Radarr once it’s out | 12 hours |
 | Search right after Sonarr, Radarr or Lidarr finds nothing | Off |
 | Treat files below the cutoff as gaps | Off |
 | Category | `backfill` |

@@ -3050,7 +3050,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "下げるまでの日数",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI の画質プリセット (設定 → 画質) を使うタイトルで何も取得されない場合、次の条件のゆるいプリセットに移り、何か取得されたら元に戻ります。",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sonarr や Radarr の最後の検索からの経過時間",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "新しいエピソードの放送後、Sonarr に任せる時間",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "新しいエピソードや映画の公開後、Sonarr または Radarr に任せる時間",
   "components.Settings.SettingsBackfill.torrentClient": "torrent パックの送り先",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet パックの送り先",
   "components.Settings.SettingsBackfill.when": "作品が止まっていると判断する条件",

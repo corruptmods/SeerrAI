@@ -2777,7 +2777,7 @@
   "components.Settings.SettingsBackfill.maxSizeGb": "Largest download (GB)",
   "components.Settings.SettingsBackfill.minFreeSpaceGb": "Keep free on the series’ disk (GB)",
   "components.Settings.SettingsBackfill.minScore": "Minimum score",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Hours a new episode is left to Sonarr after it airs",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Hours a new episode or film is left to Sonarr or Radarr once it’s out",
   "components.Settings.SettingsBackfill.noClient": "Not used",
   "components.Settings.SettingsBackfill.noClients": "Add a download client under Services → Download clients first.",
   "components.Settings.SettingsBackfill.openBackfill": "Open Backfill",

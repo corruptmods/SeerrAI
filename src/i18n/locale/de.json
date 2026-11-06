@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Tage, bis es eine Stufe tiefer geht",
   "components.Settings.SettingsBackfill.stepDownTip": "Ein Titel auf einer der Qualitätsvorlagen von Seerr AI (Einstellungen → Qualität), für den nichts genommen wird, wechselt zur nächst lockereren Vorlage und wieder zurück, sobald etwas genommen wurde.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Stunden seit der letzten Suche von Sonarr bzw. Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Stunden, die eine neue Folge nach der Ausstrahlung Sonarr überlassen bleibt",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Stunden, die eine neue Folge oder ein neuer Film nach Erscheinen Sonarr oder Radarr überlassen bleibt",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent-Pakete gehen an",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-Pakete gehen an",
   "components.Settings.SettingsBackfill.when": "Wenn ein Titel festhängt",

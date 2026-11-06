@@ -2432,6 +2432,64 @@ describe('the admin agent and movies', () => {
     }));
   });
 
+  it('leaves a film out under 12 hours to Radarr, on its own', async () => {
+    const hour = 60 * 60 * 1000;
+    mock.method(BackfillRadarr.prototype, 'getMovieDetail', async () => ({
+      ...MOVIE,
+      minimumAvailability: 'released',
+      releaseDate: new Date(Date.now() - 2 * hour).toISOString(),
+    }));
+    mock.method(BackfillRadarr.prototype, 'getQualityProfile', async () => ({
+      id: 6,
+      name: 'HD',
+      upgradeAllowed: true,
+      cutoff: 3,
+      items: [{ quality: { id: 3, name: 'WEBDL-1080p' }, allowed: true }],
+      minFormatScore: 0,
+      cutoffFormatScore: 0,
+    }));
+    const state = {
+      run: {
+        trigger: 'auto',
+        kind: 'movie',
+        serverId: 0,
+        arrId: MOVIE.id,
+        title: MOVIE.title,
+        memory: {},
+        steps: [],
+        actions: [],
+      },
+      user: await admin(),
+      releases: new Map(),
+      files: new Map(),
+      series: new Map(),
+      movies: new Map(),
+      grabsToday: 0,
+      bind: () => undefined,
+      act: () => undefined,
+      ask: () => undefined,
+      propose: () => undefined,
+    } as unknown as AgentState;
+
+    const status = await runTool(state, 'title_status', {
+      title: `movie:0:${MOVIE.id}`,
+    });
+    assert.match(status.text, /out under 12 hours ago, left to Radarr/);
+
+    await runTool(state, 'search_indexers', {
+      query: 'Bramwell the Goat Little Goat of Terrors',
+      kind: 'movie',
+    });
+    const refused = await runTool(state, 'grab', {
+      title: `movie:0:${MOVIE.id}`,
+      release: 'r1',
+      files: [{ index: 0 }],
+      reason: 'The one file is the movie',
+    });
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /came out under 12 hours ago/);
+  });
+
   it('downloads a missing movie it was asked for', async () => {
     script = [
       () =>

@@ -42,8 +42,10 @@ import type { PlanEntry } from '@server/lib/backfill/plan';
 import {
   airedAWhile,
   airedUnder,
+  filmOutAWhile,
   qualityAllowed,
   summarize,
+  underWait,
 } from '@server/lib/backfill/plan';
 import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import { sizeNote } from '@server/lib/backfill/sizeLimits';
@@ -70,6 +72,14 @@ const tooNew = (
 ): boolean =>
   !adminPresent(state.run) &&
   episodes.some((ep) => !ep.hasFile && !airedAWhile(ep));
+
+/** On its own, a film Radarr still has its first hours out with. */
+const filmTooNew = (state: AgentState, film: RadarrMovieDetail): void => {
+  if (adminPresent(state.run) || film.hasFile || filmOutAWhile(film)) return;
+  throw new Refused(
+    `That film came out ${underWait()}: Radarr gets new films first. Leave it for now.`
+  );
+};
 
 const outsideProfile = (
   state: AgentState,
@@ -289,6 +299,7 @@ const prepareWhole = async (
       parsed.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
       parsed.customFormatScore ?? 0
     );
+    filmTooNew(state, movieCtx.movie);
     Object.assign(entry, {
       // A movie's plan entry carries the movie's id, as Backfill's own do.
       episodeIds: [movie.id],
@@ -678,6 +689,7 @@ const prepareGrab = async (
       parsed?.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
       parsed?.customFormatScore ?? 0
     );
+    filmTooNew(state, ctx.movie);
     plan.push({
       index: file.index,
       path: file.path,

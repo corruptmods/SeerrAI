@@ -20,7 +20,7 @@ Requests over the limit that wait for an admin, default quality profiles, a view
 
 ### Changed
 
-- Backfill and the admin agent leave a new episode to Sonarr for 12 hours after it airs, even for a show just requested. Change it under Settings → Backfill → **Hours a new episode is left to Sonarr after it airs**.
+- Backfill and the admin agent leave a new episode to Sonarr for 12 hours after it airs, and a new film to Radarr for 12 hours after the release its Minimum Availability waits for, even for a title just requested. Change it under Settings → Backfill → **Hours a new episode or film is left to Sonarr or Radarr once it’s out**.
 - On its own, the admin agent no longer takes a release the title's quality profile turns down; it leaves it for you.
 - Nightly **Database Maintenance** also clears which library held a title on a server or library that's gone, and quality applies older than the 50 that History lists.
 - **Settings → Network** applies every change as soon as you save, with no restart, so its Restart Required badges and the restart reminder are gone.

@@ -3057,7 +3057,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Jaitsi aurretik igaro beharreko egunak",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI-ren kalitate-aurrezarpenetako batean (Ezarpenak → Kalitatea) dagoen titulu batentzat ezer hartzen ez bada, hurrengo aurrezarpen malguagora pasatzen da, eta zerbait hartzen denean itzultzen da.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Sonarr-en edo Radarr-en azken bilaketatik igarotako orduak",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Atal berri bat emititu ondoren Sonarri uzten zaion ordu kopurua",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Atal edo film berri bat argitaratu ondoren Sonarri edo Radarri uzten zaion ordu kopurua",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent paketeak hona doaz",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet paketeak hona doaz",
   "components.Settings.SettingsBackfill.when": "Izenburu bat trabatuta dagoenean",

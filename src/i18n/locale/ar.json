@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "الأيام قبل النزول",
   "components.Settings.SettingsBackfill.stepDownTip": "العنوان الذي على أحد إعدادات الجودة المسبقة في Seerr AI (الإعدادات ← الجودة) ولا يُؤخذ له شيء ينتقل إلى الإعداد المسبق الأقل تشددًا التالي، ثم يعود حين يُؤخذ له شيء.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "ساعات منذ آخر بحث لـ Sonarr أو Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "عدد الساعات التي تُترك فيها الحلقة الجديدة لـ Sonarr بعد عرضها",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "عدد الساعات التي تُترك فيها الحلقة أو الفيلم الجديد لـ Sonarr أو Radarr بعد صدوره",
   "components.Settings.SettingsBackfill.torrentClient": "حزم التورنت تذهب إلى",
   "components.Settings.SettingsBackfill.usenetClient": "حزم Usenet تذهب إلى",
   "components.Settings.SettingsBackfill.when": "عندما يعلق عنوان",

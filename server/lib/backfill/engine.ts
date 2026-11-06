@@ -62,6 +62,7 @@ import {
 import type { PlanEntry, PlanSummary } from '@server/lib/backfill/plan';
 import {
   airedAWhile,
+  filmOutAWhile,
   multiMustWait,
   rankCandidates,
   selectEntries,
@@ -1253,7 +1254,10 @@ class Backfill {
     const cutoffList = settings.includeCutoffUnmet
       ? await radarr.getWanted('cutoff')
       : { records: [], complete: true };
-    const missing = missingList.records.filter((movie) => movie.isAvailable);
+    // Radarr's to fetch for its first hours out, as a new episode is Sonarr's.
+    const missing = missingList.records.filter(
+      (movie) => movie.isAvailable && filmOutAWhile(movie)
+    );
     const wanted = new Map<
       number,
       { movie: RadarrMovieDetail; missing: boolean }
@@ -1651,7 +1655,12 @@ class Backfill {
         title: ctx.movie.title,
         poster: posterOf(ctx.movie.images),
         names: ctx.names,
-        missing: !ctx.movie.hasFile && ctx.movie.isAvailable ? 1 : 0,
+        missing:
+          !ctx.movie.hasFile &&
+          ctx.movie.isAvailable &&
+          filmOutAWhile(ctx.movie)
+            ? 1
+            : 0,
         categories: MOVIE_CATEGORIES,
         extraTerms: [],
         wants: () => 0,
@@ -2674,7 +2683,7 @@ class Backfill {
       const fileId = movie.hasFile ? movie.movieFileId : 0;
       return {
         files: new Map([[movie.id, fileId]]),
-        missing: !fileId && movie.isAvailable ? 1 : 0,
+        missing: !fileId && movie.isAvailable && filmOutAWhile(movie) ? 1 : 0,
       };
     }
     const includeSpecials = getSettings().backfill.includeSpecials;

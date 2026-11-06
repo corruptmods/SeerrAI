@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Deeg, ier et erofgeet",
   "components.Settings.SettingsBackfill.stepDownTip": "En Titel op engem vun de Qualitéitspresete vu Seerr AI (Astellungen → Qualitéit), fir deen näischt geholl gëtt, geet op den nächste méi lockere Preset, an zréck, soubal eppes geholl ass.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Stonnen zanter der leschter Sich vu Sonarr oder Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Stonnen, déi eng nei Episod no der Ausstralung Sonarr iwwerlooss gëtt",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Stonnen, déi eng nei Episod oder en neie Film no der Verëffentlechung Sonarr oder Radarr iwwerlooss gëtt",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent-Päck ginn un",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-Päck ginn un",
   "components.Settings.SettingsBackfill.when": "Wann en Titel hänke bleift",

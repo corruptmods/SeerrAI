@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "ימים עד הירידה",
   "components.Settings.SettingsBackfill.stepDownTip": "כותר שמשתמש באחת מתבניות האיכות של Seerr AI (הגדרות ← איכות) ושלא נלקח עבורו כלום עובר לתבנית הבאה, המקילה יותר, וחוזר ברגע שמשהו נלקח.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "שעות מאז החיפוש האחרון של Sonarr או Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "שעות שבהן פרק חדש נשאר ל־Sonarr לאחר שידורו",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "שעות שבהן פרק או סרט חדש נשאר ל־Sonarr או ל־Radarr לאחר יציאתו",
   "components.Settings.SettingsBackfill.torrentClient": "חבילות טורנט נשלחות אל",
   "components.Settings.SettingsBackfill.usenetClient": "חבילות Usenet נשלחות אל",
   "components.Settings.SettingsBackfill.when": "כשכותר תקוע",

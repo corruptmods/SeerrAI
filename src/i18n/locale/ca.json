@@ -3050,7 +3050,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dies abans de baixar",
   "components.Settings.SettingsBackfill.stepDownTip": "Un títol amb una de les plantilles de qualitat de Seerr AI (Configuració → Qualitat) per al qual no s’agafa res passa a la plantilla següent, menys exigent, i torna quan se n’agafa alguna cosa.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Hores des de la darrera cerca de Sonarr o Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Hores que un episodi nou es deixa a Sonarr després que s’emeti",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Hores que un episodi o una pel·lícula nous es deixen a Sonarr o Radarr un cop surten",
   "components.Settings.SettingsBackfill.torrentClient": "Els paquets de torrent van a",
   "components.Settings.SettingsBackfill.usenetClient": "Els paquets d'Usenet van a",
   "components.Settings.SettingsBackfill.when": "Quan un títol està encallat",

@@ -48,7 +48,7 @@ const body = z.object({
     .int()
     .min(1)
     .max(24 * 30),
-  newEpisodeWaitHours: z.coerce
+  newReleaseWaitHours: z.coerce
     .number()
     .int()
     .min(0)

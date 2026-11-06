@@ -3049,7 +3049,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Počet dní před snížením",
   "components.Settings.SettingsBackfill.stepDownTip": "Titul na jedné z předvoleb kvality Seerr AI (Nastavení → Kvalita), pro který se nic nevezme, přejde na další, volnější předvolbu a vrátí se, jakmile se něco vezme.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Hodin od posledního hledání v Sonarr nebo Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Hodiny, po které je nový díl po odvysílání ponechán Sonarru",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Hodiny, po které je nový díl nebo film po vydání ponechán Sonarru nebo Radarru",
   "components.Settings.SettingsBackfill.torrentClient": "Torrentové balíčky jdou do",
   "components.Settings.SettingsBackfill.usenetClient": "Usenetové balíčky jdou do",
   "components.Settings.SettingsBackfill.when": "Když se titul zasekne",

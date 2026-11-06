@@ -3067,7 +3067,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dage før den går et trin ned",
   "components.Settings.SettingsBackfill.stepDownTip": "En titel på en af Seerr AI’s kvalitetsskabeloner (Indstillinger → Kvalitet), som der ikke tages noget til, flyttes til den næste, løsere skabelon og tilbage igen, når der er taget noget.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Timer siden Sonarrs eller Radarrs seneste søgning",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Timer et nyt afsnit overlades til Sonarr, efter det er sendt",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Timer et nyt afsnit eller en ny film overlades til Sonarr eller Radarr, når det er udkommet",
   "components.Settings.SettingsBackfill.torrentClient": "Torrent-pakker sendes til",
   "components.Settings.SettingsBackfill.usenetClient": "Usenet-pakker sendes til",
   "components.Settings.SettingsBackfill.when": "Når en titel sidder fast",

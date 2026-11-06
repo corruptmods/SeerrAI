@@ -8,22 +8,68 @@ import type {
 import { getSettings } from '@server/lib/settings';
 
 /**
- * Hours a new episode is left to Sonarr after it airs (a Settings → Backfill
- * setting). Backfill treats it as missing only after this, so Sonarr's own
- * feeds get the first go, even for a show just requested.
+ * Hours a new episode or film is left to Sonarr or Radarr once it's out (a
+ * Settings → Backfill setting). Backfill treats it as missing only after
+ * this, so the *arr's own feeds get the first go, even for a title just
+ * requested.
  */
-export const newEpisodeWaitHours = (): number =>
-  getSettings().backfill.newEpisodeWaitHours ?? 12;
+export const newReleaseWaitHours = (): number =>
+  getSettings().backfill.newReleaseWaitHours ?? 12;
+
+const outAWhile = (date: string): boolean =>
+  new Date(date).getTime() < Date.now() - newReleaseWaitHours() * 3_600_000;
 
 /** Aired, and long enough ago that Backfill may fetch it. */
 export const airedAWhile = (ep: { airDateUtc?: string }): boolean =>
-  !!ep.airDateUtc &&
-  new Date(ep.airDateUtc).getTime() <
-    Date.now() - newEpisodeWaitHours() * 3_600_000;
+  !!ep.airDateUtc && outAWhile(ep.airDateUtc);
+
+/** "under 12 hours ago". */
+export const underWait = (): string =>
+  `under ${newReleaseWaitHours()} hour${newReleaseWaitHours() === 1 ? '' : 's'} ago`;
 
 /** "Aired under 12 hours ago". */
-export const airedUnder = (): string =>
-  `Aired under ${newEpisodeWaitHours()} hour${newEpisodeWaitHours() === 1 ? '' : 's'} ago`;
+export const airedUnder = (): string => `Aired ${underWait()}`;
+
+/** A film's release dates, as Radarr gives them. */
+export interface FilmRelease {
+  /** 'announced', 'inCinemas' or 'released'. */
+  minimumAvailability?: string;
+  inCinemas?: string;
+  /** The date Radarr counts as released (digital or physical). */
+  releaseDate?: string;
+  digitalRelease?: string;
+  physicalRelease?: string;
+}
+
+/**
+ * When a film became available to Radarr: the release its Minimum
+ * Availability waits for. Undefined when Radarr has no such date, or takes it
+ * as soon as it's announced.
+ */
+export const filmOutSince = (film: FilmRelease): string | undefined => {
+  const released =
+    film.releaseDate ??
+    [film.digitalRelease, film.physicalRelease]
+      .filter((d): d is string => !!d)
+      .sort()[0];
+  switch (film.minimumAvailability) {
+    case 'inCinemas':
+      return film.inCinemas ?? released;
+    case 'released':
+      return released;
+    default:
+      return undefined;
+  }
+};
+
+/**
+ * Out long enough that Backfill may fetch it. A film with no date to go by
+ * has been Radarr's since it was added.
+ */
+export const filmOutAWhile = (film: FilmRelease): boolean => {
+  const since = filmOutSince(film);
+  return !since || outAWhile(since);
+};
 
 /*
  * A pack's effect on a series, file by file, judged as Sonarr does: profile

@@ -984,6 +984,33 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     assert.equal(row.status, 'found');
   });
 
+  it('leaves a film to Radarr for its first hours out', async () => {
+    const hour = 60 * 60 * 1000;
+    // Searched long ago, before it came out, and released two hours ago.
+    movie = {
+      ...SECRETS,
+      minimumAvailability: 'released',
+      releaseDate: new Date(Date.now() - 2 * hour).toISOString(),
+      lastSearchTime: new Date(Date.now() - 72 * hour).toISOString(),
+    };
+    await backfill.scan();
+    assert.equal(
+      await getRepository(BackfillSeries).count(),
+      0,
+      'out 2 hours: still Radarr’s'
+    );
+
+    movie = {
+      ...movie,
+      releaseDate: new Date(Date.now() - 13 * hour).toISOString(),
+    };
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    assert.equal(row.status, 'found');
+  });
+
   describe('searching right after Radarr finds nothing', () => {
     const minute = 60 * 1000;
     const askFor = async () => {

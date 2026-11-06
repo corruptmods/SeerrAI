@@ -3066,7 +3066,7 @@
   "components.Settings.SettingsBackfill.stepDownDays": "Dni do obniżenia",
   "components.Settings.SettingsBackfill.stepDownTip": "Tytuł na jednym z szablonów jakości Seerr AI (Ustawienia → Jakość), dla którego nic nie zostało pobrane, przechodzi na następny, mniej wymagający szablon, a wraca, gdy coś się pobierze.",
   "components.Settings.SettingsBackfill.stuckAfterHours": "Godziny od ostatniego wyszukiwania w Sonarr lub Radarr",
-  "components.Settings.SettingsBackfill.newEpisodeWaitHours": "Liczba godzin, przez które nowy odcinek po emisji zostaje pozostawiony Sonarrowi",
+  "components.Settings.SettingsBackfill.newReleaseWaitHours": "Liczba godzin, przez które nowy odcinek lub film po premierze zostaje pozostawiony Sonarrowi lub Radarrowi",
   "components.Settings.SettingsBackfill.torrentClient": "Paczki torrent trafiają do",
   "components.Settings.SettingsBackfill.usenetClient": "Paczki Usenet trafiają do",
   "components.Settings.SettingsBackfill.when": "Kiedy tytuł utknął",

@@ -44,7 +44,8 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   includeMusic: 'Music too',
   includeMusicTip: 'Also follow albums Lidarr couldn’t find.',
   stuckAfterHours: 'Hours since Sonarr’s or Radarr’s last search',
-  newEpisodeWaitHours: 'Hours a new episode is left to Sonarr after it airs',
+  newReleaseWaitHours:
+    'Hours a new episode or film is left to Sonarr or Radarr once it’s out',
   searchAfterArr: 'Search right after Sonarr, Radarr or Lidarr finds nothing',
   searchAfterArrTip:
     'Titles requested in the last 3 days are searched about 20 minutes after their own search comes up empty, instead of waiting for the hours above and the next scan. Each is searched once this way.',
@@ -181,7 +182,7 @@ const SettingsBackfill = () => {
               includeMovies: values.includeMovies,
               includeMusic: values.includeMusic,
               stuckAfterHours: Number(values.stuckAfterHours),
-              newEpisodeWaitHours: Number(values.newEpisodeWaitHours),
+              newReleaseWaitHours: Number(values.newReleaseWaitHours),
               searchAfterArr: values.searchAfterArr,
               includeCutoffUnmet: values.includeCutoffUnmet,
               includeSpecials: values.includeSpecials,
@@ -355,7 +356,7 @@ const SettingsBackfill = () => {
               {(
                 [
                   ['stuckAfterHours', messages.stuckAfterHours],
-                  ['newEpisodeWaitHours', messages.newEpisodeWaitHours],
+                  ['newReleaseWaitHours', messages.newReleaseWaitHours],
                 ] as const
               ).map(([name, label]) => (
                 <div className="form-row" key={name}>

@@ -27,7 +27,12 @@ import {
   titleRef,
 } from '@server/lib/agent/tools/base';
 import backfill from '@server/lib/backfill/engine';
-import { airedAWhile, newEpisodeWaitHours } from '@server/lib/backfill/plan';
+import {
+  airedAWhile,
+  filmOutAWhile,
+  newReleaseWaitHours,
+  underWait,
+} from '@server/lib/backfill/plan';
 import { musicReady } from '@server/lib/music/access';
 import { albumStatuses } from '@server/lib/music/library';
 import { rankAlbums } from '@server/lib/music/searchRank';
@@ -487,9 +492,13 @@ export const titleStatus: AgentTool = {
                 ? `, audio ${file.mediaInfo.audioLanguages}`
                 : ''
             }.`
-          : `Not on disk; ${movie.isAvailable ? 'released' : 'not released yet'}; ${
-              movie.monitored ? 'monitored' : 'not monitored'
-            }.`,
+          : `Not on disk; ${
+              !movie.isAvailable
+                ? 'not released yet'
+                : filmOutAWhile(movie)
+                  ? 'released'
+                  : `out ${underWait()}, left to Radarr for now: don't fetch it`
+            }; ${movie.monitored ? 'monitored' : 'not monitored'}.`,
         queued ? `Downloading in Radarr: ${queued} item(s).` : '',
         await backfillLine(title),
       ]
@@ -631,7 +640,7 @@ export const titleStatus: AgentTool = {
         ? `… and ${missing.length - MAX_LISTED_MISSING} more.`
         : '',
       justAired
-        ? `Aired in the last ${newEpisodeWaitHours()} hours, left to Sonarr: ${justAired}. Don't fetch these.`
+        ? `Aired in the last ${newReleaseWaitHours()} hours, left to Sonarr: ${justAired}. Don't fetch these.`
         : '',
       upcoming ? `Not aired yet: ${upcoming}.` : '',
       doubled.length

@@ -546,7 +546,7 @@ export const titleStatus: AgentTool = {
         kinds ? ` (${kinds}; audio: ${heard})` : ''
       }${all.some((ep) => ep.monitored) ? '' : ', not monitored'}`;
     });
-    // As Backfill counts them: aired longer ago than New episodes wait. One
+    // As Backfill counts them: aired longer ago than Backfill's wait for new episodes. One
     // with no air date hasn't aired.
     const missing = episodes
       .filter((ep) => !ep.hasFile && ep.monitored && airedAWhile(ep))

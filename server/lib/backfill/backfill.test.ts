@@ -696,7 +696,7 @@ describe('Backfill: what Sonarr would take', () => {
     assert.equal(isMissing(fresh.get(1)!, false), true);
   });
 
-  it('waits as long as New episodes wait says', (t) => {
+  it('waits as long as its setting says', (t) => {
     const settings = getSettings();
     const saved = settings.backfill;
     t.after(() => {

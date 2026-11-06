@@ -2,15 +2,17 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.4.2 (6 November 2026)
 
-### Added
+Requests over the limit that wait for an admin, default quality profiles, a view limited to what each person's libraries hold, requests from lists, quality badges on title pages, Network settings that apply without a restart, and tighter sign-in and account checks.
+
+### New
 
 - **Send Requests Over the Limit to Admins** (Settings → Users, off to start): a request past someone's limit waits for an admin, marked **Over Limit**, instead of being refused.
 - **Default Quality Profiles** in Profile → General, for people who choose profiles: one per Radarr, Sonarr and Lidarr server, and one for anime.
 - **Folders by Quality Profile** on each Radarr and Sonarr server: a request with one of those profiles goes to its folder.
 - Override rules can match a title's **Production Countries**.
-- **Show People Only What Their Libraries Hold** (Settings → General, off to start): a title only in libraries someone can't open is left out of their Recently Added and shown as **Not in your libraries**, with no Request or Play link. Run a full library scan once after turning it on.
+- **Show People Only What Their Libraries Hold** (Settings → General, off to start): a title only in libraries someone can't open is left out of their Recently Added and shown as **Not in your libraries**, with no Request or Play link. Run a full library scan once after turning it on. While it's on, an account linked to no media server sees nothing here as available.
 - **Request What's Added to Lists** (on to start, off in Profile → Settings → Features or for everyone in Settings → Features): adding a title to a list requests it.
 - Title pages show the resolutions and HDR formats a title is here in, such as 4K and Dolby Vision, from the next library scan on.
 - **Select all** for streaming services, up to 100.
@@ -18,7 +20,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
-- **New episodes wait** (Settings → Backfill, 12 hours to start): Backfill and the admin agent leave a new episode to Sonarr that long after it airs, even for a show just requested.
+- Backfill and the admin agent leave a new episode to Sonarr for 12 hours after it airs, even for a show just requested. Change it under Settings → Backfill → **Hours a new episode is left to Sonarr after it airs**.
 - On its own, the admin agent no longer takes a release the title's quality profile turns down; it leaves it for you.
 - Nightly **Database Maintenance** also clears which library held a title on a server or library that's gone, and quality applies older than the 50 that History lists.
 - **Settings → Network** applies every change as soon as you save, with no restart, so its Restart Required badges and the restart reminder are gone.

@@ -8,9 +8,9 @@ import type {
 import { getSettings } from '@server/lib/settings';
 
 /**
- * Hours a new episode is left to Sonarr after it airs (Settings → Backfill →
- * New episodes wait). Backfill treats it as missing only after this, so
- * Sonarr's own feeds get the first go, even for a show just requested.
+ * Hours a new episode is left to Sonarr after it airs (a Settings → Backfill
+ * setting). Backfill treats it as missing only after this, so Sonarr's own
+ * feeds get the first go, even for a show just requested.
  */
 export const newEpisodeWaitHours = (): number =>
   getSettings().backfill.newEpisodeWaitHours ?? 12;

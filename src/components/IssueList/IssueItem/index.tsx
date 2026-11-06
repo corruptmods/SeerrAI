@@ -128,7 +128,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
             sizes="(min-width: 1280px) 66vw, 100vw"
             {...pictureLoading(nearness)}
           />
-          <div className="row-backdrop-fade absolute inset-0" />
+          <div className="row-backdrop-fade absolute inset-y-0 -right-px left-0" />
         </div>
       )}
       <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">

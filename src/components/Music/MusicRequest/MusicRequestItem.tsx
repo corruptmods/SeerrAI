@@ -15,6 +15,7 @@ import {
   musicRequestTitle,
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
+import { artistImageUrl } from '@app/components/Music/musicHelpers';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import useNearScreen, { NearScreen, bothRefs } from '@app/hooks/useNearScreen';
@@ -95,6 +96,7 @@ const MusicRequestItem = ({
   const { ref: nearRef, nearness } = useNearScreen();
   const ref = useMemo(() => bothRefs(viewRef, nearRef), [viewRef, nearRef]);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [noBackdrop, setNoBackdrop] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const {
     requestData,
@@ -108,6 +110,8 @@ const MusicRequestItem = ({
 
   const title = musicRequestTitle(requestData, intl);
   const href = musicRequestHref(requestData);
+  const artistId = requestData.media?.foreignId;
+  const cover = musicRequestImage(requestData);
   const pending = requestData.status === MediaRequestStatus.PENDING;
   const manages = hasPermission(Permission.MANAGE_REQUESTS);
   const isOwner = requestData.requestedBy?.id === user?.id;
@@ -146,6 +150,34 @@ const MusicRequestItem = ({
         className="relative flex w-full flex-col justify-between overflow-hidden rounded-xl bg-gray-800 py-2 text-gray-400 shadow-md ring-1 ring-gray-700 xl:h-28 xl:flex-row"
         ref={ref}
       >
+        {/* The artist's wide picture behind, as for a film; the cover,
+            blurred, for an artist without one. */}
+        {(artistId || cover) && (
+          <div
+            className="absolute inset-0 z-0 w-full overflow-hidden xl:w-2/3"
+            aria-hidden
+          >
+            <NearScreen.Provider value={nearness}>
+              {artistId && !noBackdrop ? (
+                <MusicImage
+                  src={artistImageUrl(artistId, 'backdrop')}
+                  fallback="none"
+                  sizes="(min-width: 1280px) 66vw, 100vw"
+                  onMissing={() => setNoBackdrop(true)}
+                />
+              ) : (
+                <div className="absolute inset-0 scale-110 blur-md">
+                  <MusicImage
+                    src={cover}
+                    fallback="none"
+                    sizes="(min-width: 1280px) 66vw, 100vw"
+                  />
+                </div>
+              )}
+            </NearScreen.Provider>
+            <div className="row-backdrop-fade absolute inset-y-0 -right-px left-0" />
+          </div>
+        )}
         <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">
           <div className="relative z-10 flex w-full items-center overflow-hidden pl-4 pr-4 sm:pr-0 xl:w-7/12 2xl:w-2/3">
             <Link
@@ -160,7 +192,7 @@ const MusicRequestItem = ({
               >
                 <NearScreen.Provider value={nearness}>
                   <MusicImage
-                    src={musicRequestImage(requestData)}
+                    src={cover}
                     fallback={musicRequestFallback(requestData)}
                     sizes="3rem"
                   />

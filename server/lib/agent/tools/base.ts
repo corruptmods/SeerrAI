@@ -74,6 +74,11 @@ export class Refused extends ToolError {}
 export interface AgentTool extends ConverseTool {
   /** Offered only with an admin in the conversation. */
   askOnly?: boolean;
+  /**
+   * Changes something with no approval step: with an admin present, only
+   * on the conversation's own title or one an admin named.
+   */
+  acts?: boolean;
   /** Read-only; several in one turn run in parallel. */
   readOnly?: boolean;
   run(state: AgentState, input: Record<string, unknown>): Promise<string>;
@@ -96,6 +101,12 @@ export const decisionText = (
 const isDecision = (step: AgentStep): boolean =>
   step.decision ?? / (approved|declined): /.test(step.text ?? '');
 
+/** What admins said in replies, without their decisions on proposals. */
+export const adminReplies = (run: AgentRun): string[] =>
+  run.steps
+    .filter((step) => step.kind === 'reply' && !isDecision(step))
+    .map((step) => step.text);
+
 /**
  * Whether an admin is in the conversation: they asked, or replied since.
  * Only then may the run propose changes or request titles. Approving a
@@ -105,6 +116,39 @@ const isDecision = (step: AgentStep): boolean =>
 export const adminPresent = (run: AgentRun): boolean =>
   run.trigger === 'ask' ||
   run.steps.some((step) => step.kind === 'reply' && !isDecision(step));
+
+/**
+ * Whether this go of the run follows an admin's word (their ask or a
+ * reply), not a failed download it was sent back to look at on its own.
+ */
+export const adminDriven = (run: AgentRun): boolean => {
+  for (let i = run.steps.length - 1; i >= 0; i--) {
+    const step = run.steps[i];
+    if (step.kind === 'followUp') return false;
+    if (step.kind === 'reply' && !isDecision(step)) return true;
+  }
+  return run.trigger === 'ask';
+};
+
+/**
+ * Whether an admin named this title in the conversation: every word of
+ * one of its names (a year or country after it aside) is in their ask or
+ * one of their replies.
+ */
+export const namedByAdmin = (
+  run: AgentRun,
+  ...names: (string | undefined)[]
+): boolean => {
+  const said = [
+    ...(run.trigger === 'ask' && run.ask ? [run.ask] : []),
+    ...adminReplies(run),
+  ];
+  return names.some((name) => {
+    if (!name) return false;
+    const bare = name.replace(/\s*\([^)]*\)\s*$/, '');
+    return !!normalize(bare) && titleMatches(bare, ...said);
+  });
+};
 
 /** Someone reported the files bad and asked for them to be replaced. */
 export const replaceReported = (run: AgentRun): boolean =>

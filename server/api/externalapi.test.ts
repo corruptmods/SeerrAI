@@ -61,6 +61,19 @@ class Probe extends ExternalAPI {
   public login(ttl?: number) {
     return this.post<{ n: number }>('/login', { user: 'u' }, undefined, ttl);
   }
+  public profiles() {
+    return this.get<{ n: number }>('/profiles', undefined, 60);
+  }
+}
+
+/** A client of a service allowing five requests a second. */
+class Limited extends ExternalAPI {
+  constructor(baseUrl: string) {
+    super(baseUrl, {}, { rateLimit: { maxRequests: 5, maxRPS: 5 } });
+  }
+  public item(id: number) {
+    return this.get<{ n: number }>(`/items/${id}`, undefined, 0);
+  }
 }
 
 let server: Server;
@@ -141,6 +154,49 @@ describe('a background refresh', () => {
     await settle();
     assert.deepEqual(asked, ['GET /profiles', 'GET /profiles']);
     assert.deepEqual(await api.rolling(), { n: 2 }, 'the refreshed answer');
+  });
+});
+
+describe('answers asked for at once', () => {
+  it('are fetched once for everyone asking, each getting their own copy', async () => {
+    const cache = new TestCache();
+    let release: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (release = resolve));
+    const answers = Promise.all([
+      new Probe(base, cache).profiles(),
+      new Probe(base, cache).profiles(),
+      new Probe(base, cache).profiles(),
+    ]);
+    await settle();
+    release();
+    const [first, second, third] = await answers;
+    assert.deepEqual(asked, ['GET /profiles']);
+    assert.deepEqual([first, second, third], [{ n: 1 }, { n: 1 }, { n: 1 }]);
+    assert.notEqual(first, second);
+    assert.notEqual(second, third);
+  });
+
+  it('are fetched again once the first fetch failed', async () => {
+    const cache = new TestCache();
+    failing = true;
+    await assert.rejects(new Probe(base, cache).profiles());
+    failing = false;
+    assert.deepEqual(await new Probe(base, cache).profiles(), { n: 2 });
+  });
+});
+
+describe('a rate limit', () => {
+  it('holds for every client of a service together', async () => {
+    const service = `${base}/shared-limit`;
+    const started = Date.now();
+    const answers = Promise.all(
+      Array.from({ length: 8 }, (_, i) => new Limited(service).item(i))
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.equal(asked.length, 5, 'five in the first second');
+    await answers;
+    assert.equal(asked.length, 8);
+    assert.ok(Date.now() - started >= 950, 'the rest a second later');
   });
 });
 

@@ -140,14 +140,18 @@ const describeGroup = async (
 const lastGrab = (history: ArrHistoryRecord[]) =>
   history.find((h) => h.eventType === 'grabbed');
 
+/** Whether a Radarr or Sonarr queue item is a download of this title. */
+const queuedFor = (item: object, title: TitleRef): boolean =>
+  title.kind === 'movie'
+    ? (item as { movieId?: number }).movieId === title.arrId
+    : (item as { seriesId?: number }).seriesId === title.arrId;
+
 const describeFailed = async (input: ChangeInput): Promise<ProposedChange> => {
   const title = needTitle(input);
   const name = input.name ?? 'the title';
   if (title.kind === 'movie') {
     const api = radarrOf(title);
-    const queued = (await api.getQueue()).filter(
-      (q) => (q as { movieId?: number }).movieId === title.arrId
-    );
+    const queued = (await api.getQueue()).filter((q) => queuedFor(q, title));
     if (queued.length) {
       return {
         kind: 'markFailed',
@@ -182,9 +186,7 @@ const describeFailed = async (input: ChangeInput): Promise<ProposedChange> => {
     };
   }
   const api = sonarrOf(title);
-  const queued = (await api.getQueue()).filter(
-    (q) => (q as { seriesId?: number }).seriesId === title.arrId
-  );
+  const queued = (await api.getQueue()).filter((q) => queuedFor(q, title));
   if (!queued.length) {
     throw new ChangeError(
       `${name} has nothing downloading in Sonarr to mark failed.`
@@ -442,7 +444,12 @@ export const applyChange = async (change: ProposedChange): Promise<string> => {
       const api = title.kind === 'movie' ? radarrOf(title) : sonarrOf(title);
       const queueIds = ids(params.queueIds);
       if (queueIds.length) {
-        const still = new Set((await api.getQueue()).map((q) => q.id));
+        // Only the title's own downloads, as when it was proposed.
+        const still = new Set(
+          (await api.getQueue())
+            .filter((q) => queuedFor(q, title))
+            .map((q) => q.id)
+        );
         const gone = queueIds.filter((id) => !still.has(id));
         const left = queueIds.filter((id) => still.has(id));
         if (!left.length) {

@@ -28,6 +28,7 @@ let jellyfinPort = 0;
 let port = 0;
 const servers: Server[] = [];
 const embyRequests: { url: string; auth: string }[] = [];
+const jellyfinRequests: typeof embyRequests = [];
 
 /** A stand-in Jellyfin or Emby server, checking its API key. */
 const standIn =
@@ -86,7 +87,9 @@ before(async () => {
     });
 
   embyPort = await listen(standIn('Den Emby', 'emby-key', embyRequests));
-  jellyfinPort = await listen(standIn('Den Jellyfin', 'jellyfin-key'));
+  jellyfinPort = await listen(
+    standIn('Den Jellyfin', 'jellyfin-key', jellyfinRequests)
+  );
 
   const app = express();
   app.use(express.json());
@@ -114,6 +117,7 @@ after(() => servers.forEach((server) => server.close()));
 
 beforeEach(() => {
   embyRequests.length = 0;
+  jellyfinRequests.length = 0;
   const settings = getSettings();
   settings.main.mediaServerType = MediaServerType.EMBY;
   settings.emby = {
@@ -173,6 +177,34 @@ describe('Settings → Emby', () => {
 
     const jellyfin = await api('/jellyfin');
     assert.equal((await jellyfin.json()).name, 'Untouched');
+  });
+
+  it('keeps the saved API key only for the same address', async () => {
+    const moved = await api('/emby', {
+      method: 'POST',
+      body: JSON.stringify({ ip: '127.0.0.1', port: jellyfinPort }),
+    });
+    assert.notEqual(moved.status, 200);
+    assert.ok(jellyfinRequests.length > 0, 'the new address was tried');
+    assert.ok(
+      jellyfinRequests.every((r) => !r.auth.includes('emby-key')),
+      'without the saved key'
+    );
+    const settings = getSettings();
+    assert.equal(settings.emby.port, embyPort, 'nothing saved');
+    assert.equal(settings.emby.apiKey, 'emby-key');
+
+    const entered = await api('/emby', {
+      method: 'POST',
+      body: JSON.stringify({
+        ip: '127.0.0.1',
+        port: jellyfinPort,
+        apiKey: 'jellyfin-key',
+      }),
+    });
+    assert.equal(entered.status, 200);
+    assert.equal(settings.emby.port, jellyfinPort);
+    assert.equal(settings.emby.apiKey, 'jellyfin-key');
   });
 
   it("syncs and switches Emby's libraries", async () => {

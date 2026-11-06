@@ -9,6 +9,8 @@ describe('safeRedirect', () => {
       '/discover/movies?genre=28&sortBy=popularity.desc',
       '/movie/549263#cast',
       '/collection/10',
+      // An AI chat fix link, which the chat follows through here.
+      '/backfill/agent/12',
     ]) {
       assert.equal(safeRedirect(path), path);
     }

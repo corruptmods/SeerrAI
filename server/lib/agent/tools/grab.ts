@@ -894,6 +894,48 @@ const commitGrab = async (
   }`;
 };
 
+/** What an admin is shown of a grab: the release opened and its files. */
+interface ShownGrab {
+  infoHash: string | null;
+  files: { path: string; size: number }[];
+  doubts: string[];
+}
+
+const shownOf = (prepared: PreparedGrab): ShownGrab => ({
+  infoHash: prepared.known.infoHash?.toLowerCase() ?? null,
+  files: prepared.plan.map((e) => ({ path: e.path, size: e.size })),
+  doubts: prepared.doubts,
+});
+
+/**
+ * Why a grab prepared again on approval is not the one shown, or null.
+ * Proposals saved before this was kept are not compared.
+ */
+const changedSince = (
+  prepared: PreparedGrab,
+  shown: ShownGrab | undefined
+): string | null => {
+  if (!shown) return null;
+  const now = shownOf(prepared);
+  if (shown.infoHash && now.infoHash && shown.infoHash !== now.infoHash) {
+    return 'The release is not the one that was opened when this was approved';
+  }
+  const key = (f: { path: string; size: number }) => `${f.path}\0${f.size}`;
+  const before = shown.files.map(key).sort();
+  const after = now.files.map(key).sort();
+  if (
+    before.length !== after.length ||
+    before.some((file, i) => file !== after[i])
+  ) {
+    return 'The files it would take are not the ones shown when this was approved';
+  }
+  const fresh = now.doubts.filter((doubt) => !shown.doubts.includes(doubt));
+  if (fresh.length) {
+    return `Something changed since this was approved: ${fresh.join(' ')}`;
+  }
+  return null;
+};
+
 /**
  * A replacing grab for an admin to approve: what goes and what comes. On
  * approval it is rechecked from scratch and started.
@@ -930,7 +972,7 @@ const replaceProposal = (
         : []),
       `Why: ${args.reason}`,
     ],
-    params: { grab: { ...args, certain: true } },
+    params: { grab: { ...args, certain: true }, shown: shownOf(prepared) },
   };
 };
 
@@ -958,12 +1000,13 @@ const oversizeProposal = (
         : []),
       `Why: ${args.reason}`,
     ],
-    params: { grab: { ...args, certain: true } },
+    params: { grab: { ...args, certain: true }, shown: shownOf(prepared) },
   };
 };
 
 export const grab: AgentTool = {
   name: 'grab',
+  acts: true,
   description:
     "Downloads chosen files of a release through Backfill and imports each as the episode you map it to (or as the movie). It only fills episodes with no file and never replaces one. One file per episode is preferred: take a release whose files each hold several episodes only when none has them one per file, and then give each such file all its episodes. Map files by comparing file titles with episode titles: a collection may number files its own way. If a file names neither its episode title nor its number, you are asked to look again; call it again with certain: true only once you are sure. A pack used before for other episodes (one season of a full-series pack) can be taken again for the rest; while it is still downloading, the new files join that download. For an album, give no files: Backfill matches the release's files to the album's tracks itself and takes those that fill missing tracks, or says why none do.",
   parameters: {
@@ -1056,15 +1099,26 @@ export const grab: AgentTool = {
 
 /**
  * Starts a grab an admin approved, rechecking everything against the
- * current state; files are taken only if it all still holds.
+ * current state; files are taken only if it all still holds and they are
+ * the ones shown. Only an approved replacement may replace a file.
  */
 export const startApprovedGrab = async (
   state: AgentState,
-  input: unknown,
+  change: Pick<ProposedChange, 'kind' | 'params'>,
   by: string
 ): Promise<string> => {
-  const args = grabInput.parse(input);
-  const prepared = await prepareGrab(state, { ...args, replace: true });
+  const args = grabInput.parse(change.params.grab);
+  const prepared = await prepareGrab(state, {
+    ...args,
+    replace: change.kind === 'replace',
+  });
+  const changed = changedSince(
+    prepared,
+    change.params.shown as ShownGrab | undefined
+  );
+  if (changed) {
+    throw new ToolError(`${changed}; nothing was started.`);
+  }
   return commitGrab(state, prepared, by);
 };
 
@@ -1103,6 +1157,16 @@ export const stopDownload: AgentTool = {
     if (!job) throw new ToolError(`There is no job #${id}.`);
     if (['done', 'failed', 'cancelled'].includes(job.status)) {
       return `Job #${id} is already ${job.status}; ${job.imported} files were imported.`;
+    }
+    // Nor one another conversation has since added its own files to.
+    // Grabs recorded without their episodes can't be told apart.
+    if (grabs.every((a) => a.episodeIds)) {
+      const own = new Set(grabs.flatMap((a) => a.episodeIds ?? []));
+      if (job.files.some((f) => f.episodeIds.some((e) => !own.has(e)))) {
+        throw new ToolError(
+          `Job #${id} now also downloads files another conversation added, so it is not yours alone to stop. The admin can end it on its Backfill page.`
+        );
+      }
     }
     if (job.status === 'importing') {
       throw new ToolError(

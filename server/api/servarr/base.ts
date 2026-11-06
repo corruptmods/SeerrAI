@@ -268,6 +268,36 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     return Array.isArray(response.data) ? response.data : [];
   };
 
+  /** Categories (or labels) this app files its downloads under. */
+  public getDownloadCategories = async (): Promise<string[]> => {
+    const response =
+      await this.axios.get<{ fields?: { name?: string; value?: unknown }[] }[]>(
+        '/downloadclient'
+      );
+    return (Array.isArray(response.data) ? response.data : []).flatMap(
+      (client) =>
+        (client.fields ?? [])
+          .filter((f) => /category$/i.test(f.name ?? ''))
+          .map((f) => f.value)
+          .filter((v): v is string => typeof v === 'string' && v !== '')
+    );
+  };
+
+  /** The addresses of the indexers this app has set up. */
+  public getIndexerUrls = async (): Promise<string[]> => {
+    const response =
+      await this.axios.get<{ fields?: { name?: string; value?: unknown }[] }[]>(
+        '/indexer'
+      );
+    return (Array.isArray(response.data) ? response.data : []).flatMap(
+      (indexer) =>
+        (indexer.fields ?? [])
+          .filter((f) => f.name === 'baseUrl')
+          .map((f) => f.value)
+          .filter((v): v is string => typeof v === 'string' && v !== '')
+    );
+  };
+
   public getTags = async (): Promise<Tag[]> => {
     try {
       const response = await this.axios.get<Tag[]>(`/tag`);

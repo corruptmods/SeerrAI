@@ -9,7 +9,7 @@ import agent from '@server/lib/agent';
 import backfill from '@server/lib/backfill/engine';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
-import { stylePolicy } from '@server/lib/customCss';
+import { pagePolicy } from '@server/lib/customCss';
 import { splitEmbyData } from '@server/lib/embySplit';
 import { isConnected, rememberJellyfinAdmins } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
@@ -29,10 +29,13 @@ import playlists from '@server/lib/playlists';
 import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import apiPathCase from '@server/middleware/apiPathCase';
 import { unlessApiKey } from '@server/middleware/auth';
 import clearCookies from '@server/middleware/clearcookies';
 import { csrfProtection } from '@server/middleware/csrf';
 import { aiChatBody, jsonBody } from '@server/middleware/jsonBody';
+import privateAnswers from '@server/middleware/privateAnswers';
+import secureCookies from '@server/middleware/secureCookies';
 import warmPosters from '@server/middleware/warmPosters';
 import routes from '@server/routes';
 import avatarproxy from '@server/routes/avatarproxy';
@@ -244,6 +247,7 @@ app
     await DiscoverSlider.bootstrapSliders();
 
     const server = express();
+    server.disable('x-powered-by');
     if (settings.network.trustProxy) {
       server.set('trust proxy', proxyTrust(settings.network));
     }
@@ -255,13 +259,18 @@ app
         brotli: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } },
       })
     );
+    // The API base path as the spec writes it, whatever case it came in.
+    server.use(apiPathCase);
+    // Every cookie is Secure for a browser on https (an https Application
+    // URL's host included); other hosts over plain http work as before.
+    server.use(secureCookies);
     server.use(cookieParser());
     // AI Search reads its body after the session is known (below), since an
     // attached photo may exceed the usual limit.
     server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
     if (settings.network.csrfProtection) {
-      server.use(csrfProtection(!dev));
+      server.use(csrfProtection());
     }
 
     const sessionRepository = getRepository(Session);
@@ -273,7 +282,9 @@ app
       cookie: {
         maxAge: 1000 * 60 * 60 * 24 * 30,
         httpOnly: true,
-        sameSite: settings.network.csrfProtection ? 'strict' : 'lax',
+        // Lax keeps people signed in when they arrive from a link; with CSRF
+        // protection on, its token guards every change.
+        sameSite: 'lax',
         secure: 'auto',
       },
       store: sessionStore,
@@ -281,6 +292,7 @@ app
     // API key requests belong to the key alone, so their session cookie is
     // never read, changed or ended.
     server.use('/api', unlessApiKey(sessions));
+    server.use('/api', privateAnswers);
     server.use(aiChatBody);
     // The image cache only accepts new images for signed-in users.
     useSessionForImages({
@@ -317,11 +329,12 @@ app
     // Next.js catch-all.
     server.get('/sw-precache.json', swPrecacheHandler);
 
-    // Pages may load stylesheets and fonts only from here and the hosts the
-    // admin's Server CSS names (server/lib/customCss.ts).
+    // Pages may load scripts only from here, stylesheets and fonts only from
+    // here and the hosts the admin's Server CSS names, and may be framed only
+    // here (server/lib/customCss.ts).
     server.get(
       '*path',
-      stylePolicy(() => settings.appearance.serverCss ?? ''),
+      pagePolicy(() => settings.appearance.serverCss ?? '', { dev }),
       (req, res) => handle(req, res)
     );
     server.use(

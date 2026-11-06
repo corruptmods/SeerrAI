@@ -216,6 +216,29 @@ describe('signing out everywhere else', () => {
   });
 });
 
+describe('deleting someone', () => {
+  it('ends every session they had', async () => {
+    const doomed = new User({
+      email: 'static-garden@example.invalid',
+      username: 'static-garden',
+      avatar: '',
+      permissions: Permission.REQUEST,
+      userType: UserType.LOCAL,
+    });
+    await doomed.setPassword('test1234');
+    await getRepository(User).save(doomed);
+    await signIn('static-garden@example.invalid');
+    await signIn('static-garden@example.invalid');
+    assert.equal(await sessionsOf(doomed.id), 2);
+
+    const admin = await signIn('admin@seerr.dev');
+    assert.equal((await admin.agent.delete(`/user/${doomed.id}`)).status, 200);
+
+    assert.equal(await sessionsOf(doomed.id), 0);
+    assert.ok(await signedIn(admin.agent));
+  });
+});
+
 describe('signing out after unlinking an account', () => {
   it('follows removing a single sign-on link, by them or an admin', async () => {
     const here = await signIn('friend@seerr.dev');

@@ -15,7 +15,9 @@ import type {
 } from '@server/lib/agent/tools/base';
 import {
   Refused,
+  adminDriven,
   adminPresent,
+  namedByAdmin,
   readTitleRef,
   titleRef,
 } from '@server/lib/agent/tools/base';
@@ -26,16 +28,18 @@ import {
   searchIndexers,
   searchReleases,
 } from '@server/lib/agent/tools/search';
-import { findTitle, titleStatus } from '@server/lib/agent/tools/titles';
+import { findTitle, nameOf, titleStatus } from '@server/lib/agent/tools/titles';
 import { z } from 'zod';
 
 export {
   Refused,
   ToolError,
+  adminDriven,
   adminPresent,
   boundTitle,
   decisionText,
   mayReplace,
+  namedByAdmin,
   readTitleRef,
   titleMatches,
   titleRef,
@@ -86,16 +90,28 @@ export const TOOLS: AgentTool[] = [
 ];
 
 /**
- * Why a run without an admin may not use a tool on this title, or null.
- * Such a run (automatic, or from a report) is confined to its own title, so
- * what it reads (release names, file paths) cannot steer it to another.
+ * Whether the model is offered a tool now. Tools that need an admin need
+ * one in the conversation, and those that change something unapproved
+ * need this go to follow an admin's word, not a failed download alone.
  */
-const elsewhere = (
+export const offered = (tool: AgentTool, run: AgentRun): boolean =>
+  !tool.askOnly || (adminPresent(run) && (!tool.acts || adminDriven(run)));
+
+/**
+ * Why a run may not use a tool on this title, or null. A run without an
+ * admin (automatic, or from a report) is confined to its own title, so
+ * what it reads (release names, file paths) cannot steer it to another.
+ * With an admin, a tool that changes something unapproved may act on
+ * another title only once an admin has named it.
+ */
+const elsewhere = async (
   run: AgentRun,
+  tool: AgentTool,
   input: Record<string, unknown>
-): string | null => {
-  if (adminPresent(run) || run.arrId == null) return null;
-  if (input.title === undefined) return null;
+): Promise<string | null> => {
+  if (run.arrId == null || input.title === undefined) return null;
+  const present = adminPresent(run);
+  if (present && !tool.acts) return null;
   let asked: TitleRef;
   try {
     asked = readTitleRef(input.title);
@@ -108,9 +124,13 @@ const elsewhere = (
     serverId: run.serverId ?? 0,
     arrId: run.arrId,
   });
-  return titleRef(asked) === own
-    ? null
-    : `This conversation is only about ${run.title ?? 'its title'} (${own}). No admin is in it, so no other title is looked at or changed.`;
+  if (titleRef(asked) === own) return null;
+  if (!present) {
+    return `This conversation is only about ${run.title ?? 'its title'} (${own}). No admin is in it, so no other title is looked at or changed.`;
+  }
+  const name = await nameOf(asked).catch(() => null);
+  if (name && namedByAdmin(run, name)) return null;
+  return `This conversation is about ${run.title ?? 'its title'} (${own}), and no admin has named ${name ?? 'that title'} in it, so nothing is done to it. If it should be, ask the admin (ask_admin); it can be done once an admin names it in a reply.`;
 };
 
 /** Runs one tool for the model, returning its output or why it failed. */
@@ -120,10 +140,10 @@ export const runTool = async (
   input: Record<string, unknown>
 ): Promise<{ text: string; isError: boolean; refused?: boolean }> => {
   const tool = TOOLS.find((t) => t.name === name);
-  if (!tool || (tool.askOnly && !adminPresent(state.run))) {
+  if (!tool || !offered(tool, state.run)) {
     return { text: `There is no tool called ${name}.`, isError: true };
   }
-  const refused = elsewhere(state.run, input);
+  const refused = await elsewhere(state.run, tool, input);
   if (refused) return { text: refused, isError: true };
   try {
     return { text: clip(await tool.run(state, input)), isError: false };

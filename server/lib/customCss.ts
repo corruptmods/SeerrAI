@@ -1,7 +1,9 @@
 /*
  * Server side of custom CSS (see server/constants/customCss.ts): stylesheet
- * versions and the Content-Security-Policy limiting stylesheet and font
- * sources.
+ * versions, and the pages' Content-Security-Policy. It limits stylesheet and
+ * font sources to this server and the hosts Server CSS names, scripts to this
+ * server's files and the page's own inline scripts (by a nonce made for each
+ * page, which pages/_document puts on them), and framing to this server.
  *
  * The policy doesn't cover images: posters, avatars and logos come from many
  * places (TMDB with the image cache off, Gravatar, media servers), so the
@@ -9,7 +11,7 @@
  */
 import { cssAddresses } from '@server/constants/customCss';
 import type { RequestHandler } from 'express';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 /**
  * Short stylesheet hash for its URL, so browsers cache it until it changes.
@@ -41,8 +43,8 @@ const unique = (places: (string | undefined)[]): string[] => [
   ...new Set(places.filter((place): place is string => !!place)),
 ];
 
-/** The Content-Security-Policy for pages, given the server's CSS. */
-export const contentSecurityPolicy = (serverCss: string): string => {
+/** The stylesheet and font sources, given the server's CSS. */
+export const styleSources = (serverCss: string): string => {
   const { imports, others } = cssAddresses(serverCss);
   const stylesheets = unique(imports.map(placeOf));
   // An imported stylesheet's fonts usually come from where it does.
@@ -54,17 +56,40 @@ export const contentSecurityPolicy = (serverCss: string): string => {
 };
 
 /**
- * Sends the policy with each page. Server CSS is read per request so changes
- * apply on the next load; the policy is rebuilt only when it changes.
+ * The policy for a page with these style sources and script nonce. In
+ * development Next.js also evaluates code it loads.
  */
-export const stylePolicy = (serverCss: () => string): RequestHandler => {
-  let last: { css: string; policy: string } | undefined;
+const policyOf = (sources: string, nonce: string, dev: boolean): string =>
+  [
+    `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ''}`,
+    sources,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+
+/**
+ * Sends the policy with each page, with a new nonce each time. Server CSS is
+ * read per request so changes apply on the next load; its sources are worked
+ * out again only when it changes.
+ */
+export const pagePolicy = (
+  serverCss: () => string,
+  { dev = false }: { dev?: boolean } = {}
+): RequestHandler => {
+  let last: { css: string; sources: string } | undefined;
   return (_req, res, next) => {
     const css = serverCss();
     if (last?.css !== css) {
-      last = { css, policy: contentSecurityPolicy(css) };
+      last = { css, sources: styleSources(css) };
     }
-    res.setHeader('Content-Security-Policy', last.policy);
+    const nonce = randomBytes(16).toString('base64');
+    res.setHeader(
+      'Content-Security-Policy',
+      policyOf(last.sources, nonce, dev)
+    );
+    // For browsers without frame-ancestors.
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     next();
   };
 };

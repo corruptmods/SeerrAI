@@ -53,19 +53,15 @@ This setting is **disabled** by default.
 
 ## Enable CSRF Protection
 
-:::warning
-**This is an advanced setting.** Please only enable this setting if you are familiar with CSRF protection and how it works.
-:::
-
 CSRF stands for [cross-site request forgery](https://en.wikipedia.org/wiki/Cross-site_request_forgery). With this on, every change made from a browser must carry a token Seerr AI gave that browser, so another website can't make your signed-in browser change things.
 
-Apps and scripts that use an API key (the server's, or a [personal one](../../seerr-ai/account.md#api-keys)) in the `X-Api-Key` header are not affected: they never use the browser's sign-in, so they need no token and can still make changes. A wrong key is always refused.
+Apps and scripts that use an API key (the server's, or a [personal one](../../seerr-ai/account.md#api-keys)) in the `X-Api-Key` header are not affected: they never use the browser's sign-in, so they need no token and can still make changes. A wrong key is always refused. An app that signs in like a browser and keeps the session cookie instead needs that token for every change, so with this on, set such apps up with an API key.
 
-The token's cookie is only sent over HTTPS, so with this on you can no longer use Seerr AI from a browser over plain _HTTP_ (including an IP address and port).
+It works over HTTPS and over plain _HTTP_ (including an IP address and port).
 
 It takes effect after Seerr AI restarts. If you turn it on and can't get in, turn it off again by setting `csrfProtection` to `false` under `network` in `settings.json` in `/app/config`, and restart.
 
-This setting is **disabled** by default.
+This setting is **enabled** by default on new installs. An existing install keeps the setting it had.
 
 ## API Request Timeout
 

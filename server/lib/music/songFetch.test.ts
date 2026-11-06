@@ -1335,6 +1335,30 @@ describe('taking a song from its album', () => {
     );
   });
 
+  it('never has Lidarr import a file the client names by a root path', async () => {
+    const qbit = QBittorrentAPI.prototype;
+    const getFiles = qbit.getFiles;
+    mock.method(qbit, 'getFiles', async function (this: unknown, hash: string) {
+      const files = await getFiles.call(this, hash);
+      return done
+        ? files.map((f) => ({ ...f, name: `/elsewhere/${f.name}` }))
+        : files;
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).status, 'downloading');
+
+    done = true;
+    await songFetcher.tick();
+    assert.notEqual((await fetchOf()).status, 'importing');
+    assert.equal(
+      lidarr.calls.filter(
+        (c) => c.path === '/api/v1/command' && c.body?.name === 'ManualImport'
+      ).length,
+      0
+    );
+  });
+
   /** Sets up a Backfill Usenet client and a Usenet post of the album. */
   const useUsenet = (packed: boolean) => {
     const settings = getSettings();

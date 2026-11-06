@@ -46,9 +46,15 @@ let accounts: { Id: string; Name: string; Policy: Policy }[] = [];
 let refuse = new Set<string>();
 /** Emby lists libraries by Guid as well as a short Id. */
 let emby = false;
+/** Libraries removed from the server. */
+let removedLibraries = new Set<string>();
+/** Accounts made administrators after the list was read. */
+let promoted = new Set<string>();
 
 const fresh = () => {
   refuse = new Set();
+  removedLibraries = new Set();
+  promoted = new Set();
   accounts = [
     {
       Id: ADMIN,
@@ -95,11 +101,13 @@ const folders = () =>
     { Id: MOVIES, Name: 'Movies', CollectionType: 'movies', short: '3' },
     { Id: SHOWS, Name: 'Shows', CollectionType: 'tvshows', short: '11' },
     { Id: MUSIC, Name: 'Music', CollectionType: 'music', short: '3454' },
-  ].map(({ short, ...folder }) => ({
-    ...folder,
-    ...(emby ? { Id: short, Guid: folder.Id } : {}),
-    Type: 'CollectionFolder',
-  }));
+  ]
+    .filter((folder) => !removedLibraries.has(folder.Id))
+    .map(({ short, ...folder }) => ({
+      ...folder,
+      ...(emby ? { Id: short, Guid: folder.Id } : {}),
+      Type: 'CollectionFolder',
+    }));
 
 const jellyfinStandIn = (req: IncomingMessage, res: http.ServerResponse) => {
   const url = new URL(req.url ?? '', 'http://localhost');
@@ -137,7 +145,13 @@ const jellyfinStandIn = (req: IncomingMessage, res: http.ServerResponse) => {
     }
     const one = accounts.find((a) => url.pathname === `/Users/${a.Id}`);
     if (one) {
-      return res.end(JSON.stringify(one));
+      return res.end(
+        JSON.stringify(
+          promoted.has(one.Id)
+            ? { ...one, Policy: { ...one.Policy, IsAdministrator: true } }
+            : one
+        )
+      );
     }
     res.statusCode = 404;
     res.end('{}');
@@ -443,6 +457,55 @@ describe('library access on Jellyfin', () => {
       { name: 'Pip', error: 'The server answered 500.' },
     ]);
     assert.equal(result.change.failed, 1);
+  });
+
+  it('leaves alone someone made an administrator since their access was read', async () => {
+    promoted.add(SOME);
+    const result = await (
+      await post('/library-access/jellyfin/apply', {
+        libraryId: MUSIC,
+        action: 'remove',
+      })
+    ).json();
+    assert.deepEqual(
+      result.failed.map((f: { name: string }) => f.name),
+      ['Pip']
+    );
+    assert.match(result.failed[0].error, /administrator/);
+    assert.deepEqual(policyOf(SOME).EnabledFolders, [MOVIES, MUSIC, GONE]);
+  });
+
+  it('undoes a change once, however many ask at the same time', async () => {
+    const result = await (
+      await post('/library-access/jellyfin/apply', {
+        libraryId: MUSIC,
+        action: 'remove',
+      })
+    ).json();
+    const statuses = await Promise.all(
+      [1, 2].map(
+        async () =>
+          (await post(`/library-access/history/${result.change.id}/undo`))
+            .status
+      )
+    );
+    assert.deepEqual(statuses.sort(), [200, 409]);
+  });
+
+  it('leaves someone as they are when the libraries they had are gone', async () => {
+    const result = await (
+      await post('/library-access/jellyfin/apply', {
+        libraryId: MUSIC,
+        action: 'add',
+      })
+    ).json();
+    assert.deepEqual(policyOf(NO_MUSIC).EnabledFolders, [SHOWS, MUSIC]);
+    removedLibraries.add(SHOWS);
+    const back = await (
+      await post(`/library-access/history/${result.change.id}/undo`)
+    ).json();
+    assert.ok(back.skipped >= 1);
+    assert.ok(policyOf(NO_MUSIC).EnabledFolders.includes(MUSIC));
   });
 
   it('gives a library to everyone who lacks it', async () => {

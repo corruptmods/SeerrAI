@@ -1,9 +1,12 @@
+import { standInEmail } from '@server/constants/oidc';
 import type { MediaServerKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { USER_TYPE, primaryServer } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
+import logger from '@server/logger';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Whether `actor` may change `target`'s account on their behalf: permissions,
@@ -33,8 +36,9 @@ export const mayEditUser = (actor: User | undefined, target: User): boolean =>
  * sign-in or Import Plex Users. Only an account waiting for its Plex account:
  * added by an admin as a Plex user by email, or the owner linking Plex for the
  * first time. Anyone can type another's email into their profile, so a
- * password account or one linked to another Plex account is never handed
- * over; its owner links Plex from their own settings.
+ * password account, one linked to another Plex account or one with an
+ * unconfirmed email is never handed over; its owner links Plex from their own
+ * settings.
  *
  * The owner only while Plex is primary: on a Jellyfin or Emby setup the
  * owner's email says nothing about who holds a Plex account, and the owner
@@ -42,6 +46,7 @@ export const mayEditUser = (actor: User | undefined, target: User): boolean =>
  */
 export const plexAccountMayClaim = (user: User): boolean =>
   !user.plexId &&
+  user.emailVerified !== false &&
   (user.id === 1
     ? primaryServer() === 'plex'
     : user.userType === UserType.PLEX);
@@ -60,6 +65,37 @@ export const emailFree = async (
     .where('user.email = :email', { email: (email ?? '').toLowerCase() })
     .getOne();
   return !holder || holder.id === exceptId;
+};
+
+/**
+ * Whether an account a media server or sign-in provider brings may have this
+ * email: no one else has it, or only someone who set it on themselves and
+ * never confirmed it, who then gets a stand-in in its place.
+ */
+export const takeEmail = async (
+  email: string,
+  exceptId?: number
+): Promise<boolean> => {
+  const userRepository = getRepository(User);
+  const holder = await userRepository
+    .createQueryBuilder('user')
+    .select(['user.id', 'user.emailVerified'])
+    .where('user.email = :email', { email: (email ?? '').toLowerCase() })
+    .getOne();
+  if (!holder || holder.id === exceptId) {
+    return true;
+  }
+  if (holder.emailVerified) {
+    return false;
+  }
+  await userRepository.update(holder.id, {
+    email: standInEmail('unconfirmed', randomUUID()),
+  });
+  logger.warn(
+    'An unconfirmed email went to the account that signed in with it; the account that had it needs a new one',
+    { label: 'User Management', userId: holder.id }
+  );
+  return true;
 };
 
 /**
@@ -89,6 +125,7 @@ export const plexProfileChanges = async (
   const changes: Partial<User> = { avatar: account.thumb };
   if (await emailFree(account.email, user.id)) {
     changes.email = account.email;
+    changes.emailVerified = true;
   }
   return changes;
 };

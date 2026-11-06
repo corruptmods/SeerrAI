@@ -89,6 +89,22 @@ export interface MusicRequestOptions {
 
 export const MAX_SONGS_PER_REQUEST = 50;
 
+/**
+ * Season numbers asked for, each once, and only those TMDB lists for the
+ * series (all of them when TMDB lists none).
+ */
+export const listedSeasons = (
+  asked: number[],
+  show: { seasons?: { season_number: number }[] }
+): number[] => {
+  const listed = Array.isArray(show.seasons)
+    ? new Set(show.seasons.map((season) => season.season_number))
+    : undefined;
+  return [...new Set(asked)].filter(
+    (sn) => Number.isInteger(sn) && (!listed || listed.has(sn))
+  );
+};
+
 /** Why the songs asked for aren't requested: each is here or coming. */
 const coveredMessage = (
   versions: SongVersion[],
@@ -742,7 +758,9 @@ export class MediaRequest {
       // typically a remake and its original, to one TVDB id) fails the insert
       // and loses the request. The id is only used to find the series in
       // Sonarr, so drop it and warn about the collision instead.
-      let tvdbId = requestBody.tvdbId ?? tmdbMedia.external_ids.tvdb_id;
+      // TMDB's own TVDB id first; the one asked with only when it has none
+      // (picked by the requester when TMDB doesn't know the series there).
+      let tvdbId = tmdbMedia.external_ids.tvdb_id ?? requestBody.tvdbId;
 
       if (tvdbId) {
         const conflicting = await mediaRepository.findOne({
@@ -1001,7 +1019,7 @@ export class MediaRequest {
                   season.season_number !== 0 && season.episode_count > 0
               )
               .map((season) => season.season_number)
-          : (requestBody.seasons as number[]);
+          : listedSeasons(requestBody.seasons as number[], tmdbMediaShow);
       if (!settings.main.enableSpecialEpisodes) {
         requestedSeasons = requestedSeasons.filter((sn) => sn > 0);
       }

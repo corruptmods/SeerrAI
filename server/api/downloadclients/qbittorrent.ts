@@ -7,8 +7,12 @@ import type {
 import {
   CLIENT_TIMEOUT_MS,
   clientBaseUrl,
+  confirmListed,
+  dataRoot,
   isTorrentHash,
+  rootUnlessSaveFolder,
   sessionKeyOf,
+  sharesData,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import type { AxiosInstance, AxiosResponse } from 'axios';
@@ -295,6 +299,7 @@ class QBittorrentAPI implements TorrentClient {
   public async addTorrent(options: {
     torrent?: Buffer;
     magnet?: string;
+    hash: string;
     category: string;
     savePath?: string;
     /**
@@ -337,6 +342,7 @@ class QBittorrentAPI implements TorrentClient {
     if (String(data).trim().toLowerCase().startsWith('fails')) {
       throw new Error('qBittorrent would not add the torrent.');
     }
+    await confirmListed(this, options.hash);
   }
 
   /** Ensures the category exists; qBittorrent answers 409 if it does. */
@@ -427,11 +433,23 @@ class QBittorrentAPI implements TorrentClient {
     await this.either('/torrents/stop', '/torrents/pause', hash);
   }
 
-  /** Removes the torrent and its data on disk. */
+  /** Removes the torrent, and its data unless another torrent shares it. */
   public async deleteTorrent(hash: string): Promise<void> {
+    const id = hash.toLowerCase();
+    const { data } = await this.get<QbitTorrentInfo[]>('/torrents/info');
+    const all = Array.isArray(data) ? data : [];
+    const rootOf = (t: QbitTorrentInfo) =>
+      rootUnlessSaveFolder(
+        t.content_path || dataRoot(t.save_path ?? '', t.name ?? ''),
+        t.save_path ?? ''
+      );
+    const own = all.find((t) => t.hash?.toLowerCase() === id);
+    const shared =
+      !!own &&
+      sharesData(rootOf(own), all.filter((t) => t !== own).map(rootOf));
     await this.post('/torrents/delete', {
-      hashes: hash.toLowerCase(),
-      deleteFiles: 'true',
+      hashes: id,
+      deleteFiles: shared ? 'false' : 'true',
     });
   }
 

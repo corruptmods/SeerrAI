@@ -82,6 +82,12 @@ export const jellyfinAccess = async (
       // Fetch fresh so other policy fields aren't overwritten with stale
       // values.
       const { Policy: policy } = await client.getPolicyAccount(person.ref);
+      // Made an administrator since it was read: never changed here.
+      if (policy.IsAdministrator) {
+        throw new Error(
+          `${person.name} is now an administrator in ${kind === 'emby' ? 'Emby' : 'Jellyfin'}, so their libraries are left as they are.`
+        );
+      }
       // Keep listed ids the server no longer reports.
       const unknown = (policy.EnabledFolders ?? []).filter(
         (id) => !names.has(plain(id))

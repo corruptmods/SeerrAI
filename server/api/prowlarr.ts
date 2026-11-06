@@ -1,7 +1,14 @@
 import { clientBaseUrl } from '@server/api/downloadclients/types';
 import type { ServarrHealthIssue } from '@server/api/servarr/base';
-import type { AxiosInstance, AxiosResponse } from 'axios';
+import { infoHashHex, magnetHash } from '@server/lib/backfill/bencode';
+import {
+  LocalAddressRefused,
+  assertPublicUrl,
+  publicLookup,
+} from '@server/utils/publicHost';
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 /*
  * Backfill searches every Prowlarr indexer and fetches a result's .torrent or
@@ -185,17 +192,29 @@ class ProwlarrAPI {
    * indexers only have a magnet, returned as such: its files come only from
    * the swarm.
    */
-  public async fetchRelease(release: ProwlarrRelease): Promise<FetchedRelease> {
+  public async fetchRelease(
+    release: ProwlarrRelease,
+    {
+      indexerOrigins,
+    }: {
+      /**
+       * Indexers Sonarr, Radarr or Lidarr have set up, by `originKey`; read
+       * only for a link to a local address.
+       */
+      indexerOrigins?: () => Promise<ReadonlySet<string>>;
+    } = {}
+  ): Promise<FetchedRelease> {
     let url = release.downloadUrl ?? release.magnetUrl;
     if (!url) {
       // No link: the guid is often the magnet, or the hash makes one.
       if (release.guid?.startsWith('magnet:')) {
-        return { kind: 'magnet', uri: release.guid };
+        return magnetOf(release.guid);
       }
-      if (release.infoHash) {
+      const hash = release.infoHash && infoHashHex(release.infoHash);
+      if (hash) {
         return {
           kind: 'magnet',
-          uri: `magnet:?xt=urn:btih:${release.infoHash}&dn=${encodeURIComponent(release.title)}`,
+          uri: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(release.title)}`,
         };
       }
       throw new Error('The result has no download link.');
@@ -203,7 +222,7 @@ class ProwlarrAPI {
     // Prowlarr usually serves magnets as its own link that redirects to the
     // magnet; a bare magnet needs no fetching.
     if (url.startsWith('magnet:')) {
-      return { kind: 'magnet', uri: url };
+      return magnetOf(url);
     }
     const own = new URL(clientBaseUrl(this.settings)).origin;
     // Send the API key only to Prowlarr, never to an indexer it redirects to
@@ -216,21 +235,40 @@ class ProwlarrAPI {
         throw new Error('The download link is not a web address.');
       }
       keyed &&= target.origin === own;
-      const response: AxiosResponse<ArrayBuffer> = await axios.get<ArrayBuffer>(
-        url,
-        {
+      // Prowlarr, and indexers the *arr apps have set up, are often on this
+      // network; anything else must be public.
+      const link = url;
+      const get = (known: boolean) => {
+        if (!known) assertPublicUrl(target);
+        return axios.get<ArrayBuffer>(link, {
           responseType: 'arraybuffer',
           maxRedirects: 0,
           timeout: FETCH_TIMEOUT_MS,
           maxContentLength: MAX_FILE_BYTES,
           headers: keyed ? { 'X-Api-Key': this.settings.apiKey } : {},
           validateStatus: (status) => status >= 200 && status < 400,
+          ...(known
+            ? {}
+            : { lookup: publicLookup as AxiosRequestConfig['lookup'] }),
+        });
+      };
+      let response: AxiosResponse<ArrayBuffer>;
+      try {
+        response = await get(this.isProwlarr(target));
+      } catch (e) {
+        if (
+          !isUnusableLink(e) ||
+          !indexerOrigins ||
+          !(await indexerOrigins()).has(originKey(target))
+        ) {
+          throw e;
         }
-      );
+        response = await get(true);
+      }
       if (response.status >= 300) {
         const location: string = String(response.headers.location ?? '');
         if (location.startsWith('magnet:')) {
-          return { kind: 'magnet', uri: location };
+          return magnetOf(location);
         }
         if (!location) {
           throw new Error('The indexer redirected nowhere.');
@@ -245,7 +283,72 @@ class ProwlarrAPI {
     }
     throw new Error('The indexer redirected too many times.');
   }
+
+  /**
+   * Whether a link is Prowlarr's: its own address, or its download path as
+   * Sonarr, Radarr or Lidarr know it by another name, either on its port or,
+   * through a proxy, on another port carrying its API key.
+   */
+  private isProwlarr(target: URL): boolean {
+    const own = new URL(clientBaseUrl(this.settings));
+    if (originKey(target) === originKey(own)) return true;
+    if (!/\/\d+\/download$/.test(target.pathname)) return false;
+    const base = own.pathname.replace(/\/+$/, '');
+    if (
+      portOf(target) === portOf(own) &&
+      target.pathname.startsWith(`${base}/`) &&
+      /^\/\d+\/download$/.test(target.pathname.slice(base.length))
+    ) {
+      return true;
+    }
+    const key = target.searchParams.get('apikey');
+    return (
+      !!key && !!this.settings.apiKey && sameSecret(key, this.settings.apiKey)
+    );
+  }
 }
+
+const portOf = (url: URL): string =>
+  url.port || (url.protocol === 'https:' ? '443' : '80');
+
+/** A host and port, the default port written out. */
+export const originKey = (url: URL): string =>
+  `${url.hostname.toLowerCase()}:${portOf(url)}`;
+
+const sameSecret = (a: string, b: string): boolean => {
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(a), digest(b));
+};
+
+/** A magnet link that can't be added: it doesn't name one valid hash. */
+export class UnusableMagnet extends Error {
+  constructor() {
+    super('The magnet link has no single valid info hash.');
+  }
+}
+
+/**
+ * Whether a release's own link can't be used: it leads to a local address
+ * that isn't Prowlarr or a known indexer, or is a magnet without one hash.
+ */
+export const isUnusableLink = (e: unknown): boolean => {
+  let at: unknown = e;
+  for (let depth = 0; at && depth < 5; depth++) {
+    if (at instanceof LocalAddressRefused || at instanceof UnusableMagnet) {
+      return true;
+    }
+    at = (at as { cause?: unknown }).cause;
+  }
+  return false;
+};
+
+/** A magnet link as given, once it names a single valid info hash. */
+const magnetOf = (uri: string): FetchedRelease => {
+  if (!magnetHash(uri)) {
+    throw new UnusableMagnet();
+  }
+  return { kind: 'magnet', uri };
+};
 
 /** Detects a downloaded file's kind from its content, not its headers. */
 export const detectKind = (

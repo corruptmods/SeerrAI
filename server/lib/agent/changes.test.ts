@@ -334,6 +334,27 @@ describe('marking a download failed', () => {
     assert.deepEqual(calls, ['failed 32776']);
   });
 
+  it('removes only the title’s own downloads, whatever the queue holds by then', async () => {
+    queue = [{ id: 61, title: 'Static.Garden.S01E01', seriesId: SERIES.arrId }];
+    const proposed = await describeChange({
+      kind: 'markFailed',
+      title: SERIES,
+      name: 'Static Garden',
+      reason: 'A fake.',
+    });
+    assert.deepEqual(proposed.params.queueIds, [61]);
+    // By approval, the same queue id belongs to another series.
+    queue = [{ id: 61, title: 'Harbour.Lights.S02E04', seriesId: 78 }];
+    assert.match(
+      await applyChange(proposed),
+      /^Nothing was marked: it had already left the queue/
+    );
+    assert.deepEqual(calls, []);
+    queue = [{ id: 61, title: 'Static.Garden.S01E01', seriesId: SERIES.arrId }];
+    await applyChange(proposed);
+    assert.deepEqual(calls, ['remove 61']);
+  });
+
   it('turns it down for a series with nothing downloading', async () => {
     await assert.rejects(
       describeChange({

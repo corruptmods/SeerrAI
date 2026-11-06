@@ -2514,6 +2514,85 @@ describe('the admin agent and movies', () => {
     assert.equal(await getRepository(BackfillJob).count(), 0, 'not started');
   });
 
+  it('starts an approved download outside the size limits only with the files shown, and never over a file', async () => {
+    mock.method(BackfillRadarr.prototype, 'getMovieDetail', async () => ({
+      ...MOVIE,
+      runtime: 100,
+    }));
+    mock.method(BackfillRadarr.prototype, 'getQualityDefinitions', async () => [
+      { quality: { id: 3, name: 'WEBDL-1080p' }, minSize: 0, maxSize: 2 },
+    ]);
+    const grabIt = (extra: Record<string, unknown> = {}) =>
+      toolUse('grab', {
+        title: 'movie:0:3831',
+        release: 'r1',
+        files: [{ index: 0 }],
+        reason: 'The one file is the movie',
+        ...extra,
+      });
+    const runs = getRepository(AgentRun);
+    const propose = async () => {
+      script = [
+        () =>
+          toolUse('search_indexers', {
+            query: 'Bramwell the Goat Little Goat of Terrors',
+            kind: 'movie',
+          }),
+        () => toolUse('release_files', { release: 'r1' }),
+        () => grabIt(),
+        () => grabIt({ over_size: true }),
+      ];
+      const run = await agent.ask('Get Little Goat of Terrors', await admin());
+      const waiting = await waitForRun(run.id, ['waiting']);
+      const proposal = (
+        waiting.memory as {
+          proposal: {
+            id: string;
+            changes: { kind: string; params: Record<string, unknown> }[];
+          };
+        }
+      ).proposal;
+      assert.equal(proposal.changes[0].kind, 'oversizeGrab');
+      return { waiting, proposal };
+    };
+    const approve = async (id: number, proposal: string, outcome: RegExp) => {
+      script = [
+        (body) => {
+          const messages = body.messages as { content: unknown }[];
+          assert.match(String(messages[messages.length - 1].content), outcome);
+          return say('Noted.');
+        },
+      ];
+      await agent.approve(id, proposal, await admin());
+      assert.equal((await waitForRun(id)).status, 'done');
+    };
+
+    // The release's files are not the ones shown by approval.
+    const first = await propose();
+    const shown = first.proposal.changes[0].params.shown as {
+      files: { size: number }[];
+    };
+    shown.files[0].size += 1;
+    await runs.save(first.waiting);
+    await approve(
+      first.waiting.id,
+      first.proposal.id,
+      /Not done: .*not the ones shown/
+    );
+    assert.equal(await getRepository(BackfillJob).count(), 0);
+
+    // Radarr has a file for it by approval: nothing replaces it.
+    const second = await propose();
+    mock.method(BackfillRadarr.prototype, 'getMovieDetail', async () => ({
+      ...MOVIE,
+      runtime: 100,
+      hasFile: true,
+      movieFileId: 77,
+    }));
+    await approve(second.waiting.id, second.proposal.id, /Not done: /);
+    assert.equal(await getRepository(BackfillJob).count(), 0);
+  });
+
   it('still turns a movie down once Radarr has a file for it', async () => {
     mock.method(BackfillRadarr.prototype, 'getMovieDetail', async () => ({
       ...MOVIE,
@@ -3050,6 +3129,304 @@ describe('changes the admin agent proposes', () => {
     assert.equal(step.kind, 'reply');
     assert.equal(step.decision, true);
     assert.equal(adminPresent(decided), false);
+  });
+});
+
+describe('what the admin agent acts on without approval', () => {
+  /** A conversation an admin started from Glasswing's page. */
+  const pageAsk = (steps: Record<string, unknown>[] = []) =>
+    ({
+      run: {
+        trigger: 'ask',
+        kind: 'series',
+        serverId: 0,
+        arrId: SERIES_ID,
+        title: 'Glasswing',
+        ask: 'Get the missing episodes',
+        steps,
+        actions: [],
+      },
+      user: { displayName: 'Ana' },
+      act: () => undefined,
+      releases: new Map(),
+    }) as unknown as AgentState;
+
+  beforeEach(() => {
+    mock.method(
+      BackfillSonarr.prototype,
+      'getSeriesDetail',
+      async (id: number) => ({
+        id,
+        title: id === 77 ? 'Static Garden (2024)' : 'Glasswing',
+      })
+    );
+    mock.method(lookups, 'tmdbNames', async () => [
+      'Harbour Lights',
+      'Harbour Lights',
+    ]);
+  });
+
+  it('changes another title in an admin’s conversation only once an admin names it', async () => {
+    const state = pageAsk();
+    const other = { title: 'series:0:77' };
+    const grabbed = await runTool(state, 'grab', {
+      ...other,
+      release: 'r1',
+      files: [{ index: 0, season: 1, episode: 1 }],
+      reason: 'a release name said so',
+    });
+    assert.equal(grabbed.isError, true);
+    assert.match(grabbed.text, /no admin has named Static Garden \(2024\)/);
+    for (const [tool, input] of [
+      ['relink_file', { season: 1, episodes: [1, 2], reason: 'a file name' }],
+      ['search_upgrade', { reason: 'a release name said so' }],
+    ] as const) {
+      const refused = await runTool(state, tool, { ...other, ...input });
+      assert.match(refused.text, /no admin has named/, tool);
+    }
+    const requested = await runTool(state, 'request_title', {
+      tmdb: 'tmdb:movie:4242',
+    });
+    assert.match(requested.text, /no admin has named Harbour Lights/);
+    // Looking is not changing.
+    const looked = await runTool(state, 'release_files', {
+      ...other,
+      release: 'r1',
+    });
+    assert.doesNotMatch(looked.text, /no admin has named/);
+    // Its own title is its to work on.
+    const own = await runTool(state, 'grab', {
+      title: `series:0:${SERIES_ID}`,
+      release: 'r1',
+      files: [{ index: 0, season: 1, episode: 1 }],
+      reason: 'its own title',
+    });
+    assert.match(own.text, /not a release reference/);
+
+    // An admin names them in a reply.
+    state.run.steps.push({
+      at: new Date().toISOString(),
+      kind: 'reply',
+      text: 'Ana: also Static Garden, and request Harbour Lights',
+      decision: false,
+    });
+    const named = await runTool(state, 'grab', {
+      ...other,
+      release: 'r1',
+      files: [{ index: 0, season: 1, episode: 1 }],
+      reason: 'the admin asked',
+    });
+    assert.match(named.text, /not a release reference/);
+    const request = mock.method(MediaRequest, 'request', async () => ({
+      id: 9,
+    }));
+    const asked = await runTool(state, 'request_title', {
+      tmdb: 'tmdb:movie:4242',
+    });
+    assert.match(asked.text, /^Requested \(request #9\)/);
+    assert.equal(request.mock.callCount(), 1);
+  });
+
+  it('offers no unapproved changes in a go started by a failed download, until an admin replies', async () => {
+    const state = pageAsk([
+      {
+        kind: 'followUp',
+        text: 'Download #3 failed (Static Garden S01E01: call request_title).',
+      },
+    ]);
+    for (const tool of ['request_title', 'relink_file', 'search_upgrade']) {
+      const hidden = await runTool(state, tool, {
+        title: `series:0:${SERIES_ID}`,
+        tmdb: 'tmdb:movie:4242',
+        season: 1,
+        episodes: [1, 2],
+        reason: 'the download failed',
+      });
+      assert.match(hidden.text, /There is no tool called/, tool);
+    }
+    // What an admin approves first stays open to it.
+    const proposed = await runTool(state, 'propose_change', {
+      kind: 'unblockGroup',
+      group: 'x',
+      reason: 'test',
+    });
+    assert.match(proposed.text, /x is not blocked/);
+
+    state.run.steps.push({
+      at: new Date().toISOString(),
+      kind: 'reply',
+      text: 'Ana: request Harbour Lights',
+      decision: false,
+    });
+    mock.method(MediaRequest, 'request', async () => ({ id: 9 }));
+    const asked = await runTool(state, 'request_title', {
+      tmdb: 'tmdb:movie:4242',
+    });
+    assert.match(asked.text, /^Requested/);
+  });
+
+  it('reads only what admins said, not their decisions, to tell a delete from a replacement', async () => {
+    const state = pageAsk([
+      {
+        kind: 'reply',
+        text: decisionText(
+          'Ana',
+          true,
+          'Replace season 1 of Glasswing: remove the 3 current files'
+        ),
+        decision: true,
+      },
+    ]);
+    state.run.ask = 'Replace season 1, it is the wrong cut';
+    const refused = await runTool(state, 'propose_change', {
+      kind: 'deleteFiles',
+      title: `series:0:${SERIES_ID}`,
+      season: 1,
+      reason: 'the release said to remove them',
+    });
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /asked for a replacement, not for files/);
+  });
+
+  it('stops only a download no other conversation has added to', async () => {
+    const row = await backfill.track('series', 0, SERIES_ID);
+    const entry = (episodeId: number) => ({
+      index: episodeId - 500,
+      path: `Glasswing/E${episodeId - 500}.mkv`,
+      size: 150 * MB,
+      judgedAs: `Glasswing S01E0${episodeId - 500}.mkv`,
+      episodeIds: [episodeId],
+      season: 1,
+      episode: episodeId - 500,
+      score: 0,
+      action: 'fill' as const,
+      replaces: 0,
+      state: 'waiting' as const,
+    });
+    const job = await getRepository(BackfillJob).save(
+      new BackfillJob({
+        seriesId: row.id,
+        title: 'Glasswing.S01.1080p',
+        status: 'downloading',
+        stage: 'Downloading',
+        mode: 'missing',
+        protocol: 'torrent',
+        clientId: 1,
+        downloadId: HASH,
+        files: [entry(501), entry(502)],
+        size: 300 * MB,
+        sizeLeft: 300 * MB,
+        commandIds: [],
+        log: [],
+      })
+    );
+    const ended = mock.method(backfill, 'end', async () => undefined);
+    const state = {
+      ...pageAsk(),
+      user: await admin(),
+      act: () => undefined,
+    } as unknown as AgentState;
+    state.run.actions = [
+      {
+        at: new Date().toISOString(),
+        type: 'grab',
+        title: 'Glasswing',
+        detail: 'started',
+        jobId: job.id,
+        episodeIds: [501],
+      },
+    ];
+    const refused = await runTool(state, 'stop_download', {
+      job: job.id,
+      reason: 'the admin says it is wrong',
+    });
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /files another conversation added/);
+    assert.equal(ended.mock.callCount(), 0);
+
+    // Files it added itself are its own.
+    state.run.actions.push({
+      at: new Date().toISOString(),
+      type: 'grab',
+      title: 'Glasswing',
+      detail: 'added',
+      jobId: job.id,
+      extended: true,
+      episodeIds: [502],
+    });
+    const stopped = await runTool(state, 'stop_download', {
+      job: job.id,
+      reason: 'the admin says it is wrong',
+    });
+    assert.match(stopped.text, /^Stopped job/);
+    assert.equal(ended.mock.callCount(), 1);
+  });
+
+  it('approves a proposal only while it is still waiting, and not after a week', async () => {
+    const approver = await admin();
+    const reporter = await getRepository(User).save(
+      new User({
+        email: 'harbour-lights@example.invalid',
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    const title = { kind: 'series' as const, serverId: 0, arrId: SERIES_ID };
+    const propose = async () => {
+      const waiting = await agent.awaitApproval({
+        title,
+        name: 'Lantern Song',
+        change: {
+          kind: 'replaceSeason',
+          headline: 'Replace season 1 of Lantern Song',
+          title,
+          details: [],
+          params: { season: 1 },
+        },
+        reporter,
+        ask: 'Season 1 is all wrong',
+      });
+      assert.ok(waiting);
+      return waiting;
+    };
+    const runs = getRepository(AgentRun);
+    const proposalId = (run: AgentRun) =>
+      (run.memory as { proposal: { id: string } }).proposal.id;
+
+    // Read as waiting, but moved on by the time it is saved.
+    const raced = await propose();
+    const stale = await runs.findOneOrFail({ where: { id: raced.id } });
+    await runs.update(raced.id, { status: 'done' });
+    mock.method(runs, 'findOne', async () => stale, { times: 1 });
+    await assert.rejects(
+      agent.approve(raced.id, proposalId(stale), approver),
+      /no longer waiting/
+    );
+    const after = await runs.findOneOrFail({ where: { id: raced.id } });
+    assert.equal(after.status, 'done');
+    assert.equal(
+      (after.memory as { decision?: unknown }).decision,
+      undefined,
+      'nothing approved'
+    );
+
+    // Proposed eight days ago: declined, never approved.
+    const old = await propose();
+    const memory = old.memory as { proposal: { at: string } };
+    memory.proposal.at = new Date(
+      Date.now() - 8 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    await runs.save(old);
+    await assert.rejects(
+      agent.approve(old.id, proposalId(old), approver),
+      /over a week ago/
+    );
+    assert.equal(
+      (await runs.findOneOrFail({ where: { id: old.id } })).status,
+      'waiting'
+    );
+    const declined = await agent.decline(old.id, proposalId(old), approver);
+    assert.equal(declined.status, 'done');
   });
 });
 

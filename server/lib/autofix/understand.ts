@@ -70,7 +70,7 @@ export const askAboutReport = async (
       system: SYSTEM,
       prompt,
       maxTokens: 60,
-      cache: { key: cacheKey(prompt), ms: DAY },
+      cache: { key: cacheKey(user.id, prompt), ms: DAY },
     });
     if (answer.kind === 'unclear') return undefined;
     // A film has no season; replace its file instead.

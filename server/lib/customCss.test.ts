@@ -1,22 +1,22 @@
-import {
-  contentSecurityPolicy,
-  cssVersion,
-  stylePolicy,
-} from '@server/lib/customCss';
+import { cssVersion, pagePolicy, styleSources } from '@server/lib/customCss';
 import express from 'express';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import request from 'supertest';
 
 /*
- * The CSP sent with every page: stylesheets and fonts only from this server
- * or hosts the admin's Server CSS names, whatever a user's own CSS tries.
+ * The CSP sent with every page: scripts only from this server or the page's
+ * own (by nonce), stylesheets and fonts only from this server or hosts the
+ * admin's Server CSS names, whatever a user's own CSS tries, and framing only
+ * by this server.
  */
 
 describe('the page’s Content-Security-Policy', () => {
   it('allows only this server’s stylesheets and fonts with no Server CSS', () => {
     assert.equal(
-      contentSecurityPolicy(''),
+      styleSources(''),
       "style-src 'self' 'unsafe-inline'; font-src 'self' data:"
     );
   });
@@ -29,7 +29,7 @@ describe('the page’s Content-Security-Policy', () => {
 a { background: url(/own.png); }
 /* @import "https://commented.example/x.css"; */`;
     assert.equal(
-      contentSecurityPolicy(css),
+      styleSources(css),
       "style-src 'self' 'unsafe-inline' https://theme-park.dev cdn.example:8443; " +
         "font-src 'self' data: https://theme-park.dev cdn.example:8443 https://fonts.example"
     );
@@ -40,7 +40,7 @@ a { background: url(/own.png); }
 @import "javascript:alert(1)";
 @import "data:text/css,a{}";
 @import url("https://ok.example/b.css 'unsafe-eval'");`;
-    const policy = contentSecurityPolicy(css);
+    const policy = styleSources(css);
     assert.doesNotMatch(policy, /script-src|unsafe-eval|javascript|data:text/);
     assert.equal(
       policy,
@@ -53,22 +53,96 @@ a { background: url(/own.png); }
     const app = express();
     app.get(
       '*path',
-      stylePolicy(() => serverCss),
+      pagePolicy(() => serverCss),
       (_req, res) => {
         res.send('<!doctype html>');
       }
     );
     const first = await request(app).get('/discover');
-    assert.equal(
+    assert.match(
       first.headers['content-security-policy'],
-      "style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      /; style-src 'self' 'unsafe-inline'; font-src 'self' data:;/
     );
     serverCss = '@import "https://theme-park.dev/x.css";';
     const second = await request(app).get('/login');
     assert.match(
       second.headers['content-security-policy'],
-      /^style-src 'self' 'unsafe-inline' https:\/\/theme-park\.dev;/
+      /; style-src 'self' 'unsafe-inline' https:\/\/theme-park\.dev;/
     );
+  });
+
+  it('lets pages run only this server’s scripts and their own, with a new nonce each time', async () => {
+    const app = express();
+    app.get(
+      '*path',
+      pagePolicy(() => ''),
+      (_req, res) => res.send('ok')
+    );
+    const policies = await Promise.all(
+      ['/discover', '/discover'].map(
+        async (page) =>
+          (await request(app).get(page)).headers[
+            'content-security-policy'
+          ] as string
+      )
+    );
+    const nonces = policies.map((policy) => {
+      const match = /^script-src 'self' 'nonce-([A-Za-z0-9+/]{22}==)'; /.exec(
+        policy
+      );
+      assert.ok(match, policy);
+      return match[1];
+    });
+    assert.notEqual(nonces[0], nonces[1]);
+    for (const policy of policies) {
+      assert.doesNotMatch(policy, /unsafe-eval|script-src[^;]*unsafe-inline/);
+      assert.match(policy, /; object-src 'none'; base-uri 'self'/);
+    }
+  });
+
+  it('lets Next.js evaluate code in development only', async () => {
+    const app = express();
+    app.get(
+      '*path',
+      pagePolicy(() => '', { dev: true }),
+      (_req, res) => res.send('ok')
+    );
+    const res = await request(app).get('/');
+    assert.match(
+      res.headers['content-security-policy'],
+      /^script-src 'self' 'nonce-[^']+' 'unsafe-eval'; /
+    );
+  });
+
+  it('lets only this server frame its pages', async () => {
+    const app = express();
+    app.get(
+      '*path',
+      pagePolicy(() => ''),
+      (_req, res) => res.send('ok')
+    );
+    const res = await request(app).get('/discover');
+    assert.match(
+      res.headers['content-security-policy'],
+      /; frame-ancestors 'self'$/
+    );
+    assert.equal(res.headers['x-frame-options'], 'SAMEORIGIN');
+  });
+
+  it('is carried by every script the page writes', () => {
+    // Read from source: the document needs the whole app to render.
+    const source = readFileSync(
+      path.join(process.cwd(), 'src/pages/_document.tsx'),
+      'utf8'
+    );
+    const scripts = source.match(/<script\b[^>]*/g) ?? [];
+    assert.ok(scripts.length >= 2);
+    for (const script of scripts) {
+      assert.match(script, /nonce=\{nonce\}/, script);
+    }
+    assert.match(source, /<Head nonce=\{nonce\}>/);
+    assert.match(source, /<NextScript nonce=\{nonce\} \/>/);
+    assert.match(source, /getHeader\('Content-Security-Policy'\)/);
   });
 });
 

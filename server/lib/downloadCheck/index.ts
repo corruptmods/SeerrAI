@@ -153,7 +153,14 @@ export class Pass {
   private filesOf = new Map<number, Promise<Map<number, HeldFile>>>();
   private ranksOf = new Map<number, Promise<ProfileRanks>>();
 
-  constructor(public readonly server: CheckServer) {}
+  /** Downloads removed from the queue during this pass. */
+  public readonly removed = new Set<string>();
+
+  constructor(
+    public readonly server: CheckServer,
+    /** Its id in settings, for its recorded checks. */
+    public readonly serverId?: number
+  ) {}
 
   private once<K, V>(map: Map<K, Promise<V>>, key: K, load: () => Promise<V>) {
     let value = map.get(key);
@@ -277,10 +284,12 @@ class DownloadCheckEngine {
     try {
       // Keys of every download queued this pass.
       const queued = new Set<string>();
+      // Imports being followed, so they hold up no other check.
+      const imports: Promise<unknown>[] = [];
       for (const ref of this.servers()) {
         const name = `${appName(ref.app)} ${ref.settings.name}`;
         try {
-          await this.checkServer(ref, mode, queued);
+          await this.checkServer(ref, mode, queued, imports);
           if (this.unreachable.delete(name)) {
             logger.info(`${name} is answering again`, { label: LABEL });
           }
@@ -295,6 +304,7 @@ class DownloadCheckEngine {
           }
         }
       }
+      await Promise.allSettled(imports);
       // A download gone from every queue for an hour is forgotten.
       const cutoff = Date.now() - 3600_000;
       for (const [key, seen] of this.seen) {
@@ -312,13 +322,24 @@ class DownloadCheckEngine {
   private async checkServer(
     ref: ServerRef,
     mode: DownloadCheckMode,
-    queued: Set<string>
+    queued: Set<string>,
+    imports: Promise<unknown>[]
   ) {
     const server = this.apiFor(ref);
-    const pass = new Pass(server);
+    const pass = new Pass(server, ref.settings.id);
     const grabs = await server.queue();
     const now = Date.now();
     const live = new Set<string>();
+    const carryOut = async (row: DownloadCheck, grab: Grab) => {
+      if (row.action === 'import') {
+        imports.push(this.act(server, row, grab));
+        return;
+      }
+      const after = await this.act(server, row, grab);
+      if (after.status === 'done' && after.action !== 'review') {
+        pass.removed.add(grab.key);
+      }
+    };
 
     for (const grab of grabs) {
       live.add(grab.key);
@@ -341,7 +362,7 @@ class DownloadCheckEngine {
       if (row) {
         // Found under Report only and now on: act if it still applies.
         if (row.status === 'would' && mode === 'on') {
-          await this.act(server, row, grab);
+          await carryOut(row, grab);
         }
         continue;
       }
@@ -375,7 +396,7 @@ class DownloadCheckEngine {
         { label: LABEL, server: `${appName(ref.app)} ${ref.settings.name}` }
       );
       if (mode === 'on' && decision.action !== 'review') {
-        await this.act(server, saved, grab);
+        await carryOut(saved, grab);
       }
     }
 
@@ -548,9 +569,10 @@ class DownloadCheckEngine {
       // (If this one lands first, the better one replaces it; no harm.)
       if (grab.sizeLeft > 0) {
         const mine = new Set(grab.episodes.map((e) => e.id));
-        const better = queue.find(
+        const betters = queue.filter(
           (other) =>
             other.key !== grab.key &&
+            stageOf(other) !== 'import' &&
             other.itemId === grab.itemId &&
             other.quality &&
             other.status !== 'delay' &&
@@ -569,6 +591,13 @@ class DownloadCheckEngine {
               offered
             ) > 0
         );
+        let better: Grab | undefined;
+        for (const other of betters) {
+          if (await this.stillQueued(pass, other)) {
+            better = other;
+            break;
+          }
+        }
         if (better) {
           return {
             finding: 'duplicate',
@@ -579,6 +608,25 @@ class DownloadCheckEngine {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Whether a download stays queued: not removed this pass, and not found
+   * to be rejected, dropped or cleared before.
+   */
+  private async stillQueued(pass: Pass, grab: Grab): Promise<boolean> {
+    if (pass.removed.has(grab.key)) return false;
+    if (pass.serverId === undefined) return true;
+    const leaving = await getRepository(DownloadCheck).count({
+      where: {
+        app: pass.server.app,
+        serverId: pass.serverId,
+        downloadKey: grab.key,
+        action: In(['reject', 'drop', 'clear'] satisfies CheckAction[]),
+        status: In(['would', 'done'] satisfies CheckStatus[]),
+      },
+    });
+    return leaving === 0;
   }
 
   /**

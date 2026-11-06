@@ -169,16 +169,28 @@ aiRoutes.post(
 );
 
 const fixBody = z.object({
-  kind: z.enum(['broken', 'wrongEpisode', 'replaceSeason']),
+  kind: z.enum([
+    'broken',
+    'wrongEpisode',
+    'replaceSeason',
+    'subtitles',
+    'transcribe',
+    'missing',
+  ]),
   mediaId: z.number().int().positive(),
+  albumId: z.number().int().positive().optional(),
   seasonNumber: z.number().int().min(0).max(500).optional(),
   episodeNumber: z.number().int().min(0).max(5000).optional(),
+  language: z
+    .string()
+    .regex(/^[a-z]{2}$/)
+    .optional(),
   message: z.string().max(500).default(''),
 });
 
 /**
- * Apply a file-replacing fix offered in chat, once the person has seen the
- * title and confirmed. No model call.
+ * Apply a fix offered in chat, once the person has seen the title and
+ * confirmed. No model call.
  */
 aiRoutes.post(
   '/fix',

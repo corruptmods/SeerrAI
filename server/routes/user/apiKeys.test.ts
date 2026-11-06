@@ -439,6 +439,26 @@ describe('using a personal API key', () => {
     assert.equal(as.body.id, other.id);
   });
 
+  it("refuses the server's own key for an X-API-User that isn't a user ID", async () => {
+    const global = getSettings().main.apiKey;
+    for (const value of ['abc', '0', '-1', '1.5', '1e3']) {
+      const res = await request(app)
+        .get('/auth/me')
+        .set('X-Api-Key', global)
+        .set('X-API-User', value);
+      assert.equal(res.status, 400, value);
+      assert.equal(res.body.message, 'X-API-User must be a user ID.');
+    }
+  });
+
+  it("refuses a key that only starts like the server's own", async () => {
+    const global = getSettings().main.apiKey;
+    for (const value of [global.slice(0, -1), `${global}x`]) {
+      const res = await request(app).get('/auth/me').set('X-Api-Key', value);
+      assert.equal(res.status, 401, value);
+    }
+  });
+
   it('refuses an expired key, plainly', async () => {
     const { agent, id } = await signIn('friend@seerr.dev');
     const { secret, key } = await makeKey(agent, id, {

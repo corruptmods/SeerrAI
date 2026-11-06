@@ -99,7 +99,7 @@ Seerr AI keeps its database in that volume, so it runs as one pod: a StatefulSet
 | service.port | int | `80` |  |
 | service.type | string | `"ClusterIP"` |  |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account |
-| serviceAccount.automount | bool | `true` | Automatically mount a ServiceAccount's API credentials? |
+| serviceAccount.automount | bool | `false` | Automatically mount a ServiceAccount's API credentials? Seerr AI never calls the Kubernetes API. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `""` | If not set and create is true, a name is generated using the fullname template |
 | tolerations | list | `[]` |  |

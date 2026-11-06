@@ -42,6 +42,7 @@ import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
+import { endSessions } from '@server/lib/signIn';
 import {
   attachRequestCount,
   attachRequestCounts,
@@ -803,6 +804,8 @@ router.delete<{ id: string }>(
       }
 
       await userRepository.delete(user.id);
+      // Their sessions go with them, should the id ever be used again.
+      await endSessions(user.id);
       return res.status(200).json(user.filter());
     } catch (e) {
       logger.error('Something went wrong deleting a user', {

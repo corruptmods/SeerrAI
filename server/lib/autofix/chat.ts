@@ -22,11 +22,12 @@ import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
 
 /*
- * Fixes from AI Search. Subtitles, transcription and missing-episode
- * searches run at once. File-replacing fixes are offered with the title
- * shown and run only after confirmation; they need issue-reporting
- * permission and are filed as an issue (record and status), then fixed in
- * the background.
+ * Fixes from AI Search, for those who may report problems. Subtitles,
+ * transcription and missing-episode searches run at once when the person's
+ * own message asks for that fix of that title, and are otherwise offered
+ * for confirmation. File-replacing fixes are always offered with the title
+ * shown and run only after confirmation; they are filed as an issue
+ * (record and status), then fixed in the background.
  *
  * Season/episode from the user's words beat the model's, so a model that
  * drops or misreads "season 6" can't turn it into All Seasons.
@@ -48,15 +49,33 @@ const ISSUE_TYPE: Partial<Record<FixKind, IssueType>> = {
   replaceSeason: IssueType.OTHER,
 };
 
-/** A file-replacing fix awaiting confirmation. */
+/** Fixes that replace files, filed as an issue. */
+type FileFix = 'broken' | 'wrongEpisode' | 'replaceSeason';
+
+/** A fix awaiting confirmation. */
 export interface FixToConfirm {
-  kind: 'broken' | 'wrongEpisode' | 'replaceSeason';
+  kind: FileFix | 'subtitles' | 'transcribe' | 'missing';
   mediaId: number;
+  /** For a music fix: the album, when it is about one. */
+  albumId?: number;
   seasonNumber?: number;
   episodeNumber?: number;
+  language?: string;
   /** The user's text, used as the issue's first comment. */
   message: string;
 }
+
+const isFileFix = (kind: FixToConfirm['kind']): kind is FileFix =>
+  ISSUE_TYPE[kind] !== undefined;
+
+/** Fixing from AI Search needs the permission reporting a problem does. */
+const mayReport = (user: User) =>
+  user.hasPermission([Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES], {
+    type: 'or',
+  });
+
+const NOT_REPORTER =
+  'Fixing a title needs permission to report problems. Ask an admin to look at it.';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -234,16 +253,8 @@ const refuseToFile = async (
   fix: { kind: FixKind; seasonNumber?: number; episodeNumber?: number },
   results: ChatResults
 ): Promise<ChatFixAnswer | undefined> => {
-  if (
-    !user.hasPermission([Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES], {
-      type: 'or',
-    })
-  ) {
-    return {
-      reply:
-        'Replacing a file needs permission to report problems. Ask an admin to look at it.',
-      results,
-    };
+  if (!mayReport(user)) {
+    return { reply: NOT_REPORTER, results };
   }
   // Already reported today: the open issue covers it.
   const open = await reportedToday(
@@ -292,6 +303,51 @@ export const readFix = (
   return { ...fix, kind, seasonNumber, episodeNumber };
 };
 
+/** A message asking for a title to be fixed, without saying how. */
+const FIX_WORDS = /\b(fix\w*|repair\w*|sort (it )?out|look (at|into))\b/i;
+
+/** A message saying something is not there, beyond missing episodes. */
+const MISSING_WORDS =
+  /\b(missing|lost|gone|never (came|arrived|downloaded)|not (there|here|available|on the server)|(isn'?t|aren'?t) (there|here|available)|can'?t find)\b/i;
+
+/**
+ * Whether the person's own words ask for this fix of this title: their
+ * message reads as that fix, and it or their previous message names the
+ * title. Otherwise the model's reading of the conversation is only offered.
+ */
+const askedInTheirWords = (
+  kind: FixKind,
+  names: (string | undefined)[],
+  message: string,
+  earlier?: string
+): boolean => {
+  // Their words read as this fix, or ask for a fix and leave which to it.
+  const read = classify(message)?.kind;
+  const asked =
+    read === kind ||
+    (read === undefined &&
+      (FIX_WORDS.test(message) ||
+        (kind === 'missing' && MISSING_WORDS.test(message))));
+  if (!asked) {
+    return false;
+  }
+  const said = ` ${plain(`${message} ${earlier ?? ''}`)} `;
+  return names.some((name) => {
+    const wanted = name ? plain(name) : '';
+    return !!wanted && said.includes(` ${wanted} `);
+  });
+};
+
+/** What a fix that replaces nothing does, offered for confirmation. */
+const offerText = (kind: FixKind, what: string) =>
+  `${
+    kind === 'subtitles'
+      ? 'This gets subtitles for'
+      : kind === 'transcribe'
+        ? 'This makes subtitles from the audio of'
+        : 'This searches again for what is missing of'
+  } ${what}. Confirm to go ahead.`;
+
 const MUSIC_FIXES =
   'For music, I can search again for an album’s missing tracks or an artist’s missing albums. For anything else, ask an admin.';
 
@@ -302,7 +358,9 @@ const MUSIC_FIXES =
 const fixMusicFromChat = async (
   user: User,
   kind: FixKind,
-  named: NamedMusic
+  named: NamedMusic,
+  message: string,
+  earlier?: string
 ): Promise<ChatFixAnswer> => {
   const found = await resolveMusic([named]);
   const shown = found.albums.length + found.artists.length ? found : undefined;
@@ -338,6 +396,26 @@ const fixMusicFromChat = async (
       music: shown,
     };
   }
+  if (
+    !askedInTheirWords(
+      kind,
+      [named.t, albumResult?.title, album ? undefined : found.artists[0]?.name],
+      message,
+      earlier
+    )
+  ) {
+    return {
+      reply: offerText(kind, albumResult?.title ?? named.t),
+      results: [],
+      music: shown,
+      confirm: {
+        kind: 'missing',
+        mediaId: media.id,
+        ...(album && { albumId: album.id }),
+        message,
+      },
+    };
+  }
   const result = await autofix.run({
     kind,
     media,
@@ -361,9 +439,12 @@ export const fixFromChat = async (
   if (!autofix.enabledFor(user)) {
     return { reply: 'Fixing problems from here is turned off.', results: [] };
   }
+  if (!mayReport(user)) {
+    return { reply: NOT_REPORTER, results: [] };
+  }
   const fix = readFix(asked, message, earlier);
   if (!fix.title && fix.music && musicFor(user)) {
-    return fixMusicFromChat(user, fix.kind, fix.music);
+    return fixMusicFromChat(user, fix.kind, fix.music, message, earlier);
   }
   const {
     kind: titleKind,
@@ -387,9 +468,32 @@ export const fixFromChat = async (
     };
   }
 
+  const episode =
+    mediaType === MediaType.TV && fix.seasonNumber
+      ? ` season ${fix.seasonNumber}${
+          fix.episodeNumber ? ` episode ${fix.episodeNumber}` : ''
+        }`
+      : '';
   const issueType = ISSUE_TYPE[fix.kind];
   if (issueType === undefined) {
-    const result = await autofix.run({
+    const name = 'title' in result ? result.title : result.name;
+    if (!askedInTheirWords(fix.kind, [name, fix.title?.t], message, earlier)) {
+      return {
+        reply: offerText(fix.kind, `${label(result)}${episode}`),
+        results,
+        confirm: {
+          kind: fix.kind,
+          mediaId: media.id,
+          seasonNumber:
+            mediaType === MediaType.TV ? fix.seasonNumber : undefined,
+          episodeNumber:
+            mediaType === MediaType.TV ? fix.episodeNumber : undefined,
+          language: fix.language,
+          message,
+        },
+      };
+    }
+    const done = await autofix.run({
       kind: fix.kind,
       media,
       seasonNumber: fix.seasonNumber,
@@ -398,9 +502,9 @@ export const fixFromChat = async (
       user,
     });
     return {
-      reply: result.message,
+      reply: done.message,
       results,
-      fix: { kind: result.kind, ok: result.ok, link: result.link },
+      fix: { kind: done.kind, ok: done.ok, link: done.link },
     };
   }
 
@@ -420,12 +524,6 @@ export const fixFromChat = async (
   if (refused) {
     return refused;
   }
-  const episode =
-    mediaType === MediaType.TV && fix.seasonNumber
-      ? ` season ${fix.seasonNumber}${
-          fix.episodeNumber ? ` episode ${fix.episodeNumber}` : ''
-        }`
-      : '';
   // Offer only: it replaces files, so the user confirms the title first.
   const admin = user.hasPermission(Permission.ADMIN);
   return {
@@ -453,7 +551,10 @@ export const fixFromChat = async (
   };
 };
 
-/** Files and starts a confirmed file-replacing fix. */
+/**
+ * Starts a confirmed fix. One that replaces files is filed as an issue
+ * first.
+ */
 export const confirmFix = async (
   user: User,
   fix: FixToConfirm
@@ -466,6 +567,34 @@ export const confirmFix = async (
   });
   if (!media) {
     return { reply: 'That title is no longer on the server.', results: [] };
+  }
+  if (!isFileFix(fix.kind)) {
+    if (!mayReport(user)) {
+      return { reply: NOT_REPORTER, results: [] };
+    }
+    const album =
+      media.mediaType === MediaType.MUSIC && fix.albumId !== undefined
+        ? await getRepository(MusicAlbum).findOne({
+            where: { id: fix.albumId, mediaId: media.id },
+          })
+        : undefined;
+    if (album === null) {
+      return { reply: 'That album is no longer on the server.', results: [] };
+    }
+    const result = await autofix.run({
+      kind: fix.kind,
+      media,
+      ...(album && { album }),
+      seasonNumber: fix.seasonNumber,
+      episodeNumber: fix.episodeNumber,
+      language: fix.language,
+      user,
+    });
+    return {
+      reply: result.message,
+      results: [],
+      fix: { kind: result.kind, ok: result.ok, link: result.link },
+    };
   }
   // Files are replaced only for films and series.
   if (media.mediaType === MediaType.MUSIC) {

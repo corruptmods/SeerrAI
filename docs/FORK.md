@@ -414,8 +414,12 @@ Do not undo these without reading why first — each was tried the other way.
   The `ai-` prefix keeps releases apart from Seerr's own `v1.0.0`…`v3.x`
   tags, which arrive whenever Seerr is fetched as `upstream`; never
   `git push --tags`, which would send those too. It builds only when asked,
-  and doesn't run the tests itself: they are `ci.yml`'s, so check a
-  commit's run there (or run them locally, see Tests) before tagging it.
+  and doesn't run the tests itself: they are `ci.yml`'s. An `ai-v*` tag is
+  built only once its commit is on `main` and has a passing `ci.yml` run
+  (the gate job waits for one still going); previews and runs by hand
+  aren't held to that. For a release, that check runs in the `release`
+  environment, so the owner can require one approval there before anything
+  is built or published.
   Upstream's other workflows (docs, issue triage, Helm, its weekly Trivy
   scan to code scanning, Discord notices, `create-tag`) and its Helm chart
   aren't carried. Anyone can still build their own image with `build.sh`.
@@ -528,8 +532,8 @@ Do not undo these without reading why first — each was tried the other way.
   link from the provider's site, so the state, PKCE verifier, nonce and
   return path ride in a signed, httpOnly, SameSite=Lax cookie (Strict
   would not come back), cleared on use. The callback answers with a page
-  that moves on rather than a redirect, so a Strict session cookie (CSRF
-  protection on) is sent with the page it lands on. Everything is built
+  that moves on rather than a redirect, so CSRF protection's Strict
+  cookies are sent with the page it lands on. Everything is built
   from the Application URL, never the request's Host. A provider sign-in
   is proof enough on its own (no `maySignIn`), and signing out ends only
   Seerr's session. A provider's rules for who may sign in

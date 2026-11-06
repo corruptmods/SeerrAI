@@ -10,6 +10,7 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
+import { createHash } from 'node:crypto';
 
 /*
  * The subtitle a user's own Plex player starts with. Plex stores that per user
@@ -58,11 +59,17 @@ interface PlexAnswer {
 const yes = (value: unknown) =>
   value === true || value === 1 || value === '1' || value === 'true';
 
-/** Per user: their token and the server (machine id) it is for. */
+/**
+ * Per user: their server token, the server (machine id) it is for, and which
+ * of their Plex sign-ins it came from.
+ */
 const tokens = new Map<
   number,
-  { at: number; machineId: string; token: string }
+  { at: number; machineId: string; signIn: string; token: string }
 >();
+
+const signInOf = (plexToken: string) =>
+  createHash('sha256').update(plexToken).digest('base64url');
 
 /** The user's own token for this Plex server, if any. */
 const serverToken = async (userId: number): Promise<string | undefined> => {
@@ -71,29 +78,40 @@ const serverToken = async (userId: number): Promise<string | undefined> => {
   if (!isConnected('plex') || !machineId) {
     return undefined;
   }
-  // Never send a token for a server Seerr has since moved off to the new one.
-  const cached = tokens.get(userId);
-  if (
-    cached &&
-    cached.machineId === machineId &&
-    Date.now() - cached.at < TOKEN_TTL_MS
-  ) {
-    return cached.token;
-  }
+  // Read each time: a deleted account, an unlinked Plex account or a new
+  // Plex sign-in leaves nothing kept from before.
   const user = await getRepository(User).findOne({
     where: { id: userId },
     select: ['id', 'plexToken'],
   });
   if (!user?.plexToken) {
+    tokens.delete(userId);
     return undefined;
   }
+  const signIn = signInOf(user.plexToken);
+  // Never send a token for a server Seerr has since moved off to the new one.
+  const cached = tokens.get(userId);
+  if (
+    cached &&
+    cached.machineId === machineId &&
+    cached.signIn === signIn &&
+    Date.now() - cached.at < TOKEN_TTL_MS
+  ) {
+    return cached.token;
+  }
+  tokens.delete(userId);
   const server = (await new PlexTvAPI(user.plexToken).getDevices()).find(
     (device) => device.clientIdentifier === machineId
   );
   if (!server?.accessToken) {
     return undefined;
   }
-  tokens.set(userId, { at: Date.now(), machineId, token: server.accessToken });
+  tokens.set(userId, {
+    at: Date.now(),
+    machineId,
+    signIn,
+    token: server.accessToken,
+  });
   return server.accessToken;
 };
 

@@ -2,6 +2,7 @@ import AgentRun from '@server/entity/AgentRun';
 import AiSpend from '@server/entity/AiSpend';
 import AiUsage from '@server/entity/AiUsage';
 import AlbumRequest from '@server/entity/AlbumRequest';
+import AutoFixMark from '@server/entity/AutoFixMark';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
@@ -67,6 +68,7 @@ const entities = [
   AiSpend,
   AiUsage,
   AlbumRequest,
+  AutoFixMark,
   BackfillCandidate,
   BackfillJob,
   BackfillSeries,

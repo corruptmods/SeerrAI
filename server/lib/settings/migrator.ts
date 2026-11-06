@@ -5,6 +5,18 @@ import path from 'path';
 
 const migrationsDir = path.join(__dirname, 'migrations');
 
+/**
+ * Writes a settings file readable only by Seerr's own user. chmod covers a
+ * file that already existed; not every filesystem supports it.
+ */
+export const writeSettingsFile = async (
+  file: string,
+  data: string
+): Promise<void> => {
+  await fs.writeFile(file, data, { mode: 0o600 });
+  await fs.chmod(file, 0o600).catch(() => undefined);
+};
+
 export const runMigrations = async (
   settings: AllSettings,
   SETTINGS_PATH: string
@@ -20,7 +32,10 @@ export const runMigrations = async (
     } catch {
       /* empty */
     }
-    await fs.writeFile(BACKUP_PATH, JSON.stringify(settings, undefined, ' '));
+    await writeSettingsFile(
+      BACKUP_PATH,
+      JSON.stringify(settings, undefined, ' ')
+    );
 
     const migrations = (await fs.readdir(migrationsDir)).filter(
       (file) => file.endsWith('.js') || file.endsWith('.ts')
@@ -65,7 +80,7 @@ export const runMigrations = async (
 
     if (settingsBefore !== settingsAfter) {
       // Verify the migrated settings were written.
-      await fs.writeFile(
+      await writeSettingsFile(
         SETTINGS_PATH,
         JSON.stringify(migrated, undefined, ' ')
       );
@@ -76,7 +91,7 @@ export const runMigrations = async (
     } else if (oldBackup) {
       // Nothing migrated: restore the previous backup so it doesn't equal
       // settings.json.
-      await fs.writeFile(BACKUP_PATH, oldBackup.toString());
+      await writeSettingsFile(BACKUP_PATH, oldBackup.toString());
     }
   } catch (e) {
     // A failed migration stops Seerr.

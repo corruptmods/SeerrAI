@@ -7,6 +7,7 @@ import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
+import { createServer } from 'node:http';
 import path from 'node:path';
 import {
   after,
@@ -159,5 +160,62 @@ describe('Prowlarr, in Services', () => {
     });
     assert.equal(refused.status, 400);
     assert.match(refused.data.message, /Set it up in Settings → Services/);
+  });
+});
+
+describe('Backfill’s category', () => {
+  it('is refused while a Sonarr download client files under it, and saved otherwise', async () => {
+    const sonarr = createServer((req, res) => {
+      if (req.url?.startsWith('/api/v3/downloadclient')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(
+          JSON.stringify([
+            {
+              name: 'qBittorrent',
+              fields: [
+                { name: 'host', value: 'qbit' },
+                { name: 'tvCategory', value: 'tv-sonarr' },
+                { name: 'tvImportedCategory', value: '' },
+              ],
+            },
+          ])
+        );
+      } else {
+        res.writeHead(404).end();
+      }
+    });
+    await new Promise<void>((resolve) =>
+      sonarr.listen(0, '127.0.0.1', resolve)
+    );
+    const settings = getSettings();
+    const saved = settings.sonarr;
+    settings.sonarr = [
+      {
+        id: 0,
+        name: 'Sonarr',
+        hostname: '127.0.0.1',
+        port: (sonarr.address() as { port: number }).port,
+        apiKey: 'sonarr-key',
+        useSsl: false,
+      } as (typeof settings.sonarr)[number],
+    ];
+    try {
+      const form = {
+        ...withoutProwlarr(),
+        blockedGroups: undefined,
+        downloadCheck: undefined,
+      };
+      const refused = await call('put', '', { ...form, category: 'TV-Sonarr' });
+      assert.equal(refused.status, 400);
+      assert.match(refused.data.message, /Sonarr already uses the category/);
+      assert.equal(getSettings().backfill.category, 'backfill');
+
+      const ok = await call('put', '', { ...form, category: 'backfill-tv' });
+      assert.equal(ok.status, 200, JSON.stringify(ok.data));
+      assert.equal(getSettings().backfill.category, 'backfill-tv');
+    } finally {
+      settings.sonarr = saved;
+      sonarr.closeAllConnections();
+      sonarr.close();
+    }
   });
 });

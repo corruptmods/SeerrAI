@@ -163,6 +163,34 @@ describe('webhook templates', () => {
     );
   });
 
+  it('sends nothing when a value would change the address path', async (t) => {
+    const posted: string[] = [];
+    t.mock.method(notificationHttp, 'post', async (postedUrl: string) => {
+      posted.push(postedUrl);
+      return { data: {} };
+    });
+    const agent = new WebhookAgent({
+      enabled: true,
+      types: Notification.MEDIA_AVAILABLE,
+      options: {
+        webhookUrl: 'https://hook.test/hooks/{{subject}}/{{event}}',
+        jsonPayload: Buffer.from(JSON.stringify('{}')).toString('base64'),
+        supportVariables: true,
+      },
+    } as NotificationAgentWebhook);
+    for (const subject of ['..', '.', '%2e%2E']) {
+      assert.equal(
+        await agent.send(Notification.MEDIA_AVAILABLE, {
+          notifySystem: true,
+          subject,
+        } as NotificationPayload),
+        subject === '%2e%2E',
+        subject
+      );
+    }
+    assert.deepEqual(posted, ['https://hook.test/hooks/%252e%252E/']);
+  });
+
   it('fills the address with "test" for the test notification', async (t) => {
     const { url } = await send(t, {
       url: 'https://hook.test/{{media_tmdbid}}',

@@ -492,7 +492,11 @@ describe('the real download clients', { skip }, () => {
       });
 
       it('adds a .torrent stopped, chooses its files, starts, stops and deletes it', async () => {
-        await api.addTorrent({ torrent: TORRENT, category: CATEGORY });
+        await api.addTorrent({
+          torrent: TORRENT,
+          hash: HASH,
+          category: CATEGORY,
+        });
         const added = await until(
           'found',
           () => api.findTorrent(HASH),
@@ -553,7 +557,11 @@ describe('the real download clients', { skip }, () => {
 
       it('finishes once the files chosen are in, though one is skipped', async () => {
         await lay(local(name, save), 'shared');
-        await api.addTorrent({ torrent: TORRENT, category: CATEGORY });
+        await api.addTorrent({
+          torrent: TORRENT,
+          hash: HASH,
+          category: CATEGORY,
+        });
         await until(
           'its files',
           () => api.getFiles(HASH),
@@ -583,7 +591,11 @@ describe('the real download clients', { skip }, () => {
 
       it('deletes what it downloaded with it', async () => {
         await lay(local(name, save), 'all');
-        await api.addTorrent({ torrent: TORRENT, category: CATEGORY });
+        await api.addTorrent({
+          torrent: TORRENT,
+          hash: HASH,
+          category: CATEGORY,
+        });
         await until(
           'found',
           () => api.findTorrent(HASH),
@@ -614,6 +626,7 @@ describe('the real download clients', { skip }, () => {
       it('follows a magnet link while its file list comes', async () => {
         await api.addTorrent({
           magnet: MAGNET,
+          hash: MAGNET_HASH,
           category: CATEGORY,
           metadataOnly: true,
         });

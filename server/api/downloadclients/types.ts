@@ -100,6 +100,11 @@ export interface TorrentClient extends DownloadClient {
   addTorrent(options: {
     torrent?: Buffer;
     magnet?: string;
+    /**
+     * The info hash Backfill read from the file or link. Refused, and
+     * nothing else changed, when the client adds or already holds another.
+     */
+    hash: string;
     category: string;
     metadataOnly?: boolean;
   }): Promise<void>;
@@ -119,7 +124,10 @@ export interface TorrentClient extends DownloadClient {
   ): Promise<void>;
   startTorrent(hash: string): Promise<void>;
   stopTorrent(hash: string): Promise<void>;
-  /** Removes the torrent and its data on disk. */
+  /**
+   * Removes the torrent and its data on disk, keeping the data when another
+   * torrent in the client is, holds or is inside the same files or folder.
+   */
   deleteTorrent(hash: string): Promise<void>;
   /** Problems that limit Backfill's use of the client; empty if none. */
   backfillProblems(): Promise<string[]>;
@@ -194,3 +202,74 @@ export const sessionKeyOf = (
 /** A torrent's hash: 40 hex characters, or 64 for a v2-only torrent. */
 export const isTorrentHash = (id: string): boolean =>
   /^[0-9a-f]{40}([0-9a-f]{24})?$/i.test(id);
+
+const sameHash = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** The added torrent's hash as the client reports it is the one read. */
+export const assertAddedHash = (
+  product: string,
+  added: string,
+  hash: string
+): void => {
+  if (!sameHash(added, hash)) {
+    throw new Error(`${product} added the torrent under another hash.`);
+  }
+};
+
+// A busy client can take a while to list what it was just given.
+const LISTED_TRIES = 20;
+const LISTED_WAIT_MS = 1_000;
+
+/**
+ * For clients whose add answer names no hash: waits up to about 20 seconds
+ * for the torrent to be listed under the hash read.
+ */
+export const confirmListed = async (
+  client: Pick<TorrentClient, 'product' | 'findTorrent'>,
+  hash: string
+): Promise<void> => {
+  for (let tries = 0; tries < LISTED_TRIES; tries++) {
+    if (tries) await new Promise((r) => setTimeout(r, LISTED_WAIT_MS));
+    if (await client.findTorrent(hash)) return;
+  }
+  throw new Error(`${client.product} did not list the torrent under its hash.`);
+};
+
+/** One "/"-separated form of a client path, for comparing. */
+const tidyDataPath = (path: string): string => {
+  const slashed = path.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+  const tidy = slashed.length > 1 ? slashed.replace(/\/+$/, '') : slashed;
+  // Windows paths compare without case.
+  return /^[a-z]:(\/|$)|^\/\//i.test(path.replace(/\\/g, '/'))
+    ? tidy.toLowerCase()
+    : tidy;
+};
+
+/** Where a torrent's data is: its folder, or a single file's path. */
+export const dataRoot = (savePath: string, name: string): string =>
+  savePath && name ? `${savePath.replace(/[\\/]+$/, '')}/${name}` : '';
+
+/**
+ * A data root, or none when it is the save folder itself (a torrent added
+ * without its own folder), which holds other torrents' files too.
+ */
+export const rootUnlessSaveFolder = (root: string, savePath: string): string =>
+  savePath && tidyDataPath(root) === tidyDataPath(savePath) ? '' : root;
+
+/**
+ * Whether a torrent's data root is, holds or is inside another torrent's.
+ * Unknown roots share nothing.
+ */
+export const sharesData = (root: string, others: string[]): boolean => {
+  const own = tidyDataPath(root);
+  if (own.length <= 1) return false;
+  return others
+    .map(tidyDataPath)
+    .filter((other) => other.length > 1)
+    .some(
+      (other) =>
+        other === own ||
+        other.startsWith(`${own}/`) ||
+        own.startsWith(`${other}/`)
+    );
+};

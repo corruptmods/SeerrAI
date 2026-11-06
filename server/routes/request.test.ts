@@ -2663,3 +2663,141 @@ describe('retrying a failed request', () => {
     );
   });
 });
+
+describe('GET /request/count', () => {
+  it('counts only their own requests for someone who may not view others', async () => {
+    await seedRequest();
+    const userRepo = getRepository(User);
+    const admin = await userRepo.findOneByOrFail({ email: 'admin@seerr.dev' });
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.MOVIE,
+        tmdbId: 67890,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.MOVIE,
+        status: MediaRequestStatus.PENDING,
+        media,
+        requestedBy: admin,
+        is4k: false,
+      })
+    );
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const own = await agent.get('/request/count');
+    assert.strictEqual(own.status, 200);
+    assert.strictEqual(own.body.total, 1);
+    assert.strictEqual(own.body.pending, 1);
+    assert.strictEqual(own.body.movie, 1);
+
+    await userRepo.update(
+      { email: 'friend@seerr.dev' },
+      { permissions: Permission.REQUEST | Permission.REQUEST_VIEW }
+    );
+    const viewer = await agent.get('/request/count');
+    assert.strictEqual(viewer.body.total, 2);
+    assert.strictEqual(viewer.body.pending, 2);
+
+    const manager = await (
+      await loginAs('admin@seerr.dev', 'test1234')
+    ).get('/request/count');
+    assert.strictEqual(manager.body.total, 2);
+  });
+});
+
+describe('seasons and series ids asked for', () => {
+  const GLASSWING = 67951;
+  const listing = (seasons: number[], tvdbId?: number) =>
+    showDetails.set(GLASSWING, {
+      genres: [],
+      original_language: 'en',
+      seasons: seasons.map((n) => ({ season_number: n, episode_count: 8 })),
+      external_ids: tvdbId ? { tvdb_id: tvdbId } : {},
+    } as never);
+
+  it('stores each edited season once, and only seasons the series has', async () => {
+    listing([1, 2, 3]);
+    const owner = await seedUser('friend@seerr.dev');
+    const mediaRequest = await seedTvRequest(owner, [1], { tmdbId: GLASSWING });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.TV,
+      seasons: [1, 2, 2, 2, 99],
+    });
+
+    assert.strictEqual(res.status, 200);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.deepStrictEqual(
+      saved.seasons.map((s) => s.seasonNumber).sort((a, b) => a - b),
+      [1, 2]
+    );
+    showDetails.delete(GLASSWING);
+  });
+
+  it('counts a season added to an older request towards the quota from then', async () => {
+    listing([1, 2, 3]);
+    const owner = await seedUser('friend@seerr.dev', {
+      tvQuotaLimit: 3,
+      tvQuotaDays: 7,
+    });
+    const long = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const mediaRequest = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.TV,
+        status: MediaRequestStatus.PENDING,
+        media: await seedTvMedia(GLASSWING),
+        requestedBy: owner,
+        is4k: false,
+        createdAt: long,
+        seasons: [
+          new SeasonRequest({
+            seasonNumber: 1,
+            status: MediaRequestStatus.PENDING,
+            createdAt: long,
+          }),
+        ],
+      })
+    );
+    assert.strictEqual((await owner.getQuota()).tv.used, 0);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.TV,
+      seasons: [1, 2],
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual((await owner.getQuota()).tv.used, 1);
+    await getRepository(MediaRequest).delete(mediaRequest.id);
+    showDetails.delete(GLASSWING);
+  });
+
+  it('requests each season once, only those the series has, under the series’ own TVDB id', async () => {
+    getSettings().sonarr = [];
+    listing([1, 2], 81001);
+    showDetails.set(GLASSWING + 1, showDetails.get(GLASSWING)!);
+    await seedUser('friend@seerr.dev');
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: GLASSWING + 1,
+      seasons: [1, 1, 1, 7],
+      tvdbId: 81002,
+    });
+    showDetails.delete(GLASSWING);
+    showDetails.delete(GLASSWING + 1);
+    assert.strictEqual(res.status, 201, JSON.stringify(res.body));
+    assert.deepStrictEqual(
+      res.body.seasons.map((s: { seasonNumber: number }) => s.seasonNumber),
+      [1]
+    );
+    assert.strictEqual(res.body.media.tvdbId, 81001);
+  });
+});

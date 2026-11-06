@@ -10,6 +10,7 @@ import { getSettings } from '@server/lib/settings';
 import { endSessions, stillMaySignInNow } from '@server/lib/signIn';
 import logger from '@server/logger';
 import type { Request, RequestHandler } from 'express';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 /**
  * Whether a request authenticates with an API key: an X-Api-Key header, even
@@ -27,16 +28,30 @@ export const unlessApiKey =
   (req, res, next) =>
     sentApiKey(req) ? next() : handler(req, res, next);
 
+const digest = (value: string): Buffer =>
+  createHash('sha256').update(value).digest();
+
+/** Whether `given` is the server's own API key, in constant time. */
+export const isServerKey = (given: string, serverKey: string): boolean =>
+  !!given && !!serverKey && timingSafeEqual(digest(given), digest(serverKey));
+
 export const checkUser: Middleware = async (req, res, next) => {
   const settings = getSettings();
   let user: User | undefined | null;
   const apiKey = req.header('X-API-Key');
 
-  if (apiKey && apiKey === settings.main.apiKey) {
+  if (apiKey && isServerKey(apiKey, settings.main.apiKey)) {
     const userRepository = getRepository(User);
 
     // X-API-User acts on that user's behalf; else the original admin account.
     const apiUser = req.header('X-API-User');
+    if (apiUser && !/^[1-9]\d{0,9}$/.test(apiUser)) {
+      res.status(400).json({
+        status: 400,
+        message: 'X-API-User must be a user ID.',
+      });
+      return;
+    }
     const userId = apiUser ? Number(apiUser) : 1;
 
     user = await userRepository.findOne({ where: { id: userId } });

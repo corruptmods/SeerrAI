@@ -100,21 +100,26 @@ export const chooseSharer = (
 
 /** Merges several searches' results into one response per sharer. */
 export const mergeResponses = (lists: SlskdResponse[][]): SlskdResponse[] => {
-  const bySharer = new Map<string, SlskdResponse>();
+  const bySharer = new Map<
+    string,
+    { response: SlskdResponse; names: Set<string> }
+  >();
   for (const response of lists.flat()) {
     const seen = bySharer.get(response.username);
     if (!seen) {
+      const files = [...(response.files ?? [])];
       bySharer.set(response.username, {
-        ...response,
-        files: [...(response.files ?? [])],
+        response: { ...response, files },
+        names: new Set(files.map((f) => f.filename)),
       });
       continue;
     }
     for (const file of response.files ?? []) {
-      if (!seen.files.some((f) => f.filename === file.filename)) {
-        seen.files.push(file);
+      if (!seen.names.has(file.filename)) {
+        seen.names.add(file.filename);
+        seen.response.files.push(file);
       }
     }
   }
-  return [...bySharer.values()];
+  return [...bySharer.values()].map((sharer) => sharer.response);
 };

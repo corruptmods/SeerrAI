@@ -85,6 +85,7 @@ before(async () => {
   useSessionForImages({ store, secret: SECRET });
 
   const app = express();
+  app.set('trust proxy', 'loopback');
   app.use(cookieParser());
   app.use('/imageproxy', imageproxy);
   app.use(
@@ -307,6 +308,23 @@ describe('GET /imageproxy/tmdb/...', () => {
     // An existing copy is served to anyone.
     const made = await get(`${path(0)}?f=webp&w=480`);
     assert.equal(made.headers.get('content-type'), 'image/webp');
+  });
+
+  it('gives each signed-out visitor a budget of their own', async () => {
+    const path = (n: number) =>
+      `/t/p/w1920_and_h800_multi_faces/${unique}real-apart${n}.jpg`;
+    const asked = async (n: number, from: string) => {
+      await get(path(n), SIGNED_IN);
+      const res = await get(`${path(n)}?f=webp&w=480`, {
+        'X-Forwarded-For': from,
+      });
+      return res.headers.get('content-type');
+    };
+    for (let n = 0; n < 20; n += 1) {
+      assert.equal(await asked(n, '192.0.2.21'), 'image/webp');
+    }
+    assert.equal(await asked(20, '192.0.2.21'), 'image/jpeg');
+    assert.equal(await asked(21, '192.0.2.22'), 'image/webp');
   });
 
   it('gives an image TMDB sent without an ETag one of its own', async () => {

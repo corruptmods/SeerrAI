@@ -8,8 +8,8 @@
 #                   wants its version raised) and installed in a throwaway
 #                   kind cluster, where Seerr AI (the :develop image) has to
 #                   turn healthy and answer its connection test.
-#   Publish         on main, when charts/ changes, or run by hand: a chart
-#                   version not yet in the registry is pushed to
+#   Publish         on main, when charts/ changes, or run by hand from
+#                   main: a chart version not yet in the registry is pushed to
 #                   oci://ghcr.io/<owner>/seerr-ai-chart, signed with cosign
 #                   (keyless, from this workflow's GitHub identity), its
 #                   signature checked, and its Artifact Hub metadata pushed
@@ -95,7 +95,7 @@ jobs:
 
   package:
     name: Package
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     needs: [lint-test]
     runs-on: ubuntu-24.04
     permissions:
@@ -160,7 +160,7 @@ jobs:
   publish:
     name: Publish to ghcr.io
     needs: [package]
-    if: needs.package.outputs.has_artifacts == 'true'
+    if: github.ref == 'refs/heads/main' && needs.package.outputs.has_artifacts == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -241,6 +241,6 @@ jobs:
             version=${chart_release_file#"$chart_name"-}
             version=${version%.tgz}
             cosign verify "ghcr.io/${owner}/${chart_name}:${version}" \
-              --certificate-identity "https://github.com/${{ github.workflow_ref }}" \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
           done

@@ -350,15 +350,20 @@ class LibraryAccess {
   /** Reverts a change, skipping anyone changed again since. */
   public async undo(id: number): Promise<AccessResult> {
     const repo = getRepository(LibraryAccessChange);
-    const change = await repo.findOneBy({ id });
-    if (!change) {
+    const found = await repo.findOneBy({ id });
+    if (!found) {
       throw new LibraryAccessError(404, 'That change is not in the history.');
     }
-    if (change.undoneAt) {
-      throw new LibraryAccessError(409, 'That change was already undone.');
-    }
-    const kind = change.serverKind;
+    const kind = found.serverKind;
     return this.exclusive(kind, async () => {
+      // Read again under the lock, so a change is undone once.
+      const change = await repo.findOneBy({ id });
+      if (!change) {
+        throw new LibraryAccessError(404, 'That change is not in the history.');
+      }
+      if (change.undoneAt) {
+        throw new LibraryAccessError(409, 'That change was already undone.');
+      }
       const server = await this.server(kind);
       const access = await this.read(kind, server);
       const all = access.libraries.map((l) => l.id);
@@ -379,13 +384,16 @@ class LibraryAccess {
           continue;
         }
         const back = entry.before.libraries.filter((l) => all.includes(l));
-        moves.push({
-          person,
-          to:
-            entry.before.all && server.canGiveAll
-              ? { all: true, libraries: all }
-              : { all: false, libraries: entry.before.all ? all : back },
-        });
+        const to =
+          entry.before.all && server.canGiveAll
+            ? { all: true, libraries: all }
+            : { all: false, libraries: entry.before.all ? all : back };
+        // Their libraries then are gone: nobody is left with none.
+        if (!to.all && !to.libraries.length) {
+          skipped += 1;
+          continue;
+        }
+        moves.push({ person, to });
       }
       const entries = await this.make(server, access, moves);
       change.undoneAt = new Date();

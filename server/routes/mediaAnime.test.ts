@@ -489,3 +489,18 @@ describe('PUT /media/:id/anime', () => {
     assert.equal((await call('PUT', media.id, {})).status, 400);
   });
 });
+
+describe('POST /media/:id/:status', () => {
+  const setStatus = (mediaId: number, status: string) =>
+    fetch(`http://127.0.0.1:${port}/api/v1/media/${mediaId}/${status}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is4k: false }),
+    });
+
+  it('sets the statuses it offers, and refuses one it does not', async () => {
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
+    assert.equal((await setStatus(media.id, 'pending')).status, 200);
+    assert.equal((await setStatus(media.id, 'deleted')).status, 400);
+  });
+});

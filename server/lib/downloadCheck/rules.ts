@@ -49,6 +49,14 @@ export const PROGRAM_EXTENSIONS = new Set([
   'apk',
   'cpl',
   'reg',
+  'dll',
+  'js',
+  'jse',
+  'msc',
+  'msp',
+  'cab',
+  'sh',
+  'wsh',
 ]);
 
 const ARCHIVE = /\.(rar|r\d{2,3}|zip|7z|001|tar|tgz|gz|bz2|xz)$/i;
@@ -56,8 +64,9 @@ const ARCHIVE = /\.(rar|r\d{2,3}|zip|7z|001|tar|tgz|gz|bz2|xz)$/i;
 /** Videos this small are samples or stand-ins, never a whole episode. */
 export const SAMPLE_BYTES = 50 * 1024 * 1024;
 
+/** Windows drops trailing dots and spaces, so "a.exe." is an .exe. */
 const extensionOf = (name: string): string =>
-  (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
+  (/\.([a-z0-9]+)[. ]*$/i.exec(name)?.[1] ?? '').toLowerCase();
 
 export const isVideo = (name: string): boolean =>
   VIDEO_EXTENSIONS.has(extensionOf(name));

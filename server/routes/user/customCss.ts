@@ -18,17 +18,36 @@ const personalCssRoutes = Router({ mergeParams: true });
 
 const allowed = () => getSettings().appearance.personalCss === true;
 
+/**
+ * For another user: the owner's only by the owner, an admin's only by an
+ * admin.
+ */
+const mayUse = (actor: User | undefined, user: User): boolean =>
+  user.id === actor?.id ||
+  (user.id !== 1 &&
+    (!user.hasPermission(Permission.ADMIN) ||
+      !!actor?.hasPermission(Permission.ADMIN)));
+
 personalCssRoutes.get<{ id: string }>(
   '/',
   isOwnProfileOrAdmin(),
   async (req, res, next) => {
     try {
-      const settings = await getRepository(UserSettings).findOne({
-        where: { user: { id: Number(req.params.id) } },
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
       });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      if (!mayUse(req.user, user)) {
+        return next({
+          status: 403,
+          message: "You do not have permission to view this user's settings.",
+        });
+      }
       return res
         .status(200)
-        .json({ css: settings?.customCss ?? '', allowed: allowed() });
+        .json({ css: user.settings?.customCss ?? '', allowed: allowed() });
     } catch (e) {
       return next({ status: 500, message: e.message });
     }
@@ -59,14 +78,7 @@ personalCssRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      // For another user: the owner's only by the owner, an admin's only by
-      // an admin.
-      if (
-        user.id !== req.user?.id &&
-        (user.id === 1 ||
-          (user.hasPermission(Permission.ADMIN) &&
-            !req.user?.hasPermission(Permission.ADMIN)))
-      ) {
+      if (!mayUse(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",

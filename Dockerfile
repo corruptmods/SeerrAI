@@ -12,7 +12,20 @@ WORKDIR /app
 
 FROM base AS prod-deps
 
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store CI=true pnpm install --prod --frozen-lockfile
+# sqlite3's binding is compiled here from the source in its locked package,
+# against this image's own Node.js headers, rather than taken as a
+# downloaded binary. Only node_modules leaves this stage.
+RUN apk add --no-cache python3 make g++
+
+RUN --mount=type=cache,id=seerr-ai-pnpm,target=/pnpm/store CI=true pnpm install --prod --frozen-lockfile
+
+RUN cd node_modules/sqlite3 && \
+  rm -rf build && \
+  /app/node_modules/.bin/node-gyp rebuild --release --nodedir=/usr/local && \
+  mv build/Release/node_sqlite3.node /tmp/node_sqlite3.node && \
+  rm -rf build && \
+  mkdir -p build/Release && \
+  mv /tmp/node_sqlite3.node build/Release/node_sqlite3.node
 
 # Remove large native modules for linux-x64-gnu platform (we use alpine which is musl-based)
 # not supported in pnpm for now due to this bug: https://github.com/pnpm/pnpm/issues/9654
@@ -55,11 +68,11 @@ RUN \
   'linux/arm64' | 'linux/arm/v7') \
   apk update && \
   apk add --no-cache python3 make g++ gcc libc6-compat bash && \
-  npm install --global node-gyp \
+  npm install --global --ignore-scripts node-gyp@12.2.0 \
   ;; \
   esac
 
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=seerr-ai-pnpm,target=/pnpm/store CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
 
 RUN pnpm build
 

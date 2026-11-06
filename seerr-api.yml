@@ -4338,7 +4338,7 @@ paths:
   /status/appdata:
     get:
       summary: Get application data volume status
-      description: For Docker installs, returns whether or not the volume mount was configured properly. Always returns true for non-Docker installs.
+      description: For Docker installs, returns whether or not the volume mount was configured properly. Always returns true for non-Docker installs. The path is included only before setup is finished, or for admins.
       security: []
       tags:
         - public
@@ -10738,8 +10738,8 @@ paths:
                 additionalProperties: true
   /ai/fix:
     post:
-      summary: Carry out a fix offered in the AI chat that replaces files
-      description: The chat only offers a fix that replaces a file (`confirm` in its answer); this files it as an issue and starts it, once the person has confirmed it. Requires permission to report issues.
+      summary: Carry out a fix offered in the AI chat
+      description: The chat offers a fix (`confirm` in its answer) when it replaces a file, or when the message did not itself ask for it; this starts it once the person has confirmed it, filing one that replaces files as an issue first. Requires permission to report issues.
       tags:
         - ai
       requestBody:
@@ -10754,13 +10754,26 @@ paths:
               properties:
                 kind:
                   type: string
-                  enum: [broken, wrongEpisode, replaceSeason]
+                  enum:
+                    [
+                      broken,
+                      wrongEpisode,
+                      replaceSeason,
+                      subtitles,
+                      transcribe,
+                      missing,
+                    ]
                 mediaId:
+                  type: number
+                albumId:
                   type: number
                 seasonNumber:
                   type: number
                 episodeNumber:
                   type: number
+                language:
+                  type: string
+                  pattern: '^[a-z]{2}$'
                 message:
                   type: string
                   maxLength: 500
@@ -11128,9 +11141,9 @@ paths:
         '302':
           description: On to the provider, or back to the sign-in page
   /auth/oidc/{providerId}/link:
-    get:
+    post:
       summary: Link a single sign-on account to your own
-      description: A page the browser goes to while signed in. Sends it on to the provider (302); the callback links the account it signs in as to the signed-in person, unless it is linked to someone else, and ends on Linked Accounts with `?sso=` saying how it went.
+      description: A form the page posts while signed in (a browser navigation, with the CSRF token as `_csrf` when CSRF protection is on). Sends it on to the provider (302); the callback links the account it signs in as to the signed-in person, unless it is linked to someone else, and ends on Linked Accounts with `?sso=` saying how it went.
       security: []
       tags:
         - auth
@@ -11140,6 +11153,15 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                _csrf:
+                  type: string
       responses:
         '302':
           description: On to the provider, to Linked Accounts when it can't be used, or to sign in first
@@ -11263,6 +11285,24 @@ paths:
                   type: string
               required:
                 - password
+  /auth/confirm-email/{token}:
+    get:
+      summary: Confirm an email address
+      description: Confirms the email address a user set on their own account, from the link emailed to it, then redirects to their settings.
+      security: []
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Confirmed; redirects to the user's settings
+        '400':
+          description: The link is invalid or has expired
   /user:
     get:
       summary: Get all users
@@ -12413,6 +12453,8 @@ paths:
       responses:
         '204':
           description: Being looked for
+        '403':
+          description: Not the owner, or its failed request is for an admin to retry
   /list/{listId}/search-again:
     post:
       summary: Look for a playlist's waiting songs now
@@ -17040,7 +17082,7 @@ paths:
           example: available
           schema:
             type: string
-            enum: [available, partial, processing, pending, unknown, deleted]
+            enum: [available, partial, processing, pending, unknown]
       requestBody:
         content:
           application/json:

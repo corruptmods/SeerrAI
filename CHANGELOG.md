@@ -13,6 +13,19 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - A blocklisted title must come off the blocklist before its status can be changed.
 - An API key can no longer change an account's email. Change it while signed in.
 - The API's Discover reset is now `POST /settings/discover/reset`.
+- Settings files (`settings.json` and its backup) are readable only by the user Seerr AI runs as.
+- The Docker image builds sqlite3 from its source instead of downloading a ready-built copy, so building it takes a minute or two longer.
+- The Helm chart no longer gives the pod a Kubernetes API token (`serviceAccount.automount` is now off).
+- **CSRF Protection** is on for new installs and now works over plain HTTP too. Existing installs keep their setting. Apps that sign in like a browser need an API key while it's on.
+- Seerr AI's pages can only be framed by Seerr AI itself, so dashboards on another address (Organizr, Homarr, Home Assistant) can no longer embed them.
+- Emails people set on their own account are confirmed by a link sent to them. See [Your email](./docs/seerr-ai/account.md#your-email).
+- Studio, network, keyword and streaming-service lookups need a sign-in.
+- Request and issue counts show only your own unless you may view everyone's.
+- Linking a single sign-on account is now `POST /auth/oidc/{id}/link`, and `X-API-User` must be a user ID.
+- With no accounts left and Plex set up, only the Plex server's owner becomes the owner here.
+- The admin agent's proposals expire after 7 days, and AI Search asks before a fix you didn't clearly ask for.
+- A Backfill category that Sonarr, Radarr or Lidarr already uses is refused, and Prowlarr download links may only lead to Prowlarr itself or a public address.
+- Releases are built only from a commit on `main` that passed CI, after one approval when the `release` environment asks for it, and images carry build provenance.
 
 ### Fixed
 
@@ -34,6 +47,12 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Soulseek settings reuse the saved API key only for the same address.
 - Playlist songs wait while Music is turned off, instead of being requested.
 - Very long download and file names no longer slow the server down.
+- Jellyfin and Emby settings reuse the saved API key only for the same address.
+- Quotas count a season or album added to an older request from when it was added, and a request keeps each season once, only those the series has.
+- Removing a torrent with its files keeps files another torrent shares, in qBittorrent, Transmission and Deluge too, and Transmission no longer takes over a torrent it already has.
+- Playlist song retries need the owner to be allowed to approve them.
+- Large or slow images, and many visitors at once, no longer slow image conversion down.
+- The update check runs only while version checks are on, or when an admin asks, and stops asking GitHub for a while after it fails.
 
 ## 2.4.1 (4 November 2026)
 

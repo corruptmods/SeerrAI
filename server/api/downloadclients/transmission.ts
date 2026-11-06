@@ -6,8 +6,11 @@ import type {
 } from '@server/api/downloadclients/types';
 import {
   CLIENT_TIMEOUT_MS,
+  assertAddedHash,
   clientBaseUrl,
+  dataRoot,
   isTorrentHash,
+  sharesData,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
@@ -273,6 +276,7 @@ class TransmissionAPI implements TorrentClient {
   public async addTorrent(options: {
     torrent?: Buffer;
     magnet?: string;
+    hash: string;
     category: string;
     metadataOnly?: boolean;
   }): Promise<void> {
@@ -288,10 +292,19 @@ class TransmissionAPI implements TorrentClient {
         : // A stopped magnet never fetches its file list.
           { filename: options.magnet, paused: false }
     );
-    const hash = (added?.['torrent-added'] ?? added?.['torrent-duplicate'])
-      ?.hashString;
+    // One already there is someone else's: leave it as it is.
+    if (added?.['torrent-duplicate']) {
+      throw new Error('The torrent is already in Transmission.');
+    }
+    const hash = added?.['torrent-added']?.hashString;
     if (!hash) {
       throw new Error('Transmission would not add the torrent.');
+    }
+    try {
+      assertAddedHash(this.product, hash, options.hash);
+    } catch (e) {
+      await this.call('torrent-remove', { ids: [hash] }).catch(() => undefined);
+      throw e;
     }
     await this.call('torrent-set', {
       ids: [hash],
@@ -381,9 +394,24 @@ class TransmissionAPI implements TorrentClient {
   }
 
   public async deleteTorrent(hash: string): Promise<void> {
+    const id = hash.toLowerCase();
+    const answer = await this.call<{
+      torrents?: Pick<
+        TransmissionTorrentInfo,
+        'hashString' | 'name' | 'downloadDir'
+      >[];
+    }>('torrent-get', { fields: ['hashString', 'name', 'downloadDir'] });
+    const all = answer?.torrents ?? [];
+    const own = all.find((t) => String(t.hashString).toLowerCase() === id);
+    const others = all
+      .filter((t) => t !== own)
+      .map((t) => dataRoot(t.downloadDir ?? '', t.name ?? ''));
     await this.call('torrent-remove', {
-      ids: [hash.toLowerCase()],
-      'delete-local-data': true,
+      ids: [id],
+      'delete-local-data': !(
+        own &&
+        sharesData(dataRoot(own.downloadDir ?? '', own.name ?? ''), others)
+      ),
     });
   }
 

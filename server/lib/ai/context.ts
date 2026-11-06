@@ -23,7 +23,10 @@ import { In } from 'typeorm';
 
 /** Short, so "what I just watched" stays current. */
 const RECENT_MS = 5 * 60 * 1000;
-const recent = new Map<number, { at: number; value: Activity }>();
+/** By user and media server account, as suggestions are. */
+const recent = new Map<string, { at: number; value: Activity }>();
+/** Longest title taken from watch history. */
+const MAX_PLAYED_TITLE = 200;
 
 /** Plays below this percent are someone sampling a title. */
 const STARTED_PERCENT = 20;
@@ -42,24 +45,31 @@ export interface Activity {
  * are never passed off as watched. Only names leave the server.
  */
 export const recentActivity = async (user: User): Promise<Activity> => {
-  const hit = recent.get(user.id);
+  const source = watchSource();
+  const viewer = source?.viewerOf(user);
+  const key = `${user.id}:${viewer ?? ''}`;
+  const hit = recent.get(key);
   if (hit && Date.now() - hit.at < RECENT_MS) {
     return hit.value;
   }
 
   const watched = new Map<string, number>();
-  const source = watchSource();
-  if (source?.viewerOf(user)) {
+  if (source && viewer) {
     try {
       const history = await source.history(user, 300);
       for (const play of history) {
         if (!isCompletedPlay(play) && play.percent < STARTED_PERCENT) {
           continue;
         }
+        // Media server text, kept to one plain line.
+        const title = clip(play.title, MAX_PLAYED_TITLE);
+        if (!title) {
+          continue;
+        }
         const name =
           play.kind === 'movie'
-            ? `${play.title}${play.year ? ` (${play.year})` : ''}`
-            : `${play.title} (series)`;
+            ? `${title}${play.year ? ` (${play.year})` : ''}`
+            : `${title} (series)`;
         // History is newest first, so a title's first play is its latest.
         if (!watched.has(name)) {
           watched.set(name, play.at);
@@ -107,7 +117,7 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     };
   }
 
-  recent.set(user.id, { at: Date.now(), value });
+  recent.set(key, { at: Date.now(), value });
   return value;
 };
 

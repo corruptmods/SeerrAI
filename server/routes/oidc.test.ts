@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it, mock } from 'node:test';
 
-import { oidcCallbackUrl } from '@server/constants/oidc';
+import { isStandInEmail, oidcCallbackUrl } from '@server/constants/oidc';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -172,8 +172,9 @@ const goThrough = async (
     from = '127.0.0.1',
   }: FlowOptions = {}
 ) => {
+  // Linking is posted from the page; sign-in is followed as a link.
   const started = await request(app)
-    .get(start)
+    [start.endsWith('/link') ? 'post' : 'get'](start)
     .set('X-Forwarded-For', from)
     .set('Cookie', cookieHeader(cookies));
   assert.equal(started.status, 302, started.text);
@@ -377,6 +378,28 @@ describe('signing in with a provider', () => {
     assert.equal(await signedInAs(cookies), undefined);
     assert.equal(await getRepository(User).count(), before);
     assert.equal(await getRepository(OidcLink).count(), 0);
+  });
+
+  it('takes a verified email from an account that set it on itself without confirming it', async () => {
+    setProvider({ newUserSignUp: true });
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { emailVerified: false }
+    );
+
+    const { cookies } = await goThrough({
+      ...ALICE,
+      email: 'Friend@Seerr.dev',
+    });
+
+    const id = await signedInAs(cookies);
+    const created = await getRepository(User).findOneByOrFail({ id });
+    assert.equal(created.email, 'friend@seerr.dev');
+    const friend = await getRepository(User).findOneByOrFail({
+      username: 'friend',
+    });
+    assert.notEqual(friend.id, id);
+    assert.ok(isStandInEmail(friend.email));
   });
 
   it('refuses a callback whose state does not match', async () => {
@@ -935,7 +958,7 @@ describe('linking a provider account', () => {
   });
 
   it('sends someone not signed in to sign in first', async () => {
-    const res = await request(app).get('/api/v1/auth/oidc/authentik/link');
+    const res = await request(app).post('/api/v1/auth/oidc/authentik/link');
 
     assert.equal(res.status, 302);
     assert.equal(
@@ -966,7 +989,7 @@ describe('linking a provider account', () => {
         { 'X-Api-Key': 'the-servers-own-key', 'X-Api-User': String(friend.id) },
       ]) {
         const res = await request(app)
-          .get('/api/v1/auth/oidc/authentik/link')
+          .post('/api/v1/auth/oidc/authentik/link')
           .set(headers);
 
         assert.equal(res.status, 403);
@@ -976,6 +999,64 @@ describe('linking a provider account', () => {
       settings.main.personalApiKeys = before.access;
       settings.main.apiKey = before.serverKey;
     }
+  });
+});
+
+describe('the ID token’s signature', () => {
+  for (const signing of ['ES256', 'HS256'] as const) {
+    it(`signs in with an ID token signed ${signing}`, async () => {
+      const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+      fake.signing = signing;
+
+      const { cookies } = await goThrough(ALICE);
+
+      assert.equal(await signedInAs(cookies), friend.id);
+    });
+  }
+
+  it('signs nobody in with an ID token the provider did not sign', async () => {
+    await linkSub('friend@seerr.dev', ALICE.sub);
+    fake.signing = 'forged';
+
+    const { destination, cookies } = await goThrough(ALICE);
+
+    assert.equal(destination.searchParams.get('sso'), 'provider');
+    assert.equal(await signedInAs(cookies), undefined);
+  });
+});
+
+describe('starting a link', () => {
+  it('is never started by following a link', async () => {
+    const session = await signInWithPassword('friend@seerr.dev');
+
+    const res = await request(app)
+      .get('/api/v1/auth/oidc/authentik/link')
+      .set('Cookie', cookieHeader(session));
+
+    assert.notEqual(res.status, 302);
+    assert.equal(cookiesOf(res)[CORRELATION_COOKIE], undefined);
+  });
+
+  it('is dropped at sign-out, so nobody can finish it for the signed-out account', async () => {
+    const lineFor = (res: request.Response) =>
+      ([] as string[])
+        .concat(res.headers['set-cookie'] ?? [])
+        .find((line) => line.startsWith(`${CORRELATION_COOKIE}=`)) ?? '';
+    const session = await signInWithPassword('friend@seerr.dev');
+    const started = await request(app)
+      .post('/api/v1/auth/oidc/authentik/link')
+      .set('Cookie', cookieHeader(session));
+    assert.equal(started.status, 302);
+    assert.match(lineFor(started), /Path=\/api\/v1\/auth\/oidc(;|$)/);
+
+    const out = await request(app)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookieHeader(session));
+    assert.equal(out.status, 200);
+    const cleared = lineFor(out);
+    assert.match(cleared, new RegExp(`^${CORRELATION_COOKIE}=;`));
+    assert.match(cleared, /Path=\/api\/v1\/auth\/oidc(;|$)/);
+    assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
   });
 });
 

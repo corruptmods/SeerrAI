@@ -36,6 +36,7 @@ import {
   DiscoverNetworksError,
   sanitizeDiscoverNetworks,
 } from '@server/lib/discoverNetworks';
+import { sendEmailConfirmation } from '@server/lib/emailConfirmation';
 import { cleanFeatureList, featureEnabled } from '@server/lib/features';
 import { mayEditUser, mayManageUser } from '@server/lib/manageUser';
 import type {
@@ -202,6 +203,19 @@ userSettingsRoutes.post<
       throw new ApiError(400, ApiErrorCode.InvalidEmail);
     }
 
+    // An email someone sets on themselves is unconfirmed until confirmed from
+    // the link sent to it. One the owner or a user manager sets, the owner's
+    // own, or their server username counts as confirmed.
+    const emailChanged = !sameEmail(oldEmail, user.email);
+    if (emailChanged) {
+      user.emailVerified =
+        user.id === 1 ||
+        req.user?.id !== user.id ||
+        [user.jellyfinUsername, user.embyUsername].some((name) =>
+          sameEmail(name ?? undefined, user.email)
+        );
+    }
+
     // Only user managers may change quotas.
     if (
       !user.hasPermission(Permission.MANAGE_USERS) &&
@@ -229,7 +243,7 @@ userSettingsRoutes.post<
 
     if (!user.settings) {
       user.settings = new UserSettings({
-        user: req.user,
+        user,
         locale: req.body.locale,
         discoverRegion: req.body.discoverRegion,
         streamingRegion: req.body.streamingRegion,
@@ -251,6 +265,9 @@ userSettingsRoutes.post<
     }
 
     const savedUser = await userRepository.save(user);
+    if (emailChanged && !savedUser.emailVerified) {
+      void sendEmailConfirmation(savedUser);
+    }
 
     return res.status(200).json({
       username: savedUser.username,
@@ -1038,7 +1055,7 @@ userSettingsRoutes.post<{ id: string }, UserSettingsNotificationsResponse>(
 
       if (!user.settings) {
         user.settings = new UserSettings({
-          user: req.user,
+          user,
           pgpKey: req.body.pgpKey,
           discordIds,
           pushbulletAccessToken: req.body.pushbulletAccessToken,
@@ -1196,8 +1213,8 @@ userSettingsRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      // As everywhere: only the owner changes the owner's.
-      if (user.id === 1 && req.user?.id !== 1) {
+      // As everywhere: only the owner changes the owner's or another admin's.
+      if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",
@@ -1298,7 +1315,7 @@ userSettingsRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      if (user.id === 1 && req.user?.id !== 1) {
+      if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",
@@ -1368,7 +1385,7 @@ userSettingsRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      if (user.id === 1 && req.user?.id !== 1) {
+      if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",
@@ -1497,7 +1514,7 @@ userSettingsRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      if (user.id === 1 && req.user?.id !== 1) {
+      if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",

@@ -29,9 +29,8 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
     'Configure network settings for your Seerr AI instance.',
   csrfProtection: 'Enable CSRF Protection',
   csrfProtectionTip:
-    'Stops other sites making changes through a signed-in browser. Needs HTTPS.',
-  csrfProtectionHoverTip:
-    'Over plain HTTP, saving anything in the browser fails. API key requests aren’t affected.',
+    'Stops other sites making changes through a signed-in browser.',
+  csrfProtectionHoverTip: 'API key requests aren’t affected.',
   trustProxy: 'Enable Proxy Support',
   trustProxyLocalTip:
     'Trust a reverse proxy on this machine, your local network or Tailscale for people’s addresses.',

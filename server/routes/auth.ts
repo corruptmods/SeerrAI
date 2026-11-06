@@ -5,14 +5,19 @@ import type { JellyfinFamilyKind } from '@server/constants/server';
 import { MediaServerType, kindOfType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
-import { User } from '@server/entity/User';
+import { User, noPasswordMatches } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
 import { cssVersion } from '@server/lib/customCss';
+import {
+  confirmEmail,
+  sendEmailConfirmation,
+} from '@server/lib/emailConfirmation';
 import {
   emailFree,
   mainAccountOn,
   plexAccountMayClaim,
   plexProfileChanges,
+  takeEmail,
 } from '@server/lib/manageUser';
 import {
   DEVICE_ID,
@@ -40,7 +45,7 @@ import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
-import oidcRoutes from '@server/routes/oidc';
+import oidcRoutes, { clearOidcInProgress } from '@server/routes/oidc';
 import passkeyRoutes from '@server/routes/passkey';
 import { ApiError } from '@server/types/error';
 import { getAppVersion } from '@server/utils/appVersion';
@@ -164,6 +169,29 @@ authRoutes.post('/plex', async (req, res, next) => {
           .getOne();
 
     if (!user && !(await userRepository.count())) {
+      // The first account sets Plex up, or, with Plex already primary, must
+      // own its server, as a Jellyfin or Emby owner must be its administrator.
+      // Another primary server sets up its own owner.
+      const primary = primaryServer();
+      if (
+        (primary && primary !== 'plex') ||
+        (primary === 'plex' &&
+          settings.plex.machineId &&
+          !(await plextv.reachesServer(settings.plex.machineId, {
+            ownedOnly: true,
+          })))
+      ) {
+        logger.warn(
+          'Plex sign-in refused: no accounts yet and this Plex account does not own the media server',
+          {
+            label: 'API',
+            ip: req.ip,
+            plexId: account.id,
+            plexUsername: account.username,
+          }
+        );
+        return next({ status: 403, message: 'Access denied.' });
+      }
       user = withNewUserDefaults(
         new User({
           email: account.email,
@@ -176,7 +204,9 @@ authRoutes.post('/plex', async (req, res, next) => {
         })
       );
 
-      connectAsPrimary('plex');
+      if (!primary) {
+        connectAsPrimary('plex');
+      }
       await settings.save();
       startJobs();
 
@@ -205,15 +235,20 @@ authRoutes.post('/plex', async (req, res, next) => {
       if (
         account.id === mainUser.plexId ||
         // The owner's first Plex sign-in, on a Plex-primary or not-yet-set-up
-        // server. With another server primary, the owner's email says nothing
-        // about who holds this Plex account.
+        // server, from a Plex account with access to the Plex server. With
+        // another server primary, the owner's email says nothing about who
+        // holds this Plex account.
         ((primaryServer() ?? 'plex') === 'plex' &&
           account.email === mainUser.email &&
-          !mainUser.plexId) ||
+          !mainUser.plexId &&
+          !!settings.plex.machineId &&
+          (await plextv.reachesServer(settings.plex.machineId))) ||
         (await mainPlexTv.checkUserAccess(account.id))
       ) {
         if (!user && sameEmail) {
-          if (!plexAccountMayClaim(sameEmail)) {
+          if (plexAccountMayClaim(sameEmail)) {
+            user = sameEmail;
+          } else if (sameEmail.emailVerified) {
             logger.warn(
               'Plex sign-in refused: the email belongs to an account that is not this Plex account',
               {
@@ -229,7 +264,6 @@ authRoutes.post('/plex', async (req, res, next) => {
               message: ApiErrorCode.ExistingAccount,
             });
           }
-          user = sameEmail;
         }
 
         if (user) {
@@ -290,6 +324,12 @@ authRoutes.post('/plex', async (req, res, next) => {
               plexUsername: account.username,
             }
           );
+          if (!(await takeEmail(account.email))) {
+            return next({
+              status: 403,
+              message: ApiErrorCode.ExistingAccount,
+            });
+          }
           user = withNewUserDefaults(
             new User({
               email: account.email,
@@ -480,6 +520,46 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       ) {
         throw new ApiError(500, ApiErrorCode.NoAdminUser);
       }
+
+      // With no accounts, only the primary server, if any, sets up the owner.
+      // With accounts but no primary server (fresh settings), only the
+      // owner's own account on this kind of server, or one they lack.
+      const owner = missingAdminUser
+        ? null
+        : await userRepository.findOne({ where: { id: 1 } });
+      const ownerAccount = owner?.[USER_ID[serverKind]];
+      if (
+        (missingAdminUser &&
+          primaryServer() &&
+          primaryServer() !== serverKind) ||
+        (owner &&
+          ((ownerAccount && ownerAccount !== account.User.Id) ||
+            (user && user.id !== owner.id)))
+      ) {
+        logger.warn(
+          `${name} sign-in refused: this account may not set up the owner`,
+          {
+            label: 'API',
+            ip: req.ip,
+            jellyfinUsername: account.User.Name,
+          }
+        );
+        return next({
+          status: 403,
+          message: ApiErrorCode.ExistingAccount,
+        });
+      }
+
+      // Everything the media server must answer comes first, so a failure
+      // leaves settings as they were.
+      const serverName = await jellyfinserver.getServerName();
+      const apiKey = await new JellyfinAPI(
+        hostname,
+        account.AccessToken,
+        deviceId,
+        serverKind
+      ).createApiToken('Seerr');
+
       connectAsPrimary(serverKind, account.User.Id);
 
       if (missingAdminUser) {
@@ -523,13 +603,10 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
 
         // User exists but settings.json isn't configured: update the admin
         // user.
-
-        user = await userRepository.findOne({
-          where: { id: 1 },
-        });
-        if (!user) {
+        if (!owner) {
           throw new Error('Unable to find admin user to edit');
         }
+        user = owner;
         user.email = body.email || account.User.Name;
         Object.assign(
           user,
@@ -547,16 +624,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         await userRepository.save(user);
       }
 
-      // Create a media server API key from this admin user.
-      const jellyfinClient = new JellyfinAPI(
-        hostname,
-        account.AccessToken,
-        deviceId,
-        serverKind
-      );
-      const apiKey = await jellyfinClient.createApiToken('Seerr');
-
-      server.name = await jellyfinserver.getServerName();
+      server.name = serverName;
       server.serverId = account.User.ServerId;
       if (body.hostname) {
         server.ip = body.hostname;
@@ -613,9 +681,11 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       );
 
       // Their email, else their server username, is their password-login name;
-      // never one another account already has.
+      // never one another account already has. The server vouches only for
+      // their username.
       const email = body.email || account.User.Name;
-      if (!(await emailFree(email))) {
+      const vouched = email.toLowerCase() === account.User.Name.toLowerCase();
+      if (!(await (vouched ? takeEmail(email) : emailFree(email)))) {
         logger.warn(
           `${name} sign-in refused: another account already has this email or name`,
           {
@@ -640,6 +710,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
           }),
           permissions: settings.main.defaultPermissions,
           userType: USER_TYPE[serverKind],
+          emailVerified: vouched,
         })
       );
       user.avatar = getUserAvatarUrl(user, serverKind);
@@ -650,6 +721,9 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         await user.setPassword(body.password ?? '');
       }
       await userRepository.save(user);
+      if (!vouched) {
+        void sendEmailConfirmation(user);
+      }
     }
 
     // Avatar follows this server only when it holds their main account.
@@ -905,6 +979,9 @@ authRoutes.post(
       );
 
       const account = await jellyfinServer.authenticateQuickConnect(secret);
+      if (!account?.User?.Id) {
+        throw new ApiError(401, ApiErrorCode.InvalidCredentials);
+      }
 
       let user = await userRepository.findOne({
         where: { jellyfinUserId: account.User.Id },
@@ -946,7 +1023,7 @@ authRoutes.post(
           status: 403,
           message: 'Access denied.',
         });
-      } else if (!(await emailFree(account.User.Name))) {
+      } else if (!(await takeEmail(account.User.Name))) {
         logger.warn(
           'Quick Connect sign-in refused: another account already has this name as its email',
           {
@@ -1052,7 +1129,9 @@ authRoutes.post('/local', async (req, res, next) => {
       .where('user.email = :email', { email: body.email.toLowerCase() })
       .getOne();
 
-    const matches = !!user && (await user.passwordMatch(body.password));
+    const matches = user
+      ? await user.passwordMatch(body.password)
+      : await noPasswordMatches(body.password);
     pending = false;
     if (!user || !matches) {
       logger.warn('Failed sign-in attempt using invalid Seerr password', {
@@ -1104,6 +1183,7 @@ authRoutes.post('/local', async (req, res, next) => {
 
 authRoutes.post('/logout', async (req, res, next) => {
   try {
+    clearOidcInProgress(req, res);
     const userId = req.session?.userId;
     if (!userId) {
       return res.status(200).json({ status: 'ok' });
@@ -1228,7 +1308,6 @@ authRoutes.post('/reset-password/:guid', async (req, res, next) => {
     logger.warn('Failed password reset attempt using invalid new password', {
       label: 'API',
       ip: req.ip,
-      guid: req.params.guid,
     });
     return next({
       status: 500,
@@ -1284,5 +1363,21 @@ authRoutes.post('/reset-password/:guid', async (req, res, next) => {
 
   return res.status(200).json({ status: 'ok' });
 });
+
+// The link emailed to confirm an address someone set on their own account.
+authRoutes.get<{ token: string }>(
+  '/confirm-email/:token',
+  async (req, res, next) => {
+    if (!(await confirmEmail(req.params.token))) {
+      return next({
+        status: 400,
+        message: 'This confirmation link is invalid or has expired.',
+      });
+    }
+    return res.redirect(
+      `${getSettings().main.applicationUrl}/profile/settings`
+    );
+  }
+);
 
 export default authRoutes;

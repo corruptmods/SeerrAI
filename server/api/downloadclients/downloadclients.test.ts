@@ -439,6 +439,9 @@ describe('adding a torrent to qBittorrent for Backfill', () => {
         return { data: 'Ok.' };
       }
     );
+    mock.method(QBittorrentAPI.prototype, 'findTorrent', async () => ({
+      hash: 'ab'.repeat(20),
+    }));
     await new QBittorrentAPI({
       hostname: '127.0.0.1',
       port: 1,
@@ -446,13 +449,112 @@ describe('adding a torrent to qBittorrent for Backfill', () => {
       urlBase: '',
       username: '',
       password: '',
-    }).addTorrent({ torrent: Buffer.from('torrent'), category: 'backfill' });
+    }).addTorrent({
+      torrent: Buffer.from('torrent'),
+      hash: 'ab'.repeat(20),
+      category: 'backfill',
+    });
     // A limit of 0 is hit at once, and qBittorrent is often set to remove
     // the torrent and files then, before Radarr imports.
     assert.equal(form?.get('ratioLimit'), '-1');
     assert.equal(form?.get('seedingTimeLimit'), '-1');
     assert.equal(form?.get('inactiveSeedingTimeLimit'), '-1');
   });
+  const qbit = () =>
+    new QBittorrentAPI({
+      hostname: '127.0.0.1',
+      port: 1,
+      useSsl: false,
+      urlBase: '',
+      username: '',
+      password: '',
+    });
+
+  it('refuses a torrent qBittorrent does not list under the hash read', async () => {
+    mock.method(
+      QBittorrentAPI.prototype as unknown as {
+        post: (path: string) => Promise<unknown>;
+      },
+      'post',
+      async () => ({ data: 'Ok.' })
+    );
+    let asked = 0;
+    mock.method(QBittorrentAPI.prototype, 'findTorrent', async () => {
+      asked++;
+      return undefined;
+    });
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const added = assert.rejects(
+        qbit().addTorrent({
+          magnet: `magnet:?xt=urn:btih:${'ab'.repeat(20)}`,
+          hash: 'ab'.repeat(20),
+          category: 'backfill',
+        }),
+        /did not list the torrent/
+      );
+      // A busy client gets about 20 seconds to list it.
+      for (let second = 0; second < 25; second++) {
+        await new Promise((resolve) => setImmediate(resolve));
+        mock.timers.tick(1_000);
+      }
+      await added;
+      assert.ok(asked >= 15, String(asked));
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  it('removes a torrent with its data, unless another torrent shares the files', async () => {
+    const own = 'ab'.repeat(20);
+    let listed: Record<string, string>[] = [];
+    const deletes: unknown[] = [];
+    const api = QBittorrentAPI.prototype as unknown as {
+      get: (path: string) => Promise<unknown>;
+      post: (path: string, body: unknown) => Promise<unknown>;
+    };
+    mock.method(api, 'get', async () => ({ data: listed }));
+    mock.method(api, 'post', async (_path: string, body: unknown) => {
+      deletes.push(body);
+      return { data: '' };
+    });
+    const torrent = (hash: string, content: string) => ({
+      hash,
+      name: content.split('/').pop()!,
+      save_path: '/downloads',
+      content_path: content,
+    });
+
+    listed = [
+      torrent(own, '/downloads/Glasswing.S01'),
+      torrent('cd'.repeat(20), '/downloads/Glasswing.S02'),
+    ];
+    await qbit().deleteTorrent(own);
+    listed = [
+      torrent(own, '/downloads/Glasswing.S01'),
+      torrent('cd'.repeat(20), '/downloads/Glasswing.S01'),
+    ];
+    await qbit().deleteTorrent(own);
+    listed = [
+      torrent(own, '/downloads/Glasswing.S01'),
+      torrent('ef'.repeat(20), '/downloads/Glasswing.S01/Glasswing.S01E01.mkv'),
+    ];
+    await qbit().deleteTorrent(own);
+    // Another torrent added without its own folder (its content is the save
+    // folder) doesn't hold every torrent kept there.
+    listed = [
+      torrent(own, '/downloads/Glasswing.S01'),
+      torrent('ef'.repeat(20), '/downloads'),
+    ];
+    await qbit().deleteTorrent(own);
+    assert.deepEqual(deletes, [
+      { hashes: own, deleteFiles: 'true' },
+      { hashes: own, deleteFiles: 'false' },
+      { hashes: own, deleteFiles: 'false' },
+      { hashes: own, deleteFiles: 'true' },
+    ]);
+  });
+
   it('reads how much of each file the swarm has, unknown as unknown', async () => {
     mock.method(
       QBittorrentAPI.prototype as unknown as {

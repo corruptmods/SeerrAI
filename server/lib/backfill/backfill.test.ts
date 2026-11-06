@@ -9,6 +9,7 @@ import {
   canonicalName,
   isExtra,
   readNumbers,
+  releaseGroup,
   releaseTags,
 } from '@server/lib/backfill/naming';
 import {
@@ -136,6 +137,18 @@ describe('Backfill: reading names', () => {
       releaseTags('Carryall.S01-S04.480p.WEB-DL.x264-GRP'),
       '480p WEB-DL x264'
     );
+  });
+
+  it('reads tags and group from very long bracket- or dash-heavy names quickly', () => {
+    const started = performance.now();
+    assert.equal(releaseTags(`${'('.repeat(20_000)}Glasswing`), '');
+    assert.ok(releaseTags(`Glasswing ${'[1080p'.repeat(5_000)}]`).length > 0);
+    assert.equal(releaseGroup(`Glasswing${'-a['.repeat(8_000)}`), undefined);
+    assert.equal(
+      releaseGroup(`${'Static.Garden.'.repeat(2_000)}1080p.WEB-GRP`),
+      'GRP'
+    );
+    assert.ok(performance.now() - started < 1000);
   });
 
   it('builds the names Sonarr was shown to judge correctly', () => {
@@ -335,6 +348,76 @@ describe('Backfill: torrents and NZBs', () => {
     assert.equal(
       magnetHash('magnet:?xt=urn:btih:WWKYWR375JJCHYZRBH5ASR2UFFHNJGYE'),
       'b5958b477fea5223e33109fa094754294ed49b04'
+    );
+  });
+
+  it('reads a magnet’s hash only from a single agreeing xt parameter', () => {
+    const one = 'ab'.repeat(20);
+    const two = 'cd'.repeat(20);
+    assert.equal(magnetHash(`magnet:?dn=Glasswing&xt=urn:btih:${one}`), one);
+    assert.equal(
+      magnetHash(`magnet:?xt=urn:btih:${one}&xt=urn:btih:${one.toUpperCase()}`),
+      one
+    );
+    assert.equal(
+      magnetHash(`magnet:?dn=Glasswing.xt=urn:btih:${one}&xt=urn:btih:${two}`),
+      two
+    );
+    assert.equal(
+      magnetHash(`magnet:?xt=urn:btih:${one}&xt=urn:btih:${two}`),
+      undefined
+    );
+    assert.equal(magnetHash(`magnet:?dn=xt=urn:btih:${one}`), undefined);
+    assert.equal(magnetHash(`magnet:?xt=urn:btih:${one}0`), undefined);
+    assert.equal(
+      magnetHash(`https://example.invalid/?xt=urn:btih:${one}`),
+      undefined
+    );
+  });
+
+  it('reads a torrent whose keys are named like object properties as plain keys', () => {
+    const info = Buffer.concat([
+      Buffer.from('d9:__proto__'),
+      ben({ files: [{ length: 5, path: ['Static Garden.mkv'] }] }),
+      Buffer.from('6:lengthi10e4:name14:Harbour Lights12:piece lengthi16384e'),
+      Buffer.from('6:pieces20:'),
+      Buffer.alloc(20),
+      Buffer.from('e'),
+    ]);
+    const meta = parseTorrent(
+      Buffer.concat([Buffer.from('d4:info'), info, Buffer.from('e')])
+    );
+    assert.deepEqual(meta.files, [
+      { index: 0, path: 'Harbour Lights', size: 10 },
+    ]);
+    assert.equal(meta.infoHash, createHash('sha1').update(info).digest('hex'));
+  });
+
+  it('refuses a torrent with a repeated key', () => {
+    const info = ben({
+      name: 'Static Garden',
+      'piece length': 16384,
+      pieces: Buffer.alloc(20),
+      length: 10,
+    });
+    const other = ben({
+      name: 'Lantern Song',
+      'piece length': 16384,
+      pieces: Buffer.alloc(20),
+      length: 20,
+    });
+    assert.throws(
+      () =>
+        parseTorrent(
+          Buffer.concat([
+            Buffer.from('d4:info'),
+            info,
+            Buffer.from('4:info'),
+            other,
+            Buffer.from('e'),
+          ])
+        ),
+      /repeats/
     );
   });
 

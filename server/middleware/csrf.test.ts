@@ -38,7 +38,7 @@ function createApp() {
   app.use(cookieParser());
   app.use(jsonBody);
   app.use(express.urlencoded({ extended: true }));
-  app.use(csrfProtection(false));
+  app.use(csrfProtection());
   app.use(
     '/api',
     unlessApiKey(

@@ -158,7 +158,10 @@ playlistRoutes.post<{ listId: string; songId: string }>(
     if (!song) {
       return next({ status: 404, message: 'That song is not on it.' });
     }
-    await playlists.retry(song);
+    const refused = await playlists.retry(song);
+    if (refused) {
+      return next({ status: 403, message: refused });
+    }
     return res.status(204).send();
   }
 );

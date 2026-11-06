@@ -11,6 +11,7 @@ import useAi, { aiErrorMessage } from '@app/hooks/useAi';
 import useFeature from '@app/hooks/useFeature';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { safeRedirect } from '@app/utils/loginRedirect';
 import type { ShrunkPhoto } from '@app/utils/shrinkPhoto';
 import { shrinkPhoto } from '@app/utils/shrinkPhoto';
 import {
@@ -108,7 +109,7 @@ interface Turn {
   source?: { name: string; more: boolean };
   /** A fix that ran or started, with a link to follow it. */
   fix?: { kind: string; ok: boolean; link?: string };
-  /** A file-replacing fix awaiting the user's confirmation. */
+  /** A fix awaiting the user's confirmation. */
   confirm?: Record<string, unknown>;
   error?: string;
 }
@@ -287,7 +288,7 @@ const AiChatPanel = ({
     }
   };
 
-  // Start a confirmed file-replacing fix and update the turn that offered it.
+  // Start a confirmed fix and update the turn that offered it.
   const confirmFix = async (index: number) => {
     const turn = turns[index];
     if (!turn?.confirm || busy) {
@@ -585,7 +586,7 @@ const AiChatPanel = ({
                 {turn.fix?.link && (
                   <button
                     type="button"
-                    onClick={() => router.push(turn.fix!.link!)}
+                    onClick={() => router.push(safeRedirect(turn.fix!.link))}
                     className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
                   >
                     {intl.formatMessage(messages.openFix)} →

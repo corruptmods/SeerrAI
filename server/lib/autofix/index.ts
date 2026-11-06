@@ -7,6 +7,7 @@ import { WHISPER_PROVIDER } from '@server/api/bazarr';
 import { IssueType } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AutoFixMark from '@server/entity/AutoFixMark';
 import type { BackfillKind } from '@server/entity/BackfillSeries';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
@@ -48,6 +49,7 @@ import {
   subtitlesReady,
 } from '@server/lib/subtitles';
 import logger from '@server/logger';
+import { LessThan } from 'typeorm';
 
 /*
  * Auto-fix for reported problems: subtitles (or transcription), missing
@@ -358,6 +360,15 @@ const radarrFor = (media: Media) => {
 
 const isAdmin = (user: User) => user.hasPermission(Permission.ADMIN);
 
+/**
+ * Who takes what a Backfill search started for this fix finds: for an
+ * admin, Backfill itself when its auto-approve is on.
+ */
+const whoApproves = (req: FixRequest, what: 'anything' | 'any pack') =>
+  isAdmin(req.user) && getSettings().backfill.autoApprove.enabled
+    ? `Backfill starts ${what === 'any pack' ? 'a pack' : 'a release'} its auto-approve rules allow at once; anything else waits for an admin to approve it.`
+    : `An admin approves ${what} it finds.`;
+
 const NOT_ON_SERVER: Omit<FixResult, 'kind'> = {
   ok: false,
   skipped: true,
@@ -448,7 +459,10 @@ const commonOffset = (offsets: (number | undefined)[]): number | undefined => {
 type Outcome = Omit<FixResult, 'kind'>;
 
 interface IssueFixOptions {
-  /** Whom it was filed for, if by someone else; their limits apply. */
+  /**
+   * Who acts: the person who filed it in Seerr, never someone it was filed
+   * on behalf of. Their permissions and limits apply.
+   */
   actor?: User;
   /** AI Search's reading, used instead of re-reading the report. */
   asked?: Pick<FixRequest, 'kind' | 'language' | 'replace'>;
@@ -456,17 +470,84 @@ interface IssueFixOptions {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Kept marks: allowances in use, and fixes holding a title. */
+const USE = 'use:';
+const HELD = 'held:';
+
 class AutoFix {
   /** Last fix time per title and kind, to prevent repeats. */
   private recent = new Map<string, number>();
   /** Daily usage by "kind:user:day". */
   private used = new Map<string, number>();
+  /** Reading back what the last day used, once. */
+  private loading?: Promise<void>;
+  /** Writes of marks, in order. */
+  private writes: Promise<void> = Promise.resolve();
+  private purgedAt = 0;
+
+  /**
+   * Reads back the last day's allowances and fixes, so a restart does not
+   * reset them. Tried again on the next fix if the database fails.
+   */
+  private loaded(): Promise<void> {
+    this.loading ??= (async () => {
+      const marks = getRepository(AutoFixMark);
+      await marks.delete({ at: LessThan(new Date(Date.now() - DAY)) });
+      for (const mark of await marks.find()) {
+        if (mark.key.startsWith(USE)) {
+          const key = mark.key.slice(USE.length);
+          this.used.set(key, Math.max(this.used.get(key) ?? 0, mark.count));
+        } else if (mark.key.startsWith(HELD)) {
+          const key = mark.key.slice(HELD.length);
+          const at = new Date(mark.at).getTime();
+          this.recent.set(key, Math.max(this.recent.get(key) ?? 0, at));
+        }
+      }
+    })().catch((e) => {
+      this.loading = undefined;
+      logger.warn('Could not read back auto-fix limits', {
+        label: LABEL,
+        errorMessage: message(e),
+      });
+    });
+    return this.loading;
+  }
+
+  /** Keeps a mark, or with no count removes it. Never throws. */
+  private keep(key: string, count?: number): Promise<void> {
+    const now = Date.now();
+    const purge = now - this.purgedAt > HOUR;
+    if (purge) this.purgedAt = now;
+    this.writes = this.writes
+      .then(async () => {
+        const marks = getRepository(AutoFixMark);
+        if (purge) {
+          await marks.delete({ at: LessThan(new Date(now - DAY)) });
+        }
+        if (count === undefined) {
+          await marks.delete({ key });
+        } else {
+          await marks.upsert({ key, count, at: new Date(now) }, ['key']);
+        }
+      })
+      .catch((e) => {
+        logger.warn('Could not keep auto-fix limits', {
+          label: LABEL,
+          errorMessage: message(e),
+        });
+      });
+    return this.writes;
+  }
 
   /**
    * Claims a key; undefined if claimed within `within`, else a callback that
    * releases it.
    */
-  private claim(key: string, within: number): (() => void) | undefined {
+  private async claim(
+    key: string,
+    within: number
+  ): Promise<(() => void) | undefined> {
+    await this.loaded();
     const now = Date.now();
     if (this.recent.size > 5000) {
       for (const [k, at] of this.recent) {
@@ -476,8 +557,12 @@ class AutoFix {
     const at = this.recent.get(key);
     if (at && now - at < within) return undefined;
     this.recent.set(key, now);
+    await this.keep(`${HELD}${key}`, 0);
     return () => {
-      if (this.recent.get(key) === now) this.recent.delete(key);
+      if (this.recent.get(key) === now) {
+        this.recent.delete(key);
+        void this.keep(`${HELD}${key}`);
+      }
     };
   }
 
@@ -486,12 +571,13 @@ class AutoFix {
    * all pass. Admins are unlimited. Returns a refund, or undefined if none
    * left.
    */
-  private take(
+  private async take(
     what: 'fix' | 'replace',
     user: User,
     limit: number
-  ): (() => void) | undefined {
+  ): Promise<(() => void) | undefined> {
     if (isAdmin(user)) return () => undefined;
+    await this.loaded();
     const key = `${what}:${user.id}:${today()}`;
     if (this.used.size > 5000) {
       for (const k of this.used.keys()) {
@@ -501,13 +587,19 @@ class AutoFix {
     const count = this.used.get(key) ?? 0;
     if (count >= limit) return undefined;
     this.used.set(key, count + 1);
-    return () => this.used.set(key, Math.max(0, (this.used.get(key) ?? 1) - 1));
+    await this.keep(`${USE}${key}`, count + 1);
+    return () => {
+      const left = Math.max(0, (this.used.get(key) ?? 1) - 1);
+      this.used.set(key, left);
+      void this.keep(`${USE}${key}`, left);
+    };
   }
 
-  /** Clears state, for tests. */
+  /** Clears state, for tests; what was kept is read back again. */
   public reset() {
     this.recent.clear();
     this.used.clear();
+    this.loading = undefined;
   }
 
   /** Running issue fixes. */
@@ -521,7 +613,7 @@ class AutoFix {
     if (req.media.mediaType === MediaType.MUSIC && req.kind !== 'missing') {
       return { kind: req.kind, ...MUSIC_ONLY_MISSING };
     }
-    const refund = this.take('fix', req.user, MAX_FIXES_PER_DAY);
+    const refund = await this.take('fix', req.user, MAX_FIXES_PER_DAY);
     if (!refund) {
       return {
         kind: req.kind,
@@ -581,7 +673,7 @@ class AutoFix {
     busy: string,
     work: () => Promise<Outcome>
   ): Promise<Outcome> {
-    const release = this.claim(key, within);
+    const release = await this.claim(key, within);
     if (!release) return { ok: false, message: busy };
     try {
       const outcome = await work();
@@ -825,7 +917,7 @@ class AutoFix {
             ? {
                 ok: true,
                 link: looking.link,
-                message: `Searching for it: Radarr is looking, and Backfill is checking indexers for releases Radarr cannot see. An admin approves anything it finds.${
+                message: `Searching for it: Radarr is looking, and Backfill is checking indexers for releases Radarr cannot see. ${whoApproves(req, 'anything')}${
                   handedOn ? agentAfter(req) : ''
                 }`,
               }
@@ -907,7 +999,7 @@ class AutoFix {
           ? {
               ok: true,
               link: looking.link ?? link,
-              message: `Searching for ${album.title}: Lidarr is looking, and Backfill is checking indexers for releases Lidarr cannot see. An admin approves anything it finds.`,
+              message: `Searching for ${album.title}: Lidarr is looking, and Backfill is checking indexers for releases Lidarr cannot see. ${whoApproves(req, 'anything')}`,
             }
           : {
               ok: true,
@@ -963,7 +1055,7 @@ class AutoFix {
       ? {
           ok: true,
           link: looking.link,
-          message: `Searching for the ${count}: Sonarr is looking, and Backfill is checking indexers for packs Sonarr cannot see. An admin approves any pack it finds.${
+          message: `Searching for the ${count}: Sonarr is looking, and Backfill is checking indexers for packs Sonarr cannot see. ${whoApproves(req, 'any pack')}${
             handedOn ? agentAfter(req) : ''
           }`,
         }
@@ -1142,7 +1234,7 @@ class AutoFix {
    * unless nothing was removed.
    */
   private async swap(user: User, swap: Swap): Promise<Outcome> {
-    const refund = this.take('replace', user, MAX_REPLACED_PER_DAY);
+    const refund = await this.take('replace', user, MAX_REPLACED_PER_DAY);
     if (!refund) return { ok: false, message: TOO_MANY };
     const of = swap.name ? ` of ${swap.name}` : '';
     try {
@@ -1202,14 +1294,14 @@ class AutoFix {
     const admin = isAdmin(req.user);
     const release = admin
       ? () => undefined
-      : this.claim(`replace:season:${req.media.id}:${season}`, DAY);
+      : await this.claim(`replace:season:${req.media.id}:${season}`, DAY);
     if (!release) {
       return {
         ok: false,
         message: `Season ${season} was already asked to be replaced today. An admin can see where that stands, or ask again tomorrow.`,
       };
     }
-    const refund = this.take('replace', req.user, MAX_REPLACED_PER_DAY);
+    const refund = await this.take('replace', req.user, MAX_REPLACED_PER_DAY);
     if (!refund) {
       release();
       return { ok: false, message: TOO_MANY };
@@ -1472,8 +1564,9 @@ class AutoFix {
 
   /**
    * Tries to fix a new issue and comments the outcome on it. `actor` is the
-   * user it was filed for (their switch and limits apply); `asked` is AI
-   * Search's reading. Runs in the background; never throws.
+   * user who filed it (their switch, permissions and limits apply), or by
+   * default its creator; `asked` is AI Search's reading. Runs in the
+   * background; never throws.
    */
   public fromIssue(
     issueId: number,
@@ -1485,9 +1578,10 @@ class AutoFix {
     return work;
   }
 
-  /** Resolves when background fixes finish. */
+  /** Resolves when background fixes, and keeping their limits, finish. */
   public async idle(): Promise<void> {
     await Promise.all([...this.pending]);
+    await this.writes;
   }
 
   private async fixIssue(

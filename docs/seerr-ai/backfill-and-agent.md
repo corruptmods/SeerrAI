@@ -70,9 +70,9 @@ Backfill adds a pack with only the chosen files picked, follows it, has Sonarr o
 
 | Client | Category | Magnet links | Removing |
 |---|---|---|---|
-| qBittorrent | A category | Stop by themselves once their file list is in | With its files |
-| Transmission | A label (3.0 and newer) | Held at 1 KB/s until the files are chosen, seconds later | With its files |
-| Deluge | A label, when the Label plugin is on | Held at 1 KiB/s until the files are chosen, seconds later | With its files |
+| qBittorrent | A category | Stop by themselves once their file list is in | With its files, unless another torrent shares them |
+| Transmission | A label (3.0 and newer) | Held at 1 KB/s until the files are chosen, seconds later | With its files, unless another torrent shares them |
+| Deluge | A label, when the Label plugin is on | Held at 1 KiB/s until the files are chosen, seconds later | With its files, unless another torrent shares them |
 | rTorrent / ruTorrent | ruTorrent's label | Watched every few seconds until the files are chosen | Its files deleted one by one, then empty folders, through rTorrent's `execute` command |
 | SABnzbd | A category | | With its files |
 | NZBGet (16 and newer) | A category | | From the queue with what it downloaded, or from the history; the finished folder's leftovers (an .nfo, a sample) stay, as the videos were moved out by the import |

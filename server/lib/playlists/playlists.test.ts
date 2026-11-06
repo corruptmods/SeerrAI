@@ -795,12 +795,26 @@ describe('a playlist’s songs as they are got', () => {
       'Unheard Tune': 'unmatched',
     });
 
-    // Try again retries the request and the song with it.
+    // Try again retries the request and the song with it, for an owner
+    // whose requests need no approval, as Retry would.
     const song = await getRepository(MediaListSong).findOneByOrFail({
       listId: list.id,
       recordingMbid: LANTERN,
     });
-    await playlists.retry(song);
+    assert.match(
+      (await playlists.retry(song)) ?? '',
+      /an admin retries it/,
+      'not for an owner whose requests wait for an admin'
+    );
+    assert.equal(
+      (await getRepository(MediaRequest).findOneByOrFail({ id: request.id }))
+        .status,
+      MediaRequestStatus.FAILED
+    );
+    await getRepository(User).update(user.id, {
+      permissions: Permission.REQUEST | Permission.AUTO_APPROVE,
+    });
+    assert.equal(await playlists.retry(song), undefined);
     const again = await getRepository(MediaRequest).findOneByOrFail({
       id: request.id,
     });

@@ -7,6 +7,7 @@ import type {
 import {
   CLIENT_TIMEOUT_MS,
   clientBaseUrl,
+  confirmListed,
   isTorrentHash,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
@@ -262,6 +263,7 @@ export interface RtorrentInfo {
   /** A multi-file torrent's own folder; a single file's parent. */
   directory: string;
   isMultiFile: number;
+  /** As stored: ruTorrent URL-encodes it. */
   label: string;
   /** When Seerr added it, in seconds; empty if Seerr didn't. */
   addedBySeerr: string;
@@ -304,20 +306,11 @@ const infoOf = (row: XmlValue[]): RtorrentInfo => {
     message: String(message ?? ''),
     directory: String(directory ?? ''),
     isMultiFile: Number(isMultiFile),
-    label: decodeLabel(String(label ?? '')),
+    label: String(label ?? ''),
     addedBySeerr: String(addedBySeerr ?? ''),
     chunkSize: Number(chunkSize),
     wantedChunks: Number(wantedChunks),
   };
-};
-
-/** ruTorrent keeps labels URL-encoded. */
-const decodeLabel = (label: string) => {
-  try {
-    return decodeURIComponent(label);
-  } catch {
-    return label;
-  }
 };
 
 /** A magnet's placeholder name until its file list is in: "<HASH>.meta". */
@@ -485,6 +478,7 @@ class RtorrentAPI implements TorrentClient {
   public async addTorrent(options: {
     torrent?: Buffer;
     magnet?: string;
+    hash: string;
     category: string;
     metadataOnly?: boolean;
   }): Promise<void> {
@@ -501,6 +495,7 @@ class RtorrentAPI implements TorrentClient {
     } else {
       throw new Error('A torrent file or magnet link is needed.');
     }
+    await confirmListed(this, options.hash);
   }
 
   /** Labels need no setup. */
@@ -514,8 +509,10 @@ class RtorrentAPI implements TorrentClient {
   }
 
   public async listCategory(category: string): Promise<ClientTorrent[]> {
+    // ruTorrent keeps labels URL-encoded; compared as stored.
+    const label = encodeURIComponent(category);
     return (await this.torrents())
-      .filter((t) => t.label === category)
+      .filter((t) => t.label === label)
       .map(rtorrentTorrent);
   }
 

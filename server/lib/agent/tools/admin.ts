@@ -14,7 +14,9 @@ import type {
 } from '@server/lib/agent/tools/base';
 import {
   ToolError,
+  adminReplies,
   mayReplace,
+  namedByAdmin,
   readTitleRef,
   replaceReported,
 } from '@server/lib/agent/tools/base';
@@ -56,6 +58,7 @@ export const relinkFile: AgentTool = {
   // Changes Sonarr's file links on a guess from name and length, so only
   // with an admin in the conversation to see it.
   askOnly: true,
+  acts: true,
   description:
     'Fixes a file already imported that holds several episodes (S06E01-02) but that Sonarr links to only one, so the others look missing and Plex shows one: links the file to every episode it holds and has Sonarr rename it (S06E01-E02). Give the season and every episode the file holds, in a row; the file is the one on the first of them that has one. The others must have no file of their own. Nothing is downloaded, moved or deleted.',
   parameters: {
@@ -179,11 +182,10 @@ export const proposeChange: AgentTool = {
       name = await nameOf(title);
     }
     if (args.kind === 'deleteFiles') {
+      // What admins (or the report) said, not the headlines of decisions.
       const problem = deleteProblem([
         state.run.ask ?? '',
-        ...state.run.steps
-          .filter((step) => step.kind === 'reply')
-          .map((step) => step.text),
+        ...adminReplies(state.run),
         ...(replaceReported(state.run) ? ['replace'] : []),
       ]);
       if (problem) throw new ToolError(problem);
@@ -247,6 +249,7 @@ export const replaceSeason: AgentTool = {
 export const searchUpgrade: AgentTool = {
   name: 'search_upgrade',
   askOnly: true,
+  acts: true,
   description:
     "Has Radarr, Sonarr or Lidarr search for a better release of a movie, of a series' episodes (all, a season, or some episodes) or of an album, and take one its quality profile prefers to what is there; the file is replaced only once the new one has imported. For when the admin asks for something better and the profile would prefer it. To take one particular release instead, grab it with replace: true.",
   parameters: {
@@ -303,6 +306,21 @@ export const searchUpgrade: AgentTool = {
 // ---- requesting ----------------------------------------------------------------
 
 /**
+ * Refuses a request in a conversation about a library title unless an
+ * admin named what is requested.
+ */
+const unnamed = (
+  state: AgentState,
+  shown: string,
+  ...names: (string | undefined)[]
+) => {
+  if (state.run.arrId == null || namedByAdmin(state.run, ...names)) return;
+  throw new ToolError(
+    `This conversation is about ${state.run.title ?? 'another title'}, and no admin has named ${shown} in it, so it is not requested. If it should be, ask the admin (ask_admin); it can be requested once an admin names it in a reply.`
+  );
+};
+
+/**
  * Requests an album not in Lidarr under its first credited artist, as the
  * music pages do. Once approved, Lidarr adds the artist and searches.
  */
@@ -331,6 +349,7 @@ const requestAlbum = async (
     );
   }
   const name = album.artist ? `${album.title} by ${album.artist}` : album.title;
+  unnamed(state, name, album.title);
   const request = await MediaRequest.requestMusic(
     { artistMbid: album.artistMbid, albums: [albumMbid] },
     state.user
@@ -348,6 +367,7 @@ const requestAlbum = async (
 export const requestTitle: AgentTool = {
   name: 'request_title',
   askOnly: true,
+  acts: true,
   description:
     'Requests a title that is not in the library yet, as the admin who asked, so Sonarr, Radarr or Lidarr adds and searches for it: a film or series by its TMDB reference, or an album by its MusicBrainz reference. Only when the admin asked for something that is not in the library.',
   parameters: {
@@ -373,6 +393,16 @@ export const requestTitle: AgentTool = {
       );
     }
     const mediaType = match[1] === 'tv' ? MediaType.TV : MediaType.MOVIE;
+    if (state.run.arrId != null) {
+      const names = await lookups
+        .tmdbNames(match[1] as 'tv' | 'movie', Number(match[2]))
+        .catch(() => {
+          throw new ToolError(
+            'TMDB did not answer about that title; try again in a minute.'
+          );
+        });
+      unnamed(state, names[0] ?? `TMDB ${match[1]} ${match[2]}`, ...names);
+    }
     const request = await MediaRequest.request(
       {
         mediaType,

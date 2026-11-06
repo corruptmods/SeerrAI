@@ -1,5 +1,6 @@
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
+import useAi from '@app/hooks/useAi';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
@@ -14,6 +15,8 @@ const messages = defineMessages('components.MediaLists.ShareListModal', {
   save: 'Share',
   skip: 'Keep Private',
   nousers: 'There are no other users to share with.',
+  picker:
+    'People who accept can include you in Pick for the Room, which reads your recent watching. Turn Pick for the Room off in your settings to be left out.',
   search: 'Search users',
   nomatch: 'No one matches "{query}".',
   searchformore: 'Not everyone is shown. Search to find someone else.',
@@ -44,6 +47,7 @@ const ShareListModal = ({
   onComplete,
 }: ShareListModalProps) => {
   const intl = useIntl();
+  const { on } = useAi();
   // Ticked people with names, so a pick stays shown after the search changes.
   const [selected, setSelected] = useState<Person[]>(initialMembers);
   // Members at open, fixed even if the page reloads, so the save can detect
@@ -158,6 +162,11 @@ const ShareListModal = ({
         <p className="mb-3 text-sm text-gray-300">
           {intl.formatMessage(messages.description)}
         </p>
+        {on('aiPicker') && (
+          <p className="mb-3 text-sm text-gray-400">
+            {intl.formatMessage(messages.picker)}
+          </p>
+        )}
 
         <input
           aria-label={intl.formatMessage(messages.search)}

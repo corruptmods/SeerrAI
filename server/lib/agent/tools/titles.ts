@@ -95,6 +95,18 @@ export const musicOn = () => backfill.readiness().music;
 /** External lookups, stubbed in tests. */
 export const lookups = {
   tmdb: (query: string) => new TheMovieDb().searchMulti({ query }),
+  /** A TMDB film's or series' names, as shown and original. */
+  tmdbNames: async (
+    type: 'movie' | 'tv',
+    id: number
+  ): Promise<(string | undefined)[]> => {
+    if (type === 'movie') {
+      const movie = await new TheMovieDb().getMovie({ movieId: id });
+      return [movie.title, movie.original_title];
+    }
+    const show = await new TheMovieDb().getTvShow({ tvId: id });
+    return [show.name, show.original_name];
+  },
   /** MusicBrainz albums, ranked as music search does, with Seerr's status. */
   albums: async (query: string): Promise<MusicAlbumResult[]> => {
     const page = await musicBrainz().searchReleaseGroups(query, { limit: 10 });

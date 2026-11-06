@@ -53,9 +53,15 @@ class Reader {
     if (c === 0x64 /* d */) {
       this.pos++;
       this.enter();
-      const dict: { [key: string]: Value } = {};
+      // No prototype, so any key is just a key.
+      const dict: { [key: string]: Value } = Object.create(null);
       while (this.data[this.pos] !== 0x65) {
-        const key = (this.read() as Buffer).toString('utf8');
+        const raw = this.read();
+        if (!Buffer.isBuffer(raw))
+          throw new Error('Bad key in the torrent file.');
+        const key = raw.toString('utf8');
+        // Clients differ on which copy of a repeated key they use.
+        if (key in dict) throw new Error('A key repeats in the torrent file.');
         const start = this.pos;
         dict[key] = this.read();
         if (key === 'info' && this.depth === 1 && this.infoStart < 0) {
@@ -129,14 +135,31 @@ export const parseTorrent = (data: Buffer): TorrentMeta => {
   return { infoHash, name, files };
 };
 
-/** The info hash in a magnet link, as 40 hex characters. */
-export const magnetHash = (uri: string): string | undefined => {
-  const match = uri.match(/xt=urn:btih:([0-9a-z]+)/i);
-  if (!match) return undefined;
-  const id = match[1];
+/** A BitTorrent v1 info hash (40 hex or 32 base32 characters) as hex. */
+export const infoHashHex = (id: string): string | undefined => {
   if (/^[0-9a-f]{40}$/i.test(id)) return id.toLowerCase();
   if (/^[a-z2-7]{32}$/i.test(id)) return base32ToHex(id);
   return undefined;
+};
+
+/**
+ * The info hash in a magnet link, as 40 hex characters. Read from its "xt"
+ * parameters as a client reads them; undefined unless every btih one names
+ * the same valid hash.
+ */
+export const magnetHash = (uri: string): string | undefined => {
+  if (!/^magnet:\?/i.test(uri)) return undefined;
+  const hashes = new Set<string>();
+  for (const xt of new URLSearchParams(uri.slice(uri.indexOf('?') + 1)).getAll(
+    'xt'
+  )) {
+    const btih = xt.match(/^urn:btih:(.*)$/i);
+    if (!btih) continue;
+    const hash = infoHashHex(btih[1]);
+    if (!hash) return undefined;
+    hashes.add(hash);
+  }
+  return hashes.size === 1 ? [...hashes][0] : undefined;
 };
 
 const base32ToHex = (input: string): string => {

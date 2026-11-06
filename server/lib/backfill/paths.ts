@@ -63,11 +63,16 @@ export const mapRemotePath = (
   const windows = /^[a-z]:\\|^\\\\/i.test(path);
   const norm = (p: string) =>
     windows ? p.replace(/\//g, '\\').toLowerCase() : p;
+  const sep = windows ? '\\' : '/';
+  // A whole folder: "/downloads" holds "/downloads/x", not "/downloads2/x".
+  const holds = (remote: string) => {
+    const root = norm(remote).replace(/[\\/]+$/, '');
+    const own = norm(path);
+    return own === root || own.startsWith(`${root}${sep}`);
+  };
   const mapping = mappings
     .filter(
-      (m) =>
-        m.host.toLowerCase() === host.toLowerCase() &&
-        norm(path).startsWith(norm(m.remotePath))
+      (m) => m.host.toLowerCase() === host.toLowerCase() && holds(m.remotePath)
     )
     .sort((a, b) => b.remotePath.length - a.remotePath.length)[0];
   if (!mapping) return path;
@@ -76,6 +81,6 @@ export const mapRemotePath = (
   const theirs = windows ? /[\\/]+/g : /\/+/g;
   const rest = path.slice(mapping.remotePath.length).replace(/^[\\/]+/, '');
   if (!rest) return local;
-  const sep = /^[a-z]:[\\/]|^\\\\/i.test(local) ? '\\' : '/';
-  return `${local.replace(/[\\/]+$/, '')}${sep}${rest.replace(theirs, sep)}`;
+  const localSep = /^[a-z]:[\\/]|^\\\\/i.test(local) ? '\\' : '/';
+  return `${local.replace(/[\\/]+$/, '')}${localSep}${rest.replace(theirs, localSep)}`;
 };

@@ -23,7 +23,10 @@ import {
 } from '@server/lib/quality/types';
 import type { SeasonCalendar, SeasonsSettings } from '@server/lib/seasons';
 import { seasonCalendar, seasonSettings } from '@server/lib/seasons';
-import { runMigrations } from '@server/lib/settings/migrator';
+import {
+  runMigrations,
+  writeSettingsFile,
+} from '@server/lib/settings/migrator';
 import type { AvailableLocale } from '@server/types/languages';
 import { randomBytes, randomUUID } from 'crypto';
 import fs from 'fs/promises';
@@ -1400,7 +1403,7 @@ class Settings {
         },
       },
       network: {
-        csrfProtection: false,
+        csrfProtection: true,
         forceIpv4First: false,
         trustProxy: false,
         trustCloudflare: false,
@@ -1901,7 +1904,7 @@ class Settings {
   public async save(): Promise<void> {
     const savePromise = this.saveLock.then(async () => {
       const tmp = SETTINGS_PATH + '.tmp';
-      await fs.writeFile(tmp, JSON.stringify(this.data, undefined, ' '));
+      await writeSettingsFile(tmp, JSON.stringify(this.data, undefined, ' '));
       await fs.rename(tmp, SETTINGS_PATH);
     });
 

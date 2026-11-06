@@ -255,6 +255,17 @@ class WebhookAgent
       );
     }
 
+    // Escaped or not, "." and ".." path segments move up the path, so a
+    // value must not make one.
+    if (dotSegments(webhookUrl) > dotSegments(settings.options.webhookUrl)) {
+      logger.warn('Webhook not sent: a value would change its address path', {
+        label: 'Notifications',
+        type: Notification[type],
+        subject: payload.subject,
+      });
+      return false;
+    }
+
     try {
       const headers: Record<string, string> = {};
 
@@ -302,5 +313,12 @@ class WebhookAgent
     }
   }
 }
+
+/** How many "." or ".." segments (or escaped forms) an address's path has. */
+const dotSegments = (url: string): number =>
+  url
+    .split(/[?#]/)[0]
+    .split('/')
+    .filter((part) => /^(\.|%2e){1,2}$/i.test(part)).length;
 
 export default WebhookAgent;

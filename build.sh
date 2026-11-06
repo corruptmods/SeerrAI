@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-git pull
+git pull --ff-only
 
 # Seerr AI's own quality presets against TRaSH Guides: what changed since
 # they were last reviewed (quality-check.sh). A report; it never stops it.

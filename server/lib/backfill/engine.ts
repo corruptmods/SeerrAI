@@ -10,6 +10,7 @@ import ProwlarrAPI, {
   AUDIO_CATEGORIES,
   MOVIE_CATEGORIES,
   TV_CATEGORIES,
+  isUnusableLink,
 } from '@server/api/prowlarr';
 import type { LidarrAlbum } from '@server/api/servarr/lidarr';
 import { getRepository } from '@server/datasource';
@@ -37,6 +38,7 @@ import {
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import { arrIndexerOrigins } from '@server/lib/backfill/indexerOrigins';
 import type { AlbumTrack } from '@server/lib/backfill/lidarr';
 import BackfillLidarr from '@server/lib/backfill/lidarr';
 import type { PackFile, SeriesContext } from '@server/lib/backfill/matcher';
@@ -2168,18 +2170,26 @@ class Backfill {
     return indexerLimits.guard(
       { id: candidate.indexerId, name: candidate.indexer },
       'download',
-      () =>
-        this.prowlarr().fetchRelease({
-          guid: candidate.guid,
-          title: candidate.title,
-          size: candidate.size,
-          indexerId: candidate.indexerId,
-          indexer: candidate.indexer,
-          protocol: candidate.protocol,
-          downloadUrl: candidate.downloadUrl ?? undefined,
-          magnetUrl: candidate.magnetUrl ?? undefined,
-          infoHash: candidate.infoHash ?? undefined,
-        })
+      async () => {
+        try {
+          return await this.prowlarr().fetchRelease(
+            {
+              guid: candidate.guid,
+              title: candidate.title,
+              size: candidate.size,
+              indexerId: candidate.indexerId,
+              indexer: candidate.indexer,
+              protocol: candidate.protocol,
+              downloadUrl: candidate.downloadUrl ?? undefined,
+              magnetUrl: candidate.magnetUrl ?? undefined,
+              infoHash: candidate.infoHash ?? undefined,
+            },
+            { indexerOrigins: arrIndexerOrigins }
+          );
+        } catch (e) {
+          throw isUnusableLink(e) ? new ReleaseProblem(message(e)) : e;
+        }
+      }
     );
   }
 
@@ -2199,11 +2209,16 @@ class Backfill {
     const category = getSettings().backfill.category;
     const already = await torrents.findTorrent(hash);
     this.probing.add(hash);
-    if (!already) {
-      await torrents.ensureCategory(category);
-      await torrents.addTorrent({ magnet: uri, category, metadataOnly: true });
-    }
     try {
+      if (!already) {
+        await torrents.ensureCategory(category);
+        await torrents.addTorrent({
+          magnet: uri,
+          hash,
+          category,
+          metadataOnly: true,
+        });
+      }
       const files = await this.fileListOf(torrents, hash);
       if (files.length) {
         return files.map((f) => ({
@@ -2829,10 +2844,11 @@ class Backfill {
       } else {
         await torrents.addTorrent(
           fetched.kind === 'torrent'
-            ? { torrent: fetched.data, category: settings.category }
+            ? { torrent: fetched.data, hash, category: settings.category }
             : // A magnet fetches its file list from the swarm, then stops.
               {
                 magnet: fetched.uri,
+                hash,
                 category: settings.category,
                 metadataOnly: true,
               }

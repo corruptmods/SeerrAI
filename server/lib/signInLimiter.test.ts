@@ -1,4 +1,4 @@
-import { SignInLimiter } from '@server/lib/signInLimiter';
+import { addressGroupOf, SignInLimiter } from '@server/lib/signInLimiter';
 import type { Request, Response } from 'express';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -46,6 +46,54 @@ describe('the sign-in limiter', () => {
     }
     assert.ok(limiter.retryAfter(from('10.0.0.1'), long) > 0);
     assert.equal(limiter.retryAfter(from('10.0.0.1'), `${long}y`), 0);
+  });
+});
+
+describe('the address a budget belongs to', () => {
+  it('counts an IPv6 client by its /64, however the address is written', () => {
+    const limiter = new SignInLimiter('test-v6');
+    for (let i = 1; i <= 10; i++) {
+      limiter.count(from(`2001:db8:1:2::${i.toString(16)}`), 'someone');
+    }
+    assert.ok(limiter.retryAfter(from('2001:db8:1:2:ffff::1'), 'someone') > 0);
+    assert.ok(
+      limiter.retryAfter(from('2001:0DB8:0001:0002:0:0:0:abcd'), 'someone') > 0
+    );
+    assert.equal(limiter.retryAfter(from('2001:db8:1:3::1'), 'someone'), 0);
+  });
+
+  it('never puts distinct IPv4 clients together, however they arrive', () => {
+    const limiter = new SignInLimiter('test-v4');
+    for (let i = 0; i < 10; i++) {
+      limiter.count(from('192.0.2.1'), 'someone');
+    }
+    assert.ok(limiter.retryAfter(from('::ffff:192.0.2.1'), 'someone') > 0);
+    assert.ok(limiter.retryAfter(from('::ffff:c000:201'), 'someone') > 0);
+    for (const other of [
+      '192.0.2.2',
+      '::ffff:192.0.2.2',
+      '::ffff:c000:202',
+      '::192.0.2.1',
+      '::1',
+      '64:ff9b::192.0.2.1',
+      '2001:0:c000:201:8000:63bf:3fff:fdd2',
+    ]) {
+      assert.equal(limiter.retryAfter(from(other), 'someone'), 0, other);
+    }
+  });
+
+  it('keeps addresses that carry IPv4 clients whole', () => {
+    assert.equal(addressGroupOf('64:ff9b::192.0.2.1'), '64:ff9b::192.0.2.1');
+    assert.notEqual(
+      addressGroupOf('64:ff9b::192.0.2.1'),
+      addressGroupOf('64:ff9b::192.0.2.2')
+    );
+    assert.notEqual(
+      addressGroupOf('2001:0:c000:201:8000:63bf:3fff:fdd2'),
+      addressGroupOf('2001:0:c000:201:8000:63bf:3fff:fdd3')
+    );
+    assert.equal(addressGroupOf('fe80::1%eth0'), 'fe80:0:0:0::/64');
+    assert.equal(addressGroupOf(undefined), '');
   });
 });
 

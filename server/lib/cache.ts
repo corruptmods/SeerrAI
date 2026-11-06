@@ -22,11 +22,14 @@ const OBJECT_VALUE_SIZE = 80;
 const PROMISE_VALUE_SIZE = 80;
 const ARRAY_VALUE_SIZE = 40;
 
-// Caps key count, not memory: TMDB credits rosters are uncapped.
 const TMDB_MAX_KEYS = 1000;
 
 // Backstop only; the 15 minute TTL bounds this tier.
 const TMDB_SCAN_MAX_KEYS = 2000;
+
+// Credits rosters are uncapped, so TMDB answers are also capped by their size
+// (as JSON); the least recently used go first.
+const TMDB_MAX_BYTES = 64 * 1024 * 1024;
 
 // Only profile, root folder and language lookups land here, keyed by server
 // url: a few keys per server.
@@ -108,6 +111,18 @@ const valueLength = (value: unknown): number => {
   return 0;
 };
 
+/** An answer's size as JSON, or as bytes for a buffer. */
+const bytesOf = (value: unknown): number => {
+  if (Buffer.isBuffer(value)) {
+    return value.length;
+  }
+  try {
+    return Math.max(1, JSON.stringify(value)?.length ?? 1);
+  } catch {
+    return 1;
+  }
+};
+
 interface LruEntry {
   value: unknown;
   ksize: number;
@@ -122,10 +137,22 @@ class LruCacheStore implements CacheStore {
   private ksize = 0;
   private vsize = 0;
 
-  constructor({ max, stdTtl }: { max: number; stdTtl: number }) {
+  constructor({
+    max,
+    maxBytes,
+    stdTtl,
+  }: {
+    max: number;
+    maxBytes?: number;
+    stdTtl: number;
+  }) {
     this.stdTtl = stdTtl;
     this.cache = new LRUCache<string, LruEntry>({
       max,
+      ...(maxBytes && {
+        maxSize: maxBytes,
+        sizeCalculation: (entry) => bytesOf(entry.value),
+      }),
       ttl: stdTtl * 1000,
       // Otherwise expired entries are dropped only when read.
       ttlAutopurge: true,
@@ -160,6 +187,10 @@ class LruCacheStore implements CacheStore {
     // A ttl of 0 means the entry never expires.
     this.cache.set(key, entry, { ttl: (ttl ?? this.stdTtl) * 1000 });
 
+    // An answer larger than the whole size limit isn't kept.
+    if (this.cache.peek(key) !== entry) {
+      return false;
+    }
     this.ksize += entry.ksize;
     this.vsize += entry.vsize;
 
@@ -200,7 +231,7 @@ class LruCacheStore implements CacheStore {
   }
 }
 
-class Cache {
+export class Cache {
   public id: AvailableCacheIds;
   public data: CacheStore;
   public name: string;
@@ -208,13 +239,14 @@ class Cache {
   constructor(
     id: AvailableCacheIds,
     name: string,
-    options: { max: number; stdTtl?: number }
+    options: { max: number; maxBytes?: number; stdTtl?: number }
   ) {
     this.id = id;
     this.name = name;
 
     this.data = new LruCacheStore({
       max: options.max,
+      maxBytes: options.maxBytes,
       stdTtl: options.stdTtl ?? DEFAULT_TTL,
     });
   }
@@ -233,10 +265,12 @@ class CacheManager {
     tmdb: new Cache('tmdb', 'The Movie Database API', {
       stdTtl: 21600,
       max: TMDB_MAX_KEYS,
+      maxBytes: TMDB_MAX_BYTES,
     }),
     tmdbscan: new Cache('tmdbscan', 'The Movie Database API (Library Scans)', {
       stdTtl: 900,
       max: TMDB_SCAN_MAX_KEYS,
+      maxBytes: TMDB_MAX_BYTES,
     }),
     radarr: new Cache('radarr', 'Radarr API', { max: RADARR_MAX_KEYS }),
     sonarr: new Cache('sonarr', 'Sonarr API', { max: SONARR_MAX_KEYS }),

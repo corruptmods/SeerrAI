@@ -26,12 +26,14 @@ import type { Song, SongVersion } from '@server/lib/music/songs';
 import { albumFor, otherTake, singleFor } from '@server/lib/music/songs';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import { Permission } from '@server/lib/permissions';
 import type { PlaylistLink, SourceSong } from '@server/lib/playlists/sources';
 import {
   PlaylistSourceError,
   parsePlaylistLink,
   readPlaylist,
 } from '@server/lib/playlists/sources';
+import { requestServerIssue } from '@server/lib/requestServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import requestLock, { requestKey } from '@server/utils/requestLock';
@@ -139,9 +141,10 @@ class Playlists {
 
   /**
    * Retries a song now: unmatched, unrequestable or orphaned songs are
-   * matched again; a failed request is retried.
+   * matched again; a failed request is retried. Returns why it can't be,
+   * if it can't.
    */
-  public async retry(song: MediaListSong): Promise<void> {
+  public async retry(song: MediaListSong): Promise<string | undefined> {
     if (
       (song.state === 'requested' || song.state === 'approval') &&
       song.requestId
@@ -162,8 +165,7 @@ class Playlists {
         this.kick();
         return;
       }
-      await this.retryRequest(song.requestId);
-      return;
+      return this.retryRequest(song.requestId);
     }
     // Held back by a setting: try again in case it now allows.
     if (song.state === 'waiting') {
@@ -178,27 +180,52 @@ class Playlists {
     this.kick();
   }
 
-  /** Retries a failed request, as the request's Retry button does. */
-  private async retryRequest(requestId: number): Promise<void> {
-    await requestLock.dispatch(requestKey(requestId), async () => {
+  /**
+   * Retries a failed request, as the request's Retry button does, for an
+   * owner who may still request music and whose requests need no approval.
+   * Returns why not, if not.
+   */
+  private async retryRequest(requestId: number): Promise<string | undefined> {
+    return requestLock.dispatch(requestKey(requestId), async () => {
       const repo = getRepository(MediaRequest);
       const request = await repo.findOne({
         where: { id: requestId },
         relations: { requestedBy: true, modifiedBy: true },
       });
-      if (request?.status !== MediaRequestStatus.FAILED) return;
+      if (request?.status !== MediaRequestStatus.FAILED) return undefined;
       // Like Retry: never for blocklisted media.
       if (
         request.media?.status === MediaStatus.BLOCKLISTED ||
         request.media?.status4k === MediaStatus.BLOCKLISTED
       ) {
-        return;
+        return undefined;
+      }
+      const owner = request.requestedBy;
+      if (
+        !owner?.hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
+          type: 'or',
+        }) ||
+        !owner.hasPermission(
+          [
+            Permission.MANAGE_REQUESTS,
+            Permission.AUTO_APPROVE,
+            Permission.AUTO_APPROVE_MUSIC,
+          ],
+          { type: 'or' }
+        )
+      ) {
+        return 'Its request failed after it was approved, so an admin retries it.';
+      }
+      // Its server is gone: retrying would only fail again.
+      if (requestServerIssue(request)) {
+        return 'Its request has no Lidarr server to go to. An admin can edit it to choose one, then retry it.';
       }
       // Release the failure notice so a second failure notifies again.
       await releaseDelivery(request.id, Notification.MEDIA_FAILED);
       // Re-approving picks up its failed songs.
       request.status = MediaRequestStatus.APPROVED;
       await repo.save(request);
+      return undefined;
     });
   }
 

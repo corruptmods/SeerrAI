@@ -309,6 +309,49 @@ describe('a person’s own CSS', () => {
       200
     );
   });
+
+  it('can’t be read on the owner’s or an admin’s screens by someone who only manages users', async () => {
+    getSettings().appearance.personalCss = true;
+    const users = getRepository(User);
+    await users.update(
+      { email: 'friend@seerr.dev' },
+      { permissions: Permission.MANAGE_USERS }
+    );
+    const make = (email: string, permissions: Permission) =>
+      users.save(
+        Object.assign(new User(), {
+          email,
+          username: email.split('@')[0],
+          permissions,
+          avatar: '',
+          userType: UserType.LOCAL,
+        })
+      );
+    const otherAdmin = await make('second-admin@seerr.dev', Permission.ADMIN);
+    const someone = await make('someone@seerr.dev', Permission.REQUEST);
+    const owner = await signIn('admin@seerr.dev');
+    for (const id of [1, otherAdmin.id, someone.id]) {
+      const saved = await owner.agent
+        .post(`/api/v1/user/${id}/settings/css`)
+        .send({ css: mine });
+      assert.equal(saved.status, 200);
+    }
+
+    const { agent } = await signIn('friend@seerr.dev');
+    for (const id of [1, otherAdmin.id]) {
+      const res = await agent.get(`/api/v1/user/${id}/settings/css`);
+      assert.equal(res.status, 403);
+      assert.equal(res.body.css, undefined);
+    }
+    const theirs = await agent.get(`/api/v1/user/${someone.id}/settings/css`);
+    assert.equal(theirs.status, 200);
+    assert.equal(theirs.body.css, mine);
+
+    const byOwner = await owner.agent.get(
+      `/api/v1/user/${otherAdmin.id}/settings/css`
+    );
+    assert.equal(byOwner.body.css, mine);
+  });
 });
 
 describe('a theme file as the server’s default', () => {

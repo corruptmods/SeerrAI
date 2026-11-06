@@ -41,7 +41,15 @@ type ThemeAppProps = AppProps & {
 type ThemedDocumentProps = DocumentInitialProps & {
   appearance: Appearance;
   season?: SeasonId;
+  /** The script nonce in this page's Content-Security-Policy. */
+  nonce?: string;
 };
+
+/** The script nonce the server put in this page's Content-Security-Policy. */
+const nonceOf = (policy: unknown): string | undefined =>
+  typeof policy === 'string'
+    ? /'nonce-([A-Za-z0-9+/=]+)'/.exec(policy)?.[1]
+    : undefined;
 
 class MyDocument extends Document<ThemedDocumentProps> {
   static async getInitialProps(
@@ -62,6 +70,7 @@ class MyDocument extends Document<ThemedDocumentProps> {
       });
 
     const initialProps = await Document.getInitialProps(ctx);
+    const nonce = nonceOf(ctx.res?.getHeader('Content-Security-Policy'));
     const chosen = appProps?.currentSettings
       ? chosenAppearance({
           signedIn: !!appProps.user,
@@ -109,15 +118,18 @@ class MyDocument extends Document<ThemedDocumentProps> {
         {links.personal && (
           <link rel="stylesheet" id={PERSONAL_CSS_ID} href={links.personal} />
         )}
-        <script dangerouslySetInnerHTML={{ __html: SAFE_MODE_SCRIPT }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: SAFE_MODE_SCRIPT }}
+        />
       </>
     );
 
-    return { ...initialProps, appearance, season, styles };
+    return { ...initialProps, appearance, season, nonce, styles };
   }
 
   render(): JSX.Element {
-    const { appearance, season } = this.props;
+    const { appearance, season, nonce } = this.props;
     // The browser loads strings as a cached file (_app's startStrings); drop
     // them from page data (about 400 KB).
     delete (this.props.__NEXT_DATA__.props as { messages?: unknown }).messages;
@@ -125,17 +137,20 @@ class MyDocument extends Document<ThemedDocumentProps> {
     // page before first paint.
     return (
       <Html {...themeAttributes(appearance, season)}>
-        <Head>
+        <Head nonce={nonce}>
           <style
             id={THEME_STYLE_ID}
             dangerouslySetInnerHTML={{ __html: themeCss(appearance, season) }}
           />
-          <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+          <script
+            nonce={nonce}
+            dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+          />
         </Head>
         <body>
           <BootScreen />
           <Main />
-          <NextScript />
+          <NextScript nonce={nonce} />
         </body>
       </Html>
     );

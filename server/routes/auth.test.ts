@@ -4,6 +4,7 @@ import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
+import { isStandInEmail } from '@server/constants/oidc';
 import type { MediaServerKind } from '@server/constants/server';
 import {
   MEDIA_SERVER_KINDS,
@@ -14,16 +15,20 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import type { PlexDevice } from '@server/interfaces/api/plexInterfaces';
 import { scheduledJobs } from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
+import { confirmationToken } from '@server/lib/emailConfirmation';
 import ImageProxy from '@server/lib/imageproxy';
 import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { checkUser } from '@server/middleware/auth';
 import { setupTestDb } from '@server/test/db';
 import { ApiError } from '@server/types/error';
 import axios from 'axios';
+import bcrypt from 'bcrypt';
 import type { Express } from 'express';
 import express from 'express';
 import session from 'express-session';
@@ -435,6 +440,25 @@ describe('POST /auth/jellyfin/quickconnect/authenticate', () => {
     assert.notStrictEqual(updatedUser.jellyfinDeviceId, 'old-device-id');
   });
 
+  it('signs no one in when Jellyfin answers without an account id', async () => {
+    authenticateQCMock.mock.mockImplementation(async () => ({
+      ...defaultAuthenticateResponse,
+      // A broken answer, as some servers send.
+      User: {
+        ...defaultAuthenticateResponse.User,
+        Id: undefined as unknown as string,
+      },
+    }));
+    const agent = request.agent(app);
+
+    const res = await agent
+      .post('/auth/jellyfin/quickconnect/authenticate')
+      .send({ secret: 'abc123def456abc123def456' });
+
+    assert.strictEqual(res.status, 401);
+    assert.strictEqual((await agent.get('/auth/me')).status, 403);
+  });
+
   it('refreshes avatarVersion/avatarETag when the remote avatar has changed', async () => {
     const userRepo = getRepository(User);
     const existingUser = new User({
@@ -753,6 +777,33 @@ describe('POST /auth/local', () => {
     assert.strictEqual(res.body.message, 'Access denied.');
   });
 
+  it('checks a password as long for an unknown email or a passwordless account as for a wrong one', async () => {
+    await getRepository(User).save(
+      new User({
+        email: 'nopassword@example.invalid',
+        permissions: Permission.REQUEST,
+        avatar: '',
+        userType: UserType.PLEX,
+      })
+    );
+    const compare = mock.method(bcrypt, 'compare');
+    try {
+      for (const email of [
+        'nobody@example.invalid',
+        'nopassword@example.invalid',
+      ]) {
+        compare.mock.resetCalls();
+        const res = await request(app)
+          .post('/auth/local')
+          .send({ email, password: 'test1234' });
+        assert.strictEqual(res.status, 403, email);
+        assert.strictEqual(compare.mock.callCount(), 1, email);
+      }
+    } finally {
+      compare.mock.restore();
+    }
+  });
+
   it('returns 500 when local login is disabled', async () => {
     const settings = getSettings();
     settings.main.localLogin = false;
@@ -949,6 +1000,23 @@ describe('POST /auth/reset-password/:guid', () => {
     );
   });
 
+  it('keeps a still-valid recovery link out of the log when the new password is too short', async () => {
+    const guid = await getResetGuid('admin@seerr.dev');
+    const warn = mock.method(logger, 'warn');
+    try {
+      const res = await request(app)
+        .post(`/auth/reset-password/${guid}`)
+        .send({ password: 'short' });
+      assert.strictEqual(res.status, 500);
+      assert.ok(warn.mock.callCount() > 0);
+      assert.ok(
+        !JSON.stringify(warn.mock.calls.map((c) => c.arguments)).includes(guid)
+      );
+    } finally {
+      warn.mock.restore();
+    }
+  });
+
   it('returns 500 when password is missing', async () => {
     const guid = await getResetGuid('admin@seerr.dev');
 
@@ -1012,6 +1080,20 @@ mock.method(PlexTvAPI.prototype, 'getUser', async () => ({
   authToken: 'plex-token',
 }));
 mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => plexShared);
+/** Plex servers the signing-in account owns or has shared with it. */
+let plexServers = ['machine-1'];
+/** Whether it owns them, rather than having them shared. */
+let plexOwnsServers = true;
+mock.method(PlexTvAPI.prototype, 'getDevices', async () =>
+  plexServers.map(
+    (clientIdentifier) =>
+      ({
+        clientIdentifier,
+        provides: ['server'],
+        owned: plexOwnsServers,
+      }) as unknown as PlexDevice
+  )
+);
 /** Whether plex.tv is reachable for the owner's share check. */
 let plexDown = false;
 mock.method(PlexTvAPI.prototype, 'getUsers', async () => {
@@ -1104,6 +1186,29 @@ describe('signing in with Plex', () => {
     assert.strictEqual(after.plexId, null);
     assert.strictEqual(after.userType, UserType.LOCAL);
     assert.strictEqual(after.username, 'mallory');
+  });
+
+  it('gives a Plex account an email someone set on themselves without confirming it', async () => {
+    const mallory = await passwordUser({
+      email: 'plexfriend@example.com',
+      username: 'mallory',
+      emailVerified: false,
+    });
+
+    const res = await plexSignIn();
+
+    assert.strictEqual(res.status, 200);
+    assert.notStrictEqual(res.body.id, mallory.id);
+    const created = await getRepository(User).findOneOrFail({
+      where: { plexId: 3000 },
+    });
+    assert.strictEqual(created.email, 'plexfriend@example.com');
+    const after = await getRepository(User).findOneOrFail({
+      where: { id: mallory.id },
+    });
+    assert.ok(isStandInEmail(after.email));
+    assert.strictEqual(after.plexId, null);
+    assert.strictEqual(after.userType, UserType.LOCAL);
   });
 
   it('never moves an account linked to one Plex account to another', async () => {
@@ -1617,6 +1722,8 @@ describe('with several media servers', () => {
   beforeEach(() => {
     plexAccount = { id: 3000, email: 'plexfriend@example.com' };
     plexShared = true;
+    plexServers = ['machine-1'];
+    plexOwnsServers = true;
     plexDown = false;
     jellyfinAccountMock.mock.mockImplementation(async () => ({
       Policy: { IsDisabled: false },
@@ -1684,6 +1791,112 @@ describe('with several media servers', () => {
       where: { id: 1 },
     });
     assert.strictEqual(owner.plexId, 3000);
+  });
+
+  it('never links the owner by email to a Plex account without this Plex server', async () => {
+    connectServers('plex');
+    await getRepository(User).update(1, { plexId: null });
+    plexAccount = { id: 3000, email: 'admin@seerr.dev' };
+    plexShared = false;
+    plexServers = ['machine-elsewhere'];
+
+    const res = await plexSignIn();
+    assert.strictEqual(res.status, 403);
+    const owner = await getRepository(User).findOneOrFail({
+      where: { id: 1 },
+    });
+    assert.strictEqual(owner.plexId, null);
+  });
+
+  describe('with no accounts yet', () => {
+    beforeEach(async () => {
+      await getRepository(User).createQueryBuilder().delete().execute();
+    });
+    afterEach(async () => {
+      await schedule.gracefulShutdown();
+      scheduledJobs.length = 0;
+    });
+
+    it('never makes a Plex account the owner of a server set up with Jellyfin', async () => {
+      connectServers('jellyfin', 'plex');
+
+      const res = await plexSignIn();
+      assert.strictEqual(res.status, 403);
+      assert.strictEqual(await getRepository(User).count(), 0);
+      assert.strictEqual(
+        getSettings().main.mediaServerType,
+        MediaServerType.JELLYFIN
+      );
+    });
+
+    it('makes the owner of a server set up with Plex only from the Plex account that owns it', async () => {
+      connectServers('plex');
+      plexServers = ['machine-elsewhere'];
+      assert.strictEqual((await plexSignIn()).status, 403);
+      assert.strictEqual(await getRepository(User).count(), 0);
+
+      plexServers = ['machine-1'];
+      plexOwnsServers = false;
+      assert.strictEqual((await plexSignIn()).status, 403);
+      assert.strictEqual(await getRepository(User).count(), 0);
+
+      plexOwnsServers = true;
+
+      plexServers = ['machine-1'];
+      const res = await plexSignIn();
+      assert.strictEqual(res.status, 200);
+      const owner = await getRepository(User).findOneOrFail({
+        where: { plexId: 3000 },
+      });
+      assert.strictEqual(owner.permissions, Permission.ADMIN);
+      assert.strictEqual(
+        getSettings().main.mediaServerType,
+        MediaServerType.PLEX
+      );
+    });
+
+    it('sets Plex up with the first account on a fresh install', async () => {
+      connectServers('plex');
+      const settings = getSettings();
+      settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+      settings.plex.connected = false;
+      plexServers = [];
+
+      const res = await plexSignIn();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(settings.main.mediaServerType, MediaServerType.PLEX);
+      assert.strictEqual(settings.plex.connected, true);
+    });
+
+    it('never makes the owner from a Jellyfin server beside a Plex primary', async () => {
+      connectServers('plex', 'jellyfin');
+      const login = mock.method(JellyfinAPI.prototype, 'login', async () => ({
+        User: {
+          Id: 'jf-admin',
+          Name: 'glasswing',
+          ServerId: 'jellyfin-server',
+          ServerName: 'Static Garden',
+          Configuration: { GroupedFolders: [] },
+          Policy: { IsAdministrator: true },
+        },
+        AccessToken: 'jellyfin-token',
+      }));
+      try {
+        const res = await request(app).post('/auth/jellyfin').send({
+          username: 'glasswing',
+          password: 'secret',
+          serverType: MediaServerType.JELLYFIN,
+        });
+        assert.strictEqual(res.status, 403);
+        assert.strictEqual(await getRepository(User).count(), 0);
+        assert.strictEqual(
+          getSettings().main.mediaServerType,
+          MediaServerType.PLEX
+        );
+      } finally {
+        login.mock.restore();
+      }
+    });
   });
 
   it('signs in with Plex only while Plex is connected and its sign-in is on', async () => {
@@ -1852,6 +2065,55 @@ describe('with several media servers', () => {
         where: { embyUserId: 'emby-bob' },
       });
       assert.strictEqual(emby.jellyfinUserId, null, 'never merged');
+    });
+
+    it('gives a new account its username as email when someone set it on themselves without confirming it', async () => {
+      connectServers('plex', 'jellyfin');
+      const holder = await passwordUser({
+        email: 'bob',
+        username: 'static',
+        emailVerified: false,
+      });
+
+      const res = await signIn(MediaServerType.JELLYFIN);
+      assert.strictEqual(res.status, 200);
+      const created = await getRepository(User).findOneOrFail({
+        where: { jellyfinUserId: 'jf-bob' },
+      });
+      assert.strictEqual(created.email, 'bob');
+      assert.strictEqual(created.emailVerified, true);
+      const after = await getRepository(User).findOneOrFail({
+        where: { id: holder.id },
+      });
+      assert.ok(isStandInEmail(after.email));
+    });
+
+    it('never takes an email the new account only typed in, and leaves it unconfirmed', async () => {
+      connectServers('plex', 'jellyfin');
+      await passwordUser({
+        email: 'harbour@example.invalid',
+        username: 'static',
+        emailVerified: false,
+      });
+      const typed = (email: string) =>
+        request(app).post('/auth/jellyfin').send({
+          username: 'bob',
+          password: 'secret',
+          email,
+          serverType: MediaServerType.JELLYFIN,
+        });
+
+      const refused = await typed('harbour@example.invalid');
+      assert.strictEqual(refused.status, 403);
+      assert.strictEqual(refused.body.message, ApiErrorCode.ExistingAccount);
+
+      const res = await typed('lantern@example.invalid');
+      assert.strictEqual(res.status, 200);
+      const created = await getRepository(User).findOneOrFail({
+        where: { jellyfinUserId: 'jf-bob' },
+      });
+      assert.strictEqual(created.email, 'lantern@example.invalid');
+      assert.strictEqual(created.emailVerified, false);
     });
 
     it('refuses a sign-in the server answers without an account id', async () => {
@@ -2124,6 +2386,37 @@ describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
     });
   }
 
+  it('leaves setup unfinished and settings untouched when the media server cannot make an API key', async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = false;
+    }
+    settings.jellyfin.ip = '';
+    const keyBefore = settings.jellyfin.apiKey;
+    apiToken.mock.mockImplementation(async () => {
+      throw new Error('no key');
+    });
+
+    const res = await request(app).post('/auth/jellyfin').send({
+      username: 'harbour',
+      password: 'secret',
+      email: 'harbour@example.invalid',
+      hostname: '192.0.2.20',
+      port: 8096,
+      serverType: MediaServerType.JELLYFIN,
+    });
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual(
+      settings.main.mediaServerType,
+      MediaServerType.NOT_CONFIGURED
+    );
+    assert.strictEqual(settings.jellyfin.connected, false);
+    assert.strictEqual(settings.jellyfin.ip, '');
+    assert.strictEqual(settings.jellyfin.apiKey, keyBefore);
+    assert.strictEqual(await getRepository(User).count(), 0);
+  });
+
   it('never takes a server address from sign-in after setup, even with none saved', async () => {
     connectServers('jellyfin');
     getSettings().jellyfin.ip = '';
@@ -2148,5 +2441,184 @@ describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
     });
     assert.strictEqual(unnamed.status, 500);
     assert.strictEqual(login.mock.callCount(), 0);
+  });
+});
+
+describe('setting up a Jellyfin or Emby server over existing accounts', () => {
+  let login: ReturnType<typeof mock.method<JellyfinAPI, 'login'>>;
+  let apiToken: ReturnType<typeof mock.method<JellyfinAPI, 'createApiToken'>>;
+  let serverName: ReturnType<typeof mock.method<JellyfinAPI, 'getServerName'>>;
+  let saved: {
+    mediaServerType: MediaServerType;
+    jellyfin: object;
+    emby: object;
+  };
+
+  beforeEach(() => {
+    const settings = getSettings();
+    saved = {
+      mediaServerType: settings.main.mediaServerType,
+      jellyfin: structuredClone(settings.jellyfin),
+      emby: structuredClone(settings.emby),
+    };
+    // Fresh settings over a database that has users.
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = false;
+    }
+    settings.jellyfin.ip = '';
+    settings.emby.ip = '';
+    login = mock.method(JellyfinAPI.prototype, 'login', async () => ({
+      User: {
+        Id: 'media-admin',
+        Name: 'harbour',
+        ServerId: 'media-server',
+        ServerName: 'Harbour Lights',
+        Configuration: { GroupedFolders: [] },
+        Policy: { IsAdministrator: true },
+      },
+      AccessToken: 'media-token',
+    }));
+    apiToken = mock.method(
+      JellyfinAPI.prototype,
+      'createApiToken',
+      async () => 'media-api-key'
+    );
+    serverName = mock.method(
+      JellyfinAPI.prototype,
+      'getServerName',
+      async () => 'Harbour Lights'
+    );
+  });
+
+  afterEach(async () => {
+    login.mock.restore();
+    apiToken.mock.restore();
+    serverName.mock.restore();
+    await schedule.gracefulShutdown();
+    scheduledJobs.length = 0;
+    const settings = getSettings();
+    settings.main.mediaServerType = saved.mediaServerType;
+    Object.assign(settings.jellyfin, saved.jellyfin);
+    Object.assign(settings.emby, saved.emby);
+  });
+
+  const setUp = (kind: 'jellyfin' | 'emby') =>
+    request(app)
+      .post('/auth/jellyfin')
+      .send({
+        username: 'harbour',
+        password: 'secret',
+        hostname: '192.0.2.20',
+        port: 8096,
+        email: 'harbour@example.invalid',
+        serverType: typeOfKind(kind),
+      });
+
+  for (const kind of ['jellyfin', 'emby'] as const) {
+    it(`refuses a ${kind} administrator when the owner has a different ${kind} account`, async () => {
+      await getRepository(User).update(1, {
+        [kind === 'jellyfin' ? 'jellyfinUserId' : 'embyUserId']: 'owner-own',
+      });
+
+      const res = await setUp(kind);
+      assert.strictEqual(res.status, 403);
+      assert.strictEqual(res.body.message, ApiErrorCode.ExistingAccount);
+      const settings = getSettings();
+      assert.strictEqual(
+        settings.main.mediaServerType,
+        MediaServerType.NOT_CONFIGURED
+      );
+      assert.strictEqual(settings[kind].ip, '');
+      assert.strictEqual(apiToken.mock.callCount(), 0);
+      const owner = await getRepository(User).findOneOrFail({
+        where: { id: 1 },
+      });
+      assert.strictEqual(owner.email, 'admin@seerr.dev');
+    });
+  }
+
+  it("sets up the owner's own account, or one the owner lacks", async () => {
+    // The seeded owner has a Plex account only.
+    const first = await setUp('jellyfin');
+    assert.strictEqual(first.status, 200);
+    assert.strictEqual(first.body.id, 1);
+    assert.strictEqual(
+      getSettings().main.mediaServerType,
+      MediaServerType.JELLYFIN
+    );
+
+    // Fresh settings again: the same account still sets up.
+    getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    getSettings().jellyfin.ip = '';
+    const again = await setUp('jellyfin');
+    assert.strictEqual(again.status, 200);
+    assert.strictEqual(again.body.id, 1);
+  });
+
+  it('refuses an account another user already has', async () => {
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { jellyfinUserId: 'media-admin' }
+    );
+
+    const res = await setUp('jellyfin');
+    assert.strictEqual(res.status, 403);
+    const owner = await getRepository(User).findOneOrFail({
+      where: { id: 1 },
+    });
+    assert.strictEqual(owner.jellyfinUserId, null);
+  });
+});
+
+describe('confirming an email', () => {
+  const friend = () =>
+    getRepository(User).findOneByOrFail({ username: 'friend' });
+
+  it('confirms the email the link was sent to', async () => {
+    await getRepository(User).update(
+      { username: 'friend' },
+      { emailVerified: false }
+    );
+    const res = await request(app).get(
+      `/auth/confirm-email/${confirmationToken(await friend())}`
+    );
+    assert.strictEqual(res.status, 302);
+    assert.strictEqual((await friend()).emailVerified, true);
+  });
+
+  it('refuses a link for an email since changed, or expired', async () => {
+    await getRepository(User).update(
+      { username: 'friend' },
+      { emailVerified: false }
+    );
+    const stale = confirmationToken(await friend());
+    const expired = confirmationToken(
+      await friend(),
+      Date.now() - 8 * 24 * 60 * 60 * 1000
+    );
+    await getRepository(User).update(
+      { username: 'friend' },
+      { email: 'glasswing@example.invalid' }
+    );
+
+    assert.strictEqual(
+      (await request(app).get(`/auth/confirm-email/${stale}`)).status,
+      400
+    );
+    await getRepository(User).update(
+      { username: 'friend' },
+      { email: 'friend@seerr.dev' }
+    );
+    assert.strictEqual(
+      (await request(app).get(`/auth/confirm-email/${expired}`)).status,
+      400
+    );
+    assert.strictEqual(
+      (await request(app).get('/auth/confirm-email/2.9999999999999.forged'))
+        .status,
+      400
+    );
+    assert.strictEqual((await friend()).emailVerified, false);
   });
 });

@@ -35,8 +35,9 @@ import {
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import { arrIndexerOrigins } from '@server/lib/backfill/indexerOrigins';
 import { nzbWith } from '@server/lib/backfill/nzb';
-import { mapRemotePath } from '@server/lib/backfill/paths';
+import { escapesFolder, mapRemotePath } from '@server/lib/backfill/paths';
 import { torrentStage } from '@server/lib/backfill/progress';
 import type { TorrentReading } from '@server/lib/backfill/watchdog';
 import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
@@ -1396,11 +1397,14 @@ class SongFetcher {
         { id: release.indexerId, name: release.indexer },
         'download',
         () =>
-          new ProwlarrAPI(getSettings().backfill.prowlarr).fetchRelease({
-            ...release,
-            protocol,
-            infoHash: release.infoHash,
-          })
+          new ProwlarrAPI(getSettings().backfill.prowlarr).fetchRelease(
+            {
+              ...release,
+              protocol,
+              infoHash: release.infoHash,
+            },
+            { indexerOrigins: arrIndexerOrigins }
+          )
       );
     } catch (e) {
       if (e instanceof IndexerLimitReached) {
@@ -1427,8 +1431,8 @@ class SongFetcher {
       await torrents.ensureCategory(category);
       await torrents.addTorrent(
         fetched.kind === 'torrent'
-          ? { torrent: fetched.data, category }
-          : { magnet: fetched.uri, category, metadataOnly: true }
+          ? { torrent: fetched.data, hash, category }
+          : { magnet: fetched.uri, hash, category, metadataOnly: true }
       );
       fetch.downloadId = hash;
       fetch.stage = CHOOSING;
@@ -1577,7 +1581,7 @@ class SongFetcher {
       }
       // Lidarr copies whatever path it's given: reject files escaping the
       // torrent's folder.
-      if (chosen.some((f) => f.name.split(/[\\/]/).includes('..'))) {
+      if (chosen.some((f) => escapesFolder(f.name))) {
         throw new ReleaseProblem(
           'The torrent names files outside its own folder.'
         );

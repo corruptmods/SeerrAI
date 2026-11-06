@@ -10,7 +10,12 @@ import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
 import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
+import { takeEmail } from '@server/lib/manageUser';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
+import {
+  forgetSigningKeys,
+  idTokenSignedByProvider,
+} from '@server/lib/oidcSignature';
 import type { OidcProviderSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import gravatarUrl from 'gravatar-url';
@@ -198,7 +203,10 @@ export const discover = async (
 };
 
 /** Clears the discovery cache, e.g. when settings change. */
-export const forgetDiscovery = (): void => discovered.clear();
+export const forgetDiscovery = (): void => {
+  discovered.clear();
+  forgetSigningKeys();
+};
 
 /** The openid-client or network error code, if any. */
 export const errorCode = (e: unknown): string | undefined =>
@@ -485,8 +493,26 @@ export const finishAtProvider = async (
     idTokenExpected: true,
   });
   const claims = tokens.claims();
-  if (!claims) {
+  if (!claims || !tokens.id_token) {
     throw new Error('The provider sent no ID token.');
+  }
+  const jwksUri = config.serverMetadata().jwks_uri;
+  const signed = await idTokenSignedByProvider(tokens.id_token, {
+    // Plain http only for an issuer on this machine (see issuerUrlProblem).
+    jwksUri:
+      jwksUri &&
+      (jwksUri.startsWith('https:') ||
+        new URL(provider.issuerUrl).protocol === 'http:')
+        ? jwksUri
+        : undefined,
+    clientSecret: provider.clientSecret,
+    timeoutSeconds: OIDC_TIMEOUT_SECONDS,
+  });
+  if (!signed) {
+    throw Object.assign(
+      new Error('The ID token is not signed by the provider.'),
+      { code: 'ID_TOKEN_SIGNATURE' }
+    );
   }
 
   // Some providers (Authelia by default) give name, email and groups only via
@@ -649,12 +675,10 @@ export const accountForSignIn = async (
     return { refused: 'no-account' };
   }
 
-  // Use the email if the provider verified it and no one here has it;
-  // otherwise a placeholder no real email can equal, replaceable in profile.
-  if (
-    identity.email &&
-    (await getRepository(User).exists({ where: { email: identity.email } }))
-  ) {
+  // Use the email if the provider verified it and no one here has it (or
+  // only unconfirmed); otherwise a placeholder no real email can equal,
+  // replaceable in profile.
+  if (identity.email && !(await takeEmail(identity.email))) {
     return { refused: 'existing-account' };
   }
   const email = identity.email ?? standInEmail(provider.id, randomUUID());

@@ -7,6 +7,10 @@
 #  - a Node.js 22 release with security fixes newer than the image's.
 # It runs in the image's own Node.js, so the host needs only Docker. It
 # stops the build when it finds anything, or can't check.
+# Not checked here: Alpine's packages (the Dockerfile's apk upgrade and
+# build tools, as Alpine publishes them at build time), the base image beyond
+# its Node.js version, and anything fetched outside the lockfile (GitHub
+# Actions and the tools they install, TRaSH Guides).
 set -euo pipefail
 cd "$(dirname "$0")"
 

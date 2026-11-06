@@ -10,8 +10,14 @@ import {
   jellyfinFamily,
   serverName,
 } from '@server/lib/mediaServers';
+import type { ServiceAddress } from '@server/lib/savedSecret';
+import { keptSecret } from '@server/lib/savedSecret';
 import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
-import type { Library, MusicLibrary } from '@server/lib/settings';
+import type {
+  JellyfinSettings,
+  Library,
+  MusicLibrary,
+} from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { requireMusicSettings } from '@server/middleware/music';
@@ -23,6 +29,14 @@ import { z } from 'zod';
 
 const libraryUpdateSchema = z.object({
   enabled: z.boolean(),
+});
+
+/** A Jellyfin or Emby address as savedSecret compares them. */
+const addressOf = (server: Partial<JellyfinSettings>): ServiceAddress => ({
+  hostname: server.ip,
+  port: server.port,
+  useSsl: server.useSsl,
+  urlBase: server.urlBase,
 });
 
 /** Jellyfin or Emby settings (/settings/jellyfin and /settings/emby). */
@@ -44,7 +58,14 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
         throw new Error('No admin user.');
       }
 
-      const tempSettings = { ...jellyfinFamily(kind), ...req.body };
+      const saved = jellyfinFamily(kind);
+      const tempSettings = { ...saved, ...req.body };
+      tempSettings.apiKey = keptSecret(
+        req.body.apiKey,
+        addressOf(tempSettings),
+        addressOf(saved),
+        saved.apiKey
+      );
 
       const client = new JellyfinAPI(
         hostnameOf(tempSettings),
@@ -61,7 +82,9 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
 
       // `connected` and `signIn` are changed only under Settings → Media
       // Servers.
-      Object.assign(settings[kind], omit(req.body, 'connected', 'signIn'));
+      Object.assign(settings[kind], omit(req.body, 'connected', 'signIn'), {
+        apiKey: tempSettings.apiKey,
+      });
       // A different server: drop the old server's libraries.
       if (settings[kind].serverId && settings[kind].serverId !== result.Id) {
         settings[kind].libraries = [];

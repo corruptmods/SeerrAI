@@ -15,6 +15,7 @@ const nextConfig = {
   // accepts it (see server/index.ts). Next's own gzip stays off so a second,
   // weaker pass can never apply.
   compress: false,
+  poweredByHeader: false,
   transpilePackages: ['country-flag-icons'],
   turbopack: {
     rules: {

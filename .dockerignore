@@ -14,9 +14,13 @@
 .prettierignore
 .vscode
 charts
+# Only config's empty folders go in the image: never settings, the
+# database, logs, caches or a settings.json.tmp left by a crash.
+config/*
+!config/db
+!config/logs
 config/db/*
 config/logs/*
-config/*.json
 cypress
 dist
 Dockerfile*
@@ -29,3 +33,6 @@ public/os_logo_filled.png
 public/preview.jpg
 stylelint.config.js
 .cache
+.claude
+.env
+.env.*

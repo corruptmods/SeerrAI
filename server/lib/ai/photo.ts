@@ -22,6 +22,8 @@ const MIN_KEPT_AFTER_TRIM = 0.2;
  * server for seconds.
  */
 export const PHOTO_MAX_INPUT_PIXELS = 50_000_000;
+/** Reading a photo longer than this gives up on it. */
+const PHOTO_TIMEOUT_S = 20;
 /**
  * Downscaled to this before trimming so trimming stays fast; twice the
  * longest side sent, so no detail is lost.
@@ -56,6 +58,7 @@ export const preparePhoto = async (
       failOn: 'error',
       limitInputPixels: PHOTO_MAX_INPUT_PIXELS,
     })
+      .timeout({ seconds: PHOTO_TIMEOUT_S })
       .rotate()
       .resize(WORKING_SIDE, WORKING_SIDE, {
         fit: 'inside',

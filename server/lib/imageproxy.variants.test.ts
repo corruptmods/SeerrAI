@@ -1,10 +1,11 @@
 import type * as ImageProxyModule from '@server/lib/imageproxy';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import assert from 'node:assert/strict';
 import { promises } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import sharp from 'sharp';
 
 /*
@@ -236,6 +237,48 @@ describe('converted copies', () => {
     assert.equal(result.status, 'ready');
     if (result.status !== 'ready') return;
     assert.ok(result.image.imageBuffer.length <= tiny.length);
+  });
+
+  it('leaves alone a picture claiming more pixels than it converts, and does not try it again', async () => {
+    const small = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: '#406080' },
+    })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    // The frame header claims 9000 x 9000.
+    const sof = small.indexOf(Buffer.from([0xff, 0xc0]));
+    assert.ok(sof > 0);
+    const claimed = Buffer.from(small);
+    claimed.writeUInt16BE(9000, sof + 5);
+    claimed.writeUInt16BE(9000, sof + 7);
+    const { proxy } = proxyAnswering(() => ({
+      data: claimed,
+      headers: JPEG_HEADERS,
+    }));
+    const path = unique('lantern-song');
+    const original = await proxy.getImage(path);
+    const warn = mock.method(logger, 'warn', () => logger);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const result = await proxy.getVariant(
+          path,
+          { format: 'webp' },
+          original,
+          {
+            convert: true,
+          }
+        );
+        assert.equal(result.status, 'unavailable');
+      }
+      assert.equal(
+        warn.mock.calls.filter(
+          (c) => (c.arguments as unknown[])[0] === 'Could not convert an image'
+        ).length,
+        1
+      );
+    } finally {
+      warn.mock.restore();
+    }
   });
 
   it('leaves alone what it cannot convert', async () => {

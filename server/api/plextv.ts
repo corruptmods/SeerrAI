@@ -296,6 +296,27 @@ class PlexTvAPI extends ExternalAPI {
     }
   }
 
+  /**
+   * Whether this account owns the Plex server with this id, or (unless
+   * ownedOnly) has it shared with them. False when plex.tv can't say.
+   */
+  public async reachesServer(
+    machineId: string,
+    { ownedOnly = false }: { ownedOnly?: boolean } = {}
+  ): Promise<boolean> {
+    try {
+      const devices = await this.getDevices();
+      return !!devices?.some(
+        (device) =>
+          device.clientIdentifier === machineId &&
+          device.provides.includes('server') &&
+          (!ownedOnly || device.owned)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   public async getUser(): Promise<PlexUser> {
     try {
       const account = await this.axios.get<PlexAccountResponse>(

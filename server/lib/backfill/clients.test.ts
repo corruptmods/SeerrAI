@@ -321,7 +321,10 @@ const deluge: http.RequestListener = async (req, res) => {
       return answer(
         Object.fromEntries(
           [...swarm.torrents.values()]
-            .filter((held) => held.label === params[0].label)
+            .filter(
+              (held) =>
+                !('label' in params[0]) || held.label === params[0].label
+            )
             .map((held) => [held.hash, pick(params[1], held)])
         )
       );

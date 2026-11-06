@@ -35,6 +35,18 @@ import { MediaRequest } from './MediaRequest';
 import { UserPushSubscription } from './UserPushSubscription';
 import { UserSettings } from './UserSettings';
 
+let throwawayHash: Promise<string> | undefined;
+
+/**
+ * Always false, after the same bcrypt work as checking a real password, so an
+ * account without one (or no account) answers as slowly as a wrong password.
+ */
+export const noPasswordMatches = async (password: string): Promise<false> => {
+  throwawayHash ??= bcrypt.hash(randomUUID(), 12);
+  await bcrypt.compare(password, await throwawayHash);
+  return false;
+};
+
 /**
  * Start of a quota window of `days`; requests after it count. Undefined when
  * there's no window, so every request counts.
@@ -48,7 +60,10 @@ export const quotaWindowStart = (days?: number | null): Date | undefined => {
   return start;
 };
 
-/** Whether a request made at `createdAt` counts towards a quota of `days`. */
+/**
+ * Whether something asked for at `createdAt` (a movie request, a season or
+ * an album) counts towards a quota of `days`.
+ */
 export const countsTowardsQuota = (
   createdAt: Date,
   days?: number | null
@@ -71,6 +86,7 @@ export class User {
     'plexId',
     'password',
     'resetPasswordGuid',
+    'emailVerified',
     'jellyfinDeviceId',
     'jellyfinAuthToken',
     'embyDeviceId',
@@ -97,6 +113,14 @@ export class User {
     },
   })
   public email: string;
+
+  /**
+   * False while the email is one the user set on themselves and hasn't
+   * confirmed from it. Such an email gives way to an account a media server
+   * or sign-in provider brings with it.
+   */
+  @Column({ type: 'boolean', default: true })
+  public emailVerified: boolean;
 
   @Column({ type: 'varchar', nullable: true })
   public plexUsername?: string | null;
@@ -278,14 +302,11 @@ export class User {
     return !!hasPermission(permissions, this.permissions, options);
   }
 
-  public passwordMatch(password: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      if (this.password) {
-        resolve(bcrypt.compare(password, this.password));
-      } else {
-        return resolve(false);
-      }
-    });
+  public async passwordMatch(password: string): Promise<boolean> {
+    if (!this.password) {
+      return noPasswordMatches(password);
+    }
+    return bcrypt.compare(password, this.password);
   }
 
   public async setPassword(password: string): Promise<void> {
@@ -437,13 +458,10 @@ export class User {
         declinedStatus: MediaRequestStatus.DECLINED,
       });
 
-    // Pass a Date so the driver writes it in its stored date format. As ISO
-    // text, SQLite compared it as a string against 'YYYY-MM-DD HH:MM:SS' and
-    // dropped the window's first day.
-    if (tvDate) {
-      tvQuotaUsedQuery.andWhere('request.createdAt > :date', { date: tvDate });
-    }
-
+    // Each season counts from when it was asked for, so one added to an
+    // older request by editing counts too. Pass a Date so the driver writes
+    // it in its stored date format. As ISO text, SQLite compared it as a
+    // string against 'YYYY-MM-DD HH:MM:SS' and dropped the window's first day.
     const tvQuotaUsed = tvQuotaLimit
       ? Number(
           (
@@ -451,7 +469,12 @@ export class User {
               .andWhere('request.ignoreQuota = :ignoreQuota', {
                 ignoreQuota: false,
               })
-              .leftJoin('request.seasons', 'quotaSeason')
+              .leftJoin(
+                'request.seasons',
+                'quotaSeason',
+                tvDate ? 'quotaSeason.createdAt > :date' : undefined,
+                tvDate ? { date: tvDate } : undefined
+              )
               .select('COUNT(quotaSeason.id)', 'seasonCount')
               .getRawOne<{ seasonCount: string | null }>()
           )?.seasonCount ?? 0
@@ -489,11 +512,13 @@ export class User {
           declinedStatus: MediaRequestStatus.DECLINED,
         })
         .andWhere('request.ignoreQuota = :ignoreQuota', { ignoreQuota: false });
-      if (date) {
-        query.andWhere('request.createdAt > :date', { date });
-      }
       const counted = await query
-        .leftJoin(`request.${kind}`, 'quotaItem')
+        .leftJoin(
+          `request.${kind}`,
+          'quotaItem',
+          date ? 'quotaItem.createdAt > :date' : undefined,
+          date ? { date } : undefined
+        )
         .select('COUNT(quotaItem.id)', 'itemCount')
         .getRawOne<{ itemCount: string | null }>();
       return Number(counted?.itemCount ?? 0);

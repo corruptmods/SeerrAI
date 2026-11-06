@@ -187,12 +187,25 @@ const UserLinkedAccountsSettings = () => {
         name: p.name,
         action: () => {
           // A server route that redirects to the provider via the
-          // Application URL, so it needs a full page load, not the router.
-          const start = `${oidcApplicationUrl(
+          // Application URL, so it needs a full page load (a form post), not
+          // the router. The CSRF token goes with it when protection is on.
+          const form = document.createElement('form');
+          form.method = 'post';
+          form.action = `${oidcApplicationUrl(
             settings.currentSettings.applicationUrl
           )}/api/v1/auth/oidc/${encodeURIComponent(p.id)}/link`;
-          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          window.location.assign(start);
+          const token = /(?:^|;\s*)XSRF-TOKEN=([^;]*)/.exec(
+            document.cookie
+          )?.[1];
+          if (token) {
+            const field = document.createElement('input');
+            field.type = 'hidden';
+            field.name = '_csrf';
+            field.value = decodeURIComponent(token);
+            form.appendChild(field);
+          }
+          document.body.appendChild(form);
+          form.submit();
         },
       })),
   ];

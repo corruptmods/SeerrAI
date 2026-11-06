@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
+import { isIPv4, isIPv6 } from 'node:net';
 
 /*
  * How many wrong passwords or password reset emails before a wait. Counted per
@@ -76,8 +77,65 @@ const accountKeyFor = (kind: string, account: unknown) =>
     .update(String(account).trim().toLowerCase())
     .digest('base64url')}`;
 
+/** An IPv6 address as its eight 16-bit groups. */
+const ipv6Groups = (ip: string): number[] => {
+  let text = ip;
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number);
+    text = `${text.slice(0, dotted.index)}${((a << 8) | b).toString(16)}:${(
+      (c << 8) |
+      d
+    ).toString(16)}`;
+  }
+  const [head, tail] = text.split('::');
+  const parse = (part: string | undefined) =>
+    part ? part.split(':').map((group) => parseInt(group, 16)) : [];
+  const front = parse(head);
+  const back = parse(tail);
+  return tail === undefined
+    ? front
+    : [...front, ...Array(8 - front.length - back.length).fill(0), ...back];
+};
+
+/**
+ * The address a budget belongs to: an IPv6 client by its /64, which one host
+ * or home usually holds whole, and anything else as it is. IPv4 (mapped or
+ * not), and IPv6 ranges that carry IPv4 clients (::/64, NAT64, Teredo), stay
+ * whole, so distinct IPv4 clients never share a budget.
+ */
+export const addressGroupOf = (ip: string | undefined): string => {
+  const address = (ip ?? '').split('%')[0];
+  if (isIPv4(address) || !isIPv6(address)) {
+    return ip ?? '';
+  }
+  const groups = ipv6Groups(address);
+  if (
+    groups[0] === 0 &&
+    groups[1] === 0 &&
+    groups[2] === 0 &&
+    groups[3] === 0
+  ) {
+    // ::ffff:a.b.c.d and the like: the IPv4 address itself.
+    return groups[4] === 0 && groups[5] === 0xffff
+      ? [groups[6] >> 8, groups[6] & 255, groups[7] >> 8, groups[7] & 255].join(
+          '.'
+        )
+      : address.toLowerCase();
+  }
+  const nat64 = groups[0] === 0x64 && groups[1] === 0xff9b;
+  const teredo = groups[0] === 0x2001 && groups[1] === 0;
+  if (nat64 || teredo) {
+    return address.toLowerCase();
+  }
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.toString(16))
+    .join(':')}::/64`;
+};
+
 const addressKeyFor = (accountKey: string, req: Request) =>
-  `${accountKey}:${req.ip ?? ''}`;
+  `${accountKey}:${addressGroupOf(req.ip)}`;
 
 export class SignInLimiter {
   private readonly capAccount: boolean;

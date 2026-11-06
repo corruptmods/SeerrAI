@@ -23,6 +23,7 @@ import {
   NoSeasonsAvailableError,
   QuotaRestrictedError,
   RequestPermissionError,
+  listedSeasons,
 } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import MusicAlbum from '@server/entity/MusicAlbum';
@@ -787,11 +788,22 @@ requestRoutes.get('/count', async (req, res, next) => {
     // Count only types this person sees in the list, so the pending badge never
     // counts requests they can't open.
     const countedTypes = requestTypesFor(req.user);
-    const query = () =>
-      requestRepository
+    // Everyone's requests for those who may view them, else their own.
+    const seesAll = req.user?.hasPermission(
+      [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+      { type: 'or' }
+    );
+    const query = () => {
+      const counted = requestRepository
         .createQueryBuilder('request')
         .innerJoinAndSelect('request.media', 'media')
         .where('request.type IN (:...countedTypes)', { countedTypes });
+      return seesAll
+        ? counted
+        : counted.andWhere('request.requestedById = :userId', {
+            userId: req.user?.id,
+          });
+    };
 
     const totalCount = await query().getCount();
 
@@ -1169,11 +1181,12 @@ const editMusicRequest = async (
     const quotas = await requestUser.getQuota();
     // Albums the owner's quota already counted are paid for; a new owner is
     // charged for all.
-    const countedAlready =
-      !ownerChanging &&
-      countsTowardsQuota(request.createdAt, quotas.music.days);
-    const required =
-      kept.length + added.length - (countedAlready ? current.length : 0);
+    const countedAlready = ownerChanging
+      ? 0
+      : current.filter((album) =>
+          countsTowardsQuota(album.createdAt, quotas.music.days)
+        ).length;
+    const required = kept.length + added.length - countedAlready;
     if (quotas.music.limit && required > (quotas.music.remaining ?? 0)) {
       return { error: { status: 403, message: 'Music Quota exceeded.' } };
     }
@@ -1432,15 +1445,23 @@ requestRoutes.put<{ requestId: string }>(
             setChosenSeriesType();
             request.requestedBy = requestUser as User;
 
-            const requestedSeasons = req.body.seasons as number[] | undefined;
+            const askedSeasons = req.body.seasons as number[] | undefined;
 
-            if (!requestedSeasons || requestedSeasons.length === 0) {
+            if (!askedSeasons || askedSeasons.length === 0) {
               return next({
                 status: 400,
                 message:
                   'Missing seasons. If you want to cancel a series request, use the DELETE method.',
               });
             }
+
+            // Seasons the series has; with TMDB unreachable, each one once.
+            const requestedSeasons = listedSeasons(
+              askedSeasons,
+              await new TheMovieDb()
+                .getTvShow({ tvId: request.media.tmdbId })
+                .catch(() => ({}))
+            );
 
             // Same key as create, so an edit can't claim a season a new request
             // is taking concurrently.
@@ -1517,13 +1538,11 @@ requestRoutes.put<{ requestId: string }>(
 
                   // Only seasons getQuota already counted for this owner are
                   // paid for, so charge for the rest.
-                  const countedAlready =
-                    !ownerChanging &&
-                    countsTowardsQuota(request.createdAt, quotas.tv.days);
-
-                  const priorSeasonCount = countedAlready
-                    ? request.seasons.length
-                    : 0;
+                  const priorSeasonCount = ownerChanging
+                    ? 0
+                    : request.seasons.filter((season) =>
+                        countsTowardsQuota(season.createdAt, quotas.tv.days)
+                      ).length;
                   const requiredSeasons =
                     resultingSeasonCount - priorSeasonCount;
 

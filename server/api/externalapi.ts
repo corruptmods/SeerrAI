@@ -21,6 +21,29 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 /** Cache keys refreshing in the background; one refresh per key at a time. */
 const refreshing = new Set<string>();
 
+type Limiter = ReturnType<typeof rateLimit.getLimiter>;
+
+/**
+ * One rate limit per service, shared by every client of it: routes make a
+ * client per request, and the limit is the service's for this server.
+ */
+const limiters = new Map<string, Limiter>();
+
+const limiterFor = (
+  baseUrl: string,
+  { maxRequests, maxRPS }: { maxRequests: number; maxRPS: number }
+): Limiter => {
+  let limiter = limiters.get(baseUrl);
+  if (!limiter) {
+    limiter = rateLimit.getLimiter({ maxRequests, maxRPS });
+    limiters.set(baseUrl, limiter);
+  }
+  return limiter;
+};
+
+/** Answers being fetched, per cache and key: one request for many callers. */
+const inFlight = new WeakMap<CacheStore, Map<string, Promise<unknown>>>();
+
 export interface ExternalAPIOptions {
   nodeCache?: CacheStore;
   headers?: Record<string, unknown>;
@@ -56,8 +79,7 @@ class ExternalAPI {
 
     if (options.rateLimit) {
       this.axios = rateLimit(this.axios, {
-        maxRequests: options.rateLimit.maxRequests,
-        maxRPS: options.rateLimit.maxRPS,
+        rateLimiter: limiterFor(baseUrl, options.rateLimit),
       });
     }
 
@@ -87,16 +109,40 @@ class ExternalAPI {
       return cachedItem;
     }
 
-    const response = await this.axios.get<T>(endpoint, config);
-    const data = options?.transform
-      ? options.transform(response.data)
-      : response.data;
+    const load = async () => {
+      const response = await this.axios.get<T>(endpoint, config);
+      const data = options?.transform
+        ? options.transform(response.data)
+        : response.data;
 
-    if (cache && ttl !== 0 && (options?.keep?.(data) ?? true)) {
-      cache.set(cacheKey, data, ttl ?? DEFAULT_TTL);
+      if (cache && ttl !== 0 && (options?.keep?.(data) ?? true)) {
+        cache.set(cacheKey, data, ttl ?? DEFAULT_TTL);
+      }
+
+      return data;
+    };
+    if (!cache || ttl === 0) {
+      return load();
     }
 
-    return data;
+    // Callers asking while it is fetched share the answer, each with its own
+    // copy, as from the cache.
+    let pending = inFlight.get(cache);
+    if (!pending) {
+      pending = new Map();
+      inFlight.set(cache, pending);
+    }
+    const shared = pending.get(cacheKey) as Promise<T> | undefined;
+    if (shared) {
+      return structuredClone(await shared);
+    }
+    const fetching = load();
+    pending.set(cacheKey, fetching);
+    try {
+      return await fetching;
+    } finally {
+      pending.delete(cacheKey);
+    }
   }
 
   /**

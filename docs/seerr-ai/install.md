@@ -67,21 +67,25 @@ It runs one pod (a StatefulSet: the database is in its `config` volume, 5 Gi to 
 
 ```bash
 cosign verify ghcr.io/corruptmods/seerr-ai-chart:1.2.0 \
-  --certificate-identity-regexp '^https://github\.com/corruptmods/SeerrAI/\.github/workflows/charts\.yml@refs/' \
+  --certificate-identity https://github.com/corruptmods/SeerrAI/.github/workflows/charts.yml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+Charts are only published from `main`, so a signature from any other branch fails this.
 
 ### Checking an image
 
 Every published image is signed, and carries a list of everything inside it (an SBOM). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) you can check that an image was built by this project's own workflow before you run it:
 
 ```bash
-cosign verify ghcr.io/corruptmods/seerr-ai:latest \
-  --certificate-identity-regexp '^https://github\.com/corruptmods/SeerrAI/\.github/workflows/release\.yml@refs/' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify ghcr.io/corruptmods/seerr-ai:1.2.3 \
+  --certificate-identity https://github.com/corruptmods/SeerrAI/.github/workflows/release.yml@refs/tags/ai-v1.2.3 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-trigger push \
+  --certificate-github-workflow-sha <commit>
 ```
 
-`verify-attestation --type cyclonedx`, with the same options, checks the SBOM. To accept only releases, end the identity with `@refs/tags/ai-v` instead of `@refs/`.
+Use the version you run in both places, and for `<commit>` the commit the release's notes on GitHub name ("Built from commit …"). The identity accepts only the release workflow run for that tag, and the commit check only that tag's own commit, so a preview or a build run by hand from a branch fails it. `verify-attestation --type cyclonedx`, with the same options, checks the SBOM.
 
 ### Trying a beta
 
@@ -189,6 +193,8 @@ git switch dev
 
 `--ff-only` refuses if `main` has anything `dev` doesn't, so `main` never gets ahead of `dev`.
 
+An `ai-v` tag is only built once its commit is on `main` and **Seerr AI CI** has passed for it there; the workflow waits for a run that is still going, so tagging straight after the push is fine. A pre-release (`ai-v1.3.0-beta.1`) is tagged on `main` the same way.
+
 The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the image for amd64 and arm64, each on its own machine (arm64 on GitHub's arm64 runner), joins them into one image and publishes it to `ghcr.io/<owner>/seerr-ai` (and Docker Hub, below). Every image is then signed and given its SBOM, and both are checked; a release's page is only published once they pass.
 
 - **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2`, `:1` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release: it gets only `:1.3.0-beta.1`, and leaves `:1.3`, `:1` and `:latest` alone. Only installs already running a pre-release are told about one; everyone else is told only of a newer stable release. The release notes are the CHANGELOG.md section whose heading is the version (`## 1.2.3`, a date in brackets after it is fine, as in `## 2.0.0 (20 October 2026)`); a pre-release without one uses **Coming next**.
@@ -211,5 +217,7 @@ Nothing has to be set for GHCR: the workflow publishes with its own token. The r
 | `DOCKERHUB_USERNAME` | Secret | Your Docker Hub user. With the token, every image also goes to Docker Hub, signed the same way; without both, Docker Hub is skipped. |
 | `DOCKERHUB_TOKEN` | Secret | A Docker Hub personal access token with **Read & Write** access (Docker Hub → Account settings → Personal access tokens). |
 | `DOCKERHUB_IMAGE` | Variable | Where on Docker Hub, if not `<username>/seerr-ai` (an organisation's repository, say). |
+
+For a release, the first check runs in the `release` environment, which GitHub creates on the first release. Unprotected, it changes nothing; to approve each release first, add required reviewers to it under Settings → Environments → release. Building, signing and publishing then wait for that one approval. Develop builds don't use the environment. Keep the Docker Hub secrets as repository secrets, not environment secrets, since the jobs that use them run outside the environment.
 
 Create the Docker Hub repository yourself first, public so anyone can pull it; otherwise the first push creates it with your account's default visibility. Signing is keyless: each signature is recorded in Sigstore's public transparency log, naming this repository and the tag or branch it was built from.

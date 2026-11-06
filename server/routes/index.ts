@@ -70,10 +70,15 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
   const currentVersion = getAppVersion();
   const commitTag = getCommitTag();
 
+  // Anyone may skip the check; only admins may ask for it while version
+  // checks are off.
+  const asked = req.query.checkUpdateAvailable;
   const checkUpdate =
-    req.query.checkUpdateAvailable !== undefined
-      ? req.query.checkUpdateAvailable
-      : settings.fullPublicSettings.versionCheck;
+    asked === undefined
+      ? settings.fullPublicSettings.versionCheck
+      : String(asked) === 'true' &&
+        (settings.fullPublicSettings.versionCheck ||
+          !!req.user?.hasPermission(Permission.ADMIN));
   let updateAvailable = false;
   let commitsBehind = 0;
 
@@ -107,10 +112,14 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
   });
 });
 
-router.get('/status/appdata', (_req, res) => {
+router.get('/status/appdata', (req, res) => {
+  // The path only for setup and admins.
+  const showPath =
+    !getSettings().public.initialized ||
+    !!req.user?.hasPermission(Permission.ADMIN);
   return res.status(200).json({
     appData: appDataStatus(),
-    appDataPath: appDataPath(),
+    ...(showPath && { appDataPath: appDataPath() }),
     appDataPermissions: appDataPermissions(),
   });
 });
@@ -242,45 +251,53 @@ router.get('/languages', isAuthenticated(), async (req, res, next) => {
   }
 });
 
-router.get<{ id: string }>('/studio/:id', async (req, res, next) => {
-  const tmdb = new TheMovieDb();
+router.get<{ id: string }>(
+  '/studio/:id',
+  isAuthenticated(),
+  async (req, res, next) => {
+    const tmdb = new TheMovieDb();
 
-  try {
-    const studio = await tmdb.getStudio(Number(req.params.id));
+    try {
+      const studio = await tmdb.getStudio(Number(req.params.id));
 
-    return res.status(200).json(mapProductionCompany(studio));
-  } catch (e) {
-    logger.debug('Something went wrong retrieving studio', {
-      label: 'API',
-      errorMessage: e.message,
-      studioId: req.params.id,
-    });
-    return next({
-      status: 500,
-      message: 'Unable to retrieve studio.',
-    });
+      return res.status(200).json(mapProductionCompany(studio));
+    } catch (e) {
+      logger.debug('Something went wrong retrieving studio', {
+        label: 'API',
+        errorMessage: e.message,
+        studioId: req.params.id,
+      });
+      return next({
+        status: 500,
+        message: 'Unable to retrieve studio.',
+      });
+    }
   }
-});
+);
 
-router.get<{ id: string }>('/network/:id', async (req, res, next) => {
-  const tmdb = new TheMovieDb();
+router.get<{ id: string }>(
+  '/network/:id',
+  isAuthenticated(),
+  async (req, res, next) => {
+    const tmdb = new TheMovieDb();
 
-  try {
-    const network = await tmdb.getNetwork(Number(req.params.id));
+    try {
+      const network = await tmdb.getNetwork(Number(req.params.id));
 
-    return res.status(200).json(mapNetwork(network));
-  } catch (e) {
-    logger.debug('Something went wrong retrieving network', {
-      label: 'API',
-      errorMessage: e.message,
-      networkId: req.params.id,
-    });
-    return next({
-      status: 500,
-      message: 'Unable to retrieve network.',
-    });
+      return res.status(200).json(mapNetwork(network));
+    } catch (e) {
+      logger.debug('Something went wrong retrieving network', {
+        label: 'API',
+        errorMessage: e.message,
+        networkId: req.params.id,
+      });
+      return next({
+        status: 500,
+        message: 'Unable to retrieve network.',
+      });
+    }
   }
-});
+);
 
 router.get('/genres/movie', isAuthenticated(), async (req, res, next) => {
   const tmdb = new TheMovieDb();
@@ -357,7 +374,7 @@ router.get('/backdrops', async (req, res, next) => {
   }
 });
 
-router.get('/keyword/:keywordId', async (req, res, next) => {
+router.get('/keyword/:keywordId', isAuthenticated(), async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage();
 
   try {
@@ -378,46 +395,54 @@ router.get('/keyword/:keywordId', async (req, res, next) => {
   }
 });
 
-router.get('/watchproviders/regions', async (req, res, next) => {
-  const tmdb = createTmdbWithRegionLanguage();
+router.get(
+  '/watchproviders/regions',
+  isAuthenticated(),
+  async (req, res, next) => {
+    const tmdb = createTmdbWithRegionLanguage();
 
-  try {
-    const result = await tmdb.getAvailableWatchProviderRegions({});
-    return res.status(200).json(result);
-  } catch (e) {
-    logger.debug('Something went wrong retrieving watch provider regions', {
-      label: 'API',
-      errorMessage: e.message,
-    });
-    return next({
-      status: 500,
-      message: 'Unable to retrieve watch provider regions.',
-    });
+    try {
+      const result = await tmdb.getAvailableWatchProviderRegions({});
+      return res.status(200).json(result);
+    } catch (e) {
+      logger.debug('Something went wrong retrieving watch provider regions', {
+        label: 'API',
+        errorMessage: e.message,
+      });
+      return next({
+        status: 500,
+        message: 'Unable to retrieve watch provider regions.',
+      });
+    }
   }
-});
+);
 
-router.get('/watchproviders/movies', async (req, res, next) => {
-  const tmdb = createTmdbWithRegionLanguage();
+router.get(
+  '/watchproviders/movies',
+  isAuthenticated(),
+  async (req, res, next) => {
+    const tmdb = createTmdbWithRegionLanguage();
 
-  try {
-    const result = await tmdb.getMovieWatchProviders({
-      watchRegion: req.query.watchRegion as string,
-    });
+    try {
+      const result = await tmdb.getMovieWatchProviders({
+        watchRegion: req.query.watchRegion as string,
+      });
 
-    return res.status(200).json(mapWatchProviderDetails(result));
-  } catch (e) {
-    logger.debug('Something went wrong retrieving movie watch providers', {
-      label: 'API',
-      errorMessage: e.message,
-    });
-    return next({
-      status: 500,
-      message: 'Unable to retrieve movie watch providers.',
-    });
+      return res.status(200).json(mapWatchProviderDetails(result));
+    } catch (e) {
+      logger.debug('Something went wrong retrieving movie watch providers', {
+        label: 'API',
+        errorMessage: e.message,
+      });
+      return next({
+        status: 500,
+        message: 'Unable to retrieve movie watch providers.',
+      });
+    }
   }
-});
+);
 
-router.get('/watchproviders/tv', async (req, res, next) => {
+router.get('/watchproviders/tv', isAuthenticated(), async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage();
 
   try {

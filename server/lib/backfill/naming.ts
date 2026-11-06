@@ -29,12 +29,37 @@ export const isExtra = (path: string): boolean => EXTRA_RX.test(path);
 export const baseName = (path: string): string =>
   (path.split('/').pop() ?? path).replace(VIDEO_RX, '');
 
+/** Longest end of a name searched for a scene group and its tags. */
+const GROUP_TAIL = 256;
+
 /** A group in brackets at the front, or after a final dash (scene style). */
 export const releaseGroup = (title: string): string | undefined => {
   const front = title.match(/^\s*\[([^\]]+)\]/);
   if (front) return front[1].trim();
-  const back = title.match(/-([A-Za-z0-9][A-Za-z0-9.]*?)(\s*\[[^\]]*\])?\s*$/);
+  // Only the end can hold it; matching there keeps long names cheap.
+  const back = title
+    .slice(-GROUP_TAIL)
+    .match(/-([A-Za-z0-9][A-Za-z0-9.]*?)(\s*\[[^\]]*\])?\s*$/);
   return back && !/^\d+$/.test(back[1]) ? back[1] : undefined;
+};
+
+/**
+ * Each "[...]" or "(...)": from an opening bracket to the next closing one,
+ * with something between. One pass, however many brackets.
+ */
+const bracketedParts = (title: string): string[] => {
+  const parts: string[] = [];
+  let start = -1;
+  for (let i = 0; i < title.length; i++) {
+    const c = title[i];
+    if (start < 0) {
+      if (c === '[' || c === '(') start = i;
+    } else if (c === ']' || c === ')') {
+      if (i > start + 1) parts.push(title.slice(start, i + 1));
+      start = -1;
+    }
+  }
+  return parts;
 };
 
 /**
@@ -43,8 +68,7 @@ export const releaseGroup = (title: string): string | undefined => {
  * first such token.
  */
 export const releaseTags = (title: string): string => {
-  const bracketed = [...title.matchAll(/[[(]([^\])]+)[\])]/g)]
-    .map((m) => m[0])
+  const bracketed = bracketedParts(title)
     .slice(/^\s*\[/.test(title) ? 1 : 0)
     .filter((tag) => QUALITY_TOKEN.test(tag) && !PACK_ONLY.test(tag));
   if (bracketed.length) {

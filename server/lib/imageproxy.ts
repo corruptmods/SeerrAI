@@ -13,6 +13,7 @@ import {
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { proxyRequestInterceptor } from '@server/utils/customProxyAgent';
+import { publicRedirectGuard } from '@server/utils/publicHost';
 import { userAgentRequestInterceptor } from '@server/utils/userAgent';
 import axios, { type AxiosInstance } from 'axios';
 import rateLimit, { type rateLimitOptions } from 'axios-rate-limit';
@@ -92,6 +93,22 @@ const CONVERSIONS_QUEUED_LIMIT = 100;
  */
 const WARM_CONVERSIONS_QUEUED_LIMIT = 10;
 /**
+ * Original bytes held by queued conversions at most; beyond it the original
+ * is sent.
+ */
+const CONVERSIONS_QUEUED_BYTES = 256 * 1024 * 1024;
+/**
+ * Largest image decoded for conversion, in pixels; a bigger one is sent as
+ * it is. Far above any poster, backdrop or cover.
+ */
+const CONVERT_MAX_PIXELS = 50_000_000;
+/** A conversion running longer is stopped and the original sent. */
+const CONVERT_TIMEOUT_S = 20;
+/** How long a failed conversion isn't tried again. */
+const CONVERT_FAILED_FOR_MS = 10 * 60 * 1000;
+const CONVERT_FAILED_LIMIT = 2000;
+
+/**
  * How long a request waits for conversion. After that the original is sent
  * (uncached) and the conversion finishes for next time.
  */
@@ -165,6 +182,10 @@ class Limiter {
 }
 
 const conversions = new Limiter(CONVERSIONS_AT_ONCE);
+/** Bytes of the originals queued conversions hold. */
+let queuedBytes = 0;
+/** Conversions that failed, by variant key and source, until when. */
+const failedConversions = new Map<string, number>();
 
 /** Short hash of an image's bytes. */
 const fingerprint = (buffer: Buffer) =>
@@ -238,12 +259,22 @@ const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
  */
 export const redirectGuard =
   (baseUrl: string, otherHosts: readonly string[] = []) =>
-  (options: { protocol?: string | null; hostname?: string | null }) => {
+  (options: {
+    protocol?: string | null;
+    hostname?: string | null;
+    port?: string | number | null;
+  }) => {
     const base = new URL(baseUrl);
     const host = (options.hostname ?? '').toLowerCase();
+    const portOf = (port: unknown, protocol?: string | null) =>
+      String(port || (protocol === 'https:' ? 443 : 80));
+    const port = portOf(options.port, options.protocol);
     const allowed =
-      (host === base.hostname && options.protocol === base.protocol) ||
+      (host === base.hostname &&
+        options.protocol === base.protocol &&
+        port === portOf(base.port, base.protocol)) ||
       (options.protocol === 'https:' &&
+        port === '443' &&
         otherHosts.some(
           (other) => host === other || host.endsWith(`.${other}`)
         ));
@@ -523,8 +554,8 @@ class ImageProxy {
       missingForMs?: number;
       /**
        * Other hosts images may redirect to. Without a base URL (avatars,
-       * fetched by full address from the admin's own servers) redirects
-       * aren't limited.
+       * fetched by full address, some from the admin's own servers) a
+       * redirect stays on the host asked or goes to a public address.
        */
       redirectHosts?: readonly string[];
     } = {}
@@ -538,9 +569,9 @@ class ImageProxy {
       headers: options.headers,
       timeout: UPSTREAM_TIMEOUT_MS,
       maxContentLength: MAX_IMAGE_BYTES,
-      ...(baseUrl
-        ? { beforeRedirect: redirectGuard(baseUrl, options.redirectHosts) }
-        : {}),
+      beforeRedirect: baseUrl
+        ? redirectGuard(baseUrl, options.redirectHosts)
+        : publicRedirectGuard,
     });
     this.axios.interceptors.request.use(proxyRequestInterceptor);
     this.axios.interceptors.request.use(userAgentRequestInterceptor);
@@ -905,13 +936,31 @@ class ImageProxy {
       return { status: (await loadSharp()) ? 'pending' : 'unavailable' };
     }
 
+    const failedKey = `${this.key}:${cacheKey}:${source}`;
+    if ((failedConversions.get(failedKey) ?? 0) > Date.now()) {
+      return { status: 'unavailable' };
+    }
+
     let conversion = ImageProxy.inFlight.get(cacheKey);
     if (!conversion) {
-      if (conversions.queued >= CONVERSIONS_QUEUED_LIMIT) {
+      const bytes = original.imageBuffer.length;
+      if (
+        conversions.queued >= CONVERSIONS_QUEUED_LIMIT ||
+        queuedBytes + bytes > CONVERSIONS_QUEUED_BYTES
+      ) {
         return { status: 'pending' };
       }
+      queuedBytes += bytes;
+      let waiting = true;
+      const started = () => {
+        if (waiting) queuedBytes -= bytes;
+        waiting = false;
+      };
       conversion = conversions
-        .run(() => this.convert(cacheKey, variant, original, source))
+        .run(() => {
+          started();
+          return this.convert(cacheKey, variant, original, source);
+        })
         .catch((e) => {
           logger.warn('Could not convert an image', {
             label: 'Image Cache',
@@ -919,9 +968,16 @@ class ImageProxy {
             variant,
             errorMessage: e instanceof Error ? e.message : String(e),
           });
+          if (failedConversions.size >= CONVERT_FAILED_LIMIT) {
+            failedConversions.clear();
+          }
+          failedConversions.set(failedKey, Date.now() + CONVERT_FAILED_FOR_MS);
           return null;
         })
-        .finally(() => ImageProxy.inFlight.delete(cacheKey));
+        .finally(() => {
+          started();
+          ImageProxy.inFlight.delete(cacheKey);
+        });
       ImageProxy.inFlight.set(cacheKey, conversion);
     }
 
@@ -948,7 +1004,10 @@ class ImageProxy {
     source: string
   ): Promise<ImageResponse> {
     const sharp = (await loadSharp()) as Sharp;
-    let image = sharp(original.imageBuffer, { failOn: 'none' });
+    let image = sharp(original.imageBuffer, {
+      failOn: 'none',
+      limitInputPixels: CONVERT_MAX_PIXELS,
+    }).timeout({ seconds: CONVERT_TIMEOUT_S });
     if (variant.width) {
       image = image.resize({ width: variant.width, withoutEnlargement: true });
     }

@@ -1,5 +1,6 @@
 import type { TrashData, TrashMetadata } from '@server/lib/quality/trashData';
 import { compileTrashApp, inFolder } from '@server/lib/quality/trashData';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { appDataPath } from '@server/utils/appDataVolume';
 import { proxyRequestInterceptor } from '@server/utils/customProxyAgent';
@@ -7,6 +8,7 @@ import { userAgentRequestInterceptor } from '@server/utils/userAgent';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
+import reviewed from './trash-reviewed.json';
 
 /*
  * TRaSH Guides (https://trash-guides.info, MIT licence, copyright TRaSH):
@@ -45,7 +47,13 @@ const trashDir = () => path.join(appDataPath(), 'trash');
 const statePath = () => path.join(trashDir(), 'state.json');
 const dataPath = () => path.join(trashDir(), 'data.json');
 
-const http = axios.create({ timeout: 30_000 });
+/** Far above the repo's tree listing and any file kept. */
+const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+const http = axios.create({
+  timeout: 30_000,
+  maxContentLength: MAX_RESPONSE_BYTES,
+});
 http.interceptors.request.use(proxyRequestInterceptor);
 http.interceptors.request.use(userAgentRequestInterceptor);
 /** For tests: the GitHub HTTP client. */
@@ -108,6 +116,15 @@ const inBatches = async <T>(
   }
 };
 
+/** Whether `head` is `base` or a later commit on its history. */
+const followsOn = async (base: string, head: string): Promise<boolean> => {
+  const { data } = await http.get<{ status?: string }>(
+    `${API}/repos/${REPO}/compare/${base}...${head}`,
+    { headers: { Accept: 'application/vnd.github+json' } }
+  );
+  return data?.status === 'ahead' || data?.status === 'identical';
+};
+
 let refreshing: Promise<TrashState> | null = null;
 
 /**
@@ -161,6 +178,20 @@ const check = async (): Promise<TrashState> => {
       delete next.failedAt;
       await writeJson(statePath(), next);
       return next;
+    }
+
+    // Applied unseen, an update must follow on from the copy already taken
+    // (or the one last reviewed), never replace its history.
+    const base = state.commit ?? reviewed.commit;
+    if (
+      getSettings().quality.trash.autoApply &&
+      COMMIT.test(base) &&
+      commit !== base &&
+      !(await followsOn(base, commit))
+    ) {
+      throw new Error(
+        `TRaSH Guides' latest commit does not follow on from ${base.slice(0, 7)}; it is taken only with automatic updates off.`
+      );
     }
 
     const metadata = await fetchRaw<TrashMetadata>(commit, 'metadata.json');

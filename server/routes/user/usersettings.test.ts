@@ -22,6 +22,7 @@ import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { UserSettings } from '@server/entity/UserSettings';
+import PreparedEmail from '@server/lib/email';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { makeKey } from '@server/lib/personalApiKeys';
@@ -720,6 +721,33 @@ describe('settings an admin saves for someone else', () => {
  * A non-admin user manager and a non-owner admin: only the owner changes an
  * admin's account.
  */
+describe('notification settings an admin saves for someone else', () => {
+  it('belong to that person, even when they had none yet', async () => {
+    const users = getRepository(User);
+    const fresh = await users.save(
+      new User({
+        email: 'fresh-notify@seerr.dev',
+        username: 'fresh-notify',
+        permissions: Permission.REQUEST,
+        avatar: '',
+        userType: UserType.LOCAL,
+      })
+    );
+    const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+
+    const saved = await agent
+      .post(`/user/${fresh.id}/settings/notifications`)
+      .send({ pgpKey: 'harbour-lights-key', notificationTypes: {} });
+    assert.strictEqual(saved.status, 200);
+
+    const settings = await getRepository(UserSettings).findOneOrFail({
+      where: { pgpKey: 'harbour-lights-key' },
+      relations: { user: true },
+    });
+    assert.strictEqual(settings.user.id, fresh.id);
+  });
+});
+
 describe("another admin's account", () => {
   const people = async () => {
     const users = getRepository(User);
@@ -829,6 +857,27 @@ describe("another admin's account", () => {
     );
     assert.strictEqual(byOwner.status, 200);
     assert.strictEqual(byOwner.body.pushbulletAccessToken, `token-${admin.id}`);
+  });
+
+  it('keeps its display preferences from user managers', async () => {
+    const { admin, regular } = await people();
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+    const changes: [string, object][] = [
+      ['features', { disabled: [] }],
+      ['discover', { hidden: [] }],
+      ['appearance', { appearance: null }],
+      ['sidebar', { hidden: [] }],
+    ];
+    for (const [page, body] of changes) {
+      const theirs = await agent
+        .post(`/user/${admin.id}/settings/${page}`)
+        .send(body);
+      assert.strictEqual(theirs.status, 403, page);
+      const others = await agent
+        .post(`/user/${regular.id}/settings/${page}`)
+        .send(body);
+      assert.strictEqual(others.status, 200, page);
+    }
   });
 
   it('cannot be demoted by a user manager', async () => {
@@ -1386,5 +1435,81 @@ describe('a key linking an account or setting a password', () => {
       settings.main.personalApiKeys = before.access;
       settings.main.apiKey = before.serverKey;
     }
+  });
+});
+
+describe('an email someone sets on their own account', () => {
+  const sent = mock.method(PreparedEmail.prototype, 'send', async () => ({}));
+  const email = getSettings().notifications.agents.email;
+  const saved = {
+    enabled: email.enabled,
+    applicationUrl: getSettings().main.applicationUrl,
+  };
+
+  beforeEach(async () => {
+    sent.mock.resetCalls();
+    email.enabled = true;
+    getSettings().main.applicationUrl = 'https://seerr.example.invalid';
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { userType: UserType.LOCAL }
+    );
+  });
+  afterEach(() => {
+    email.enabled = saved.enabled;
+    getSettings().main.applicationUrl = saved.applicationUrl;
+  });
+
+  const friend = () =>
+    getRepository(User).findOneByOrFail({ username: 'friend' });
+
+  it('is unconfirmed until confirmed from the link sent to it', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent
+      .post(`/user/${userId}/settings/main`)
+      .send({ username: 'friend', email: 'glasswing@example.invalid' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual((await friend()).emailVerified, false);
+
+    assert.strictEqual(sent.mock.callCount(), 1);
+    const [message] = sent.mock.calls[0].arguments as unknown as [
+      { message: { to: string }; locals: { confirmEmailLink: string } },
+    ];
+    assert.strictEqual(message.message.to, 'glasswing@example.invalid');
+    const link = new URL(message.locals.confirmEmailLink);
+    assert.strictEqual(link.origin, 'https://seerr.example.invalid');
+
+    const confirmed = await request(app).get(
+      link.pathname.replace('/api/v1', '')
+    );
+    assert.strictEqual(confirmed.status, 302);
+    assert.strictEqual((await friend()).emailVerified, true);
+  });
+
+  it('stays unconfirmed, with nothing sent, while email is off', async () => {
+    email.enabled = false;
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    await agent
+      .post(`/user/${userId}/settings/main`)
+      .send({ username: 'friend', email: 'glasswing@example.invalid' });
+    assert.strictEqual((await friend()).emailVerified, false);
+    assert.strictEqual(sent.mock.callCount(), 0);
+  });
+
+  it('counts as confirmed when the owner sets it, for themselves or someone else', async () => {
+    const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+    const other = await agent
+      .post(`/user/${(await friend()).id}/settings/main`)
+      .send({ username: 'friend', email: 'glasswing@example.invalid' });
+    assert.strictEqual(other.status, 200);
+    assert.strictEqual((await friend()).emailVerified, true);
+
+    const own = await agent
+      .post('/user/1/settings/main')
+      .send({ username: 'admin', email: 'lantern@example.invalid' });
+    assert.strictEqual(own.status, 200);
+    const owner = await getRepository(User).findOneByOrFail({ id: 1 });
+    assert.strictEqual(owner.emailVerified, true);
+    assert.strictEqual(sent.mock.callCount(), 0);
   });
 });

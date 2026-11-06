@@ -1484,6 +1484,15 @@ describe('the subtitle your own Plex player starts with', () => {
     getSettings().plex.machineId = 'other';
     assert.equal((await read()).status, 502);
   });
+
+  it('stops using the token it kept once their Plex sign-in is gone', async () => {
+    const read = async () =>
+      (await call<{ available: boolean }>('GET', '/movie/471906/plex-default'))
+        .body.available;
+    assert.equal(await read(), true);
+    await getRepository(User).update(member.id, { plexToken: null });
+    assert.equal(await read(), false);
+  });
 });
 
 describe('a job’s place in Bazarr’s queue', () => {

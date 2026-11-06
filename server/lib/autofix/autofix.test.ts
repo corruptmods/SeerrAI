@@ -6,6 +6,7 @@ import { IssueType } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import AgentRun from '@server/entity/AgentRun';
+import AutoFixMark from '@server/entity/AutoFixMark';
 import type BackfillSeries from '@server/entity/BackfillSeries';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
@@ -29,6 +30,7 @@ import type {
 } from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
 import { titleInTheirWords } from '@server/lib/autofix/chat';
+import { askAboutReport } from '@server/lib/autofix/understand';
 import backfill from '@server/lib/backfill/engine';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager from '@server/lib/notifications';
@@ -872,6 +874,95 @@ describe('Auto-fix: reported issues', () => {
     assert.match(result.message, /Backfill is checking indexers/);
   });
 
+  it('keeps its daily allowances and recent fixes across a restart', async () => {
+    const fix = () =>
+      autofix.run({
+        kind: 'subtitles',
+        media: movie,
+        language: 'es',
+        user: member,
+      });
+    assert.equal((await fix()).ok, true);
+    assert.deepEqual(downloads, ['subdl-es']);
+    // A restart forgets what was held in memory.
+    autofix.reset();
+    const again = await fix();
+    assert.equal(again.ok, false);
+    assert.match(again.message, /looked for in the last hour/);
+    assert.deepEqual(downloads, ['subdl-es']);
+
+    // A day's allowance used up before the restart stays used up.
+    await autofix.idle();
+    const day = new Date().toISOString().slice(0, 10);
+    await getRepository(AutoFixMark).upsert(
+      { key: `use:fix:${member.id}:${day}`, count: 30, at: new Date() },
+      ['key']
+    );
+    autofix.reset();
+    const refused = await autofix.run({
+      kind: 'missing',
+      media: movie,
+      user: member,
+    });
+    assert.equal(refused.ok, false);
+    assert.match(refused.message, /as many fixes today as allowed/);
+  });
+
+  it('says who approves what a missing-title search finds', async () => {
+    mock.method(FixRadarr.prototype, 'searchMovie', async () => undefined);
+    mock.method(backfill, 'readiness', () => ({ ready: true }));
+    mock.method(
+      backfill,
+      'track',
+      async (kind: string, serverId: number, arrId: number) =>
+        ({
+          id: 12,
+          kind,
+          serverId,
+          arrId,
+          status: 'stuck',
+        }) as unknown as BackfillSeries
+    );
+    mock.method(backfill, 'startSearch', () => undefined);
+    const settings = getSettings();
+    const before = settings.backfill;
+    settings.backfill = {
+      ...before,
+      autoApprove: { ...before.autoApprove, enabled: true },
+    };
+    try {
+      const forAdmin = await autofix.run({
+        kind: 'missing',
+        media: movie,
+        user: admin,
+      });
+      assert.match(forAdmin.message, /auto-approve rules allow at once/);
+      assert.doesNotMatch(forAdmin.message, /An admin approves/);
+      autofix.reset();
+      await getRepository(AutoFixMark).clear();
+      const forMember = await autofix.run({
+        kind: 'missing',
+        media: movie,
+        user: member,
+      });
+      assert.match(forMember.message, /An admin approves anything it finds/);
+    } finally {
+      settings.backfill = before;
+    }
+  });
+
+  it('asks the model again about the same words from someone else', async () => {
+    modelAnswer = JSON.stringify({ kind: 'subtitles', language: 'en' });
+    const post = axios.post as unknown as { mock: { callCount(): number } };
+    const before = post.mock.callCount();
+    const words = 'the words at the bottom say something else';
+    await askAboutReport(words, { user: member, episode: false });
+    await askAboutReport(words, { user: member, episode: false });
+    assert.equal(post.mock.callCount() - before, 1, 'the same person, once');
+    await askAboutReport(words, { user: admin, episode: false });
+    assert.equal(post.mock.callCount() - before, 2);
+  });
+
   it('hands a missing report on to the admin agent, should the searches find nothing', async () => {
     mock.method(FixRadarr.prototype, 'searchMovie', async () => undefined);
     mock.method(backfill, 'readiness', () => ({ ready: true }));
@@ -1000,6 +1091,60 @@ describe('Auto-fix: from AI Search', () => {
     assert.match(res.body.reply, /Downloaded es subtitles from subdl/);
     assert.equal(res.body.fix.ok, true);
     assert.deepEqual(downloads, ['subdl-es']);
+  });
+
+  it('only offers a fix the message itself did not ask for, and runs it once confirmed', async () => {
+    modelAnswer = JSON.stringify({
+      r: 'Getting Spanish subtitles for Hedgehog Morning.',
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
+      do: 'fix',
+      fx: 'subtitles',
+      lang: 'es',
+    });
+    const asked = await call('POST', '/api/v1/ai/chat', {
+      message: 'what did I watch last?',
+    });
+    assert.equal(asked.status, 200, JSON.stringify(asked.body));
+    assert.match(asked.body.reply, /Confirm to go ahead/);
+    assert.equal(asked.body.fix, undefined);
+    assert.deepEqual(downloads, []);
+    assert.deepEqual(asked.body.confirm, {
+      kind: 'subtitles',
+      mediaId: movie.id,
+      language: 'es',
+      message: 'what did I watch last?',
+    });
+
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /Downloaded es subtitles from subdl/);
+    assert.deepEqual(downloads, ['subdl-es']);
+    assert.equal(await getRepository(Issue).count(), 0);
+  });
+
+  it('needs permission to report problems for any fix from AI Search', async () => {
+    actingAs = await getRepository(User).save(
+      Object.assign(member, { permissions: Permission.REQUEST })
+    );
+    modelAnswer = JSON.stringify({
+      r: 'Getting Spanish subtitles for Hedgehog Morning.',
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
+      do: 'fix',
+      fx: 'subtitles',
+      lang: 'es',
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'get spanish subtitles for hedgehog morning',
+    });
+    assert.match(res.body.reply, /needs permission to report problems/);
+    const direct = await call('POST', '/api/v1/ai/fix', {
+      kind: 'subtitles',
+      mediaId: movie.id,
+      language: 'es',
+      message: 'get spanish subtitles for hedgehog morning',
+    });
+    assert.match(direct.body.reply, /needs permission to report problems/);
+    assert.deepEqual(downloads, []);
   });
 
   it('asks before replacing a file, then files it as an issue and fixes it in the background', async () => {

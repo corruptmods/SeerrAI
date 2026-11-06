@@ -171,42 +171,54 @@ issueRoutes.get('/count', async (req, res, next) => {
   const issueRepository = getRepository(Issue);
 
   try {
-    const query = issueRepository.createQueryBuilder('issue');
+    // Everyone's issues for those who may view them, else their own.
+    const seesAll = req.user?.hasPermission(
+      [Permission.MANAGE_ISSUES, Permission.VIEW_ISSUES],
+      { type: 'or' }
+    );
+    const query = () => {
+      const counted = issueRepository.createQueryBuilder('issue');
+      return seesAll
+        ? counted
+        : counted.andWhere('issue.createdById = :userId', {
+            userId: req.user?.id,
+          });
+    };
 
-    const totalCount = await query.getCount();
+    const totalCount = await query().getCount();
 
-    const videoCount = await query
-      .where('issue.issueType = :issueType', {
+    const videoCount = await query()
+      .andWhere('issue.issueType = :issueType', {
         issueType: IssueType.VIDEO,
       })
       .getCount();
 
-    const audioCount = await query
-      .where('issue.issueType = :issueType', {
+    const audioCount = await query()
+      .andWhere('issue.issueType = :issueType', {
         issueType: IssueType.AUDIO,
       })
       .getCount();
 
-    const subtitlesCount = await query
-      .where('issue.issueType = :issueType', {
+    const subtitlesCount = await query()
+      .andWhere('issue.issueType = :issueType', {
         issueType: IssueType.SUBTITLES,
       })
       .getCount();
 
-    const othersCount = await query
-      .where('issue.issueType = :issueType', {
+    const othersCount = await query()
+      .andWhere('issue.issueType = :issueType', {
         issueType: IssueType.OTHER,
       })
       .getCount();
 
-    const openCount = await query
-      .where('issue.status = :issueStatus', {
+    const openCount = await query()
+      .andWhere('issue.status = :issueStatus', {
         issueStatus: IssueStatus.OPEN,
       })
       .getCount();
 
-    const closedCount = await query
-      .where('issue.status = :issueStatus', {
+    const closedCount = await query()
+      .andWhere('issue.status = :issueStatus', {
         issueStatus: IssueStatus.RESOLVED,
       })
       .getCount();

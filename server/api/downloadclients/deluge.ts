@@ -6,9 +6,12 @@ import type {
 } from '@server/api/downloadclients/types';
 import {
   CLIENT_TIMEOUT_MS,
+  assertAddedHash,
   clientBaseUrl,
+  dataRoot,
   isTorrentHash,
   sessionKeyOf,
+  sharesData,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
@@ -269,6 +272,7 @@ class DelugeAPI implements TorrentClient {
   public async addTorrent(options: {
     torrent?: Buffer;
     magnet?: string;
+    hash: string;
     category: string;
     metadataOnly?: boolean;
   }): Promise<void> {
@@ -299,6 +303,14 @@ class DelugeAPI implements TorrentClient {
     }
     if (!hash) {
       throw new Error('Deluge would not add the torrent.');
+    }
+    try {
+      assertAddedHash(this.product, hash, options.hash);
+    } catch (e) {
+      await this.call('core.remove_torrent', [hash, false]).catch(
+        () => undefined
+      );
+      throw e;
     }
     if (await this.labelsOn()) {
       await this.call('label.set_torrent', [
@@ -409,7 +421,22 @@ class DelugeAPI implements TorrentClient {
   }
 
   public async deleteTorrent(hash: string): Promise<void> {
-    await this.call('core.remove_torrent', [hash.toLowerCase(), true]);
+    const id = hash.toLowerCase();
+    const all = await this.call<
+      Record<string, { name?: string; save_path?: string }>
+    >('core.get_torrents_status', [{}, ['name', 'save_path']]);
+    const rootOf = (t?: { name?: string; save_path?: string }) =>
+      dataRoot(t?.save_path ?? '', t?.name ?? '');
+    const others = Object.entries(all ?? {})
+      .filter(([key]) => key.toLowerCase() !== id)
+      .map(([, t]) => rootOf(t));
+    const own = Object.entries(all ?? {}).find(
+      ([key]) => key.toLowerCase() === id
+    )?.[1];
+    await this.call('core.remove_torrent', [
+      id,
+      !(own && sharesData(rootOf(own), others)),
+    ]);
   }
 
   public async backfillProblems(): Promise<string[]> {

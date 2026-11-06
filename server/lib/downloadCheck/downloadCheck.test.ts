@@ -285,6 +285,23 @@ describe('the rules', () => {
       ]),
       { code: 'program', files: ['Codec.Setup.exe'] }
     );
+    for (const name of [
+      'codec.exe.',
+      'codec.exe . ',
+      'player.dll',
+      'run.sh',
+      'setup.js',
+      'pack.cab',
+    ]) {
+      assert.equal(
+        checkFiles([
+          { name: 'Glasswing.S01E01.mkv', size: 900 * MB },
+          { name, size: MB },
+        ])?.code,
+        'program',
+        name
+      );
+    }
     assert.equal(
       checkFiles([
         { name: 'a.rar', size: 50 * MB },
@@ -745,6 +762,103 @@ describe('Download Check', () => {
         how: { removeFromClient: true, blocklist: false, skipRedownload: true },
       },
     ]);
+  });
+
+  it('keeps a worse copy when the better one was rejected earlier in the pass', async () => {
+    const better = grab({
+      key: 'b',
+      downloadId: 'B',
+      queueIds: [3],
+      added: new Date(Date.now() - 5 * 24 * HOUR).toISOString(),
+    });
+    const worse = grab({
+      key: 'w',
+      downloadId: 'W',
+      queueIds: [2],
+      quality: WEB720,
+      title: 'Show.S01E03.720p',
+    });
+    sonarr.parsed.set('Show.S01E03.720p', 10);
+    sonarr.seriesEpisodes.set(10, better.episodes);
+    sonarr.queueNow = [better, worse];
+    await downloadCheck.run();
+    assert.deepEqual(
+      (await rows()).map((r) => [r.downloadKey, r.finding]),
+      [['b', 'early']]
+    );
+    assert.deepEqual(
+      sonarr.removed.map((r) => r.ids),
+      [[3]]
+    );
+  });
+
+  it('keeps a worse copy when the better one is stuck at import', async () => {
+    const better = grab({
+      key: 'b',
+      downloadId: 'B',
+      queueIds: [3],
+      status: 'completed',
+      state: 'importblocked',
+      trackedStatus: 'warning',
+      sizeLeft: 0,
+      messages: ['Something Sonarr could not explain'],
+    });
+    const worse = grab({
+      key: 'w',
+      downloadId: 'W',
+      queueIds: [2],
+      quality: WEB720,
+      title: 'Show.S01E03.720p',
+    });
+    sonarr.parsed.set('Show.S01E03.720p', 10);
+    sonarr.queueNow = [worse, better];
+    await downloadCheck.run();
+    assert.ok(!(await rows()).some((r) => r.finding === 'duplicate'));
+    assert.equal(sonarr.removed.length, 0);
+  });
+
+  it('checks other servers while an import is followed', async () => {
+    const stuck = grab({
+      status: 'completed',
+      state: 'importblocked',
+      trackedStatus: 'warning',
+      sizeLeft: 0,
+      messages: [
+        'Found matching series via grab history, but release was matched to series by ID. Automatic import is not possible. See the FAQ for details.',
+      ],
+    });
+    sonarr.seriesEpisodes.set(10, stuck.episodes);
+    sonarr.importable.set('HASH1', [
+      {
+        path: '/dl/Show/a.mkv',
+        size: 1200 * MB,
+        episodeIds: [103],
+        quality: WEB1080,
+      },
+    ]);
+    sonarr.queueNow = [stuck];
+    let radarrAsked: () => void = () => undefined;
+    const asked = new Promise<boolean>((resolve) => {
+      radarrAsked = () => resolve(true);
+    });
+    let radarrFirst = false;
+    mock.method(sonarr, 'command', async () => {
+      radarrFirst = await Promise.race([
+        asked,
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => resolve(false), 2000)
+        ),
+      ]);
+      return { status: 'completed' };
+    });
+    mock.method(radarr, 'queue', async () => {
+      radarrAsked();
+      return [];
+    });
+    await downloadCheck.run();
+    assert.equal(radarrFirst, true);
+    assert.equal(sonarr.imported.length, 1);
+    assert.equal((await rows())[0].status, 'done');
   });
 
   it('rejects another country’s version before it downloads', async () => {

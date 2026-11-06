@@ -46,11 +46,21 @@ const cookieOptions = (req: Request): CookieOptions => ({
   maxAge: CORRELATION_TTL_MS,
 });
 
-const clearCorrelation = (req: Request, res: Response) => {
+const clearCorrelation = (req: Request, res: Response, path?: string) => {
   const options = cookieOptions(req);
   delete options.maxAge;
+  if (path) {
+    options.path = path;
+  }
   res.clearCookie(CORRELATION_COOKIE, options);
 };
+
+/**
+ * At sign-out: drops any sign-in or link still waiting on the provider, from
+ * the auth router these routes are mounted under (at /oidc).
+ */
+export const clearOidcInProgress = (req: Request, res: Response): void =>
+  clearCorrelation(req, res, `${req.baseUrl}/oidc`);
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -63,9 +73,9 @@ const escapeHtml = (value: string) =>
 
 /**
  * Navigate from the callback with a self-advancing page, not a redirect: the
- * provider's return was cross-site, and a redirect keeps that, so the new
- * session cookie (SameSite=Strict with CSRF protection on) wouldn't be sent.
- * Also keeps the code in the URL out of the referrer.
+ * provider's return was cross-site, and a redirect keeps that, so a
+ * SameSite=Strict cookie (CSRF protection's own) wouldn't be sent. Also keeps
+ * the code in the URL out of the referrer.
  */
 const relay = (res: Response, path: string) => {
   const target = escapeHtml(path);
@@ -169,7 +179,8 @@ oidcRoutes.get<{ providerId: string }>(
   }
 );
 
-oidcRoutes.get<{ providerId: string }>(
+// A POST from the page, so following a link elsewhere never starts one.
+oidcRoutes.post<{ providerId: string }>(
   '/:providerId/link',
   async (req, res) => {
     // Linking requires being signed in, and only to your own account.

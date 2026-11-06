@@ -240,6 +240,36 @@ describe('a playlist shared with someone', () => {
 });
 
 describe('a playlist song tried again', () => {
+  it('says why a failed request it follows is not retried', async () => {
+    const list = await makePlaylist();
+    const song = await getRepository(MediaListSong).save(
+      new MediaListSong({
+        listId: list.id,
+        sourceId: 'trk1',
+        position: 1,
+        title: 'Lantern Song',
+        artistName: 'Glasswing',
+        state: 'requested',
+        requestForId: user.id,
+      })
+    );
+    mock.method(
+      playlists,
+      'retry',
+      async () =>
+        'Its request failed after it was approved, so an admin retries it.'
+    );
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/v1/list/${list.id}/song/${song.id}/retry`,
+      { method: 'POST' }
+    );
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message:
+        'Its request failed after it was approved, so an admin retries it.',
+    });
+  });
+
   it('is refused while Music is turned off', async () => {
     const list = await makePlaylist();
     const song = await getRepository(MediaListSong).save(

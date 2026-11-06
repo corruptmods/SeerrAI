@@ -328,6 +328,156 @@ describe('reading each client’s states', () => {
   });
 });
 
+describe('adding and removing Backfill’s torrents', () => {
+  const settings = {
+    hostname: '127.0.0.1',
+    port: 1,
+    useSsl: false,
+    urlBase: '',
+    username: '',
+    password: '',
+  };
+  const rpcOf = (api: unknown) =>
+    api as { call: (method: string, params: unknown) => Promise<unknown> };
+
+  it('Transmission: refuses a torrent it already holds, and changes nothing on it', async () => {
+    const api = new TransmissionAPI(settings);
+    const sent: string[] = [];
+    mock.method(rpcOf(api), 'call', async (method: string) => {
+      sent.push(method);
+      return method === 'torrent-add'
+        ? { 'torrent-duplicate': { hashString: OTHER } }
+        : {};
+    });
+    await assert.rejects(
+      api.addTorrent({
+        magnet: `magnet:?xt=urn:btih:${OTHER}`,
+        hash: HASH,
+        category: 'backfill',
+        metadataOnly: true,
+      }),
+      /already in Transmission/
+    );
+    assert.deepEqual(sent, ['torrent-add']);
+    mock.restoreAll();
+  });
+
+  it('Transmission: removes a torrent added under another hash, without its data', async () => {
+    const api = new TransmissionAPI(settings);
+    const sent: [string, unknown][] = [];
+    mock.method(rpcOf(api), 'call', async (method: string, args: unknown) => {
+      sent.push([method, args]);
+      return method === 'torrent-add'
+        ? { 'torrent-added': { hashString: OTHER } }
+        : {};
+    });
+    await assert.rejects(
+      api.addTorrent({
+        magnet: `magnet:?xt=urn:btih:${OTHER}`,
+        hash: HASH,
+        category: 'backfill',
+      }),
+      /another hash/
+    );
+    assert.deepEqual(
+      sent.map(([method]) => method),
+      ['torrent-add', 'torrent-remove']
+    );
+    assert.deepEqual(sent[1][1], { ids: [OTHER] });
+    mock.restoreAll();
+  });
+
+  it('Transmission: removes data only when no other torrent shares it', async () => {
+    const api = new TransmissionAPI(settings);
+    let torrents: { hashString: string; name: string; downloadDir: string }[] =
+      [];
+    const removed: unknown[] = [];
+    mock.method(rpcOf(api), 'call', async (method: string, args: unknown) => {
+      if (method === 'torrent-get') return { torrents };
+      removed.push(args);
+      return {};
+    });
+    torrents = [
+      { hashString: HASH, name: 'Harbour.Lights.S01', downloadDir: '/dl' },
+      { hashString: OTHER, name: 'Harbour.Lights.S02', downloadDir: '/dl' },
+    ];
+    await api.deleteTorrent(HASH);
+    torrents[1].name = 'Harbour.Lights.S01';
+    await api.deleteTorrent(HASH);
+    assert.deepEqual(removed, [
+      { ids: [HASH], 'delete-local-data': true },
+      { ids: [HASH], 'delete-local-data': false },
+    ]);
+    mock.restoreAll();
+  });
+
+  it('Deluge: removes a torrent added under another hash, without its data', async () => {
+    const api = new DelugeAPI({ ...settings, password: 'x' } as never);
+    const sent: [string, unknown][] = [];
+    mock.method(rpcOf(api), 'call', async (method: string, params: unknown) => {
+      sent.push([method, params]);
+      return method === 'core.add_torrent_magnet' ? OTHER : true;
+    });
+    await assert.rejects(
+      api.addTorrent({
+        magnet: `magnet:?xt=urn:btih:${OTHER}`,
+        hash: HASH,
+        category: 'backfill',
+      }),
+      /another hash/
+    );
+    assert.deepEqual(sent.at(-1), ['core.remove_torrent', [OTHER, false]]);
+    mock.restoreAll();
+  });
+
+  it('Deluge: removes data only when no other torrent shares it', async () => {
+    const api = new DelugeAPI({ ...settings, password: 'x' } as never);
+    let all: Record<string, { name: string; save_path: string }> = {};
+    const removed: unknown[] = [];
+    mock.method(rpcOf(api), 'call', async (method: string, params: unknown) => {
+      if (method === 'core.get_torrents_status') return all;
+      removed.push(params);
+      return true;
+    });
+    all = {
+      [HASH]: { name: 'Lantern.Song.mkv', save_path: '/dl' },
+      [OTHER]: { name: 'Static.Garden', save_path: '/dl' },
+    };
+    await api.deleteTorrent(HASH);
+    all[OTHER] = { name: 'Lantern.Song.mkv', save_path: '/dl/' };
+    await api.deleteTorrent(HASH);
+    assert.deepEqual(removed, [
+      [HASH, true],
+      [HASH, false],
+    ]);
+    mock.restoreAll();
+  });
+
+  it('rTorrent: counts only labels stored exactly as Backfill writes them', async () => {
+    const api = new RtorrentAPI(settings as never);
+    const row = (hash: string, label: string) => [
+      hash.toUpperCase(),
+      'Glasswing',
+      ...Array(9).fill(0),
+      '/dl/Glasswing',
+      1,
+      label,
+      '',
+      0,
+      0,
+    ];
+    mock.method(rpcOf(api), 'call', async () => [
+      row(HASH, 'backfill'),
+      row(OTHER, 'backfil%6C'),
+    ]);
+    assert.deepEqual(
+      (await api.listCategory('backfill')).map((t) => t.hash),
+      [HASH]
+    );
+    mock.restoreAll();
+  });
+});
+
 describe('talking to them', () => {
   const servers: http.Server[] = [];
   const ports: Record<string, number> = {};

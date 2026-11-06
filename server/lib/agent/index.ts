@@ -34,10 +34,10 @@ import type {
 } from '@server/lib/agent/tools';
 import {
   TOOLS,
-  adminPresent,
   boundTitle,
   decisionText,
   notLookedFor,
+  offered,
   readTitleRef,
   runTool,
   startApprovedGrab,
@@ -116,6 +116,11 @@ const OUTAGE_WAITS_MS = [15_000, 30_000, 60_000, 120_000, 240_000];
  */
 const OUTAGE_CHECK_MS = 5 * 60 * 1000;
 const OUTAGE_LONGEST_MS = DAY;
+/**
+ * Longest a proposal may wait to be approved. Declining one stays possible
+ * whenever.
+ */
+const PROPOSAL_LONGEST_MS = 7 * DAY;
 /** How long a replaced season is followed for its new files to import. */
 const FOLLOW_LONGEST_MS = 2 * 24 * 60 * 60 * 1000;
 const UNFINISHED: AgentRun['status'][] = [
@@ -1022,6 +1027,7 @@ class Agent {
         throw new Error('It is busy; try again in a moment.');
       }
     }
+    const read = run.status;
     run.steps.push({
       at: new Date().toISOString(),
       kind: 'reply',
@@ -1062,6 +1068,17 @@ class Agent {
     // The rest of the conversation acts as whoever is replying now.
     run.requestedById = user.id;
     run.requestedByName = run.requestedByName ?? user.displayName;
+    // Only from where it was when read: an approval or decline that got in
+    // first wins.
+    if (read === 'waiting') {
+      const moved = await runs.update(
+        { id: run.id, status: read },
+        { status: 'queued' }
+      );
+      if (!moved.affected) {
+        throw new Error('It changed just now; reload and try again.');
+      }
+    }
     await runs.save(run);
     this.queue.push(run.id);
     void this.pump();
@@ -1169,6 +1186,25 @@ class Agent {
 
   private deciding = new Set<number>();
 
+  /**
+   * Moves a run on from waiting only if it is still waiting, so of an
+   * approval, a decline and a reply arriving together exactly one goes on.
+   */
+  private async leaveWaiting(
+    id: number,
+    status: AgentRun['status']
+  ): Promise<void> {
+    const moved = await getRepository(AgentRun).update(
+      { id, status: 'waiting' },
+      { status }
+    );
+    if (!moved.affected) {
+      throw new Error(
+        'These changes are no longer waiting; reload to see where it stands.'
+      );
+    }
+  }
+
   private async decide(
     id: number,
     proposalId: string,
@@ -1196,6 +1232,12 @@ class Agent {
           'These changes are no longer waiting; reload to see where it stands.'
         );
       }
+      const proposedAt = new Date(proposal.at).getTime();
+      if (approved && Date.now() - proposedAt > PROPOSAL_LONGEST_MS) {
+        throw new Error(
+          'These changes were proposed over a week ago, so they can no longer be approved. Decline them, or reply to have them looked at again.'
+        );
+      }
       const headlines = proposal.changes.map((c) => c.headline).join('; ');
       const direct = directOf(run);
       const { proposal: _taken, ...memory } = run.memory as {
@@ -1219,6 +1261,7 @@ class Agent {
         run.status = 'queued';
         // It continues as the approving admin.
         run.requestedById = user.id;
+        await this.leaveWaiting(run.id, 'queued');
         await runs.save(run);
         this.queue.push(run.id);
         void this.pump();
@@ -1235,6 +1278,7 @@ class Agent {
       run.status = 'done';
       run.summary = `${user.displayName} declined: ${headlines}. Nothing was changed.`;
       run.finishedAt = new Date();
+      await this.leaveWaiting(run.id, 'done');
       // Proposed on someone's behalf: they hear it was declined.
       if (direct && this.reportSettled(run)) {
         await runs.save(run);
@@ -1263,7 +1307,7 @@ class Agent {
           // The grab records itself, like any download it starts.
           const said = await startApprovedGrab(
             state,
-            change.params.grab,
+            change,
             `AI agent, approved by ${decision.by}`
           );
           lines.push(`Done: ${change.headline}. ${said}`);
@@ -1621,7 +1665,7 @@ class Agent {
       // Recomputed each turn: an admin who replies mid-run is present from
       // then on.
       const toolsNow = () =>
-        TOOLS.filter((tool) => !tool.askOnly || adminPresent(run)).map(
+        TOOLS.filter((tool) => offered(tool, run)).map(
           ({ name, description, parameters }) => ({
             name,
             description,

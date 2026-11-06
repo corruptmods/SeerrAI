@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   generateKeyPairSync,
   randomBytes,
   sign,
@@ -45,6 +46,12 @@ export interface FakeOidcProvider {
   userinfoClaims: Record<string, unknown>;
   /** While set, userinfo returns a server error. */
   userinfoDown: boolean;
+  /**
+   * How ID tokens are signed: RS256 (default) or ES256 with a published key,
+   * HS256 with the client secret, or forged (RS256 with an unpublished key
+   * under the published key's id).
+   */
+  signing: 'RS256' | 'ES256' | 'HS256' | 'forged';
   start: () => Promise<void>;
   stop: () => Promise<void>;
   reset: () => void;
@@ -72,18 +79,23 @@ const base64url = (data: Buffer | string) =>
   Buffer.from(data).toString('base64url');
 
 const signJwt = (
-  key: KeyObject,
-  kid: string,
+  alg: 'RS256' | 'ES256' | 'HS256',
+  key: KeyObject | string,
+  kid: string | undefined,
   claims: Record<string, unknown>
 ): string => {
-  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid }));
+  const header = base64url(JSON.stringify({ alg, typ: 'JWT', kid }));
   const payload = base64url(JSON.stringify(claims));
-  const signature = sign(
-    'sha256',
-    Buffer.from(`${header}.${payload}`),
-    key
-  ).toString('base64url');
-  return `${header}.${payload}.${signature}`;
+  const data = Buffer.from(`${header}.${payload}`);
+  const signature =
+    typeof key === 'string'
+      ? createHmac('sha256', key).update(data).digest()
+      : sign(
+          'sha256',
+          data,
+          alg === 'ES256' ? { key, dsaEncoding: 'ieee-p1363' } : key
+        );
+  return `${header}.${payload}.${signature.toString('base64url')}`;
 };
 
 const readBody = (req: http.IncomingMessage): Promise<string> =>
@@ -98,6 +110,9 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
     modulusLength: 2048,
   });
   const kid = 'test-key';
+  const ec = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const ecKid = 'test-ec-key';
+  const unpublished = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const codes = new Map<string, IssuedCode>();
   const accessTokens = new Map<string, FakeOidcAccount>();
   let port = 0;
@@ -113,6 +128,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
     idTokenClaims: {},
     userinfoClaims: {},
     userinfoDown: false,
+    signing: 'RS256',
     start: () =>
       new Promise((resolve) => {
         server.listen(0, '127.0.0.1', () => {
@@ -137,6 +153,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       fake.idTokenClaims = {};
       fake.userinfoClaims = {};
       fake.userinfoDown = false;
+      fake.signing = 'RS256';
     },
     authorize: async (authorizationUrl, account, tamper = {}) => {
       const url = new URL(authorizationUrl);
@@ -198,7 +215,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
         jwks_uri: `${fake.issuer}/jwks`,
         response_types_supported: ['code'],
         subject_types_supported: ['public'],
-        id_token_signing_alg_values_supported: ['RS256'],
+        id_token_signing_alg_values_supported: ['RS256', 'ES256', 'HS256'],
         code_challenge_methods_supported: ['S256'],
         token_endpoint_auth_methods_supported: [
           'client_secret_basic',
@@ -210,7 +227,10 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
 
     if (path === '/jwks') {
       return json(res, 200, {
-        keys: [{ ...publicKey.export({ format: 'jwk' }), kid, alg: 'RS256' }],
+        keys: [
+          { ...publicKey.export({ format: 'jwk' }), kid, alg: 'RS256' },
+          { ...ec.publicKey.export({ format: 'jwk' }), kid: ecKid, use: 'sig' },
+        ],
       });
     }
 
@@ -245,7 +265,14 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       const now = Math.floor(Date.now() / 1000);
       const accessToken = randomBytes(16).toString('hex');
       accessTokens.set(accessToken, issued.account);
-      const idToken = signJwt(privateKey, kid, {
+      const signer = {
+        RS256: ['RS256', privateKey, kid],
+        ES256: ['ES256', ec.privateKey, ecKid],
+        HS256: ['HS256', fake.clientSecret, undefined],
+        forged: ['RS256', unpublished.privateKey, kid],
+      } as const;
+      const [alg, key, keyId] = signer[fake.signing];
+      const idToken = signJwt(alg, key, keyId, {
         iss: fake.issuerSaid ?? fake.issuer,
         aud: fake.clientId,
         iat: now,

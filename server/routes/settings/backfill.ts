@@ -1,6 +1,7 @@
 import { isTorrentClient } from '@server/api/downloadclients';
 import ProwlarrAPI from '@server/api/prowlarr';
 import backfill from '@server/lib/backfill/engine';
+import { arrApps } from '@server/lib/backfill/indexerOrigins';
 import { GROUP_NAME, setGroupBlocked } from '@server/lib/blockedGroups';
 import { keptSecret } from '@server/lib/savedSecret';
 import type { BackfillSettings } from '@server/lib/settings';
@@ -143,6 +144,25 @@ const prowlarrFailed = (e: unknown) => {
   };
 };
 
+/**
+ * The Sonarr, Radarr or Lidarr whose download clients already use this
+ * category, if any. One that doesn't answer is passed over.
+ */
+const categoryUser = async (category: string): Promise<string | undefined> => {
+  const apps = arrApps();
+  const wanted = category.toLowerCase();
+  const users = await Promise.all(
+    apps.map(async ({ name, api }) =>
+      (await api.getDownloadCategories().catch(() => [])).some(
+        (used) => used.trim().toLowerCase() === wanted
+      )
+        ? name
+        : undefined
+    )
+  );
+  return users.find(Boolean);
+};
+
 backfillSettingsRoutes.get('/', (_req, res) => {
   res.status(200).json(shown(getSettings().backfill));
 });
@@ -189,6 +209,14 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
     )
   ) {
     return next({ status: 400, message: 'Choose a Usenet client.' });
+  }
+  // Backfill clears leftovers in its category: it must be Backfill's alone.
+  const user = await categoryUser(next_.category);
+  if (user) {
+    return next({
+      status: 400,
+      message: `${user} already uses the category "${next_.category}". Choose another for Backfill.`,
+    });
   }
   if (next_.enabled) {
     if (!next_.prowlarr.hostname || !next_.prowlarr.apiKey) {

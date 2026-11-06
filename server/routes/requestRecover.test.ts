@@ -271,6 +271,20 @@ Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
   },
 });
 
+// Season edits check the series' seasons on TMDB.
+Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
+  configurable: true,
+  set() {},
+  get() {
+    return async ({ tvId }: { tvId: number }) => ({
+      id: tvId,
+      name: 'Series',
+      seasons: [1, 2, 3].map((n) => ({ season_number: n, episode_count: 8 })),
+      external_ids: {},
+    });
+  },
+});
+
 const stored = (id: number) =>
   getRepository(MediaRequest).findOneByOrFail({ id });
 

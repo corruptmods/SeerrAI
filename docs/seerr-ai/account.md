@@ -4,6 +4,12 @@
 
 Everything here is in **Profile → Settings** (your picture, top right → **Settings**).
 
+## Your email
+
+An email you set on your own account (**Profile → Settings → General**) counts as confirmed once you open the link sent to it. The link is sent when email notifications are set up and the Application URL is set, and it works for 7 days. Emails set by an admin, brought by Plex or single sign-on, or that are your Jellyfin or Emby username, count as confirmed straight away. An email typed in when signing up with Jellyfin or Emby gets a link too.
+
+Until it's confirmed, the address isn't kept for you: if someone later signs in with Plex or single sign-on using that email, it moves to their account, and you lose password sign-in until an admin sets an email for you. Without email notifications set up, ask an admin to set your email instead.
+
 ## Passkeys
 
 Sign in with Face ID, Touch ID, Windows Hello or a security key instead of a password.

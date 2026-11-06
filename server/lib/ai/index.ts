@@ -6,7 +6,7 @@ import { forgetRecentActivity } from '@server/lib/ai/context';
 import { noteAnswer, noteFailure } from '@server/lib/ai/credit';
 import { today } from '@server/lib/ai/day';
 import type { CompletionImage } from '@server/lib/ai/providers';
-import { complete } from '@server/lib/ai/providers';
+import { AiProviderError, complete } from '@server/lib/ai/providers';
 import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { aiReady, getSettings } from '@server/lib/settings';
@@ -168,7 +168,7 @@ export interface AiRequest {
   /**
    * Refund for an answer already reserved with reserveUse, by a feature
    * with work to do first (reading a photo). Called if the answer comes
-   * from the cache or the provider fails.
+   * from the cache or the provider fails, unless it timed out.
    */
   paid?: () => Promise<void>;
 }
@@ -209,7 +209,11 @@ const ask = async (
       json,
     });
   } catch (e) {
-    await refund();
+    // A request that timed out may still be answered and billed, so it
+    // counts like an answer.
+    if (!(e instanceof AiProviderError && e.code === 'timeout')) {
+      await refund();
+    }
     noteFailure(e);
     throw e;
   }

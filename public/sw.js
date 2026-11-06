@@ -1,9 +1,11 @@
 /* eslint-disable no-undef */
 // Bump to reinstall the worker and refetch cached resources. Intentionally unused.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const OFFLINE_VERSION = 16;
+const OFFLINE_VERSION = 17;
 const CACHE_NAME = 'offline';
 const OFFLINE_URL = '/offline.html';
+// The offline page's script, kept with it: pages run only scripts from here.
+const OFFLINE_SCRIPT_URL = '/offline.js';
 
 // Hashed, immutable Next.js assets, cache-first so an installed app doesn't
 // re-download the bundle after the OS evicts the HTTP cache.
@@ -174,7 +176,10 @@ self.addEventListener('install', (event) => {
       // Never reject: a failed install keeps the previous worker, which may
       // serve a stale shell until reinstall.
       try {
-        await cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
+        await cache.addAll([
+          new Request(OFFLINE_URL, { cache: 'reload' }),
+          new Request(OFFLINE_SCRIPT_URL, { cache: 'reload' }),
+        ]);
       } catch {
         // No offline page until the next install.
       }
@@ -528,6 +533,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
+    // The copy stored with the offline page, so the two always match.
+    if (url.pathname === OFFLINE_SCRIPT_URL) {
+      event.respondWith(
+        (async () =>
+          (await (await caches.open(CACHE_NAME)).match(OFFLINE_SCRIPT_URL)) ??
+          fetch(request))()
+      );
+      return;
+    }
+
     if (url.pathname.startsWith('/_next/static/')) {
       event.respondWith(
         cacheFirst(request, STATIC_CACHE, STATIC_CACHE_MAX_ENTRIES, (promise) =>
@@ -727,7 +742,16 @@ self.addEventListener('push', (event) => {
 
 /** Focuses the app on `url`, reusing an open window when possible. */
 const openApp = async (url) => {
-  const target = new URL(url || '/', self.location.origin).href;
+  let target = new URL('/', self.location.origin).href;
+  try {
+    const asked = new URL(url || '/', self.location.origin);
+    // Only this app's own pages; anything else opens the home page.
+    if (asked.origin === self.location.origin) {
+      target = asked.href;
+    }
+  } catch {
+    // Not a URL: the home page.
+  }
   const windows = await clients.matchAll({
     type: 'window',
     includeUncontrolled: true,

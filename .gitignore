@@ -29,6 +29,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -36,6 +37,17 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# config: only its empty folders are tracked (settings, including a
+# settings.json.tmp left by a crash, the database, logs and caches are not)
+/config/*
+!/config/.gitkeep
+!/config/db/
+/config/db/*
+!/config/db/.gitkeep
+!/config/logs/
+/config/logs/*
+!/config/logs/.gitkeep
 
 # database
 config/db/*.sqlite3*
@@ -96,3 +108,6 @@ devenv.local.yaml
 
 # The pre-build quality review keeps what it fetched here
 .cache/
+
+# Claude Code
+.claude/

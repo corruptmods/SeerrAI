@@ -10,6 +10,7 @@ import {
   takeChallenge,
 } from '@server/lib/passkeys';
 import { endSessions, maySignIn, startSession } from '@server/lib/signIn';
+import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import type {
@@ -32,6 +33,8 @@ import { Router } from 'express';
  */
 
 const passkeyRoutes = Router();
+
+const limiter = new SignInLimiter('passkey', { capAccount: true });
 
 const toBase64Url = (bytes: Uint8Array) =>
   Buffer.from(bytes).toString('base64url');
@@ -242,6 +245,10 @@ passkeyRoutes.post('/login', async (req, res, next) => {
       message: 'Passkey sign-in expired. Try again.',
     });
   }
+  const credentialId = body.response.id;
+  if (!limiter.take(req, res, credentialId)) {
+    return;
+  }
 
   try {
     const repository = getRepository(UserPasskey);
@@ -308,6 +315,7 @@ passkeyRoutes.post('/login', async (req, res, next) => {
       where: { id: passkey.user.id },
     });
 
+    limiter.clear(req, credentialId);
     await startSession(req, user.id);
 
     logger.info('Signed in with a passkey', {

@@ -54,6 +54,7 @@ describe('the email logo', () => {
   it('finds every email', () => {
     assert.deepEqual(templates.sort(), [
       'backfill',
+      'confirmemail',
       'generatedpassword',
       'media-issue',
       'media-request',

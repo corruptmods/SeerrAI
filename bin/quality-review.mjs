@@ -161,8 +161,15 @@ const factsOf = (trash) =>
     })
   );
 
+// TRaSH Guides' text goes to a terminal: drop control and bidi characters.
+const clean = (text) =>
+  String(text).replace(
+    /[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu,
+    ''
+  );
+
 const added = (now = [], was = []) => now.filter((v) => !was.includes(v));
-const list = (values) => values.join(', ');
+const list = (values) => values.map(clean).join(', ');
 
 const review = (facts, was) => {
   const mustFix = [];
@@ -258,8 +265,8 @@ const gaps = (facts) =>
     return missing.length ? `${APP[kind]}: ${list(missing)}` : null;
   }).filter(Boolean);
 
-const short = (commit) => (commit ?? '').slice(0, 7);
-const day = (date) => (date ? date.slice(0, 10) : 'unknown date');
+const short = (commit) => clean(commit ?? '').slice(0, 7);
+const day = (date) => (date ? clean(date).slice(0, 10) : 'unknown date');
 
 const main = async () => {
   if (cache) await fs.mkdir(cache, { recursive: true });
@@ -326,5 +333,5 @@ const main = async () => {
 };
 
 main().catch((e) => {
-  console.log(`Could not check TRaSH Guides: ${e.message}`);
+  console.log(`Could not check TRaSH Guides: ${clean(e.message)}`);
 });

@@ -364,6 +364,7 @@ describe('what the image cache keeps, and how it serves it', () => {
 describe('image redirects', () => {
   const unique = `${process.pid}-${Date.now()}`;
   let elsewhere: string[] = [];
+  let home: string[] = [];
   let upstream: http.Server;
   let other: http.Server;
 
@@ -376,9 +377,17 @@ describe('image redirects', () => {
     await new Promise<void>((r) => other.listen(0, '127.0.0.1', () => r()));
     const otherPort = (other.address() as AddressInfo).port;
     upstream = http.createServer((req, res) => {
-      const host = req.url?.includes('away') ? 'localhost' : '127.0.0.1';
+      if (req.url === '/moved.jpg') {
+        home.push(req.url);
+        res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+        return res.end(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+      }
       res.writeHead(302, {
-        Location: `http://${host}:${otherPort}/moved.jpg`,
+        Location: req.url?.includes('away')
+          ? `http://localhost:${otherPort}/moved.jpg`
+          : req.url?.includes('port')
+            ? `http://127.0.0.1:${otherPort}/moved.jpg`
+            : '/moved.jpg',
       });
       res.end();
     });
@@ -392,19 +401,20 @@ describe('image redirects', () => {
     await promises.rm(dir, { recursive: true, force: true });
   });
 
-  it('follows one on the same host, and refuses one to another', async () => {
+  it('follows one on the same host and port, and refuses one to another', async () => {
     const proxy = new ImageProxy(
       'redirect-test',
       `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`
     );
     elsewhere = [];
+    home = [];
     const image = await proxy.getImage(`/t/p/w500/${unique}-home.jpg`);
     assert.equal(image.meta.contentType, 'image/jpeg');
-    assert.deepEqual(elsewhere, ['/moved.jpg']);
+    assert.deepEqual(home, ['/moved.jpg']);
 
-    elsewhere = [];
     await assert.rejects(() => proxy.getImage(`/t/p/w500/${unique}-away.jpg`));
-    assert.deepEqual(elsewhere, [], 'the other host was never asked');
+    await assert.rejects(() => proxy.getImage(`/t/p/w500/${unique}-port.jpg`));
+    assert.deepEqual(elsewhere, [], 'the other host and port were never asked');
   });
 
   it('lets album covers go on to archive.org, over https only', () => {
@@ -424,6 +434,15 @@ describe('image redirects', () => {
       ['http:', 'coverartarchive.org'],
     ]) {
       assert.throws(() => guard({ protocol, hostname }), hostname);
+    }
+    assert.doesNotThrow(() =>
+      guard({ protocol: 'https:', hostname: 'archive.org', port: 443 })
+    );
+    for (const hostname of ['coverartarchive.org', 'archive.org']) {
+      assert.throws(
+        () => guard({ protocol: 'https:', hostname, port: 8443 }),
+        hostname
+      );
     }
   });
 });

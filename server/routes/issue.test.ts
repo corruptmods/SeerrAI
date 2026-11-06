@@ -237,3 +237,38 @@ describe('POST /issue', () => {
     assert.strictEqual(res.body.message, 'Issue user not found');
   });
 });
+
+describe('GET /issue/count', () => {
+  const report = (createdBy: User, media: Media, issueType: IssueType) =>
+    getRepository(Issue).save(
+      new Issue({ createdBy, media, issueType, comments: [] })
+    );
+
+  it('counts only their own issues for someone who may not view others', async () => {
+    const userRepo = getRepository(User);
+    const media = await seedMedia();
+    const admin = await userRepo.findOneByOrFail({ email: 'admin@seerr.dev' });
+    const friend = await userRepo.findOneByOrFail({
+      email: 'friend@seerr.dev',
+    });
+    await report(admin, media, IssueType.VIDEO);
+    await report(admin, media, IssueType.AUDIO);
+    await report(friend, media, IssueType.SUBTITLES);
+
+    friend.permissions = Permission.CREATE_ISSUES;
+    await userRepo.save(friend);
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const own = await agent.get('/issue/count');
+    assert.strictEqual(own.status, 200);
+    assert.strictEqual(own.body.total, 1);
+    assert.strictEqual(own.body.subtitles, 1);
+    assert.strictEqual(own.body.video, 0);
+    assert.strictEqual(own.body.open, 1);
+
+    friend.permissions = Permission.VIEW_ISSUES;
+    await userRepo.save(friend);
+    const viewer = await agent.get('/issue/count');
+    assert.strictEqual(viewer.body.total, 3);
+    assert.strictEqual(viewer.body.video, 1);
+  });
+});

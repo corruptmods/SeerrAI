@@ -178,21 +178,35 @@ const variantAsked = (
 };
 
 /**
- * Conversion is costly, so signed-out users (sign-in page backdrops) share a
- * small conversion budget: enough for that page, not enough to load the server.
+ * Conversion is costly, so signed-out visitors (sign-in page backdrops) get a
+ * small conversion budget each, enough for that page, within a larger one
+ * they share, not enough to load the server.
  */
 const SIGNED_OUT_CONVERSIONS = 20;
+const SIGNED_OUT_SHARED_CONVERSIONS = 200;
 const SIGNED_OUT_WINDOW_MS = 10 * 60 * 1000;
-let signedOutWindow = { startedAt: 0, used: 0 };
+const SIGNED_OUT_CLIENTS_KEPT = 10_000;
+let signedOutWindow = {
+  startedAt: 0,
+  used: 0,
+  byClient: new Map<string, number>(),
+};
 
-const signedOutMayConvert = () => {
+const signedOutMayConvert = (req: Request) => {
   const now = Date.now();
   if (now - signedOutWindow.startedAt > SIGNED_OUT_WINDOW_MS) {
-    signedOutWindow = { startedAt: now, used: 0 };
+    signedOutWindow = { startedAt: now, used: 0, byClient: new Map() };
   }
-  if (signedOutWindow.used >= SIGNED_OUT_CONVERSIONS) {
+  const client = req.ip ?? '';
+  const used = signedOutWindow.byClient.get(client) ?? 0;
+  if (
+    used >= SIGNED_OUT_CONVERSIONS ||
+    signedOutWindow.used >= SIGNED_OUT_SHARED_CONVERSIONS ||
+    (!used && signedOutWindow.byClient.size >= SIGNED_OUT_CLIENTS_KEPT)
+  ) {
     return false;
   }
+  signedOutWindow.byClient.set(client, used + 1);
   signedOutWindow.used += 1;
   return true;
 };
@@ -238,13 +252,13 @@ const serve = async (
 
     if (variant) {
       // Only signed-in users trigger conversion; others get existing copies
-      // plus a small shared budget (see above).
+      // plus a small budget (see above).
       let result = await proxy.getVariant(imagePath, variant, imageData, {
         convert: false,
       });
       if (
         result.status === 'pending' &&
-        ((isSignedIn ?? (await signedIn(req))) || signedOutMayConvert())
+        ((isSignedIn ?? (await signedIn(req))) || signedOutMayConvert(req))
       ) {
         result = await proxy.getVariant(imagePath, variant, imageData, {
           convert: true,

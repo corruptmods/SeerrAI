@@ -160,6 +160,24 @@ describe('the Soulseek sharer songs are taken from', () => {
     );
   });
 
+  it('merges a sharer with many files quickly, each file once, in first-seen order', () => {
+    const list = (from: number) =>
+      sharer(
+        'a',
+        Array.from({ length: 10_000 }, (_, i): [string] => [
+          `x\\Static Garden\\${String(from + i).padStart(6, '0')} - Harbour Lights.flac`,
+        ])
+      );
+    const started = performance.now();
+    const merged = mergeResponses([[list(0)], [list(5_000)], [list(10_000)]]);
+    assert.ok(performance.now() - started < 1000);
+    const names = merged[0].files.map((f) => f.filename);
+    assert.equal(names.length, 20_000);
+    assert.equal(new Set(names).size, 20_000);
+    assert.match(names[0], /000000/);
+    assert.match(names[10_000], /010000/);
+  });
+
   it('is searched for by the artist and title as words', () => {
     assert.equal(
       soulseekQuery('Glasswing & Harbour Lights', 'Lantern Song (Radio Edit)'),

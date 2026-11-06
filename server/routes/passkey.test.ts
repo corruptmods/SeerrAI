@@ -587,6 +587,22 @@ describe('passkeys', () => {
     assert.equal(res.status, 403);
   });
 
+  it('asks for a wait after ten failed sign-ins with one passkey, even a good one', async () => {
+    const browser = new Browser();
+    await browser.signInAs(await userId('friend@seerr.dev'));
+    const device = new Authenticator();
+    await addPasskey(browser, device);
+
+    for (let i = 0; i < 10; i++) {
+      assert.equal(
+        (await signInWith(device, { origin: 'https://other.example.invalid' }))
+          .status,
+        403
+      );
+    }
+    assert.equal((await signInWith(device)).status, 429);
+  });
+
   it('never accepts the same challenge twice', async () => {
     const browser = new Browser();
     await browser.signInAs(await userId('friend@seerr.dev'));

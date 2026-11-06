@@ -25,6 +25,7 @@ const loadWorker = (
   const handlers: Record<string, Handler> = {};
   const sent: Request[] = [];
   const shown: Shown[] = [];
+  const opened: string[] = [];
   const jar = cookies ? { ...cookies } : undefined;
 
   class WorkerRequest extends Request {
@@ -51,7 +52,13 @@ const loadWorker = (
 
   runInNewContext(source, {
     self,
-    clients: { matchAll: async () => [], openWindow: async () => null },
+    clients: {
+      matchAll: async () => [],
+      openWindow: async (url: string) => {
+        opened.push(url);
+        return null;
+      },
+    },
     caches: {},
     navigator: {},
     Request: WorkerRequest,
@@ -97,7 +104,7 @@ const loadWorker = (
     await Promise.all(waits);
   };
 
-  return { tap, push, sent, shown, handlers };
+  return { tap, push, sent, shown, opened, handlers };
 };
 
 const actionOn = (sent: Request[]) =>
@@ -136,6 +143,26 @@ describe('approving from a notification', () => {
     const post = actionOn(worker.sent);
     assert.equal(post?.url, `${ORIGIN}/api/v1/request/7/approve`);
     assert.equal(post?.headers.get('X-XSRF-TOKEN'), null);
+  });
+});
+
+describe('opening a notification', () => {
+  it('opens the page it names in the app', async () => {
+    const worker = loadWorker(undefined);
+    await worker.tap('', { actionUrl: '/movie/7' });
+    assert.deepEqual(worker.opened, [`${ORIGIN}/movie/7`]);
+  });
+
+  it('opens the home page for an address on another site', async () => {
+    for (const actionUrl of [
+      'https://elsewhere.example.invalid/movie/7',
+      '//elsewhere.example.invalid/movie/7',
+      'javascript:alert(1)',
+    ]) {
+      const worker = loadWorker(undefined);
+      await worker.tap('', { actionUrl });
+      assert.deepEqual(worker.opened, [`${ORIGIN}/`], actionUrl);
+    }
   });
 });
 
@@ -656,5 +683,76 @@ describe('Discover rows kept on the device', () => {
     worker.server.rows = 2;
     assert.equal(await worker.row(top), 1);
     assert.equal(await worker.row(top), 2);
+  });
+});
+
+describe('the offline page', () => {
+  it('keeps its script with it and serves that copy while the server is away', async () => {
+    const handlers: Record<string, Handler> = {};
+    const stored = new Map<string, Response>();
+    const keyOf = (request: Request | string) =>
+      typeof request === 'string' ? request : new URL(request.url).pathname;
+    const cache = {
+      addAll: async (requests: Request[]) => {
+        for (const request of requests) {
+          stored.set(keyOf(request), new Response(`stored ${keyOf(request)}`));
+        }
+      },
+      match: async (request: Request | string) =>
+        stored.get(keyOf(request))?.clone(),
+    };
+    let online = true;
+
+    class WorkerRequest extends Request {
+      constructor(input: string, init?: RequestInit) {
+        super(new URL(input, ORIGIN), init);
+      }
+    }
+
+    runInNewContext(source, {
+      self: {
+        location: { origin: ORIGIN },
+        addEventListener: (type: string, handler: Handler) => {
+          handlers[type] = handler;
+        },
+        skipWaiting: () => undefined,
+      },
+      clients: { matchAll: async () => [], openWindow: async () => null },
+      caches: { open: async () => cache },
+      navigator: {},
+      Request: WorkerRequest,
+      Response,
+      URL,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      fetch: async () => {
+        if (!online) throw new TypeError('Failed to fetch');
+        return new Response('from the server');
+      },
+    });
+
+    let installed: Promise<unknown> | undefined;
+    handlers.install({
+      waitUntil: (promise: Promise<unknown>) => {
+        installed = promise;
+      },
+    });
+    await installed;
+    assert.deepEqual([...stored.keys()].sort(), [
+      '/offline.html',
+      '/offline.js',
+    ]);
+
+    online = false;
+    let response: Promise<Response> | undefined;
+    handlers.fetch({
+      request: new WorkerRequest('/offline.js'),
+      respondWith: (promise: Promise<Response>) => {
+        response = promise;
+      },
+      waitUntil: () => undefined,
+    });
+    assert.equal(await (await response!).text(), 'stored /offline.js');
   });
 });

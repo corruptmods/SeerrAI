@@ -1,18 +1,15 @@
 import { getSettings } from '@server/lib/settings';
 import routes from '@server/routes';
 import { setupTestDb } from '@server/test/db';
-import restartFlag from '@server/utils/restartFlag';
 import express from 'express';
 import session from 'express-session';
 import assert from 'node:assert/strict';
-import { afterEach, before, describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import request from 'supertest';
 
 /* GET /status: the version, whether an update is out, and the data path. */
 
 setupTestDb();
-
-before(() => restartFlag.initializeSettings(getSettings()));
 
 const app = express();
 app.use(express.json());

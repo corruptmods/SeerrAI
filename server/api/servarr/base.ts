@@ -143,6 +143,14 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     );
 
     this.apiName = apiName;
+    // Settings → Network → API Request Timeout as it is now, for requests
+    // that don't set their own.
+    this.axios.interceptors.request.use((config) => {
+      if (config.timeout === timeout) {
+        config.timeout = getSettings().network.apiRequestTimeout;
+      }
+      return config;
+    });
     // Refused for the hostname used: say how to allow Seerr AI instead of
     // "status code 400".
     this.axios.interceptors.response.use(undefined, (e) => {

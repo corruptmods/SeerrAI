@@ -128,3 +128,22 @@ export const proxyTrust = (
   return (address, hop) =>
     hop === 0 ? connecting(address, hop) : further(address, hop);
 };
+
+let current: ProxyTrust = () => false;
+
+/**
+ * Express's "trust proxy" for the whole server: follows Settings → Network as
+ * it is saved (applyProxyTrust), so a change needs no restart.
+ */
+export const liveProxyTrust: ProxyTrust = (address, hop) =>
+  current(address, hop);
+
+/** Trusts proxies as these network settings say, from the next request on. */
+export const applyProxyTrust = (
+  network: Pick<
+    NetworkSettings,
+    'trustProxy' | 'trustCloudflare' | 'trustedProxies'
+  >
+): void => {
+  current = network.trustProxy ? proxyTrust(network) : () => false;
+};

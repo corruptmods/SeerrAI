@@ -18,8 +18,11 @@ interface ProxyState {
 let proxyState: ProxyState | null = null;
 let ipv4Agents: { httpAgent: http.Agent; httpsAgent: https.Agent } | null =
   null;
+// fetch()'s connections while the proxy is on, closed when it changes.
+let proxyDispatchers: Dispatcher[] = [];
 
 export function setForceIpv4First(enabled: boolean) {
+  // Requests under way finish on the old agents; new ones use these.
   ipv4Agents = enabled
     ? {
         httpAgent: new http.Agent({ family: 4 }),
@@ -27,6 +30,16 @@ export function setForceIpv4First(enabled: boolean) {
       }
     : null;
 }
+
+/**
+ * Closes fetch()'s previous connections once their requests finish. The
+ * previous axios agents are simply dropped: their idle connections time out.
+ */
+const retire = (dispatchers: Dispatcher[]): void => {
+  for (const dispatcher of dispatchers) {
+    dispatcher.close().catch(() => undefined);
+  }
+};
 
 export function proxyRequestInterceptor(
   config: InternalAxiosRequestConfig
@@ -62,10 +75,26 @@ export function proxyRequestInterceptor(
 // Default instance only; axios.create() clients register this themselves.
 axios.interceptors.request.use(proxyRequestInterceptor);
 
+/**
+ * Settings → Network → HTTP(S) Proxy, from the next request on: every
+ * outgoing request goes through the proxy while it is on, and none once it is
+ * turned off.
+ */
 export default async function createCustomProxyAgent(
   proxySettings: ProxySettings,
   forceIpv4First?: boolean
 ) {
+  const previous = proxyDispatchers;
+  if (!proxySettings.enabled) {
+    if (proxyState || previous.length) {
+      setGlobalDispatcher(new Agent());
+      proxyState = null;
+      proxyDispatchers = [];
+      retire(previous);
+    }
+    return;
+  }
+
   const defaultAgent = new Agent({
     keepAliveTimeout: 5000,
     connections: 50,
@@ -129,6 +158,7 @@ export default async function createCustomProxyAgent(
     });
 
     setGlobalDispatcher(proxyAgent.compose(noProxyInterceptor));
+    proxyDispatchers = [proxyAgent, defaultAgent];
 
     const agentOptions = {
       headers: token ? { 'proxy-authorization': token } : undefined,
@@ -151,8 +181,11 @@ export default async function createCustomProxyAgent(
     });
     setGlobalDispatcher(defaultAgent);
     proxyState = null;
+    proxyDispatchers = [defaultAgent];
+    retire(previous);
     return;
   }
+  retire(previous);
 
   try {
     await axios.head('https://www.google.com');

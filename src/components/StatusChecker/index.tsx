@@ -1,12 +1,10 @@
 import Modal from '@app/components/Common/Modal';
 import { useNotice } from '@app/context/NoticeQueue';
 import useSettings from '@app/hooks/useSettings';
-import { Permission, useUser } from '@app/hooks/useUser';
-import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -14,33 +12,18 @@ const messages = defineMessages('components.StatusChecker', {
   appUpdated: '{applicationTitle} Updated',
   appUpdatedDescription: 'Reload to use the new version.',
   reloadApp: 'Reload {applicationTitle}',
-  restartRequired: 'Server Restart Required',
-  restartRequiredDescription: 'Restart the server to apply the new settings.',
 });
 
 const StatusChecker = () => {
   const intl = useIntl();
   const settings = useSettings();
-  const { hasPermission } = useUser();
   const { data, error } = useSWR<StatusResponse>(
     '/api/v1/status?checkUpdateAvailable=false',
     {
       refreshInterval: 60 * 1000,
     }
   );
-  const [alertDismissed, setAlertDismissed] = useState(false);
-
-  useEffect(() => {
-    if (!data?.restartRequired) {
-      setAlertDismissed(false);
-    }
-  }, [data?.restartRequired]);
-
-  const wanted =
-    !!data &&
-    !alertDismissed &&
-    ((hasPermission(Permission.ADMIN) && data.restartRequired) ||
-      data.commitTag !== process.env.commitTag);
+  const wanted = !!data && data.commitTag !== process.env.commitTag;
   // Loading counts as hidden: updates are rare and jump the queue anyway.
   const myTurn = useNotice('appUpdated', wanted ? 'show' : 'hide');
 
@@ -64,34 +47,18 @@ const StatusChecker = () => {
       appear
       show={wanted && myTurn}
     >
-      {hasPermission(Permission.ADMIN) && data.restartRequired ? (
-        <Modal
-          title={intl.formatMessage(messages.restartRequired)}
-          backgroundClickable={false}
-          onOk={() => {
-            setAlertDismissed(true);
-            if (data.commitTag !== process.env.commitTag) {
-              location.reload();
-            }
-          }}
-          okText={intl.formatMessage(globalMessages.close)}
-        >
-          {intl.formatMessage(messages.restartRequiredDescription)}
-        </Modal>
-      ) : (
-        <Modal
-          title={intl.formatMessage(messages.appUpdated, {
-            applicationTitle: settings.currentSettings.applicationTitle,
-          })}
-          onOk={() => location.reload()}
-          okText={intl.formatMessage(messages.reloadApp, {
-            applicationTitle: settings.currentSettings.applicationTitle,
-          })}
-          backgroundClickable={false}
-        >
-          {intl.formatMessage(messages.appUpdatedDescription)}
-        </Modal>
-      )}
+      <Modal
+        title={intl.formatMessage(messages.appUpdated, {
+          applicationTitle: settings.currentSettings.applicationTitle,
+        })}
+        onOk={() => location.reload()}
+        okText={intl.formatMessage(messages.reloadApp, {
+          applicationTitle: settings.currentSettings.applicationTitle,
+        })}
+        backgroundClickable={false}
+      >
+        {intl.formatMessage(messages.appUpdatedDescription)}
+      </Modal>
     </Transition>
   );
 };

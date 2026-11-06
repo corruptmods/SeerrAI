@@ -9,14 +9,13 @@ const messages = defineMessages('components.Settings', {
     'Incorrectly configuring this setting may result in broken functionality',
   experimentalTooltip:
     'Enabling this setting may result in unexpected application behavior',
-  restartrequiredTooltip: 'Restart Seerr AI for this to take effect',
 });
 
 const SettingsBadge = ({
   badgeType,
   className,
 }: {
-  badgeType: 'advanced' | 'experimental' | 'restartRequired';
+  badgeType: 'advanced' | 'experimental';
   className?: string;
 }) => {
   const intl = useIntl();
@@ -35,14 +34,6 @@ const SettingsBadge = ({
         <Tooltip content={intl.formatMessage(messages.experimentalTooltip)}>
           <Badge badgeType="warning">
             {intl.formatMessage(globalMessages.experimental)}
-          </Badge>
-        </Tooltip>
-      );
-    case 'restartRequired':
-      return (
-        <Tooltip content={intl.formatMessage(messages.restartrequiredTooltip)}>
-          <Badge badgeType="primary" className={className}>
-            {intl.formatMessage(globalMessages.restartRequired)}
           </Badge>
         </Tooltip>
       );

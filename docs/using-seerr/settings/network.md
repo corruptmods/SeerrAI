@@ -6,7 +6,7 @@ sidebar_position: 7
 
 # Network
 
-Network-related settings are available in the **Network** tab under **Settings**. These options control how Seerr communicates with external services
+Network-related settings are available in the **Network** tab under **Settings**. These options control how Seerr communicates with external services. Every change on this page applies as soon as you save, with no restart.
 
 ## DNS Caching
 
@@ -23,7 +23,7 @@ You can enable the DNS caching settings in the Network tab of the Seerr settings
 
 Sometimes there are configuration issues with IPv6 that prevent the hostname resolution from working correctly.
 
-You can force resolution to prefer IPv4 by going to `Settings > Network`, enabling `Force IPv4 Resolution First`, and then restarting Seerr.
+You can force resolution to prefer IPv4 by going to `Settings > Network`, and enabling `Force IPv4 Resolution First`.
 
 ## HTTP(S) Proxy
 
@@ -47,7 +47,7 @@ A proxy on a public address in front of your reverse proxy is only trusted if yo
 
 Without that, Seerr AI sees the public proxy's address for everyone. Having your local reverse proxy put the visitor's real address in `X-Forwarded-For` still works too (in Nginx, the `real_ip` module with the public proxy's addresses as `set_real_ip_from`).
 
-Changes to these take effect after Seerr AI restarts.
+Changes to these apply as soon as you save.
 
 This setting is **disabled** by default.
 
@@ -59,12 +59,12 @@ Apps and scripts that use an API key (the server's, or a [personal one](../../se
 
 It works over HTTPS and over plain _HTTP_ (including an IP address and port).
 
-It takes effect after Seerr AI restarts. If you turn it on and can't get in, turn it off again by setting `csrfProtection` to `false` under `network` in `settings.json` in `/app/config`, and restart.
+It applies as soon as you save. Pages already open get a token on their next change. If you turn it on and can't get in, turn it off again by setting `csrfProtection` to `false` under `network` in `settings.json` in `/app/config`, and restart.
 
 This setting is **enabled** by default on new installs. An existing install keeps the setting it had.
 
 ## API Request Timeout
 
-The API Request Timeout setting defines the maximum time (in seconds) Seerr will wait for a response from external services, such as Radarr or Sonarr. The default value is 10 seconds, though it can be entirely disabled by setting it to 0. Please note that any changes to this value require restarting Seerr to take effect.
+The API Request Timeout setting defines the maximum time (in seconds) Seerr will wait for a response from external services, such as Radarr or Sonarr. The default value is 10 seconds, though it can be entirely disabled by setting it to 0.
 
 Enforcing a timeout ensures the Seerr interface remains responsive and prevents infinite loading states when a connected service unexpectedly goes offline. Conversely, you may want to increase this value if you frequently experience failed requests due to your external services being slow to respond, which often happens when they are under heavy load or querying network-mounted storage.

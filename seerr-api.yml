@@ -4333,8 +4333,6 @@ paths:
                     type: boolean
                   commitsBehind:
                     type: number
-                  restartRequired:
-                    type: boolean
   /status/appdata:
     get:
       summary: Get application data volume status

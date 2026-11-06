@@ -49,7 +49,6 @@ const globalMessages = defineMessages('i18n', {
   all: 'All',
   experimental: 'Experimental',
   advanced: 'Advanced',
-  restartRequired: 'Restart Required',
   loading: 'Loading…',
   settings: 'Settings',
   usersettings: 'User Settings',

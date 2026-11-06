@@ -15,6 +15,7 @@ import useResumePage from '@app/hooks/useResumePage';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import '@app/styles/globals.css';
+import { retryWithFreshCsrfToken } from '@app/utils/csrfRetry';
 import { loginUrl, safeRedirect } from '@app/utils/loginRedirect';
 import { polyfillIntl } from '@app/utils/polyfillIntl';
 import { getHostAndPort } from '@app/utils/urlHelper';
@@ -179,6 +180,7 @@ if (typeof window !== 'undefined') {
   axios.defaults.headers.common['X-Seerr-Tab'] = Math.random()
     .toString(36)
     .slice(2, 12);
+  retryWithFreshCsrfToken(axios);
   void polyfillIntl();
 }
 

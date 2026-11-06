@@ -36,7 +36,6 @@ import {
   getCommitTag,
 } from '@server/utils/appVersion';
 import { releaseUpdateAvailable } from '@server/utils/releases';
-import restartFlag from '@server/utils/restartFlag';
 import { isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import authRoutes from './auth';
@@ -108,7 +107,6 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
     version: getAppVersion(),
     commitTag: getCommitTag(),
     ...(checkUpdate && { updateAvailable, commitsBehind }),
-    restartRequired: restartFlag.isSet(),
   });
 });
 

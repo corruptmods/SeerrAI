@@ -38,6 +38,7 @@ import {
 } from '@server/lib/mediaServers';
 import type { MusicImageSource } from '@server/lib/music/imageSources';
 import { MUSIC_IMAGE_ORIGINS } from '@server/lib/music/imageSources';
+import { applyNetworkSettings } from '@server/lib/networkSettings';
 import { Permission } from '@server/lib/permissions';
 import type { FixBy } from '@server/lib/plexFixMatch';
 import {
@@ -360,12 +361,20 @@ settingsRoutes.post('/network', async (req, res) => {
     });
   }
 
+  const previous = structuredClone(settings.network);
   settings.network = merge(settings.network, rest);
   // Set, not merged: a merge keeps entries past the end of a shorter list.
   if (trustedProxies) {
     settings.network.trustedProxies = trustedProxies;
   }
   await settings.save();
+  // In effect from the next request; the proxy check runs in the background.
+  applyNetworkSettings(settings.network, previous).catch((e) =>
+    logger.error('Could not apply the network settings', {
+      label: 'Settings',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    })
+  );
 
   return res.status(200).json(settings.network);
 });

@@ -553,6 +553,15 @@ Do not undo these without reading why first — each was tried the other way.
   hop: with every hop trusted the address is whatever the sender wrote
   first in X-Forwarded-For, and the sign-in limits count by address. A
   local address a proxy passes on is a visitor's, not another proxy's.
+- **Network settings apply when saved.** `applyNetworkSettings`
+  (`server/lib/networkSettings.ts`) runs at startup and after each save:
+  proxy trust is swapped behind Express's `trust proxy` function
+  (`liveProxyTrust`), the DNS cache is started, stopped or restarted with
+  Node's own lookups put back, and the outbound proxy's agents are replaced,
+  the old ones finishing their requests. CSRF protection (`csrfWhileOn`) and
+  the *arr API timeout read the setting on each request. A page opened
+  before CSRF protection came on is refused its next change once; the
+  client fetches a token and sends it again (`src/utils/csrfRetry.ts`).
 - **Sign-in limits count an attempt when it starts.** `SignInLimiter.take`
   checks and counts in one step before anything is awaited; outcomes that
   aren't failures are given back (`refund`, or `clear` on success). Password, Jellyfin/Emby and

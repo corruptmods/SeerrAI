@@ -9,7 +9,7 @@ import {
 } from '@server/lib/personalApiKeys';
 import { getSettings } from '@server/lib/settings';
 import { unlessApiKey } from '@server/middleware/auth';
-import { csrfProtection } from '@server/middleware/csrf';
+import { csrfWhileOn } from '@server/middleware/csrf';
 import { jsonBody } from '@server/middleware/jsonBody';
 import routes from '@server/routes';
 import { setupTestDb } from '@server/test/db';
@@ -38,7 +38,7 @@ function createApp() {
   app.use(cookieParser());
   app.use(jsonBody);
   app.use(express.urlencoded({ extended: true }));
-  app.use(csrfProtection());
+  app.use(csrfWhileOn());
   app.use(
     '/api',
     unlessApiKey(
@@ -307,5 +307,31 @@ describe('with CSRF Protection off', () => {
       .set('X-Forwarded-For', ip)
       .set('X-Api-Key', 'not-the-servers-key');
     assert.equal(res.status, 401);
+  });
+});
+
+describe('CSRF protection turned on or off while running', () => {
+  it('checks changes from the next request on, with no restart', async () => {
+    const { agent } = await signIn('admin@seerr.dev');
+    const change = () => agent.post(CHANGE).set('X-Forwarded-For', ip).send({});
+
+    getSettings().network.csrfProtection = false;
+    assert.equal((await change()).status, 200);
+
+    getSettings().network.csrfProtection = true;
+    const refused = await change();
+    assert.equal(refused.status, 403);
+    assert.match(refused.body.message, /csrf token/i);
+
+    // Any page load gives a token again.
+    const token = tokenFrom(
+      await agent.get('/api/v1/status').set('X-Forwarded-For', ip)
+    );
+    const retried = await agent
+      .post(CHANGE)
+      .set('X-Forwarded-For', ip)
+      .set('X-XSRF-TOKEN', token)
+      .send({});
+    assert.equal(retried.status, 200, retried.body.message);
   });
 });

@@ -27,6 +27,7 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
   networksettings: 'Network Settings',
   networksettingsDescription:
     'Configure network settings for your Seerr AI instance.',
+  networksettingsLive: 'Changes apply as soon as you save.',
   csrfProtection: 'Enable CSRF Protection',
   csrfProtectionTip:
     'Stops other sites making changes through a signed-in browser.',
@@ -150,7 +151,8 @@ const SettingsNetwork = () => {
           {intl.formatMessage(messages.networksettings)}
         </h3>
         <p className="description">
-          {intl.formatMessage(messages.networksettingsDescription)}
+          {intl.formatMessage(messages.networksettingsDescription)}{' '}
+          {intl.formatMessage(messages.networksettingsLive)}
         </p>
       </div>
       <div className="section">
@@ -254,7 +256,6 @@ const SettingsNetwork = () => {
                     <span className="mr-2">
                       {intl.formatMessage(messages.trustProxy)}
                     </span>
-                    <SettingsBadge badgeType="restartRequired" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.trustProxyLocalTip)}
                     </span>
@@ -280,7 +281,6 @@ const SettingsNetwork = () => {
                         <span className="mr-2">
                           {intl.formatMessage(messages.trustCloudflare)}
                         </span>
-                        <SettingsBadge badgeType="restartRequired" />
                         <span className="label-tip">
                           {intl.formatMessage(messages.trustCloudflareTip)}
                         </span>
@@ -304,7 +304,6 @@ const SettingsNetwork = () => {
                         <span className="mr-2">
                           {intl.formatMessage(messages.trustedProxies)}
                         </span>
-                        <SettingsBadge badgeType="restartRequired" />
                         <span className="label-tip">
                           {intl.formatMessage(messages.trustedProxiesTip)}
                         </span>
@@ -333,7 +332,6 @@ const SettingsNetwork = () => {
                       {intl.formatMessage(messages.csrfProtection)}
                     </span>
                     <SettingsBadge badgeType="advanced" className="mr-2" />
-                    <SettingsBadge badgeType="restartRequired" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.csrfProtectionTip)}
                     </span>
@@ -364,7 +362,6 @@ const SettingsNetwork = () => {
                       {intl.formatMessage(messages.forceIpv4First)}
                     </span>
                     <SettingsBadge badgeType="advanced" className="mr-2" />
-                    <SettingsBadge badgeType="restartRequired" />
                     <SettingsBadge badgeType="experimental" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.forceIpv4FirstTip)}
@@ -387,7 +384,6 @@ const SettingsNetwork = () => {
                       {intl.formatMessage(messages.dnsCache)}
                     </span>
                     <SettingsBadge badgeType="advanced" className="mr-2" />
-                    <SettingsBadge badgeType="restartRequired" />
                     <SettingsBadge badgeType="experimental" className="mr-2" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.dnsCacheTip)}
@@ -470,7 +466,6 @@ const SettingsNetwork = () => {
                     <span className="mr-2">
                       {intl.formatMessage(messages.apiRequestTimeout)}
                     </span>
-                    <SettingsBadge badgeType="restartRequired" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.apiRequestTimeoutTip)}
                     </span>
@@ -496,7 +491,6 @@ const SettingsNetwork = () => {
                       {intl.formatMessage(messages.proxyEnabled)}
                     </span>
                     <SettingsBadge badgeType="advanced" className="mr-2" />
-                    <SettingsBadge badgeType="restartRequired" />
                     <span className="label-tip">
                       {intl.formatMessage(messages.proxyEnabledTip)}
                     </span>

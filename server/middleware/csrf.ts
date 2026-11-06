@@ -1,4 +1,5 @@
 import csurf from '@dr.pogodin/csurf';
+import { getSettings } from '@server/lib/settings';
 import { unlessApiKey } from '@server/middleware/auth';
 import type { RequestHandler } from 'express';
 
@@ -31,3 +32,19 @@ export const csrfProtection = (): RequestHandler[] => [
     next();
   }),
 ];
+
+/**
+ * CSRF protection that follows the setting as it is saved: requests are
+ * checked, and given a token, only while it is on.
+ */
+export const csrfWhileOn = (): RequestHandler => {
+  const [check, issue] = csrfProtection();
+  return (req, res, next) => {
+    if (!getSettings().network.csrfProtection) {
+      return next();
+    }
+    check(req, res, (err?: unknown) =>
+      err ? next(err) : issue(req, res, next)
+    );
+  };
+};

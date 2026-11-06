@@ -8,6 +8,7 @@ import type {
   RadarrMovieOptions,
 } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
+import { getSettings } from '@server/lib/settings';
 
 function buildRadarr(): RadarrAPI {
   return new RadarrAPI({ url: 'http://localhost:7878/api/v3', apiKey: 'test' });
@@ -241,5 +242,27 @@ describe('RadarrAPI addMovie', () => {
     await radarr.addMovie({ ...options, searchNow: false });
 
     assert.strictEqual(search.mock.callCount(), 0);
+  });
+});
+
+describe('the API request timeout', () => {
+  it('follows Settings → Network as it is saved, for a client made before', async () => {
+    const settings = getSettings().network;
+    const before = settings.apiRequestTimeout;
+    const radarr = buildRadarr();
+    const timeouts: (number | undefined)[] = [];
+    getAxios(radarr).defaults.adapter = async (config) => {
+      timeouts.push(config.timeout);
+      return { data: {}, status: 200, statusText: '', headers: {}, config };
+    };
+    try {
+      settings.apiRequestTimeout = 25000;
+      await getAxios(radarr).get('/system/status');
+      // A request with its own timeout keeps it.
+      await getAxios(radarr).get('/system/status', { timeout: 1234 });
+      assert.deepEqual(timeouts, [25000, 1234]);
+    } finally {
+      settings.apiRequestTimeout = before;
+    }
   });
 });

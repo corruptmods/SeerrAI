@@ -1,6 +1,6 @@
 import { getSettings } from '@server/lib/settings';
 import settingsRoutes from '@server/routes/settings';
-import restartFlag from '@server/utils/restartFlag';
+import { liveProxyTrust } from '@server/utils/trustedProxies';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import assert from 'node:assert/strict';
@@ -40,7 +40,6 @@ beforeEach(() => {
   network.trustProxy = true;
   network.trustCloudflare = false;
   network.trustedProxies = [];
-  restartFlag.initializeSettings(getSettings());
 });
 
 describe('the trusted proxy settings', () => {
@@ -124,21 +123,23 @@ describe('the trusted proxy settings', () => {
     assert.deepEqual(getSettings().network.trustedProxies, []);
   });
 
-  it('need a restart to take effect, like Enable Proxy Support', async () => {
-    assert.equal(restartFlag.isSet(), false);
-    await request(app)
-      .post('/api/v1/settings/network')
-      .send({ trustCloudflare: true });
-    assert.equal(restartFlag.isSet(), true);
+  it('take effect from the next request, with no restart', async () => {
+    const cloudflare = '104.16.0.1';
+    const listed = '198.51.100.20';
+    const save = (body: object) =>
+      request(app).post('/api/v1/settings/network').send(body);
 
-    await request(app)
-      .post('/api/v1/settings/network')
-      .send({ trustCloudflare: false });
-    assert.equal(restartFlag.isSet(), false);
+    await save({ trustProxy: true, trustCloudflare: false });
+    assert.equal(liveProxyTrust(cloudflare, 1), false);
+    assert.equal(liveProxyTrust(listed, 1), false);
+    assert.equal(liveProxyTrust('127.0.0.1', 0), true);
 
-    await request(app)
-      .post('/api/v1/settings/network')
-      .send({ trustedProxies: ['198.51.100.20'] });
-    assert.equal(restartFlag.isSet(), true);
+    await save({ trustCloudflare: true, trustedProxies: [listed] });
+    assert.equal(liveProxyTrust(cloudflare, 1), true);
+    assert.equal(liveProxyTrust(listed, 1), true);
+
+    await save({ trustProxy: false });
+    assert.equal(liveProxyTrust('127.0.0.1', 0), false);
+    assert.equal(liveProxyTrust(cloudflare, 1), false);
   });
 });

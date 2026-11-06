@@ -13,6 +13,7 @@ import { pagePolicy } from '@server/lib/customCss';
 import { splitEmbyData } from '@server/lib/embySplit';
 import { isConnected, rememberJellyfinAdmins } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
+import { applyNetworkSettings } from '@server/lib/networkSettings';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
 import EmailAgent from '@server/lib/notifications/agents/email';
@@ -32,7 +33,7 @@ import logger from '@server/logger';
 import apiPathCase from '@server/middleware/apiPathCase';
 import { unlessApiKey } from '@server/middleware/auth';
 import clearCookies from '@server/middleware/clearcookies';
-import { csrfProtection } from '@server/middleware/csrf';
+import { csrfWhileOn } from '@server/middleware/csrf';
 import { aiChatBody, jsonBody } from '@server/middleware/jsonBody';
 import privateAnswers from '@server/middleware/privateAnswers';
 import secureCookies from '@server/middleware/secureCookies';
@@ -44,14 +45,9 @@ import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
 import { swPrecacheHandler } from '@server/routes/swPrecache';
 import { appDataPermissions } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
-import createCustomProxyAgent, {
-  setForceIpv4First,
-} from '@server/utils/customProxyAgent';
 import { isPgsql } from '@server/utils/dbType';
-import { initializeDnsCache } from '@server/utils/dnsCache';
 import { rollBackOnRelease } from '@server/utils/nestedTransaction';
-import restartFlag from '@server/utils/restartFlag';
-import { proxyTrust } from '@server/utils/trustedProxies';
+import { liveProxyTrust } from '@server/utils/trustedProxies';
 import '@server/utils/userAgent';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -126,25 +122,10 @@ app
     }
 
     const settings = await getSettings().load();
-    restartFlag.initializeSettings(settings);
 
     initI18n();
 
-    setForceIpv4First(settings.network.forceIpv4First);
-
-    if (settings.network.dnsCache?.enabled) {
-      initializeDnsCache({
-        forceMinTtl: settings.network.dnsCache.forceMinTtl,
-        forceMaxTtl: settings.network.dnsCache.forceMaxTtl,
-      });
-    }
-
-    if (settings.network.proxy.enabled) {
-      await createCustomProxyAgent(
-        settings.network.proxy,
-        settings.network.forceIpv4First
-      );
-    }
+    await applyNetworkSettings(settings.network);
 
     // On Emby servers, move Emby ids to their own columns once, before anything
     // reads them.
@@ -248,9 +229,8 @@ app
 
     const server = express();
     server.disable('x-powered-by');
-    if (settings.network.trustProxy) {
-      server.set('trust proxy', proxyTrust(settings.network));
-    }
+    // Follows Settings → Network as it is saved.
+    server.set('trust proxy', liveProxyTrust);
     // Compress text responses (pages, scripts, styles, API JSON). Brotli where
     // accepted: level 5 is about as fast as gzip and much smaller; top levels
     // are too slow per request. Images pass through untouched.
@@ -269,9 +249,7 @@ app
     // attached photo may exceed the usual limit.
     server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
-    if (settings.network.csrfProtection) {
-      server.use(csrfProtection());
-    }
+    server.use(csrfWhileOn());
 
     const sessionRepository = getRepository(Session);
     const sessionStore = sessionStoreFor(sessionRepository);

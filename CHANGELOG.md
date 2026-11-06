@@ -33,6 +33,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- The first Jellyfin or Emby sign-in on a server set up in `settings.json` keeps the API key already there, as long as it works, instead of making a second one.
 - A thin line no longer shows where a request's, issue's or blocklisted title's background picture ends, on screens scaled to 175% and the like.
 - Settings → Logs no longer offers a next page on the last page.
 - Plex scans finish anime films matched by HAMA before they report done, and a failure there is logged instead of lost.

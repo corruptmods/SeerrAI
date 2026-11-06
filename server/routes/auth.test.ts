@@ -2296,8 +2296,17 @@ describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
   let login: ReturnType<typeof mock.method<JellyfinAPI, 'login'>>;
   let apiToken: ReturnType<typeof mock.method<JellyfinAPI, 'createApiToken'>>;
   let serverName: ReturnType<typeof mock.method<JellyfinAPI, 'getServerName'>>;
+  let systemInfo: ReturnType<typeof mock.method<JellyfinAPI, 'getSystemInfo'>>;
 
   beforeEach(async () => {
+    // A saved key that no longer works, unless a test says otherwise.
+    systemInfo = mock.method(
+      JellyfinAPI.prototype,
+      'getSystemInfo',
+      async () => {
+        throw new Error('not this key');
+      }
+    );
     login = mock.method(JellyfinAPI.prototype, 'login', async () => ({
       User: {
         Id: 'media-admin',
@@ -2328,6 +2337,7 @@ describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
     login.mock.restore();
     apiToken.mock.restore();
     serverName.mock.restore();
+    systemInfo.mock.restore();
     await schedule.gracefulShutdown();
     scheduledJobs.length = 0;
     const settings = getSettings();
@@ -2385,6 +2395,40 @@ describe('the first Jellyfin or Emby sign-in with no accounts left', () => {
       assert.strictEqual(login.mock.callCount(), 1);
     });
   }
+
+  it('keeps an API key already saved for the server while it still works there', async () => {
+    connectServers('jellyfin');
+    const server = getSettings().jellyfin;
+    Object.assign(server, ADDRESS, { apiKey: 'key-from-settings' });
+    systemInfo.mock.mockImplementation(async () => ({ Id: 'media-server' }));
+
+    const res = await request(app).post('/auth/jellyfin').send({
+      username: 'harbour',
+      password: 'secret',
+      email: 'harbour@example.invalid',
+      serverType: MediaServerType.JELLYFIN,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(server.apiKey, 'key-from-settings');
+    assert.strictEqual(apiToken.mock.callCount(), 0);
+  });
+
+  it('makes a new API key when the saved one is for another server', async () => {
+    connectServers('emby');
+    const server = getSettings().emby;
+    Object.assign(server, ADDRESS, { apiKey: 'key-from-settings' });
+    systemInfo.mock.mockImplementation(async () => ({ Id: 'another-server' }));
+
+    const res = await request(app).post('/auth/jellyfin').send({
+      username: 'harbour',
+      password: 'secret',
+      email: 'harbour@example.invalid',
+      serverType: MediaServerType.EMBY,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(server.apiKey, 'media-api-key');
+    assert.strictEqual(apiToken.mock.callCount(), 1);
+  });
 
   it('leaves setup unfinished and settings untouched when the media server cannot make an API key', async () => {
     const settings = getSettings();
@@ -2448,6 +2492,7 @@ describe('setting up a Jellyfin or Emby server over existing accounts', () => {
   let login: ReturnType<typeof mock.method<JellyfinAPI, 'login'>>;
   let apiToken: ReturnType<typeof mock.method<JellyfinAPI, 'createApiToken'>>;
   let serverName: ReturnType<typeof mock.method<JellyfinAPI, 'getServerName'>>;
+  let systemInfo: ReturnType<typeof mock.method<JellyfinAPI, 'getSystemInfo'>>;
   let saved: {
     mediaServerType: MediaServerType;
     jellyfin: object;
@@ -2489,12 +2534,20 @@ describe('setting up a Jellyfin or Emby server over existing accounts', () => {
       'getServerName',
       async () => 'Harbour Lights'
     );
+    systemInfo = mock.method(
+      JellyfinAPI.prototype,
+      'getSystemInfo',
+      async () => {
+        throw new Error('not this key');
+      }
+    );
   });
 
   afterEach(async () => {
     login.mock.restore();
     apiToken.mock.restore();
     serverName.mock.restore();
+    systemInfo.mock.restore();
     await schedule.gracefulShutdown();
     scheduledJobs.length = 0;
     const settings = getSettings();

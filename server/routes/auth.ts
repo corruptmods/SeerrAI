@@ -553,12 +553,25 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       // Everything the media server must answer comes first, so a failure
       // leaves settings as they were.
       const serverName = await jellyfinserver.getServerName();
-      const apiKey = await new JellyfinAPI(
-        hostname,
-        account.AccessToken,
-        deviceId,
-        serverKind
-      ).createApiToken('Seerr');
+      // A key already saved for this server (set up in settings.json, say)
+      // is kept while it still works there; otherwise one is made.
+      const savedKeyWorks =
+        !!server.apiKey &&
+        (await new JellyfinAPI(hostname, server.apiKey, deviceId, serverKind)
+          .getSystemInfo()
+          .then(
+            (info: { Id?: string } | undefined) =>
+              !info?.Id || info.Id === account.User.ServerId
+          )
+          .catch(() => false));
+      const apiKey = savedKeyWorks
+        ? server.apiKey
+        : await new JellyfinAPI(
+            hostname,
+            account.AccessToken,
+            deviceId,
+            serverKind
+          ).createApiToken('Seerr');
 
       connectAsPrimary(serverKind, account.User.Id);
 

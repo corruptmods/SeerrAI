@@ -3619,6 +3619,99 @@ components:
               type: string
             enableMentions:
               type: boolean
+    DiscordBotSettings:
+      type: object
+      description: Seerr AI's own Discord bot, which posts requests waiting for approval with Approve and Decline buttons. The bot token is never returned.
+      properties:
+        enabled:
+          type: boolean
+          example: false
+        embedPoster:
+          type: boolean
+          example: true
+        options:
+          type: object
+          properties:
+            botToken:
+              type: string
+              description: Always empty in answers; set it with PUT /settings/notifications/discord-bot/token.
+              example: ''
+            applicationId:
+              type: string
+              readOnly: true
+            guildId:
+              type: string
+              description: The server the channel is in, or empty.
+              pattern: '^(\d{17,20})?$'
+            channelId:
+              type: string
+              description: The channel requests are posted to, or empty.
+              pattern: '^(\d{17,20})?$'
+          required:
+            - guildId
+            - channelId
+        hasBotToken:
+          type: boolean
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/DiscordBotStatus'
+      required:
+        - enabled
+        - embedPoster
+        - options
+    DiscordBotStatus:
+      type: object
+      readOnly: true
+      description: The bot's connection to Discord. "refused" means Discord turned it away (reason token, intents or other) and it stopped until the settings are saved again. "postFailed" means it's connected but the last request couldn't be posted to its channel (reason token, unreachable, access, permissions or other); the next post that works clears it.
+      properties:
+        state:
+          type: string
+          enum: [off, connecting, connected, retrying, refused, postFailed]
+        botName:
+          type: string
+        reason:
+          type: string
+          enum: [token, intents, other, unreachable, access, permissions]
+        detail:
+          type: string
+          description: Discord's own words, when there's trouble.
+    DiscordBotInfo:
+      type: object
+      properties:
+        bot:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            avatarUrl:
+              type: string
+        applicationId:
+          type: string
+        applicationName:
+          type: string
+        inviteUrl:
+          type: string
+          description: Adds the bot with View Channel, Send Messages, Embed Links and Read Message History (permissions 84992).
+          example: https://discord.com/oauth2/authorize?client_id=123456789012345678&scope=bot&permissions=84992
+        requiresCodeGrant:
+          type: boolean
+          description: Requires OAuth2 Code Grant is on for the bot, which stops a plain invite.
+        isPublic:
+          type: boolean
+          description: Public Bot is on, so anyone could add the bot to their own server.
+    DiscordBotTrouble:
+      type: object
+      properties:
+        message:
+          type: string
+        reason:
+          type: string
+          enum: [token, unreachable, access, permissions, other]
+        detail:
+          type: string
+          description: Discord's own words.
     SlackSettings:
       type: object
       properties:
@@ -3685,6 +3778,9 @@ components:
               type: string
             sendSilently:
               type: boolean
+            approvalButtons:
+              type: boolean
+              description: Approve and Decline buttons on requests waiting for approval. Seerr AI polls the bot for presses, so the bot must have no webhook and not be polled elsewhere.
     PushbulletSettings:
       type: object
       properties:
@@ -3780,6 +3876,12 @@ components:
               type: number
             locale:
               type: string
+            approvalButtons:
+              type: boolean
+              description: Approve and Decline buttons on requests waiting for approval, which the phone sends to the Application URL. Needs the Application URL set.
+            approveAsUserId:
+              type: number
+              description: The account whose approval the buttons give, which must be able to manage requests. The owner (1) when unset.
     NotificationEmailSettings:
       type: object
       properties:
@@ -4171,6 +4273,10 @@ components:
         discordEnabledTypes:
           type: number
           nullable: true
+        discordBotApprovals:
+          type: boolean
+          readOnly: true
+          description: The Discord bot is on and this account can manage requests, so its Discord user ID lets it approve and decline from Discord.
         discordIds:
           type: array
           items:
@@ -10020,6 +10126,224 @@ paths:
       responses:
         '204':
           description: Test notification attempted
+  /settings/notifications/discord-bot:
+    get:
+      summary: Get the Discord bot's settings and status
+      description: The bot token is never returned, only whether one is saved.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The settings and the bot's connection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotSettings'
+    post:
+      summary: Update the Discord bot's settings
+      description: Turns the bot on or off, and sets the channel it posts to. Turning it on needs a saved token and a channel. The token is set with PUT /settings/notifications/discord-bot/token.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscordBotSettings'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotSettings'
+        '400':
+          description: Not set up enough to turn on
+  /settings/notifications/discord-bot/token:
+    put:
+      summary: Check and save the Discord bot's token
+      description: Asks Discord who the token belongs to (GET /users/@me and /applications/@me) and saves it only if Discord accepts it. A token for another application clears the server and channel, turns the bot off, and forgets the old bot's messages.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                botToken:
+                  type: string
+                  minLength: 1
+                  maxLength: 300
+              required:
+                - botToken
+              additionalProperties: false
+      responses:
+        '200':
+          description: Saved; who the bot is, and its invite link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotInfo'
+        '400':
+          description: Discord refused the token, or it isn't one
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
+        '502':
+          description: Discord couldn't be reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
+  /settings/notifications/discord-bot/bot:
+    get:
+      summary: Who the saved Discord bot token belongs to
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The bot, and its invite link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotInfo'
+        '400':
+          description: No token saved, or Discord refused it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
+  /settings/notifications/discord-bot/guilds:
+    get:
+      summary: The Discord servers the bot is in
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    iconUrl:
+                      type: string
+                      nullable: true
+        '400':
+          description: No token saved, or Discord refused it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
+  /settings/notifications/discord-bot/guilds/{guildId}/channels:
+    get:
+      summary: A Discord server's text channels
+      description: canPost says whether the bot has View Channel, Send Messages, Embed Links and Read Message History there; null when that couldn't be worked out.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: guildId
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{17,20}$'
+      responses:
+        '200':
+          description: The channels, in Discord's order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    category:
+                      type: string
+                      nullable: true
+                    canPost:
+                      type: boolean
+                      nullable: true
+        '400':
+          description: No token saved, or Discord refused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
+  /settings/notifications/discord-bot/approvers:
+    get:
+      summary: Who can approve from Discord
+      description: Everyone who can manage requests. linked means they have a Discord user ID that no other such account has, so a press can be theirs; shared means one of their IDs is also another's, and that one works for neither.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: number
+                    displayName:
+                      type: string
+                    avatar:
+                      type: string
+                    linked:
+                      type: boolean
+                    shared:
+                      type: boolean
+  /settings/notifications/discord-bot/test:
+    post:
+      summary: Send the Discord bot's test message
+      description: Posts a message whose Approve and Decline buttons only answer that it's a test.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channelId:
+                  type: string
+                  pattern: '^\d{17,20}$'
+              required:
+                - channelId
+              additionalProperties: false
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+        '400':
+          description: Discord refused, or no token is saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordBotTrouble'
   /settings/notifications/pushbullet:
     get:
       summary: Get Pushbullet notification settings
@@ -16032,6 +16356,66 @@ paths:
                     type: number
                   completed:
                     type: number
+  /request/action:
+    post:
+      summary: Approve or decline a request from a notification button
+      description: |
+        Used by ntfy's Approve and Decline buttons (Settings → Notifications → ntfy). Needs no session, API key or CSRF token: the signed token from the notification is the credential. Each token names one request, one action and the account it acts as, works once, and expires after 7 days. The account must still be able to manage requests, the buttons must still be on, and the request must still be waiting for approval.
+
+        Answers with a short plain-text line for the app to show. Limited to 60 tries in 10 minutes from one address.
+      tags:
+        - request
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  maxLength: 512
+      responses:
+        '200':
+          description: Approved or declined
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: The token is wrong, expired or already used, or the buttons are off
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The account the buttons act as can no longer manage requests
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: The request no longer exists
+          content:
+            text/plain:
+              schema:
+                type: string
+        '409':
+          description: The request is no longer waiting for approval, or its title is blocklisted
+          content:
+            text/plain:
+              schema:
+                type: string
+        '429':
+          description: Too many tries from this address
+          content:
+            text/plain:
+              schema:
+                type: string
   /request/{requestId}/watch:
     get:
       summary: Whether the current user is watching a request
@@ -16663,7 +17047,7 @@ paths:
           example: 76479
     get:
       summary: Whether the current user gets new seasons of a series
-      description: Returns whether each new season of this series is requested for the current user as it premieres, and which season is next. Also whether anyone else gets them; someone who can manage requests sees who.
+      description: Returns whether each new season of this series is requested for the current user once announced (at the latest as it premieres), and which season is next. Also whether anyone else gets them; someone who can manage requests sees who.
       tags:
         - tv
       responses:
@@ -16675,7 +17059,7 @@ paths:
                 $ref: '#/components/schemas/FutureSeasons'
     post:
       summary: Get new seasons of a series as they premiere
-      description: From the first season that has not premiered yet, each season is requested for the current user when it premieres. Seasons already out are not requested.
+      description: From the first season that has not premiered yet, each season is requested for the current user as soon as it's announced and Sonarr lists it, or else when it premieres. Seasons already out are not requested. The follower is told when a season is announced, when one starts, and when the series ends, which also stops the follow.
       tags:
         - tv
       responses:

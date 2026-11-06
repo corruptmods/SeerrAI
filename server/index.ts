@@ -16,6 +16,7 @@ import { musicReady } from '@server/lib/music/access';
 import { applyNetworkSettings } from '@server/lib/networkSettings';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
+import DiscordBotAgent from '@server/lib/notifications/agents/discordBot';
 import EmailAgent from '@server/lib/notifications/agents/email';
 import GotifyAgent from '@server/lib/notifications/agents/gotify';
 import NtfyAgent from '@server/lib/notifications/agents/ntfy';
@@ -25,6 +26,8 @@ import SlackAgent from '@server/lib/notifications/agents/slack';
 import TelegramAgent from '@server/lib/notifications/agents/telegram';
 import WebhookAgent from '@server/lib/notifications/agents/webhook';
 import WebPushAgent from '@server/lib/notifications/agents/webpush';
+import discordBot from '@server/lib/notifications/discordBot';
+import telegramButtons from '@server/lib/notifications/telegramButtons';
 import checkOverseerrMerge from '@server/lib/overseerrMerge';
 import playlists from '@server/lib/playlists';
 import { sessionStoreFor } from '@server/lib/sessionStore';
@@ -168,6 +171,7 @@ app
 
     notificationManager.registerAgents([
       new DiscordAgent(),
+      new DiscordBotAgent(),
       new EmailAgent(),
       new GotifyAgent(),
       new NtfyAgent(),
@@ -178,6 +182,10 @@ app
       new WebhookAgent(),
       new WebPushAgent(),
     ]);
+    // Telegram's Approve and Decline buttons, if turned on.
+    telegramButtons.refresh();
+    // The Discord bot, if turned on.
+    discordBot.refresh();
 
     // Flush batched notifications before shutdown instead of losing them,
     // allowing a moment to send.
@@ -186,6 +194,8 @@ app
         // Backfill's batched notices first, so they join the rest.
         backfillNotices.flush();
         notificationManager.flush();
+        // Closed properly, Discord shows the bot offline at once.
+        discordBot.stop().catch(() => undefined);
         setTimeout(() => process.exit(0), 3000).unref();
       });
     }

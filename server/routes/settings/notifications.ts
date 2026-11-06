@@ -12,7 +12,9 @@ import SlackAgent from '@server/lib/notifications/agents/slack';
 import TelegramAgent from '@server/lib/notifications/agents/telegram';
 import WebhookAgent from '@server/lib/notifications/agents/webhook';
 import WebPushAgent from '@server/lib/notifications/agents/webpush';
+import telegramButtons from '@server/lib/notifications/telegramButtons';
 import { getSettings } from '@server/lib/settings';
+import discordBotRoutes from '@server/routes/settings/discordBot';
 import type { AvailableLocale } from '@server/types/languages';
 import { Router } from 'express';
 
@@ -34,6 +36,9 @@ const sendTestNotification = async (agent: NotificationAgent, user: User) => {
     message: intl.formatMessage(messages.message),
   });
 };
+
+// Seerr AI's own Discord bot, with its setup steps.
+notificationRoutes.use('/discord-bot', discordBotRoutes);
 
 notificationRoutes.get('/discord', (_req, res) => {
   const settings = getSettings();
@@ -114,6 +119,8 @@ notificationRoutes.post('/telegram', async (req, res) => {
 
   settings.notifications.agents.telegram = req.body;
   await settings.save();
+  // Approve and Decline presses are polled for only while wanted.
+  telegramButtons.refresh();
 
   res.status(200).json(settings.notifications.agents.telegram);
 });

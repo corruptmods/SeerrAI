@@ -8,6 +8,7 @@ import QualityApply from '@server/entity/QualityApply';
 import { Session } from '@server/entity/Session';
 import agent from '@server/lib/agent';
 import { connectedServers, MEDIA_SERVER_KINDS } from '@server/lib/mediaServers';
+import discordBot from '@server/lib/notifications/discordBot';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isPgsql } from '@server/utils/dbType';
@@ -17,7 +18,8 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
  * Nightly pruning of rows nothing reads: ended sessions, Backfill's finished
  * downloads and spent packs past the days kept, old admin agent
  * conversations, long-expired music details, which library held a title on
- * a server or library that is gone, quality applies History no longer lists.
+ * a server or library that is gone, quality applies History no longer lists,
+ * the Discord bot's messages for requests settled over a day ago.
  * Then vacuums (Postgres) or checkpoints and
  * compacts when worth it (SQLite).
  *
@@ -55,6 +57,7 @@ export interface MaintenanceReport {
     downloadChecks: number;
     libraryItems: number;
     qualityApplies: number;
+    discordMessages: number;
   };
   /** VACUUM (ANALYZE) on Postgres; checkpoint, optimize and maybe VACUUM on SQLite. */
   vacuum: string;
@@ -237,6 +240,7 @@ export const runDbMaintenance = async (
     const downloadChecks = await pruneDownloadChecks(now);
     const libraryItems = await pruneLibraryItems();
     const qualityApplies = await pruneQualityApplies();
+    const discordMessages = await discordBot.prune(now);
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -260,6 +264,7 @@ export const runDbMaintenance = async (
         downloadChecks,
         libraryItems,
         qualityApplies,
+        discordMessages,
       },
       vacuum: vacuumed,
       tookMs: Date.now() - started,

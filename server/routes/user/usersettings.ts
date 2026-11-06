@@ -1025,6 +1025,10 @@ userSettingsRoutes.get<{ id: string }, UserSettingsNotificationsResponse>(
           settings?.discord.enabled && settings.discord.options.enableMentions
             ? (settings.discord.types ?? 0) & ~Notification.LIST_ACTIVITY
             : 0,
+        discordBotApprovals:
+          settings.discordBot.enabled &&
+          !!settings.discordBot.options.channelId &&
+          user.hasPermission(Permission.MANAGE_REQUESTS),
         discordIds: user.settings?.discordIds ?? [],
         pushbulletAccessToken: user.settings?.pushbulletAccessToken,
         pushoverApplicationToken: user.settings?.pushoverApplicationToken,

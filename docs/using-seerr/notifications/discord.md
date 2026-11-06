@@ -8,6 +8,8 @@ sidebar_position: 3
 
 The Discord notification agent enables you to post notifications to a channel in a server you manage.
 
+To approve and decline requests from Discord with buttons, use the [Discord Bot](./discord-bot.md) as well: a webhook can't have buttons.
+
 :::info
 Users can optionally opt-in to being mentioned in Discord notifications by configuring their [Discord user ID](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) in their user settings.
 :::

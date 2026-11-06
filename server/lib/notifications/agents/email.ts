@@ -125,6 +125,7 @@ class EmailAgent
       type === Notification.WRONG_MATCH ||
       type === Notification.PLAYLIST_UPDATE ||
       type === Notification.LEAVING_SOON ||
+      type === Notification.FOLLOWED_SERIES ||
       payload.digest
     ) {
       return {

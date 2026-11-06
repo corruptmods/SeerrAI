@@ -62,9 +62,11 @@ What Seerr AI adds:
 - **Request Failed**: one of your own requests failed. Admins choose this apart from **Request Processing Failed**, which is about everyone else's.
 - **Playlist Updates**: songs from a playlist you imported couldn't be got, or the playlist can no longer be read from its service.
 - **Leaving Soon**: something you requested is about to be deleted by Maintainerr, with how many days are left. You're told once for each date; a title kept and set to go later is told again.
+- **Followed Series**: a series you follow with **Get New Seasons** had a new season announced (and requested for you), started a season, or ended, after which you no longer follow it. On wherever you had **Request Available**.
 - **Web Push** has every kind. Until you choose, it sends what it always has: availability, failures and what's only yours. Approvals, declines and issues are yours to turn on.
 - On **Discord**, kinds the admin turned off for everyone are shown greyed, so you can see what's missing.
 - **Declined with a reason**: the reason is in the notification.
+- **Approve and Decline from the notification**: on web push, on ntfy and Telegram when an admin turns the buttons on ([ntfy](../using-seerr/notifications/ntfy.md#approve-and-decline-buttons-optional), [Telegram](../using-seerr/notifications/telegram.md#approve-and-decline-buttons-optional)), and in Discord when an admin sets up the [Discord Bot](../using-seerr/notifications/discord-bot.md). For Discord, add your Discord user ID under **Discord** here; the page says when it lets you approve.
 - Admins also get **Backfill**, **Health** and **Wrong Match**.
 
 Admins set up the services themselves in Settings → Notifications; see [Notifications](../using-seerr/notifications/).

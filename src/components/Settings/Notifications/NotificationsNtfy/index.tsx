@@ -4,11 +4,14 @@ import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import NotificationTypeSelector from '@app/components/NotificationTypeSelector';
 import { availableLanguages } from '@app/context/LanguageContext';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { isValidURL } from '@app/utils/urlValidationHelper';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import type { UserResultsResponse } from '@server/interfaces/api/userInterfaces';
+import { Permission, hasPermission } from '@server/lib/permissions';
 import type { NotificationAgentNtfy } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
@@ -46,6 +49,14 @@ const messages = defineMessages(
     validationNtfyTopic: 'You must provide a topic',
     validationPriorityRequired: 'You must provide a priority between 1 and 5',
     validationTypes: 'You must select at least one notification type',
+    approvalButtons: 'Approve and Decline Buttons',
+    approvalButtonsTip:
+      'Adds Approve and Decline to requests waiting for approval. The phone sends a press straight to the Application URL, so it must be able to reach it. Anyone who can read this topic can use them',
+    approvalButtonsNeedUrl:
+      'Set the Application URL in Settings → General to use these',
+    approveAs: 'Approve As',
+    approveAsTip:
+      'Whose approval the buttons give; it must be an account that can manage requests',
   }
 );
 
@@ -58,6 +69,13 @@ const NotificationsNtfy = () => {
     error,
     mutate: revalidate,
   } = useSWR<NotificationAgentNtfy>('/api/v1/settings/notifications/ntfy');
+  const { applicationUrl } = useSettings().currentSettings;
+  const { data: users } = useSWR<UserResultsResponse>(
+    '/api/v1/user?take=1000&sort=displayname'
+  );
+  const approvers = (users?.results ?? []).filter((user) =>
+    hasPermission(Permission.MANAGE_REQUESTS, user.permissions)
+  );
 
   const NotificationsNtfySchema = Yup.object().shape({
     url: Yup.string()
@@ -116,6 +134,8 @@ const NotificationsNtfy = () => {
         token: data?.options.token,
         priority: data?.options.priority,
         locale: data?.options.locale ?? 'en',
+        approvalButtons: data?.options.approvalButtons ?? false,
+        approveAsUserId: data?.options.approveAsUserId ?? 1,
       }}
       validationSchema={NotificationsNtfySchema}
       onSubmit={async (values) => {
@@ -135,6 +155,8 @@ const NotificationsNtfy = () => {
               token: values.token,
               priority: Number(values.priority),
               locale: values.locale,
+              approvalButtons: values.approvalButtons,
+              approveAsUserId: Number(values.approveAsUserId),
             },
           });
 
@@ -410,6 +432,63 @@ const NotificationsNtfy = () => {
                 </div>
               </div>
             </div>
+            <div className="form-row">
+              <label htmlFor="approvalButtons" className="checkbox-label">
+                <span>{intl.formatMessage(messages.approvalButtons)}</span>
+                <span className="label-tip">
+                  {intl.formatMessage(messages.approvalButtonsTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <Field
+                  type="checkbox"
+                  id="approvalButtons"
+                  name="approvalButtons"
+                  disabled={!applicationUrl && !values.approvalButtons}
+                />
+                {!applicationUrl && (
+                  <div className="error">
+                    {intl.formatMessage(messages.approvalButtonsNeedUrl)}
+                  </div>
+                )}
+              </div>
+            </div>
+            {values.approvalButtons && (
+              <div className="form-row ml-4 mr-2">
+                <label htmlFor="approveAsUserId" className="text-label">
+                  {intl.formatMessage(messages.approveAs)}
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.approveAsTip)}
+                  </span>
+                </label>
+                <div className="form-input-area">
+                  <div className="form-input-field">
+                    <Field
+                      as="select"
+                      id="approveAsUserId"
+                      name="approveAsUserId"
+                    >
+                      {/* The saved account stays listed, even after losing
+                          the permission, so the choice shown is the one kept. */}
+                      {!approvers.some(
+                        (user) => user.id === Number(values.approveAsUserId)
+                      ) && (
+                        <option value={values.approveAsUserId}>
+                          {users?.results.find(
+                            (user) => user.id === Number(values.approveAsUserId)
+                          )?.displayName ?? `#${values.approveAsUserId}`}
+                        </option>
+                      )}
+                      {approvers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.displayName}
+                        </option>
+                      ))}
+                    </Field>
+                  </div>
+                </div>
+              </div>
+            )}
             <NotificationTypeSelector
               currentTypes={values.enabled ? values.types || 0 : 0}
               onUpdate={(newTypes) => {

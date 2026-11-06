@@ -39,6 +39,9 @@ const messages = defineMessages('components.Settings.Notifications', {
   toastTelegramTestFailed: 'Telegram test notification failed to send.',
   sendSilently: 'Send Silently',
   sendSilentlyTip: 'Send notifications with no sound',
+  approvalButtons: 'Approve and Decline Buttons',
+  approvalButtonsTip:
+    'Adds Approve and Decline to requests waiting for approval, for people whose account has their own Telegram chat ID and can manage requests. Needs no open port, but the bot must have no webhook and not be used by another program',
 });
 
 const NotificationsTelegram = () => {
@@ -94,6 +97,7 @@ const NotificationsTelegram = () => {
         chatId: data?.options.chatId,
         messageThreadId: data?.options.messageThreadId,
         sendSilently: data?.options.sendSilently,
+        approvalButtons: data?.options.approvalButtons ?? false,
       }}
       validationSchema={NotificationsTelegramSchema}
       onSubmit={async (values) => {
@@ -108,6 +112,7 @@ const NotificationsTelegram = () => {
               messageThreadId: values.messageThreadId,
               sendSilently: values.sendSilently,
               botUsername: values.botUsername,
+              approvalButtons: values.approvalButtons,
             },
           });
 
@@ -344,6 +349,21 @@ const NotificationsTelegram = () => {
               </label>
               <div className="form-input-area">
                 <Field type="checkbox" id="sendSilently" name="sendSilently" />
+              </div>
+            </div>
+            <div className="form-row">
+              <label htmlFor="approvalButtons" className="checkbox-label">
+                <span>{intl.formatMessage(messages.approvalButtons)}</span>
+                <span className="label-tip">
+                  {intl.formatMessage(messages.approvalButtonsTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <Field
+                  type="checkbox"
+                  id="approvalButtons"
+                  name="approvalButtons"
+                />
               </div>
             </div>
             <NotificationTypeSelector

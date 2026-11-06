@@ -7,6 +7,7 @@ import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { Blocklist } from '@server/entity/Blocklist';
+import DiscordApprovalMessage from '@server/entity/DiscordApprovalMessage';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import DownloadCheck from '@server/entity/DownloadCheck';
 import Episode from '@server/entity/Episode';
@@ -44,6 +45,7 @@ import SeasonRequest from '@server/entity/SeasonRequest';
 import { Session } from '@server/entity/Session';
 import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
+import UsedActionToken from '@server/entity/UsedActionToken';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
@@ -74,6 +76,7 @@ const entities = [
   BackfillJob,
   BackfillSeries,
   Blocklist,
+  DiscordApprovalMessage,
   DiscoverSlider,
   DownloadCheck,
   Issue,
@@ -110,6 +113,7 @@ const entities = [
   Session,
   SongFetch,
   SongRequest,
+  UsedActionToken,
   User,
   UserApiKey,
   UserPasskey,

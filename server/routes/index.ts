@@ -53,6 +53,7 @@ import musicRoutes from './music';
 import nowPlayingRoutes from './nowPlaying';
 import personRoutes from './person';
 import requestRoutes from './request';
+import { requestAction, requestActionLimit } from './requestAction';
 import searchRoutes from './search';
 import serviceRoutes from './service';
 import styleRoutes from './style';
@@ -171,6 +172,8 @@ router.use('/search', isAuthenticated(), searchRoutes);
 // Before Discover's own routes, which it nests under.
 router.use('/discover/music', isAuthenticated(), discoverMusicRoutes);
 router.use('/discover', isAuthenticated(), discoverRoutes);
+// ntfy's Approve and Decline buttons: no session, the token is the credential.
+router.post('/request/action', requestActionLimit, requestAction);
 router.use('/request', isAuthenticated(), requestRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);
 router.use('/blocklist', isAuthenticated(), blocklistRoutes);

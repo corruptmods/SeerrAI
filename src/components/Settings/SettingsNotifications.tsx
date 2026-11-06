@@ -19,6 +19,7 @@ const messages = defineMessages('components.Settings', {
   notificationAgentSettingsDescription:
     'Configure and enable notification agents.',
   email: 'Email',
+  discordBot: 'Discord Bot',
   webhook: 'Webhook',
   webpush: 'Web Push',
 });
@@ -62,7 +63,18 @@ const SettingsNotifications = ({ children }: SettingsNotificationsProps) => {
         </span>
       ),
       route: '/settings/notifications/discord',
-      regex: /^\/settings\/notifications\/discord/,
+      regex: /^\/settings\/notifications\/discord$/,
+    },
+    {
+      text: intl.formatMessage(messages.discordBot),
+      content: (
+        <span className="flex items-center">
+          <DiscordLogo className="mr-2 h-4" />
+          {intl.formatMessage(messages.discordBot)}
+        </span>
+      ),
+      route: '/settings/notifications/discord-bot',
+      regex: /^\/settings\/notifications\/discord-bot/,
     },
     {
       text: 'Gotify',

@@ -1,22 +1,29 @@
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import AgentRun from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import DiscordApprovalMessage from '@server/entity/DiscordApprovalMessage';
 import type { CheckStatus } from '@server/entity/DownloadCheck';
 import DownloadCheck from '@server/entity/DownloadCheck';
 import Media from '@server/entity/Media';
 import MediaLibraryItem from '@server/entity/MediaLibraryItem';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import QualityApply from '@server/entity/QualityApply';
 import { Session } from '@server/entity/Session';
+import { User } from '@server/entity/User';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it, mock } from 'node:test';
 
 setupTestDb();
 
@@ -186,6 +193,7 @@ describe('database maintenance', () => {
       downloadChecks: 1,
       libraryItems: 0,
       qualityApplies: 0,
+      discordMessages: 0,
     });
     assert.deepEqual(
       (
@@ -356,5 +364,60 @@ describe('database maintenance', () => {
     assert.equal(left.size, QualityApply.HISTORY_SHOWN + 2);
     assert.ok(!left.has(oldestOf1.id));
     assert.ok(left.has(undoableOf2.id) && left.has(newestOf2.id));
+  });
+
+  it('lets go of the Discord bot’s messages for requests settled over a day ago', async () => {
+    // The save hooks' notifications aren't what's tested here.
+    const notify = mock.method(
+      MediaRequest,
+      'sendNotification',
+      async () => true
+    );
+    try {
+      const requester = await getRepository(User).findOneByOrFail({ id: 1 });
+      const request = async (tmdbId: number, status: MediaRequestStatus) =>
+        getRepository(MediaRequest).save(
+          new MediaRequest({
+            media: await getRepository(Media).save(
+              new Media({
+                tmdbId,
+                mediaType: MediaType.MOVIE,
+                status: MediaStatus.PENDING,
+              })
+            ),
+            requestedBy: requester,
+            type: MediaType.MOVIE,
+            status,
+            is4k: false,
+          })
+        );
+      const pending = await request(9101, MediaRequestStatus.PENDING);
+      const approved = await request(9102, MediaRequestStatus.APPROVED);
+      const repo = getRepository(DiscordApprovalMessage);
+      const kept = (requestId: number, messageId: string) =>
+        repo.save(
+          new DiscordApprovalMessage({
+            requestId,
+            channelId: '200000000000000002',
+            messageId,
+          })
+        );
+      const oldPending = await kept(pending.id, '1');
+      const oldSettled = await kept(approved.id, '2');
+      await kept(approved.id, '3');
+      const now = Date.now();
+      for (const row of [oldPending, oldSettled]) {
+        await repo.update(row.id, { createdAt: new Date(now - 2 * DAY) });
+      }
+
+      const report = await runDbMaintenance(now);
+      assert.equal(report?.removed.discordMessages, 1);
+      assert.deepEqual(
+        (await repo.find({ order: { id: 'ASC' } })).map((r) => r.messageId),
+        ['1', '3']
+      );
+    } finally {
+      notify.mock.restore();
+    }
   });
 });

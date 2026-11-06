@@ -1,6 +1,7 @@
 import csurf from '@dr.pogodin/csurf';
 import { getSettings } from '@server/lib/settings';
 import { unlessApiKey } from '@server/middleware/auth';
+import { REQUEST_ACTION_PATH } from '@server/routes/requestAction';
 import type { RequestHandler } from 'express';
 
 /**
@@ -34,13 +35,24 @@ export const csrfProtection = (): RequestHandler[] => [
 ];
 
 /**
+ * ntfy's Approve and Decline buttons, sent from a phone with no session or
+ * cookie: their one-time token is the credential (routes/requestAction), so
+ * there is nothing for another site to ride. Exactly this method and path.
+ */
+const tokenOnly = (method: string, path: string) =>
+  method === 'POST' && path === REQUEST_ACTION_PATH;
+
+/**
  * CSRF protection that follows the setting as it is saved: requests are
  * checked, and given a token, only while it is on.
  */
 export const csrfWhileOn = (): RequestHandler => {
   const [check, issue] = csrfProtection();
   return (req, res, next) => {
-    if (!getSettings().network.csrfProtection) {
+    if (
+      !getSettings().network.csrfProtection ||
+      tokenOnly(req.method, req.path)
+    ) {
       return next();
     }
     check(req, res, (err?: unknown) =>

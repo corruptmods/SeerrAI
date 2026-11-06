@@ -2,6 +2,23 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### New
+
+- Approve or decline requests from Discord with Seerr AI's own bot (Settings → Notifications → **Discord Bot**, off to start). It posts each request waiting for approval to a channel you pick, with Approve and Decline buttons; Decline asks for an optional reason. It needs no open port, and the page walks you through creating the bot, inviting it, picking the channel and linking approvers.
+- Approve or decline straight from ntfy (Settings → Notifications → ntfy → **Approve and Decline Buttons**; needs the Application URL) and from Telegram (Settings → Notifications → Telegram → **Approve and Decline Buttons**; no port to open).
+- Following a series now requests each new season as soon as it's announced and Sonarr has it, so the first episode is grabbed on air day; the premiere is still the fallback.
+- **Followed Series** notifications: a followed series' new season was announced and requested for you, a season starts, or the series ended or was cancelled, which ends the follow. It starts on wherever you had Request Available on.
+
+### Changed
+
+- Nightly **Database Maintenance** also clears the Discord bot's records of requests that were dealt with over a day ago.
+
+### Fixed
+
+- A finished series with a season TMDB never dated no longer stays followed forever.
+
 ## 2.4.2 (6 November 2026)
 
 Requests over the limit that wait for an admin, default quality profiles, a view limited to what each person's libraries hold, requests from lists, quality badges on title pages, Network settings that apply without a restart, and tighter sign-in and account checks.

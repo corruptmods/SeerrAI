@@ -126,6 +126,7 @@ const WEB_PUSH_NOTIFICATION_TYPES: number[] = [
   Notification.LIST_ACTIVITY,
   Notification.PLAYLIST_UPDATE,
   Notification.LEAVING_SOON,
+  Notification.FOLLOWED_SERIES,
   Notification.PLEX_REAUTH,
   Notification.BACKFILL,
   Notification.HEALTH,
@@ -196,6 +197,7 @@ class WebPushAgent
       case Notification.WRONG_MATCH:
       case Notification.PLAYLIST_UPDATE:
       case Notification.LEAVING_SOON:
+      case Notification.FOLLOWED_SERIES:
         message = payload.message;
         break;
       case Notification.MEDIA_AUTO_REQUESTED:

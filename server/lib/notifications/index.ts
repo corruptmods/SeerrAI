@@ -39,6 +39,11 @@ export enum Notification {
    * Maintainerr will soon delete the user's request; once per date. User only.
    */
   LEAVING_SOON = 1048576,
+  /**
+   * A series the person follows got a new season, started one, or ended.
+   * User only.
+   */
+  FOLLOWED_SERIES = 2097152,
 }
 
 /** Default web push types; approvals, declines and issues are opt-in. */
@@ -49,6 +54,7 @@ export const WEB_PUSH_STARTING_TYPES =
   Notification.LIST_ACTIVITY |
   Notification.PLAYLIST_UPDATE |
   Notification.LEAVING_SOON |
+  Notification.FOLLOWED_SERIES |
   Notification.PLEX_REAUTH |
   Notification.BACKFILL |
   Notification.HEALTH |

@@ -41,7 +41,7 @@ interface Field {
   value: string;
   inline?: boolean;
 }
-interface DiscordRichEmbed {
+export interface DiscordRichEmbed {
   title?: string;
   type?: 'rich';
   description?: string;
@@ -95,15 +95,19 @@ class DiscordAgent
     return settings.notifications.agents.discord;
   }
 
+  /**
+   * The message's embed. The Discord bot builds its messages with this too,
+   * with its own poster setting.
+   */
   public buildEmbed(
     type: Notification,
     payload: NotificationPayload,
-    locale?: AvailableLocale
+    locale?: AvailableLocale,
+    embedPoster = getSettings().notifications.agents.discord.embedPoster
   ): DiscordRichEmbed {
     const intl = getIntl(locale);
     const settings = getSettings();
     const { applicationUrl } = settings.main;
-    const { embedPoster } = settings.notifications.agents.discord;
 
     const appUrl =
       applicationUrl || `http://localhost:${process.env.port || 5055}`;

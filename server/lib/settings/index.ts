@@ -892,6 +892,22 @@ export interface NotificationAgentDiscord extends NotificationAgentConfig {
   };
 }
 
+/**
+ * Seerr AI's own Discord bot, which posts requests waiting for approval with
+ * Approve and Decline buttons and hears the presses over the Gateway
+ * (lib/notifications/discordBot). Separate from the webhook agent above.
+ */
+export interface NotificationAgentDiscordBot extends NotificationAgentConfig {
+  options: {
+    /** Never sent to the browser. */
+    botToken: string;
+    /** The bot's application, read from Discord when the token is checked. */
+    applicationId: string;
+    guildId: string;
+    channelId: string;
+  };
+}
+
 export interface NotificationAgentSlack extends NotificationAgentConfig {
   options: {
     webhookUrl: string;
@@ -925,6 +941,11 @@ export interface NotificationAgentTelegram extends NotificationAgentConfig {
     chatId: string;
     messageThreadId: string;
     sendSilently: boolean;
+    /**
+     * Approve and Decline buttons on requests waiting for approval, read by
+     * polling the bot (lib/notifications/telegramButtons).
+     */
+    approvalButtons?: boolean;
   };
 }
 
@@ -979,6 +1000,13 @@ export interface NotificationAgentNtfy extends NotificationAgentConfig {
     token?: string;
     priority?: number;
     locale: AvailableLocale;
+    /**
+     * Approve and Decline buttons on requests waiting for approval. The phone
+     * calls the Application URL with a one-time token (lib/requestActionTokens).
+     */
+    approvalButtons?: boolean;
+    /** Whose approval the buttons give; the owner (1) when unset. */
+    approveAsUserId?: number;
   };
 }
 
@@ -997,6 +1025,7 @@ export enum NotificationAgentKey {
 
 interface NotificationAgents {
   discord: NotificationAgentDiscord;
+  discordBot: NotificationAgentDiscordBot;
   email: NotificationAgentEmail;
   gotify: NotificationAgentGotify;
   ntfy: NotificationAgentNtfy;
@@ -1236,6 +1265,16 @@ class Settings {
               enableMentions: true,
               locale: 'en',
               useUserLocale: true,
+            },
+          },
+          discordBot: {
+            enabled: false,
+            embedPoster: true,
+            options: {
+              botToken: '',
+              applicationId: '',
+              guildId: '',
+              channelId: '',
             },
           },
           slack: {

@@ -8,6 +8,9 @@ import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
+import requestActionMessages from '@server/lib/notifications/requestActionMessages';
+import { callbackDataFor } from '@server/lib/notifications/telegramButtons';
+import { REQUEST_ACTIONS } from '@server/lib/requestStatusChange';
 import type { NotificationAgentTelegram } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -20,12 +23,17 @@ import {
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
 
+interface InlineKeyboard {
+  inline_keyboard: { text: string; callback_data: string }[][];
+}
+
 interface TelegramMessagePayload {
   text: string;
   parse_mode: string;
   chat_id: string;
   message_thread_id: string;
   disable_notification: boolean;
+  reply_markup?: InlineKeyboard;
 }
 
 interface TelegramPhotoPayload {
@@ -35,6 +43,7 @@ interface TelegramPhotoPayload {
   chat_id: string;
   message_thread_id: string;
   disable_notification: boolean;
+  reply_markup?: InlineKeyboard;
 }
 
 /** Telegram's photo caption length limit. */
@@ -80,6 +89,37 @@ class TelegramAgent
   /** Link URLs only need `)` and backslash escaped. */
   private escapeUrl(url: string): string {
     return url.replace(/[)\\]/g, (x) => '\\' + x);
+  }
+
+  /**
+   * Approve and Decline under a request waiting for approval, for the admin
+   * and channel copies. Presses are read by lib/notifications/telegramButtons,
+   * which checks who pressed.
+   */
+  private approvalKeyboard(
+    type: Notification,
+    payload: NotificationPayload,
+    locale?: AvailableLocale
+  ): InlineKeyboard | undefined {
+    const requestId = payload.request?.id;
+    if (
+      type !== Notification.MEDIA_PENDING ||
+      !this.getSettings().options.approvalButtons ||
+      !requestId ||
+      payload.digest
+    ) {
+      return undefined;
+    }
+
+    const intl = getIntl(locale);
+    return {
+      inline_keyboard: [
+        REQUEST_ACTIONS.map((action) => ({
+          text: intl.formatMessage(requestActionMessages[action]),
+          callback_data: callbackDataFor(action, requestId),
+        })),
+      ],
+    };
   }
 
   private getNotificationPayload(
@@ -244,6 +284,7 @@ class TelegramAgent
           chat_id: settings.options.chatId,
           message_thread_id: settings.options.messageThreadId,
           disable_notification: !!settings.options.sendSilently,
+          reply_markup: this.approvalKeyboard(type, payload),
         } as TelegramMessagePayload | TelegramPhotoPayload);
       } catch (e) {
         logger.error('Error sending Telegram notification', {
@@ -342,6 +383,11 @@ class TelegramAgent
                   chat_id: user.settings.telegramChatId,
                   message_thread_id: user.settings.telegramMessageThreadId,
                   disable_notification: !!user.settings?.telegramSendSilently,
+                  reply_markup: this.approvalKeyboard(
+                    type,
+                    payload,
+                    user.settings?.locale as AvailableLocale
+                  ),
                 } as TelegramMessagePayload | TelegramPhotoPayload);
               } catch (e) {
                 logger.error('Error sending Telegram notification', {

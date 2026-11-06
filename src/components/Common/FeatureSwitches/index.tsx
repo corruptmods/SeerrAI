@@ -20,7 +20,7 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   whoWatchedTip: 'Who has watched a title, on its page (admins only)',
   newSeasons: 'Get New Seasons',
   newSeasonsTip:
-    'A series page button that requests each new season as it premieres. Off pauses followed series',
+    'A series page button that requests each new season as soon as it’s announced. Off pauses followed series',
   watchSuggestions: 'Finished Watching?',
   watchSuggestionsTip:
     'Offers to remove titles from a watch list once everyone on it has watched them',

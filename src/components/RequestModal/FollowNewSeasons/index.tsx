@@ -4,8 +4,8 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.RequestModal.FollowNewSeasons', {
   title: 'New seasons',
-  label: 'Also get new seasons as they premiere',
-  hint: 'Requests each new season as it premieres.',
+  label: 'Also get new seasons as they’re announced',
+  hint: 'Requests each new season as soon as it’s announced.',
 });
 
 interface FollowNewSeasonsProps {
@@ -13,7 +13,7 @@ interface FollowNewSeasonsProps {
   onChange: (checked: boolean) => void;
 }
 
-/** Series request option to request each future season as it premieres. */
+/** Series request option to request each future season once announced. */
 const FollowNewSeasons = ({ checked, onChange }: FollowNewSeasonsProps) => {
   const intl = useIntl();
 

@@ -26,6 +26,8 @@ const messages = defineMessages(
   {
     discordNotificationsNotEnabled:
       'Discord notifications aren’t set up on this server, so this isn’t used yet.',
+    discordBotApprover:
+      'Your Discord user ID also lets you approve and decline requests with the Discord bot.',
     discordsettingssaved: 'Discord notification settings saved successfully!',
     discordsettingsfailed: 'Discord notification settings failed to save.',
     discordId: 'User IDs',
@@ -122,13 +124,20 @@ const UserNotificationsDiscord = () => {
       }) => {
         return (
           <Form className="section">
-            {!(data?.discordEnabledTypes ?? 0) && (
+            {data?.discordBotApprovals ? (
               <Alert
-                type="warning"
-                title={intl.formatMessage(
-                  messages.discordNotificationsNotEnabled
-                )}
+                type="info"
+                title={intl.formatMessage(messages.discordBotApprover)}
               />
+            ) : (
+              !(data?.discordEnabledTypes ?? 0) && (
+                <Alert
+                  type="warning"
+                  title={intl.formatMessage(
+                    messages.discordNotificationsNotEnabled
+                  )}
+                />
+              )
             )}
             <div className="form-row">
               {/* Labels the ID list below. */}

@@ -11,7 +11,8 @@ import {
 
 /**
  * A user following a series: each season from `fromSeason` on is requested for
- * them as it premieres, nothing before.
+ * them once it's announced (or, at the latest, as it premieres), nothing
+ * before.
  */
 @Entity()
 @Unique('UNIQUE_FUTURE_SEASON_SUBSCRIPTION', ['user', 'tmdbId'])
@@ -30,6 +31,13 @@ export class FutureSeasonSubscription {
   /** The next season to request; advances each time one is requested. */
   @Column({ type: 'int' })
   public fromSeason: number;
+
+  /**
+   * The latest season they were told premiered. Behind `fromSeason` while a
+   * season requested on its announcement waits for its premiere.
+   */
+  @Column({ type: 'int', default: 0 })
+  public premieredSeason: number;
 
   @DbAwareColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   public createdAt: Date;

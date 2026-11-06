@@ -8,6 +8,12 @@ import {
 import { eventText } from '@server/lib/notifications/eventTitles';
 import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
+import requestActionMessages from '@server/lib/notifications/requestActionMessages';
+import {
+  requestFingerprint,
+  signActionToken,
+} from '@server/lib/requestActionTokens';
+import { REQUEST_ACTIONS } from '@server/lib/requestStatusChange';
 import type { NotificationAgentNtfy } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -32,6 +38,55 @@ class NtfyAgent
 
   private escapeMarkdown(text: string): string {
     return text.replace(/([\\`*_{}[\]()#+\-.!|>~<])/g, '\\$1');
+  }
+
+  /**
+   * Approve and Decline buttons for a request waiting for approval. ntfy's app
+   * makes the call itself, with no Seerr AI session, so each carries a signed
+   * one-time token in its body (never the URL, which ends up in logs). Only
+   * with an Application URL, the one address the phone can be told to use.
+   */
+  private approvalActions(
+    type: Notification,
+    payload: NotificationPayload,
+    intl: ReturnType<typeof getIntl>
+  ) {
+    const settings = this.getSettings();
+    const { applicationUrl } = getSettings().main;
+    const request = payload.request;
+
+    if (
+      type !== Notification.MEDIA_PENDING ||
+      !settings.options.approvalButtons ||
+      !applicationUrl ||
+      !request?.id ||
+      payload.digest
+    ) {
+      return undefined;
+    }
+
+    // An Application URL saved with a trailing slash still has to make one
+    // path.
+    const base = applicationUrl.replace(/\/+$/, '');
+    const requestState = requestFingerprint(request);
+
+    return REQUEST_ACTIONS.map((action) => ({
+      action: 'http',
+      label: intl.formatMessage(requestActionMessages[action]),
+      url: `${base}/api/v1/request/action`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: signActionToken({
+          requestId: request.id,
+          action,
+          userId: settings.options.approveAsUserId ?? 1,
+          agent: 'ntfy',
+          requestState,
+        }),
+      }),
+      clear: true,
+    }));
   }
 
   private buildPayload(type: Notification, payload: NotificationPayload) {
@@ -127,6 +182,10 @@ class NtfyAgent
     }
     if (click) {
       ntfyPayload.click = click;
+    }
+    const actions = this.approvalActions(type, payload, intl);
+    if (actions) {
+      ntfyPayload.actions = actions;
     }
 
     return ntfyPayload;

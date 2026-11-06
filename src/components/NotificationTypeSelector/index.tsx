@@ -36,6 +36,9 @@ const messages = defineMessages('components.NotificationTypeSelector', {
   leavingSoon: 'Leaving Soon',
   leavingSoonDescription:
     'When something you requested is about to be deleted.',
+  followedSeries: 'Followed Series',
+  followedSeriesDescription:
+    'When a series you follow gets a new season, starts one, or ends.',
   turnedOff: 'Turned off for everyone in Settings → Notifications.',
   mediadeclined: 'Request Declined',
   mediadeclinedDescription: 'When requests are declined.',
@@ -115,6 +118,7 @@ export enum Notification {
   PLAYLIST_UPDATE = 262144,
   REQUEST_FAILED = 524288,
   LEAVING_SOON = 1048576,
+  FOLLOWED_SERIES = 2097152,
 }
 
 export const ALL_NOTIFICATIONS = Object.values(Notification)
@@ -129,6 +133,7 @@ export const WEB_PUSH_STARTING_TYPES =
   Notification.LIST_ACTIVITY |
   Notification.PLAYLIST_UPDATE |
   Notification.LEAVING_SOON |
+  Notification.FOLLOWED_SERIES |
   Notification.PLEX_REAUTH |
   Notification.BACKFILL |
   Notification.HEALTH |
@@ -317,6 +322,15 @@ const NotificationTypeSelector = ({
         name: intl.formatMessage(messages.leavingSoon),
         description: intl.formatMessage(messages.leavingSoonDescription),
         value: Notification.LEAVING_SOON,
+        hasNotifyUser: true,
+        hidden: !user,
+        personal: true,
+      },
+      {
+        id: 'followed-series',
+        name: intl.formatMessage(messages.followedSeries),
+        description: intl.formatMessage(messages.followedSeriesDescription),
+        value: Notification.FOLLOWED_SERIES,
         hasNotifyUser: true,
         hidden: !user,
         personal: true,

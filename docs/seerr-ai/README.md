@@ -52,7 +52,7 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | **AI** | Claude, OpenAI or your own model: search for films, series and music, group picks, recaps, fixes for problems you describe, log explanations. |
 | **Your home page** | Hide rows, arrange your menu, Suggested for You, Anime, leave out streaming services. |
 | **Lists** | Shared watch lists with "up next" per series, activity, import, whole collections, Roulette; playlists from a Spotify or Apple Music link, their songs requested within each person's limit. |
-| **Series and anime** | Request one episode; get new seasons as they premiere; one rule for what's anime. |
+| **Series and anime** | Request one episode; get new seasons as soon as they're announced; one rule for what's anime. |
 | **Subtitles** | See, replace or transcribe subtitles through Bazarr, with what Bazarr is doing shown as it works. |
 | **Maintainerr** | "Deleting in N days" badges, a Deleting Soon row and Keep. |
-| **Notifications** | Bursts gathered into one, missed ones caught up, decline reasons, Backfill, Health and Wrong Match. |
+| **Notifications** | Bursts gathered into one, missed ones caught up, decline reasons, Approve and Decline on ntfy, Telegram and Seerr AI's own Discord bot, Backfill, Health and Wrong Match. |

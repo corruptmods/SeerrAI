@@ -68,6 +68,10 @@ import {
   requestServerIssue,
   serviceName,
 } from '@server/lib/requestServers';
+import {
+  changeRequestStatus,
+  titleBlocklisted,
+} from '@server/lib/requestStatusChange';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -95,15 +99,6 @@ const requestRoutes = Router();
  * tags) are only for those allowed them; everyone else gets the defaults.
  */
 const mayChooseAdvancedOptions = choosesAdvancedOptions;
-
-/*
- * A blocklisted title must stay out of Radarr and Sonarr, so approving or
- * retrying an older request for it is refused; declining or deleting is still
- * allowed.
- */
-const titleBlocklisted = (request: MediaRequest) =>
-  request.media?.status === MediaStatus.BLOCKLISTED ||
-  request.media?.status4k === MediaStatus.BLOCKLISTED;
 
 const withoutAdvancedOptions = (body: MediaRequestBody): MediaRequestBody => {
   const allowed = { ...body };
@@ -1774,7 +1769,6 @@ requestRoutes.post<{
   '/:requestId/:status',
   isAuthenticated(Permission.MANAGE_REQUESTS),
   async (req, res, next) => {
-    const requestRepository = getRepository(MediaRequest);
     const requestId = Number(req.params.requestId);
 
     const body = statusChangeBody.safeParse(req.body);
@@ -1783,57 +1777,37 @@ requestRoutes.post<{
       return next({ status: 400, message: body.error.issues[0]?.message });
     }
 
+    if (req.params.status !== 'approve' && req.params.status !== 'decline') {
+      return next({
+        status: 400,
+        message: 'Status must be approve or decline.',
+      });
+    }
+
     try {
-      return await requestLock.dispatch(requestKey(requestId), async () => {
-        const request = await requestRepository.findOneOrFail({
-          where: { id: requestId },
-          relations: { requestedBy: true, modifiedBy: true },
-        });
+      const change = await changeRequestStatus(
+        requestId,
+        req.params.status,
+        req.user!,
+        { declineReason: body.data?.declineReason }
+      );
 
-        let newStatus: MediaRequestStatus;
-
-        switch (req.params.status) {
-          case 'approve':
-            newStatus = MediaRequestStatus.APPROVED;
-            break;
-          case 'decline':
-            newStatus = MediaRequestStatus.DECLINED;
-            break;
-          default:
-            return next({
-              status: 400,
-              message: 'Status must be approve or decline.',
-            });
-        }
-
-        if (request.status !== MediaRequestStatus.PENDING) {
+      switch (change.outcome) {
+        case 'done':
+          return res.status(200).json(change.request);
+        case 'notPending':
           return next({
             status: 409,
             message: 'Only pending requests can be approved or declined.',
           });
-        }
-
-        if (
-          newStatus === MediaRequestStatus.APPROVED &&
-          titleBlocklisted(request)
-        ) {
+        case 'blocklisted':
           return next({
             status: 409,
             message: 'This title is blocklisted, so it cannot be approved.',
           });
-        }
-
-        request.status = newStatus;
-        request.modifiedBy = req.user;
-        // Saved with the status so the declined notification and title history
-        // both have it.
-        if (newStatus === MediaRequestStatus.DECLINED) {
-          request.declineReason = body.data?.declineReason || null;
-        }
-        await requestRepository.save(request);
-
-        return res.status(200).json(request);
-      });
+        default:
+          return next({ status: 404, message: 'Request not found.' });
+      }
     } catch (e) {
       logger.error('Error processing request update', {
         label: 'Media Request',

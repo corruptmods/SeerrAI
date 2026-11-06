@@ -797,6 +797,29 @@ describe('notification settings an admin saves for someone else', () => {
   });
 });
 
+describe('the Discord bot note on Discord settings', () => {
+  it('tells managers, only while the bot is on, that their ID approves', async () => {
+    const bot = getSettings().notifications.agents.discordBot;
+    const before = structuredClone(bot);
+    try {
+      const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+      const off = await agent.get('/user/1/settings/notifications');
+      assert.strictEqual(off.body.discordBotApprovals, false);
+
+      bot.enabled = true;
+      bot.options.channelId = '200000000000000002';
+      const on = await agent.get('/user/1/settings/notifications');
+      assert.strictEqual(on.body.discordBotApprovals, true);
+
+      // friend@seerr.dev can only request.
+      const friend = await agent.get('/user/2/settings/notifications');
+      assert.strictEqual(friend.body.discordBotApprovals, false);
+    } finally {
+      Object.assign(bot, before);
+    }
+  });
+});
+
 describe("another admin's account", () => {
   const people = async () => {
     const users = getRepository(User);

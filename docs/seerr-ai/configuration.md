@@ -96,7 +96,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 |---|---|---|
 | Notification Reconcile | every 2 minutes | Sends notifications that were missed, once each. |
 | Episode Sync | every 5 minutes | Reads which episodes Sonarr has, for per-episode availability. |
-| Future Season Requests | every 6 hours | Requests new seasons for series people follow. |
+| Future Season Requests | every 6 hours | Requests new seasons for series people follow, once announced (and known to Sonarr) or at the latest as they premiere, and tells the followers. |
 | Plex User Import | hourly | With Auto-Import Plex Users on. Plex only. |
 | Backfill Scan | every 6 hours | Finds stuck titles and searches a few. Only with Backfill on. |
 | Backfill Downloads | every minute | Moves approved Backfill downloads along: picks files, imports, cleans up. |
@@ -120,7 +120,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `releaseCalendar` | The Calendar page |
 | `arrivalEstimates` | "When it should arrive" on requests and title pages |
 | `whoWatched` | Who has watched a title, on its page (admins) |
-| `newSeasons` | Getting new seasons as they premiere (off pauses the follows) |
+| `newSeasons` | Getting new seasons as they're announced (off pauses the follows and their notifications) |
 | `watchSuggestions` | "Finished watching?" on lists |
 | `listRequests` | Requesting a title when you add it to a list (people who can request) |
 | `passkeyPrompt` | The banner offering to add a passkey (passkeys still work) |

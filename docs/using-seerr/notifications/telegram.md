@@ -47,3 +47,14 @@ If the group has Topics turned on, set this to a topic's ID to post there. Leave
 ### Send Silently (optional)
 
 Optionally, notifications can be sent silently. Silent notifications send messages without notification sounds.
+
+### Approve and Decline Buttons (optional)
+
+Adds **Approve** and **Decline** under notifications about requests waiting for approval, in the chat above and in admins' own chats. Off unless you turn it on.
+
+Seerr AI picks up the presses by asking Telegram for them, so no port has to be open and nothing has to reach your server from outside. That only works if nothing else reads the bot's updates: the bot must have no webhook set, and no other program may use the same bot to read messages. If something else does, Seerr AI says so once in its log and keeps trying every few minutes; use a bot of its own.
+
+Only people who can manage requests can use the buttons, and only from their own Telegram account: their **Chat ID** in **Profile → Settings → Notifications → Telegram** must be their own (a chat with the bot, not a group), since that is how Seerr AI knows who pressed. Anyone else, in a group chat say, is told they can't approve there, and nothing changes. A press counts as that person approving in Seerr AI: it's their name on the request.
+
+Presses made while Seerr AI was stopped, or while the buttons were off, are dropped when it starts listening again rather than acted on late: nothing happens, and pressing again works. Once pressed, the message says what happened ("Approved by …") in place of the buttons. Copies of the notification in other chats keep theirs; pressing one says the request was already approved or declined.
+

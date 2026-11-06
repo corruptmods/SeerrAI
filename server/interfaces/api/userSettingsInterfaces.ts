@@ -33,6 +33,8 @@ export interface UserSettingsNotificationsResponse {
   pgpKey?: string;
   discordEnabled?: boolean;
   discordEnabledTypes?: number;
+  /** The Discord bot is on, so a manager's Discord user ID lets them approve. */
+  discordBotApprovals?: boolean;
   discordIds?: string[];
   pushbulletAccessToken?: string;
   pushoverApplicationToken?: string;

@@ -14,17 +14,17 @@ const messages = defineMessages('components.TvDetails.FutureSeasonsButton', {
   get: 'Get New Seasons',
   getting: 'Getting New Seasons',
   explain:
-    'Request each new season as it premieres, without the seasons already out.',
+    'Request each new season as soon as it’s announced, without the seasons already out.',
   explainOn:
-    'Season {season} and every one after it are requested as each premieres. Tap to stop.',
+    'Season {season} and every one after it are requested as each is announced. Tap to stop.',
   explainOnFor:
-    'Season {season} and every one after it are requested as each premieres. {names} {count, plural, one {follows} other {follow}} this series. Tap to stop it for everyone.',
+    'Season {season} and every one after it are requested as each is announced. {names} {count, plural, one {follows} other {follow}} this series. Tap to stop it for everyone.',
   explainOnShared:
-    'Season {season} and every one after it are requested as each premieres. Others follow this series too. Tap to stop yours.',
+    'Season {season} and every one after it are requested as each is announced. Others follow this series too. Tap to stop yours.',
   explainShared:
-    'Season {season} and every one after it are already requested as each premieres, for someone who follows this series.',
+    'Season {season} and every one after it are already requested as each is announced, for someone who follows this series.',
   started:
-    'Season {season} of {title} and every season after it will be requested as each premieres.',
+    'Season {season} of {title} and every season after it will be requested as each is announced.',
   paused: 'New Seasons Paused',
   explainPaused:
     'Paused, so nothing is being requested. Tap to stop following this series.',
@@ -57,8 +57,8 @@ export interface FutureSeasonsState {
 }
 
 /**
- * Follow a series: each unpremiered season is requested as it premieres,
- * nothing already out. Shows as on for everyone once anyone follows, since
+ * Follow a series: each unpremiered season is requested once it's announced
+ * (at the latest as it premieres), nothing already out. Shows as on for everyone once anyone follows, since
  * seasons arrive for all; request managers can stop it for everyone.
  */
 const FutureSeasonsButton = ({

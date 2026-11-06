@@ -76,7 +76,7 @@ const messages = defineMessages('components.RequestModal', {
     'All of the selected seasons are already requested or available.',
   pendingapproval: 'Your request is pending approval.',
   followingNew:
-    'New seasons of <strong>{title}</strong> will be requested as each premieres.',
+    'New seasons of <strong>{title}</strong> will be requested as each is announced.',
   followFailed:
     'The request went through, but following new seasons did not. Use Get New Seasons on the series page.',
 });

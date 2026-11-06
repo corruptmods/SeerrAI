@@ -12,6 +12,7 @@ import {
   confirmEmail,
   sendEmailConfirmation,
 } from '@server/lib/emailConfirmation';
+import { saveFirstOwner } from '@server/lib/firstOwner';
 import {
   emailFree,
   mainAccountOn,
@@ -210,7 +211,7 @@ authRoutes.post('/plex', async (req, res, next) => {
       await settings.save();
       startJobs();
 
-      await userRepository.save(user);
+      user = await saveFirstOwner(user);
     } else {
       const mainUser = await userRepository.findOneOrFail({
         select: { id: true, plexToken: true, plexId: true, email: true },
@@ -589,7 +590,6 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
 
         user = withNewUserDefaults(
           new User({
-            id: 1,
             email: body.email || account.User.Name,
             ...jellyfinAccountColumns(serverKind, {
               userId: account.User.Id,
@@ -603,7 +603,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         );
         user.avatar = getUserAvatarUrl(user, serverKind);
 
-        await userRepository.save(user);
+        user = await saveFirstOwner(user);
       } else {
         logger.info(
           'Sign-in attempt from Jellyfin user with access to the media server; editing admin user for Seerr',

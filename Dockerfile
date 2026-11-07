@@ -89,6 +89,18 @@ ENV COMMIT_TAG=${COMMIT_TAG}
 ARG ALPINE_FIXES_DAY
 RUN : "${ALPINE_FIXES_DAY}" && apk upgrade --no-cache && apk add --no-cache tzdata
 
+# Only node runs here. npm, npx, corepack and yarn come with the base image
+# but are never used, so they go, with the packages they bring.
+RUN rm -rf \
+  /usr/local/lib/node_modules/npm \
+  /usr/local/lib/node_modules/corepack \
+  /usr/local/bin/npm \
+  /usr/local/bin/npx \
+  /usr/local/bin/corepack \
+  /usr/local/bin/yarn \
+  /usr/local/bin/yarnpkg \
+  /opt/yarn-*
+
 USER node:node
 
 WORKDIR /app
@@ -107,4 +119,6 @@ RUN touch config/DOCKER && \
 
 EXPOSE 5055
 
-CMD [ "npm", "start" ]
+# Node itself rather than through npm: it gets the stop signal directly and
+# shuts down cleanly (server/index.ts).
+CMD [ "node", "dist/index.js" ]

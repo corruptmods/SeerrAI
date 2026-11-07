@@ -13,6 +13,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
+- The Docker image no longer carries npm, npx, corepack or yarn, which Seerr AI never uses, and runs Node directly instead of through npm.
 - Nightly **Database Maintenance** also clears the Discord bot's records of requests that were dealt with over a day ago.
 
 ### Fixed

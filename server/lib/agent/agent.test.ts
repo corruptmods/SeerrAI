@@ -31,10 +31,13 @@ import {
 } from '@server/lib/agent/rules';
 import type { AgentState } from '@server/lib/agent/tools';
 import {
+  TOOLS,
   adminPresent,
   decisionText,
   forgetSearches,
   lookups,
+  offered,
+  prowlarrUnavailable,
   runTool,
   searchTiming,
   titleMatches,
@@ -268,6 +271,7 @@ beforeEach(async () => {
   settings.backfill = {
     ...BACKFILL_DEFAULTS,
     enabled: true,
+    searchWith: 'prowlarr',
     prowlarr: {
       ...BACKFILL_DEFAULTS.prowlarr,
       hostname: 'prowlarr',
@@ -5381,5 +5385,102 @@ describe('what the admin agent takes on its own', () => {
     });
     assert.match(status.text, /Missing, monitored and aired \(1\)/);
     assert.match(status.text, /Not aired yet: 1\./);
+  });
+});
+
+describe('the admin agent where Backfill doesn’t search Prowlarr', () => {
+  it('is not offered search_indexers, says why if it asks, and still searches through Sonarr', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      searchWith: 'arrs',
+    };
+    const asked: unknown[] = [];
+    mock.method(
+      BackfillSonarr.prototype,
+      'getReleases',
+      async (params: unknown) => {
+        asked.push(params);
+        return [
+          {
+            guid: 'sonarr-guid',
+            title: 'Wendle the Gentle Lantern S01 DVDRip',
+            indexerId: 4,
+            indexer: 'LimeTorrents (Prowlarr)',
+            protocol: 'torrent',
+            size: 600 * MB,
+            seeders: 5,
+            fullSeason: true,
+            seasonNumber: 1,
+          },
+        ];
+      }
+    );
+    script = [
+      () => toolUse('search_releases', { title: 'series:0:1283', season: 1 }),
+      (body) => {
+        const found = lastResult(body).content;
+        assert.match(found, /^1 results/);
+        assert.match(found, /r1 \| S01 pack \| 600 MB \| 5 seeders/);
+        assert.match(found, /LimeTorrents \|/);
+        return toolUse('search_indexers', { query: 'Wendle', kind: 'series' });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.equal(
+          refused.content,
+          'search_indexers is not available: Backfill searches with Sonarr, Radarr and Lidarr, not Prowlarr. Use search_releases.'
+        );
+        return say('Only Sonarr’s search was there to use.');
+      },
+    ];
+    // Backfill follows the series: the search's window is kept on it, so
+    // its scans don't take Sonarr's stamp for Sonarr's own search.
+    const tracked = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'series',
+        serverId: 0,
+        arrId: SERIES_ID,
+        title: 'Wendle the Gentle Lantern',
+        status: 'none',
+        searchTerms: [],
+      })
+    );
+    const run = await agent.ask('Get Wendle', await admin());
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.deepEqual(asked, [{ seriesId: SERIES_ID, seasonNumber: 1 }]);
+    const own = (
+      await getRepository(BackfillSeries).findOneOrFail({
+        where: { id: tracked.id },
+      })
+    ).ownArrSearch;
+    assert.equal(own?.length, 1);
+    assert.equal(own?.[0].searches, 1);
+    assert.ok(own?.[0].to, 'closed once Sonarr answered');
+
+    const names = (bodies[0].tools as { name: string }[]).map((t) => t.name);
+    assert.ok(names.includes('search_releases'));
+    assert.ok(!names.includes('search_indexers'));
+    assert.match(String(bodies[0].system), /does not search Prowlarr/);
+  });
+
+  it('offers search_indexers only while Prowlarr is searched and set up', () => {
+    const settings = getSettings();
+    const tool = TOOLS.find((t) => t.name === 'search_indexers')!;
+    const run = { trigger: 'ask', steps: [] } as unknown as AgentRun;
+    for (const searchWith of ['prowlarr', 'both'] as const) {
+      settings.backfill = { ...settings.backfill, searchWith };
+      assert.equal(offered(tool, run), true, searchWith);
+    }
+    settings.backfill = {
+      ...settings.backfill,
+      searchWith: 'both',
+      prowlarr: { ...settings.backfill.prowlarr, hostname: '' },
+    };
+    assert.equal(offered(tool, run), false);
+    assert.match(prowlarrUnavailable() ?? '', /Prowlarr is not set up/);
+    const releases = TOOLS.find((t) => t.name === 'search_releases')!;
+    assert.equal(offered(releases, run), true);
   });
 });

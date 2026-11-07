@@ -38,6 +38,7 @@ import {
   decisionText,
   notLookedFor,
   offered,
+  prowlarrUnavailable,
   readTitleRef,
   runTool,
   startApprovedGrab,
@@ -91,6 +92,17 @@ import { In, LessThan, MoreThan } from 'typeorm';
 export { answerCalls, compact } from '@server/lib/agent/conversation';
 
 const LABEL = 'Agent';
+
+/** Backfill's search as the first message names it, by where it searched. */
+const backfillSearch = (): string => {
+  const { searchWith } = getSettings().backfill;
+  return searchWith === 'prowlarr'
+    ? "Backfill's search of Prowlarr"
+    : searchWith === 'arrs'
+      ? "Backfill's own search"
+      : "Backfill's own search, Prowlarr's included";
+};
+
 /** Max tool calls per turn; more would hammer the indexers. */
 const MAX_CALLS_PER_TURN = 12;
 const readOnly = (name: string) =>
@@ -1533,11 +1545,11 @@ class Agent {
         seasonNumber !== undefined ? ` episodes in season ${seasonNumber}` : ''
       }. ${
         run.kind === 'movie' ? 'Radarr' : 'Sonarr'
-      } searched again and found nothing usable, and neither did Backfill's search of Prowlarr. Find out what is missing and get it if you can.`;
+      } searched again and found nothing usable, and neither did ${backfillSearch()}. Find out what is missing and get it if you can.`;
     }
     return `Someone requested ${run.title} (${ref}). ${
       run.kind === 'album' ? 'Lidarr' : 'Sonarr or Radarr'
-    } has not found it for a day or more, and Backfill's search of Prowlarr found nothing it could use on its own. Find out what is missing and get it if you can.`;
+    } has not found it for a day or more, and ${backfillSearch()} found nothing it could use on its own. Find out what is missing and get it if you can.`;
   }
 
   private async execute(id: number): Promise<void> {
@@ -1673,9 +1685,14 @@ class Agent {
           })
         );
       const standing = settings.backfill.agent.instructions.trim();
-      const system = standing
-        ? `${SYSTEM}\n\nStanding instructions from the admin, always to be followed:\n${standing}`
+      // The prompt teaches both searches; without Prowlarr, say there is one.
+      const noProwlarr = prowlarrUnavailable();
+      const base = noProwlarr
+        ? `${SYSTEM}\n\nThis server does not search Prowlarr: search_indexers is not offered, so search with search_releases only.`
         : SYSTEM;
+      const system = standing
+        ? `${base}\n\nStanding instructions from the admin, always to be followed:\n${standing}`
+        : base;
       messages = run.conversation.length
         ? compact(answerCalls(run.conversation as ConverseMessage[]))
         : [{ role: 'user', text: this.firstMessage(run) }];

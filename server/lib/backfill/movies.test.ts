@@ -13,6 +13,7 @@ import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
+import type { SearchOptions } from '@server/lib/backfill/engine';
 import backfill, { MAX_FAILED_PER_DAY } from '@server/lib/backfill/engine';
 import { mentionsShow, sameShow } from '@server/lib/backfill/matcher';
 import type { MovieContext } from '@server/lib/backfill/movies';
@@ -384,6 +385,7 @@ beforeEach(() => {
   settings.backfill = {
     ...BACKFILL_DEFAULTS,
     enabled: true,
+    searchWith: 'prowlarr',
     prowlarr: {
       ...BACKFILL_DEFAULTS.prowlarr,
       hostname: 'prowlarr',
@@ -962,6 +964,49 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     assert.equal(await jobs.count(), MAX_FAILED_PER_DAY + 1);
   });
 
+  it('searches the movie through Radarr alone when set to, and plans what it returns', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      searchWith: 'arrs',
+      prowlarr: BACKFILL_DEFAULTS.prowlarr,
+    };
+    const asked: number[] = [];
+    mock.method(
+      BackfillRadarr.prototype,
+      'getReleases',
+      async (movieId: number) => {
+        asked.push(movieId);
+        return [{ ...RELEASE, guid: 'radarr-guid', indexer: 'Knaben' }];
+      }
+    );
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    assert.deepEqual(asked, [55], 'one search, for the movie');
+    assert.equal(searchedWith, undefined, 'Prowlarr is not asked');
+    assert.equal(row.status, 'found');
+    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    assert.deepEqual(
+      [candidate.guid, candidate.status, candidate.summary?.fill],
+      ['radarr-guid', 'ready', 1]
+    );
+
+    // Radarr stamps the movie with Backfill's search; the next scan keeps
+    // Radarr's own last search.
+    movie = { ...movie, lastSearchTime: new Date().toISOString() };
+    await backfill.scan({ searches: false });
+    const after = await getRepository(BackfillSeries).findOneOrFail({
+      where: { id: row.id },
+    });
+    assert.equal(
+      after.lastArrSearchAt?.toISOString(),
+      new Date(SECRETS.lastSearchTime!).toISOString()
+    );
+  });
+
   it('counts a movie Radarr never searched for as stuck, once it has been there a day', async () => {
     const hour = 60 * 60 * 1000;
     movie = {
@@ -1133,13 +1178,19 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     it('gives up when Prowlarr is not answering, rather than trying every title', async () => {
       several(5);
       const searched: number[] = [];
-      mock.method(backfill, 'search', async (id: number) => {
-        searched.push(id);
-        await repo().update(id, {
-          searchError: 'Prowlarr: connect ECONNREFUSED',
-          lastSearchedAt: new Date(),
-        });
-      });
+      mock.method(
+        backfill,
+        'search',
+        async (id: number, _user: unknown, options: SearchOptions) => {
+          searched.push(id);
+          await repo().update(id, {
+            searchError: 'Prowlarr: connect ECONNREFUSED',
+            lastSearchedAt: new Date(),
+          });
+          // As a real search tells the run: Prowlarr, its one source, failed.
+          options.onSources?.({ searched: ['Prowlarr'], failed: ['Prowlarr'] });
+        }
+      );
       await backfill.startSearchAll(undefined, { pauseMs: 0 });
       assert.equal(searched.length, 3);
       assert.match(

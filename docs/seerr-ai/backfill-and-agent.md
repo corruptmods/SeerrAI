@@ -9,7 +9,14 @@ Sonarr and Radarr search their indexers and give up quietly when nothing matches
 1. Every 6 hours (the **Backfill Scan** job) it finds series and movies that Sonarr or Radarr searched for and didn't grab, once their last search is older than **Stuck after** (24 hours by default).
    - A new episode or film is left to Sonarr or Radarr for **Hours a new episode or film is left to Sonarr or Radarr once it’s out** (12 by default; 0 doesn't wait), however recently it was requested, so the *arr's own feeds get the first go. An episode counts from when it airs, a film from the release its Minimum Availability waits for (in cinemas, or digital or physical). Backfill and the admin agent count it as missing only after that.
    - With **Search right after Sonarr, Radarr or Lidarr finds nothing** on (off to start), a title requested in the last 3 days doesn't wait: about 20 minutes after Sonarr's or Radarr's own search comes up empty, with nothing in their queue, Backfill searches it (looked at every 15 minutes). An album counts once its request is 20 minutes old with nothing in Lidarr's queue, since Lidarr doesn't say when it searched. Each title is searched this way once; after that it waits its turn like the rest.
-2. It searches Prowlarr itself, under every name the title goes by, a few titles per scan (requested titles first). Missing specials, and episodes the scene numbers another way, are also searched for by their titles.
+2. It searches again, a few titles per scan (requested titles first), with what **Search with** in Settings → Backfill says:
+   - **Prowlarr**: Prowlarr itself, under every name the title goes by, and for the seasons missing most ("Show S03"). Missing specials, and episodes the scene numbers another way, are also searched for by their titles. This finds the most for stuck titles: packs under other names, and releases Sonarr or Radarr can't read.
+   - **Sonarr, Radarr and Lidarr**: the title's own *arr runs its interactive search by the title's ids, across its own indexers. A season missing more than 2 episodes is searched as a season, which returns its packs; one missing 1 or 2, episode by episode; specials one by one. At most 4 searches per series, the seasons missing most first. A film or an album is one search. No Prowlarr is needed.
+   - **Both**: both, with each release kept once (by its hash, or its name and size); if one side fails, what the other found is still used and the problem shown on the title's page.
+
+   Releases found through an *arr are opened, judged and downloaded exactly as Prowlarr's: what the *arr said about them (its rejections, which episode it mapped) isn't used, since Backfill reads every file itself. An *arr's search marks what it searched as searched; Backfill notes when its own searches (and the admin agent's) ran, from before the first is asked, so **Sonarr last searched** on the Backfill page still shows the *arr's own search, not Backfill's, even for a scan that reads it mid-search. A release skipped from one source isn't offered again when the other finds it (matched by its hash, or its name and size).
+
+   When a source stops answering during a scan or **Search All**: one whose every search failed for 3 titles in a row while another still answered is left out for the rest of that run, and the titles searched after say so; once every source used has failed for 3 titles in a row (a *arr that can't even be read counts), the run stops.
 3. It opens the likeliest packs (reading the torrent or NZB, without downloading it) and asks Sonarr or Radarr how they would import each file and whether it meets the quality profile. A file whose name carries another episode's title than its number is taken as the episode its title is (**By title**), and one Sonarr won't read that way is turned down; a file named only by its title, as specials often are, is placed by it too.
 4. It offers the packs that fill what is missing, with a score and a plan for each file, and sends a **Backfill** notification; tap it to review Torrents with seeders come first. One its indexer says nobody seeds is listed after them and never approved by itself, and a torrent whose swarm has never had all of what's wanted is given up within its first hour, since an indexer's count of seeders is often old.
 5. When a pack is approved, it downloads only the chosen files to its own category, imports them through Sonarr or Radarr, and cleans up. Torrents aren't seeded afterwards.
@@ -23,7 +30,7 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 With music set up, Backfill follows albums too: those someone requested that Lidarr lists as missing (**Music too** in Settings → Backfill turns this off). Lidarr lists an artist's other albums as missing too, so those are left alone, unless you start a search for one yourself.
 
 - Lidarr doesn't say when it last searched for an album, so an album counts as stuck once its release date, the day its artist was added, and its approved request are all older than **Stuck after**, and nothing for it is in Lidarr's queue.
-- Prowlarr is searched under "Artist Album" and the album's name, in its audio categories.
+- Prowlarr is searched under "Artist Album" and the album's name, in its audio categories; Lidarr, by the album.
 - Each file of a release is matched to a track by its title, or by its number when the release has one file per track. Lidarr imports into one edition of an album: the one already on disk, or, for an album with nothing yet, the edition most of the files are from.
 - Approval is **Missing tracks only** or **Missing and upgrades**, as for series.
 - An album's page shows admins its Backfill box, and the Backfill button there starts a search. **Start search…** lists the albums Lidarr monitors too; type the album or the artist.
@@ -32,7 +39,7 @@ With music set up, Backfill follows albums too: those someone requested that Lid
 
 **Settings → Backfill**:
 
-- **Prowlarr**: its address and API key are set in **Settings → Services**; Backfill's settings say whether it is set up. Backfill can't run without it.
+- **Searching**: **Search with** Prowlarr, Sonarr, Radarr and Lidarr, or both (see above). Prowlarr finds more for stuck titles; the *arrs search by their own ids and say what each release is; both does both and uses more of your indexers' daily searches. Prowlarr's address and API key are set in **Settings → Services**; it is needed only when the choice includes it. Servers from before this setting keep Prowlarr if it was set up, and otherwise search the *arrs; new servers start on the *arrs.
 - **Downloads**: the client for torrent packs (qBittorrent, Transmission, Deluge or rTorrent) and for Usenet packs (SABnzbd or NZBGet), from **Settings → Services → Download Clients**, and the **category** Backfill uses, kept apart so Sonarr, Radarr and Lidarr don't import on their own.
 - **When a title is stuck**: hours since the last search, movies too, music too, and whether files below the cutoff count as gaps (packs that fill gaps still show their upgrades either way).
 - **Approval**: approve some packs automatically (only ones that fill what is missing and replace nothing on disk, score at least 700 and are at most 25 GB, by default), and **Replace failed downloads** (on by default): when a download fails or stalls, the next good pack is taken, searching again if need be until none is left; anything outside the limits waits for you.
@@ -41,7 +48,7 @@ With music set up, Backfill follows albums too: those someone requested that Lid
 ### The Backfill pages
 
 - **Backfill** in the sidebar: what is stuck, packs found, ignored and complete, with a search box. **Scan now**, **Start search…** and **Search All Stuck**.
-  - **Start search…** searches one title now; Prowlarr is always searched under the title and the aliases Sonarr or Radarr has, plus any names you add.
+  - **Start search…** searches one title now; Prowlarr, when searched, is always searched under the title and the aliases Sonarr or Radarr has, plus any names you add.
   - **Search All Stuck** searches every stuck title once, one query per title to every indexer, with a pause between titles. Titles Sonarr or Radarr searched today are included; ones Backfill searched in the last day aren't. Packs that pass auto-approve start downloading as they're found.
 - **A title's Backfill page**: what is missing and why Sonarr or Radarr didn't get it (often their own search passed a release over because it couldn't match its title), each pack found with its file plan, approve or skip, history, Ignore, and **Get it with AI**.
 - **Approving a pack**: only the chosen files download; the torrent client skips the rest, and a Usenet job is removed from the client afterwards. **Include the files the AI placed** adds files whose names didn't say which episode they are: the AI matched them and Sonarr agreed; check them under **Show files** first. If the pack was approved, skipped or dropped while the window was open, it says so instead.
@@ -59,6 +66,7 @@ Many indexers allow only so many searches or downloads a day, then answer "too m
 - The download stays queued, saying when it will try again ("Tabula Rasa has reached its download limit; trying again at 5:10 PM").
 - It waits as long as the indexer says, or 15 minutes, then 30, an hour and so on, at most 6 hours between tries. Other downloads from that indexer wait too; other indexers carry on. Waits survive a restart.
 - When Prowlarr is at its own search limit, a search stops at the first name and says so.
+- Searches through Sonarr, Radarr or Lidarr spend their indexers' searches too, so they are held to the same limits, one per *arr server: one that answers "too many requests" isn't asked again by Backfill until it has had time to reset.
 - After a day, Backfill gives up on that download; the pack stays on the title's page to approve by hand later, and the notification says so.
 
 A download that can't start for another reason (a refused API key, a client not answering) is tried each minute, ten times. After any download fails to start, Backfill won't take that pack by itself for a day: it waits on the title's page, with the reason.
@@ -84,7 +92,7 @@ Without a category or label, a magnet link Backfill was reading when Seerr AI st
 
 An AI with tools that looks further when Backfill finds nothing usable for a requested title. It needs AI set up, with **Admin Agent** on.
 
-**It can:** read why Sonarr, Radarr and Lidarr turned releases down; find a title and see what it has; run Sonarr's, Radarr's or Lidarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
+**It can:** read why Sonarr, Radarr and Lidarr turned releases down; find a title and see what it has; run Sonarr's, Radarr's or Lidarr's own search; search Prowlarr with any words (only when Backfill searches with Prowlarr and it is set up; otherwise it uses the *arrs' search alone); list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
 
 **Albums**, while Backfill does music: it finds an album in Lidarr by its name or its artist, sees which tracks are missing, and searches Lidarr and Prowlarr's music. An album that isn't in Lidarr it finds on MusicBrainz, and requests when you ask it to. When it takes a release, Backfill matches the files to the album's tracks, as it does for its own finds, and only missing tracks are downloaded. To replace a track, or block a release group, it asks you first, as for films and series.
 

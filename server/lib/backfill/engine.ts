@@ -32,7 +32,21 @@ import {
 } from '@server/lib/agent/numbering';
 import type { AlbumContext } from '@server/lib/backfill/albums';
 import { judgeAlbumPack } from '@server/lib/backfill/albums';
+import type { OwnArrSearch } from '@server/lib/backfill/arrSearch';
+import {
+  arrIndexer,
+  arrRelease,
+  closeOwnSearch,
+  isOwnArrSearch,
+  openOwnSearch,
+  prowlarrSetUp,
+  searchesArrs,
+  searchesProwlarr,
+  seriesSearchLabel,
+  seriesSearches,
+} from '@server/lib/backfill/arrSearch';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
+import type { IndexerRef } from '@server/lib/backfill/indexerLimit';
 import {
   IndexerLimitReached,
   PROWLARR,
@@ -104,6 +118,7 @@ import {
   sizeProblems,
 } from '@server/lib/backfill/sizeLimits';
 import type {
+  ArrSearchRelease,
   SonarrCommand,
   SonarrEpisode,
   SonarrQualityProfile,
@@ -116,6 +131,7 @@ import { musicReady } from '@server/lib/music/access';
 import { namesAlbum } from '@server/lib/music/albumRelease';
 import { owner } from '@server/lib/owner';
 import type {
+  BackfillSearchWith,
   DownloadClientSettings,
   LidarrSettings,
   RadarrSettings,
@@ -131,8 +147,9 @@ import { In, IsNull, MoreThan, Not } from 'typeorm';
  *
  * Scan: find series with monitored, aired episodes and movies the arr has
  * searched for and not found, with nothing in its queue.
- * Search: search Prowlarr under every name the title has, open the most
- * pack-like results, and judge every file with Sonarr or Radarr.
+ * Search: search Prowlarr under every name the title has, or the title's
+ * own Sonarr, Radarr or Lidarr by its ids, or both (Settings → Backfill);
+ * open the most pack-like results, and judge every file with the *arr.
  * Approve (admin or auto-approve rule): add the pack to the download client
  * with only the needed files selected.
  * Monitor (every minute): follow the download; when done, manually import
@@ -192,6 +209,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const titleWithoutYear = (title: string) =>
   title.replace(/\s*\((19|20)\d{2}\)\s*$/, '').trim();
 
+/**
+ * One release however it was found: its hash, or its name and size, since
+ * Prowlarr and an *arr give the same release different guids.
+ */
+const releaseKey = (release: {
+  title: string;
+  size: number;
+  infoHash?: string | null;
+}): string => release.infoHash?.toLowerCase() || sameRelease(release);
+
+/** A release's name and size, in MB. */
+const sameRelease = (release: { title: string; size: number }): string =>
+  `${release.title.toLowerCase()}|${Math.round(release.size / 1e6)}`;
+
 /** Trimmed, non-empty, de-duplicated names in order. */
 const uniqueNames = (names: string[]): string[] => [
   ...new Set(names.map((n) => n.trim()).filter(Boolean)),
@@ -223,6 +254,8 @@ export interface BackfillReadiness {
   ready: boolean;
   enabled: boolean;
   prowlarr: boolean;
+  /** Where searches go, per Settings → Backfill. */
+  searchWith: BackfillSearchWith;
   torrentClient?: string;
   usenetClient?: string;
   problem?: string;
@@ -266,6 +299,12 @@ interface Target {
   ): Promise<{ plan: PlanEntry[]; summary: PlanSummary }>;
   /** Files to take that are outside the app's size limits. */
   sizeCheck?(plan: PlanEntry[]): SizeProblem[];
+  /** The title's own *arr, and its interactive searches for the title. */
+  arr: {
+    app: 'Sonarr' | 'Radarr' | 'Lidarr';
+    server: IndexerRef;
+    searches: { what: string; run: () => Promise<ArrSearchRelease[]> }[];
+  };
 }
 
 const appOf = (kind: BackfillKind) =>
@@ -317,6 +356,57 @@ export interface SearchOptions {
    * and leaves earlier findings unchanged.
    */
   cancelled?: () => boolean;
+  /**
+   * Sources the owning run has stopped using ("Prowlarr", or an *arr
+   * server's name), with why; the title's problems say so.
+   */
+  leaveOut?: ReadonlyMap<string, string>;
+  /** Told which sources were searched and which failed outright. */
+  onSources?: (report: SourceReport) => void;
+}
+
+/** The sources a search used, and those whose every search failed. */
+export interface SourceReport {
+  searched: string[];
+  failed: string[];
+}
+
+/** Titles in a row whose searches all failed before a run stops. */
+const FAILURES_TO_STOP = 3;
+
+/**
+ * Follows a run of searches (a scan, or Search All) by source. A source
+ * whose every search fails for FAILURES_TO_STOP titles in a row while
+ * another answers is left out for the rest of the run; once every source
+ * used fails for that many titles in a row, the run stops: a source down
+ * fails every title alike.
+ */
+export class SourceWatch {
+  private allFailed = 0;
+  private inARow = new Map<string, number>();
+  /** Sources left out, with why. */
+  public readonly leftOut = new Map<string, string>();
+
+  /** Takes one title's report; true once the run should stop. */
+  public note(report: SourceReport | undefined): boolean {
+    if (!report?.searched.length) return false;
+    const failed = new Set(report.failed);
+    const someAnswered = report.searched.some((source) => !failed.has(source));
+    for (const source of report.searched) {
+      const times = failed.has(source) ? (this.inARow.get(source) ?? 0) + 1 : 0;
+      this.inARow.set(source, times);
+      if (times >= FAILURES_TO_STOP && someAnswered) {
+        const why = `${source} failed for ${times} titles in a row, so it is left out for the rest of this run`;
+        this.leftOut.set(source, why);
+        logger.warn(`Backfill stopped searching ${source} for now`, {
+          label: LABEL,
+          reason: why,
+        });
+      }
+    }
+    this.allFailed = someAnswered ? 0 : this.allFailed + 1;
+    return this.allFailed >= FAILURES_TO_STOP;
+  }
 }
 
 /**
@@ -352,10 +442,29 @@ export const MAX_FAILED_PER_DAY = 6;
 const before = (date: string | undefined, when: number) =>
   !!date && new Date(date).getTime() < when;
 
+/**
+ * The *arr's own last search of a title, as a scan reads it: its latest
+ * stamp that isn't Backfill's. Some stamps being Backfill's hide what the
+ * *arr did before, so the time known from earlier scans stays unless this
+ * is later, and is dropped if it was itself Backfill's.
+ */
+const arrSearchedAt = (
+  row: Pick<BackfillSeries, 'lastArrSearchAt' | 'ownArrSearch'> | undefined,
+  read: Date | null,
+  ownStamps: boolean
+): Date | null => {
+  if (!ownStamps) return read;
+  const known =
+    row?.lastArrSearchAt &&
+    !isOwnArrSearch(row.ownArrSearch, row.lastArrSearchAt)
+      ? new Date(row.lastArrSearchAt)
+      : null;
+  if (!read) return known;
+  return known && known > read ? known : read;
+};
+
 /** Pause between titles when searching everything stuck. */
 const SEARCH_ALL_PAUSE_MS = 30_000;
-/** Consecutive Prowlarr failures before Search All stops. */
-const SEARCH_ALL_FAILURES_TO_STOP = 3;
 /**
  * For Search Right After: how long after the arr's own search a requested
  * title still missing, with nothing queued, counts as not found.
@@ -647,15 +756,19 @@ class Backfill {
         researchAfterDays: 1,
       });
       run.total = queue.length;
-      let failedInARow = 0;
+      const watch = new SourceWatch();
       for (const [i, row] of queue.entries()) {
         if (run.stopping) {
           stoppedBecause = 'Stopped.';
           break;
         }
         run.current = row.title;
+        let report: SourceReport | undefined;
         // The search records a title's own failure on it; the rest go on.
-        await this.search(row.id, user).catch((e) =>
+        await this.search(row.id, user, {
+          leaveOut: watch.leftOut,
+          onSources: (r) => (report = r),
+        }).catch((e) =>
           logger.warn('Backfill could not search a title', {
             label: LABEL,
             seriesId: row.id,
@@ -667,11 +780,9 @@ class Backfill {
         if (after && ['found', 'downloading'].includes(after.status)) {
           run.found += 1;
         }
-        // Prowlarr down fails every search alike, so stop.
-        failedInARow = after?.searchError?.startsWith('Prowlarr')
-          ? failedInARow + 1
-          : 0;
-        if (failedInARow >= SEARCH_ALL_FAILURES_TO_STOP) {
+        // A source down fails every search alike: left out while another
+        // answers, and the run stops once none does.
+        if (watch.note(report)) {
           stoppedBecause = `Stopped: ${after?.searchError}`;
           break;
         }
@@ -770,11 +881,14 @@ class Backfill {
     const usenet = clients.find(
       (c) => c.id === backfill.usenetClientId && !isTorrentClient(c.type)
     );
-    const prowlarr = !!(backfill.prowlarr.hostname && backfill.prowlarr.apiKey);
+    const prowlarr = prowlarrSetUp(backfill);
+    // Only a search that includes Prowlarr needs it.
     const problem = !backfill.enabled
       ? 'Backfill is turned off in Settings → Backfill.'
-      : !prowlarr
-        ? 'Prowlarr is not set up in Settings → Services.'
+      : searchesProwlarr(backfill) && !prowlarr
+        ? backfill.searchWith === 'both'
+          ? 'Backfill searches with Prowlarr too, and Prowlarr is not set up in Settings → Services. Set it up, or search with Sonarr, Radarr and Lidarr only in Settings → Backfill.'
+          : 'Prowlarr is not set up in Settings → Services.'
         : !torrent && !usenet
           ? 'No download client is chosen in Settings → Backfill.'
           : !settings.sonarr.length &&
@@ -786,6 +900,7 @@ class Backfill {
       ready: !problem,
       enabled: backfill.enabled,
       prowlarr,
+      searchWith: backfill.searchWith,
       torrentClient: torrent?.name,
       usenetClient: usenet?.name,
       problem,
@@ -958,12 +1073,18 @@ class Backfill {
           : { records: [], complete: true };
         const wanted = missingList.records;
         const cutoff = cutoffList.records;
+        const known = await repo.find({
+          where: { kind: 'series', serverId: server.id },
+        });
+        const byId = new Map(known.map((row) => [row.arrId, row]));
         const bySeries = new Map<
           number,
           {
             missing: number;
             stuck: number;
             lastSearch?: string;
+            /** Some episode's last search was Backfill's own via Sonarr. */
+            ownSearch?: boolean;
             belowCutoff: number;
             series: NonNullable<(typeof wanted)[number]['series']>;
           }
@@ -983,8 +1104,17 @@ class Backfill {
           };
           if (kind === 'missing') {
             entry.missing++;
-            const searched = record.lastSearchTime
-              ? new Date(record.lastSearchTime).getTime()
+            // Backfill's own search through Sonarr stamps the episode as
+            // searched; that is not Sonarr's own search, and counting it
+            // would keep the episode from looking stuck.
+            const own = isOwnArrSearch(
+              byId.get(record.seriesId)?.ownArrSearch,
+              record.lastSearchTime
+            );
+            if (own) entry.ownSearch = true;
+            const lastSearchTime = own ? undefined : record.lastSearchTime;
+            const searched = lastSearchTime
+              ? new Date(lastSearchTime).getTime()
               : 0;
             // Searched a while ago and still missing, or never searched
             // (added without search) but aired and in Sonarr a while.
@@ -1001,10 +1131,10 @@ class Backfill {
               entry.stuck++;
             }
             if (
-              record.lastSearchTime &&
-              (!entry.lastSearch || record.lastSearchTime > entry.lastSearch)
+              lastSearchTime &&
+              (!entry.lastSearch || lastSearchTime > entry.lastSearch)
             ) {
-              entry.lastSearch = record.lastSearchTime;
+              entry.lastSearch = lastSearchTime;
             }
           } else {
             entry.belowCutoff++;
@@ -1014,10 +1144,6 @@ class Backfill {
         wanted.forEach((r) => note(r, 'missing'));
         cutoff.forEach((r) => note(r, 'cutoff'));
 
-        const known = await repo.find({
-          where: { kind: 'series', serverId: server.id },
-        });
-        const byId = new Map(known.map((row) => [row.arrId, row]));
         for (const [seriesId, entry] of bySeries) {
           if (run.cancelled) return;
           const row = byId.get(seriesId);
@@ -1036,9 +1162,11 @@ class Backfill {
             poster: posterOf(entry.series.images) ?? row?.poster ?? null,
             missing: entry.missing,
             belowCutoff: entry.belowCutoff,
-            lastArrSearchAt: entry.lastSearch
-              ? new Date(entry.lastSearch)
-              : null,
+            lastArrSearchAt: arrSearchedAt(
+              row,
+              entry.lastSearch ? new Date(entry.lastSearch) : null,
+              !!entry.ownSearch
+            ),
           };
           if (!row) {
             await repo.save(
@@ -1136,13 +1264,16 @@ class Backfill {
           }
         );
       }
-      let prowlarrFailed = 0;
+      const watch = new SourceWatch();
       for (const row of toSearch) {
         if (run.cancelled) return;
         // A title's failure is recorded on it and the rest go on, unless
-        // Prowlarr is down, which fails every search alike.
+        // its sources are down, which fails every search alike.
+        let report: SourceReport | undefined;
         const failed = await this.search(row.id, undefined, {
           cancelled: () => run.cancelled,
+          leaveOut: watch.leftOut,
+          onSources: (r) => (report = r),
         }).then(
           () => undefined,
           (e) => message(e)
@@ -1154,14 +1285,11 @@ class Backfill {
             errorMessage: failed,
           });
         }
-        prowlarrFailed = failed?.startsWith('Prowlarr')
-          ? prowlarrFailed + 1
-          : 0;
-        if (prowlarrFailed >= SEARCH_ALL_FAILURES_TO_STOP) {
-          logger.warn('Backfill stopped searching: Prowlarr is not answering', {
-            label: LABEL,
-            errorMessage: failed,
-          });
+        if (watch.note(report)) {
+          logger.warn(
+            'Backfill stopped searching: none of its sources is answering',
+            { label: LABEL, errorMessage: failed }
+          );
           return;
         }
       }
@@ -1274,9 +1402,13 @@ class Backfill {
     for (const [movieId, entry] of wanted) {
       if (run.cancelled) return;
       const row = byId.get(movieId);
-      const searched = entry.movie.lastSearchTime
-        ? new Date(entry.movie.lastSearchTime).getTime()
-        : 0;
+      // Backfill's own search through Radarr stamps the movie as searched;
+      // that is not Radarr's own search.
+      const own = isOwnArrSearch(row?.ownArrSearch, entry.movie.lastSearchTime);
+      const searched =
+        entry.movie.lastSearchTime && !own
+          ? new Date(entry.movie.lastSearchTime).getTime()
+          : 0;
       const stuckBefore = stuckBeforeFor(entry.movie.tmdbId);
       // Searched a while ago and still missing, or never searched but in
       // Radarr a while.
@@ -1294,7 +1426,11 @@ class Backfill {
         poster: posterOf(entry.movie.images) ?? row?.poster ?? null,
         missing: entry.missing ? 1 : 0,
         belowCutoff: entry.missing ? 0 : 1,
-        lastArrSearchAt: searched ? new Date(searched) : null,
+        lastArrSearchAt: arrSearchedAt(
+          row,
+          searched ? new Date(searched) : null,
+          own
+        ),
       };
       if (!row) {
         await repo.save(
@@ -1647,6 +1783,16 @@ class Backfill {
           };
         },
         judge: (files, packTitle) => judgeAlbumPack(files, packTitle, ctx),
+        arr: {
+          app: 'Lidarr',
+          server: this.arrServer(row),
+          searches: [
+            {
+              what: ctx.album.title,
+              run: () => ctx.lidarr.getReleases(ctx.album.id),
+            },
+          ],
+        },
       };
     }
     if (row.kind === 'movie') {
@@ -1678,6 +1824,16 @@ class Backfill {
           ctx.movie.runtime,
           'Radarr'
         ),
+        arr: {
+          app: 'Radarr',
+          server: this.arrServer(row),
+          searches: [
+            {
+              what: ctx.movie.title,
+              run: () => ctx.radarr.getReleases(ctx.movie.id),
+            },
+          ],
+        },
       };
     }
     const ctx = await this.context(row);
@@ -1727,6 +1883,12 @@ class Backfill {
     const wantedSeasons = [...bySeason.keys()].map(
       (season) => new RegExp(`\\bS${pad(season)}\\b(?!E)`, 'i')
     );
+    // Seasons with files below the cutoff, searched when they count as gaps.
+    const belowCutoff = getSettings().backfill.includeCutoffUnmet
+      ? ctx.files
+          .filter((f) => f.qualityCutoffNotMet)
+          .map((f) => f.seasonNumber)
+      : [];
     return {
       title: ctx.series.title,
       poster: posterOf(ctx.series.images),
@@ -1762,7 +1924,105 @@ class Backfill {
         ctx.series.runtime,
         'Sonarr'
       ),
+      arr: {
+        app: 'Sonarr',
+        server: this.arrServer(row),
+        searches: seriesSearches(missing, belowCutoff).map((search) => ({
+          what: seriesSearchLabel(search),
+          run: () =>
+            ctx.sonarr.getReleases(
+              'episodeId' in search
+                ? { episodeId: search.episodeId }
+                : { seriesId: ctx.series.id, seasonNumber: search.season }
+            ),
+        })),
+      },
     };
+  }
+
+  /** Window writes per title, one at a time so none is lost. */
+  private windowWrites = new Map<number, Promise<unknown>>();
+
+  /** Changes a title's own-search windows, after any change under way. */
+  private changeWindows(
+    id: number,
+    change: (own: OwnArrSearch[] | null) => OwnArrSearch[]
+  ): Promise<void> {
+    const repo = getRepository(BackfillSeries);
+    const write = (this.windowWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const row = await repo.findOne({
+          where: { id },
+          select: { id: true, ownArrSearch: true },
+        });
+        if (row) {
+          await repo.update(id, { ownArrSearch: change(row.ownArrSearch) });
+        }
+      });
+    this.windowWrites.set(id, write);
+    return write.finally(() => {
+      if (this.windowWrites.get(id) === write) this.windowWrites.delete(id);
+    });
+  }
+
+  /**
+   * Runs a title's interactive *arr searches inside a window saved on the
+   * title, open before the first is asked and closed once all answered, so
+   * a scan meanwhile already knows the *arr's stamps for Backfill's.
+   */
+  private async ownSearchWindow<T>(
+    id: number,
+    searches: number,
+    ask: () => Promise<T>
+  ): Promise<T> {
+    const from = new Date().toISOString();
+    await this.changeWindows(id, (own) =>
+      openOwnSearch(own, { from, to: null, searches })
+    );
+    try {
+      return await ask();
+    } finally {
+      await this.changeWindows(id, (own) =>
+        closeOwnSearch(own, from, new Date().toISOString())
+      ).catch((e) =>
+        logger.warn('Could not save when Backfill searched through an arr', {
+          label: LABEL,
+          seriesId: id,
+          errorMessage: message(e),
+        })
+      );
+    }
+  }
+
+  /**
+   * The admin agent's interactive search of a title's *arr, recorded like
+   * Backfill's own when Backfill follows the title. One it doesn't follow
+   * has nowhere to keep it: its stamp then counts as the *arr's search.
+   */
+  public async withOwnArrSearch<T>(
+    title: { kind: BackfillKind; serverId: number; arrId: number },
+    ask: () => Promise<T>
+  ): Promise<T> {
+    const row = await getRepository(BackfillSeries).findOne({
+      where: title,
+      select: { id: true },
+    });
+    return row ? this.ownSearchWindow(row.id, 1, ask) : ask();
+  }
+
+  /** A title's *arr server, as indexer limits know it. */
+  private arrServer(row: BackfillSeries): IndexerRef {
+    const settings = getSettings();
+    const app = appOf(row.kind);
+    const servers: { id: number; name: string }[] =
+      row.kind === 'album'
+        ? settings.lidarr
+        : row.kind === 'movie'
+          ? settings.radarr
+          : settings.sonarr;
+    const server = servers.find((s) => s.id === row.serverId);
+    return arrIndexer(app, { name: server?.name ?? '' });
   }
 
   /**
@@ -1806,8 +2066,14 @@ class Backfill {
     const repo = getRepository(BackfillSeries);
     const candidates = getRepository(BackfillCandidate);
     let previous: BackfillSeries['status'] = 'stuck';
+    let report: SourceReport | undefined;
+    /** The title's *arr, when it is searched: down, it fails the title. */
+    let ownArr: string | undefined;
     try {
       const row = await repo.findOneOrFail({ where: { id } });
+      if (searchesArrs(getSettings().backfill)) {
+        ownArr = this.arrServer(row).name;
+      }
       previous = row.status;
       await repo.update(id, { status: 'searching', searchError: null });
       const settings = getSettings().backfill;
@@ -1818,58 +2084,147 @@ class Backfill {
           : null;
       const { missing } = target;
 
-      // Search each name in the app's order, skipping names another already
-      // covers ("Ninefold Sky" covers "Ninefold Sky (2021)").
-      const terms: string[] = [];
-      for (const name of target.names) {
-        const n = name.toLowerCase();
-        if (!terms.some((t) => n.includes(t.toLowerCase()))) terms.push(name);
-      }
-      const prowlarr = this.prowlarr();
       const found = new Map<string, ProwlarrRelease>();
-      const errors: string[] = [];
-      const queries = [
-        ...terms.slice(0, MAX_TERMS).map(titleWithoutYear),
-        ...target.extraTerms,
-      ];
-      for (const term of queries) {
-        try {
-          for (const release of await indexerLimits.guard(
-            PROWLARR,
-            'search',
-            () => prowlarr.search(term, { categories: target.categories })
-          )) {
-            const key =
-              release.infoHash?.toLowerCase() ||
-              `${release.title.toLowerCase()}|${Math.round(release.size / 1e6)}`;
-            const held = found.get(key);
-            if (!held || (release.seeders ?? 0) > (held.seeders ?? 0)) {
-              found.set(key, release);
-            }
-          }
-        } catch (e) {
-          errors.push(`${term}: ${plainProblem(e)}`);
-          if (!(e instanceof IndexerLimitReached) || e.asked) {
-            logger.warn('Prowlarr could not search', {
-              label: LABEL,
-              seriesId: id,
-              term,
-              errorMessage: message(e),
+      // One release under several names or from both sources: keep the
+      // best-seeded copy.
+      const keep = (release: ProwlarrRelease) => {
+        const key = releaseKey(release);
+        const held = found.get(key);
+        if (!held || (release.seeders ?? 0) > (held.seeders ?? 0)) {
+          found.set(key, release);
+        }
+      };
+      /**
+       * Problems by source, Prowlarr's named by term ("Glasswing: …"), an
+       * *arr's by its search ("S03: …").
+       */
+      const failures: { source: string; problem: string }[] = [];
+      /** Sources searched, and how many of their searches answered. */
+      const answered = new Map<string, number>();
+      const leftOut = (source: string) => {
+        const why = options.leaveOut?.get(source);
+        if (why) failures.push({ source, problem: why });
+        return !!why;
+      };
+
+      if (searchesProwlarr(settings) && !leftOut('Prowlarr')) {
+        answered.set('Prowlarr', 0);
+        // Search each name in the app's order, skipping names another
+        // already covers ("Ninefold Sky" covers "Ninefold Sky (2021)").
+        const terms: string[] = [];
+        for (const name of target.names) {
+          const n = name.toLowerCase();
+          if (!terms.some((t) => n.includes(t.toLowerCase()))) terms.push(name);
+        }
+        const prowlarr = this.prowlarr();
+        const queries = [
+          ...terms.slice(0, MAX_TERMS).map(titleWithoutYear),
+          ...target.extraTerms,
+        ];
+        for (const term of queries) {
+          try {
+            (
+              await indexerLimits.guard(PROWLARR, 'search', () =>
+                prowlarr.search(term, { categories: target.categories })
+              )
+            ).forEach(keep);
+            answered.set('Prowlarr', answered.get('Prowlarr')! + 1);
+          } catch (e) {
+            failures.push({
+              source: 'Prowlarr',
+              problem: `${term}: ${plainProblem(e)}`,
             });
+            if (!(e instanceof IndexerLimitReached) || e.asked) {
+              logger.warn('Prowlarr could not search', {
+                label: LABEL,
+                seriesId: id,
+                term,
+                errorMessage: message(e),
+              });
+            }
+            // Further names would only spend searches against the limit.
+            if (e instanceof IndexerLimitReached) break;
           }
-          // Further names would only spend searches against the limit.
-          if (e instanceof IndexerLimitReached) break;
         }
       }
-      if (!found.size && errors.length) {
-        throw new Error(`Prowlarr: ${errors[0]}`);
+
+      if (
+        searchesArrs(settings) &&
+        target.arr.searches.length &&
+        !leftOut(target.arr.server.name)
+      ) {
+        const { app, server } = target.arr;
+        answered.set(server.name, 0);
+        // The *arr stamps what it searched as searched by itself; the
+        // window, open from before the first search, tells scans otherwise.
+        await this.ownSearchWindow(id, target.arr.searches.length, async () => {
+          for (const search of target.arr.searches) {
+            if (options.cancelled?.()) break;
+            try {
+              for (const result of await indexerLimits.guard(
+                server,
+                'search',
+                search.run
+              )) {
+                const release = arrRelease(result);
+                if (release) keep(release);
+              }
+              answered.set(server.name, answered.get(server.name)! + 1);
+            } catch (e) {
+              failures.push({
+                source: server.name,
+                problem: `${search.what}: ${plainProblem(e)}`,
+              });
+              if (!(e instanceof IndexerLimitReached) || e.asked) {
+                logger.warn(`${app} could not search`, {
+                  label: LABEL,
+                  seriesId: id,
+                  search: search.what,
+                  errorMessage: message(e),
+                });
+              }
+              if (e instanceof IndexerLimitReached) break;
+            }
+          }
+        });
+      }
+      report = {
+        searched: [...answered.keys()],
+        failed: [...answered.entries()]
+          .filter(
+            ([source, times]) =>
+              times === 0 && failures.some((f) => f.source === source)
+          )
+          .map(([source]) => source),
+      };
+
+      // With results, each problem is kept on the title: Prowlarr's as
+      // before, an *arr's with its name ("Sonarr, S03: …").
+      const errors = failures.map((f) =>
+        f.source === 'Prowlarr' ? f.problem : `${f.source}, ${f.problem}`
+      );
+      if (!found.size && failures.length) {
+        // Each source that failed, by its first problem: "Prowlarr: …".
+        const sources = [...new Set(failures.map((f) => f.source))];
+        throw new Error(
+          sources
+            .map(
+              (source) =>
+                `${source}: ${failures.find((f) => f.source === source)!.problem}`
+            )
+            .join('; ')
+        );
       }
 
       const skipped = await candidates.find({
         where: { seriesId: id, status: In(['skipped', 'approved', 'dead']) },
       });
+      // By guid, hash, and name and size: the same release from the other
+      // source has another guid, and often no hash until opened.
       const passedOver = new Set(
-        skipped.flatMap((c) => [c.guid, c.infoHash ?? ''].filter(Boolean))
+        skipped.flatMap((c) =>
+          [c.guid, c.infoHash ?? '', sameRelease(c)].filter(Boolean)
+        )
       );
       const blocked = blockedGroups();
       const usable = [...found.values()].filter(
@@ -1878,7 +2233,8 @@ class Backfill {
           mentionsShow(release.title, target.names) &&
           !blockedGroupOf(release.title, null, blocked) &&
           !passedOver.has(release.guid) &&
-          !passedOver.has(release.infoHash?.toLowerCase() ?? '')
+          !passedOver.has(release.infoHash?.toLowerCase() ?? '') &&
+          !passedOver.has(sameRelease(release))
       );
 
       const titled = await Promise.all(
@@ -2107,9 +2463,15 @@ class Backfill {
         searchError: message(e).slice(0, 250),
         lastSearchedAt: new Date(),
       });
+      // The title's *arr not answering before any search: nothing could
+      // be searched, and the next title through it will fare the same.
+      if (!report && ownArr && isUnreachable(e)) {
+        report = { searched: [ownArr], failed: [ownArr] };
+      }
       throw e;
     } finally {
       this.searching.delete(id);
+      if (report) options.onSources?.(report);
     }
   }
 

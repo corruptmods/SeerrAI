@@ -196,8 +196,16 @@ export interface DownloadClientSettings {
  */
 export type DownloadCheckMode = 'off' | 'report' | 'on';
 
+/**
+ * Where Backfill searches: Prowlarr under every name a title goes by, the
+ * title's own Sonarr, Radarr or Lidarr by its ids, or both.
+ */
+export type BackfillSearchWith = 'prowlarr' | 'arrs' | 'both';
+
 export interface BackfillSettings {
   enabled: boolean;
+  /** Where to search; installs from before it get one by migration 0019. */
+  searchWith: BackfillSearchWith;
   prowlarr: {
     hostname: string;
     port: number;
@@ -311,6 +319,8 @@ export interface BackfillSettings {
 
 export const BACKFILL_DEFAULTS: BackfillSettings = {
   enabled: false,
+  // A new install has no Prowlarr yet.
+  searchWith: 'arrs',
   prowlarr: {
     hostname: '',
     port: 9696,

@@ -1,5 +1,6 @@
 import { isTorrentClient } from '@server/api/downloadclients';
 import ProwlarrAPI from '@server/api/prowlarr';
+import { searchesProwlarr } from '@server/lib/backfill/arrSearch';
 import backfill from '@server/lib/backfill/engine';
 import { arrApps } from '@server/lib/backfill/indexerOrigins';
 import { GROUP_NAME, setGroupBlocked } from '@server/lib/blockedGroups';
@@ -15,7 +16,8 @@ import { z } from 'zod';
  * Settings → Services (/prowlarr); the Backfill form omits it and keeps the
  * saved one. Prowlarr's API key is never sent back; a blank key keeps the
  * saved one only for the same address, so it can't be sent somewhere new.
- * With Backfill on, Prowlarr is tested before saving.
+ * With Backfill on and searching with Prowlarr, Prowlarr is tested before
+ * saving.
  */
 const backfillSettingsRoutes = Router();
 
@@ -32,6 +34,8 @@ const prowlarrBody = z.object({
 
 const body = z.object({
   enabled: z.boolean(),
+  // Left out by older pages: the saved choice stays.
+  searchWith: z.enum(['prowlarr', 'arrs', 'both']).optional(),
   prowlarr: prowlarrBody.optional(),
   torrentClientId: z.number().int().nullable(),
   usenetClientId: z.number().int().nullable(),
@@ -123,6 +127,7 @@ const prowlarrShown = (prowlarr: BackfillSettings['prowlarr']) => ({
 
 const withKey = (data: z.infer<typeof body>): BackfillSettings => ({
   ...data,
+  searchWith: data.searchWith ?? getSettings().backfill.searchWith,
   prowlarr: data.prowlarr
     ? { ...data.prowlarr, apiKey: keyFor(data.prowlarr) }
     : getSettings().backfill.prowlarr,
@@ -224,12 +229,12 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
       message: `${user} already uses the category "${next_.category}". Choose another for Backfill.`,
     });
   }
-  if (next_.enabled) {
+  if (next_.enabled && searchesProwlarr(next_)) {
     if (!next_.prowlarr.hostname || !next_.prowlarr.apiKey) {
       return next({
         status: 400,
         message:
-          'Backfill needs Prowlarr. Set it up in Settings → Services first.',
+          'Searching with Prowlarr needs it set up in Settings → Services first, or choose Sonarr, Radarr and Lidarr to search with.',
       });
     }
     try {
@@ -251,7 +256,7 @@ backfillSettingsRoutes.get('/prowlarr', (_req, res) => {
 
 /**
  * Saves Prowlarr's connection once Prowlarr answers. A blank address removes
- * it, unless Backfill is on, which needs it.
+ * it, unless Backfill is on and searching with it.
  */
 backfillSettingsRoutes.put('/prowlarr', async (req, res, next) => {
   const parsed = prowlarrBody.safeParse(req.body);
@@ -260,10 +265,11 @@ backfillSettingsRoutes.put('/prowlarr', async (req, res, next) => {
   }
   const settings = getSettings();
   if (!parsed.data.hostname) {
-    if (settings.backfill.enabled) {
+    if (settings.backfill.enabled && searchesProwlarr(settings.backfill)) {
       return next({
         status: 400,
-        message: 'Backfill is on and needs Prowlarr. Turn Backfill off first.',
+        message:
+          'Backfill is on and searches with Prowlarr. Turn Backfill off, or have it search with Sonarr, Radarr and Lidarr only, first.',
       });
     }
     settings.backfill = {

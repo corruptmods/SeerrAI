@@ -58,7 +58,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
 
   stuckTitle: 'When a title gets stuck',
   stuck1:
-    'Backfill looks every 6 hours for titles Radarr or Sonarr couldn’t find, searches Prowlarr under every name, and downloads what an admin approves.',
+    'Backfill looks every 6 hours for titles Radarr or Sonarr couldn’t find, searches again through Prowlarr under every name, through Sonarr, Radarr and Lidarr, or both, and downloads what an admin approves.',
   stuck2:
     'The admin agent, an AI, looks further when Backfill finds nothing. It runs on its own only if that’s on; otherwise ask it from Backfill.',
   stuck3:

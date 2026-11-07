@@ -18,13 +18,13 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsProwlarr', {
   prowlarr: 'Prowlarr',
   description:
-    'Backfill and songs taken from albums search Prowlarr directly, under every name a title goes by. Neither runs without it. Sonarr, Radarr and Lidarr keep using their own indexers.',
+    'Songs taken from albums, and Backfill when set to search with it, search Prowlarr directly, under every name a title goes by. Sonarr, Radarr and Lidarr keep using their own indexers.',
   addProwlarr: 'Add Prowlarr',
   usedBy: 'Used by',
   backfillAndSongs: 'Backfill and songs taken from albums',
   deleteProwlarr: 'Disconnect Prowlarr',
   deleteProwlarrConfirm:
-    'Disconnect Prowlarr? Backfill and songs taken from albums can’t search until it is added again.',
+    'Disconnect Prowlarr? Songs taken from albums, and Backfill when set to search with it, can’t search until it is added again.',
   deleteFailed: 'Could not disconnect Prowlarr: {reason}',
   noAnswer: 'it did not answer.',
 });
@@ -50,7 +50,8 @@ const SettingsProwlarr = () => {
     void globalMutate('/api/v1/settings/backfill');
   };
 
-  // A blank address removes Prowlarr; the server refuses while Backfill is on.
+  // A blank address removes Prowlarr; the server refuses while Backfill is on
+  // and searching with it.
   const disconnect = async () => {
     try {
       await axios.put('/api/v1/settings/backfill/prowlarr', {

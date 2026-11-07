@@ -599,6 +599,7 @@ const useClient = (type: DownloadClientType) => {
   settings.backfill = {
     ...BACKFILL_DEFAULTS,
     enabled: true,
+    searchWith: 'prowlarr',
     prowlarr: { ...BACKFILL_DEFAULTS.prowlarr, hostname: 'p', apiKey: 'k' },
     torrentClientId: torrent ? 1 : null,
     usenetClientId: torrent ? null : 1,

@@ -55,6 +55,7 @@ export type { GrabInput } from '@server/lib/agent/tools/grab';
 export {
   forgetSearches,
   notLookedFor,
+  prowlarrUnavailable,
   searchTiming,
 } from '@server/lib/agent/tools/search';
 export type { MadeCall } from '@server/lib/agent/tools/search';
@@ -95,7 +96,8 @@ export const TOOLS: AgentTool[] = [
  * need this go to follow an admin's word, not a failed download alone.
  */
 export const offered = (tool: AgentTool, run: AgentRun): boolean =>
-  !tool.askOnly || (adminPresent(run) && (!tool.acts || adminDriven(run)));
+  !tool.unavailable?.() &&
+  (!tool.askOnly || (adminPresent(run) && (!tool.acts || adminDriven(run))));
 
 /**
  * Why a run may not use a tool on this title, or null. A run without an
@@ -140,6 +142,9 @@ export const runTool = async (
   input: Record<string, unknown>
 ): Promise<{ text: string; isError: boolean; refused?: boolean }> => {
   const tool = TOOLS.find((t) => t.name === name);
+  // A tool the settings rule out says why, so the model stops asking.
+  const unavailable = tool?.unavailable?.();
+  if (unavailable) return { text: unavailable, isError: true };
   if (!tool || !offered(tool, state.run)) {
     return { text: `There is no tool called ${name}.`, isError: true };
   }

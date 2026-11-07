@@ -1,3 +1,4 @@
+import type { OwnArrSearch } from '@server/lib/backfill/arrSearch';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
@@ -121,6 +122,14 @@ export class BackfillSeries {
 
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public lastSearchedAt: Date | null;
+
+  /**
+   * When Backfill's latest searches (and the admin agent's) asked the
+   * title's *arr to search. The *arr stamps those as its own last search,
+   * which scans then don't take for it.
+   */
+  @Column({ type: 'simple-json', nullable: true })
+  public ownArrSearch: OwnArrSearch[] | null;
 
   @Column({ type: 'varchar', nullable: true })
   public searchError: string | null;

@@ -60,7 +60,7 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   unignore: 'Stop ignoring',
   openJob: 'Open the running backfill',
   searchingNow:
-    'Searching Prowlarr and opening the likeliest packs. This takes a few minutes.',
+    'Searching and opening the likeliest packs. This takes a few minutes.',
   lastSearch: 'Backfill last searched {when}.',
   searchError: 'The last search had a problem: {error}',
   arrError: '{app} could not be read: {error}',

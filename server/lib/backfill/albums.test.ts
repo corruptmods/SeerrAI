@@ -469,6 +469,7 @@ beforeEach(() => {
   settings.backfill = {
     ...BACKFILL_DEFAULTS,
     enabled: true,
+    searchWith: 'prowlarr',
     prowlarr: {
       ...BACKFILL_DEFAULTS.prowlarr,
       hostname: 'prowlarr',
@@ -701,6 +702,46 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
     });
     assert.deepEqual([finished.status, finished.imported], ['done', 1]);
     assert.deepEqual(removed, [HASH]);
+  });
+
+  it('searches the album through Lidarr alone when set to, and plans what it returns', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      searchWith: 'arrs',
+      prowlarr: BACKFILL_DEFAULTS.prowlarr,
+    };
+    const asked: number[] = [];
+    mock.method(
+      BackfillLidarr.prototype,
+      'getReleases',
+      async (albumId: number) => {
+        asked.push(albumId);
+        return [
+          {
+            ...RELEASE,
+            guid: 'lidarr-guid',
+            indexer: 'Knaben (Prowlarr)',
+            approved: true,
+          },
+          { ...RELEASE, guid: 'odd', protocol: 'unknown' },
+        ];
+      }
+    );
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'album', arrId: 70 },
+    });
+    assert.deepEqual(asked, [70], 'one search, for the album');
+    assert.deepEqual(searchedFor, [], 'Prowlarr is not asked');
+    assert.equal(row.status, 'found');
+    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    assert.deepEqual(
+      [candidate.guid, candidate.indexer, candidate.status],
+      ['lidarr-guid', 'Knaben', 'ready']
+    );
+    assert.equal(candidate.summary?.fill, 1);
   });
 
   it('leaves an album Lidarr has not had its chance at yet', async () => {

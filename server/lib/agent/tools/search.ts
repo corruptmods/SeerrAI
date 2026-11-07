@@ -31,6 +31,11 @@ import {
   titleRef,
 } from '@server/lib/agent/tools/base';
 import { backfillOf, failedReleases } from '@server/lib/agent/tools/titles';
+import {
+  arrRelease,
+  prowlarrSearched,
+  searchesProwlarr,
+} from '@server/lib/backfill/arrSearch';
 import backfill from '@server/lib/backfill/engine';
 import {
   IndexerLimitReached,
@@ -57,6 +62,20 @@ import { z } from 'zod';
 
 const MAX_LISTED_RELEASES = 30;
 
+/**
+ * Why search_indexers can't search Prowlarr, or null when it can: Prowlarr
+ * is searched only when Backfill searches with it, and is set up.
+ */
+export const prowlarrUnavailable = (): string | null => {
+  const settings = getSettings().backfill;
+  if (prowlarrSearched(settings)) return null;
+  return `search_indexers is not available: ${
+    searchesProwlarr(settings)
+      ? 'Prowlarr is not set up'
+      : 'Backfill searches with Sonarr, Radarr and Lidarr, not Prowlarr'
+  }. Use search_releases.`;
+};
+
 const remember = (
   state: AgentState,
   release: ProwlarrRelease,
@@ -79,27 +98,6 @@ const reasonsOf = (release: ArrSearchRelease) =>
   (release.rejections ?? [])
     .map((r) => (typeof r === 'string' ? r : (r.reason ?? '')))
     .filter(Boolean);
-
-const asRelease = (release: ArrSearchRelease): ProwlarrRelease | null => {
-  const protocol =
-    release.protocol === 'torrent' || release.protocol === 'usenet'
-      ? release.protocol
-      : null;
-  if (!protocol) return null;
-  return {
-    guid: release.guid,
-    title: release.title,
-    size: release.size ?? 0,
-    indexerId: release.indexerId,
-    indexer: (release.indexer ?? '').replace(/ \(Prowlarr\)$/, ''),
-    protocol,
-    seeders: release.seeders,
-    downloadUrl: release.downloadUrl,
-    magnetUrl: release.magnetUrl,
-    infoHash: release.infoHash,
-    publishDate: release.publishDate,
-  };
-};
 
 const releaseLine = (
   known: KnownRelease,
@@ -319,11 +317,18 @@ export const searchReleases: AgentTool = {
         what = `Sonarr is still searching season ${season}`;
       }
     }
-    const found = await arrSearch(key, start);
+    // The *arr stamps what it searched as searched by itself; Backfill
+    // keeps the window so its scans don't take it for the *arr's.
+    const search = start;
+    const found = await arrSearch(key, () =>
+      backfill.withOwnArrSearch(title, search)
+    );
     if ('pending' in found) {
       return `${what} (${minutes(found.forMs)} min so far). It keeps going: call search_releases again with the same title${
         title.kind === 'series' ? ' and season' : ''
-      } for its results, and use search_indexers meanwhile.`;
+      } for its results${
+        prowlarrUnavailable() ? '' : ', and use search_indexers meanwhile'
+      }.`;
     }
     // A season search returns other seasons too (a long-running show fills
     // the list with its newest). Keep this season's, packs covering it, and
@@ -402,7 +407,7 @@ export const searchReleases: AgentTool = {
       .map(({ r }) => r);
     const lines: string[] = [];
     for (const result of sorted.slice(0, MAX_LISTED_RELEASES)) {
-      const release = asRelease(result);
+      const release = arrRelease(result);
       if (!release) continue;
       const known = remember(
         state,
@@ -481,6 +486,7 @@ const atLimit = async <T>(ask: () => Promise<T>): Promise<T> => {
 export const searchIndexers: AgentTool = {
   name: 'search_indexers',
   readOnly: true,
+  unavailable: prowlarrUnavailable,
   description:
     'Searches every Prowlarr indexer for any text, without Sonarr, Radarr or Lidarr filtering anything out. Use other names, years, "complete", "collection", a season, or the original title; for music (kind music), "Artist Album" or the album\'s name, with the year or FLAC.',
   parameters: {

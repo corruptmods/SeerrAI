@@ -6,6 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
+- Backfill can search through Sonarr, Radarr and Lidarr instead of Prowlarr, or both (Settings → Backfill → **Search with**), so it works without Prowlarr. Prowlarr searches under every name a title goes by and finds more for stuck titles; the *arrs search with their own ids. Setups with Prowlarr keep using it.
 - Approve or decline requests from Discord with Seerr AI's own bot (Settings → Notifications → **Discord Bot**, off to start). It posts each request waiting for approval to a channel you pick, with Approve and Decline buttons; Decline asks for an optional reason. It needs no open port, and the page walks you through creating the bot, inviting it, picking the channel and linking approvers.
 - Approve or decline straight from ntfy (Settings → Notifications → ntfy → **Approve and Decline Buttons**; needs the Application URL) and from Telegram (Settings → Notifications → Telegram → **Approve and Decline Buttons**; no port to open).
 - Following a series now requests each new season as soon as it's announced and Sonarr has it, so the first episode is grabbed on air day; the premiere is still the fallback.

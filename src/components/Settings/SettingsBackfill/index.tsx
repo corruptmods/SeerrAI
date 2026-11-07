@@ -20,14 +20,20 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsBackfill', {
   backfill: 'Backfill',
   description:
-    'Finds what Sonarr couldn’t by searching Prowlarr under every name, checks each file, and downloads only what you approve.',
+    'Finds what Sonarr couldn’t by searching again, through Prowlarr under every name or through Sonarr, Radarr and Lidarr, checks each file, and downloads only what you approve.',
   enabled: 'Enable Backfill',
   enabledTip: 'Scans run on a schedule (Settings → Jobs & Cache).',
   prowlarr: 'Prowlarr',
   prowlarrAt:
     'Searches Prowlarr at {address}. <ServicesLink>Change it in Services</ServicesLink>.',
   prowlarrMissing:
-    'Backfill needs Prowlarr. <ServicesLink>Set it up in Settings → Services</ServicesLink> first.',
+    'Searching with Prowlarr needs it set up. <ServicesLink>Set it up in Settings → Services</ServicesLink>, or search with Sonarr, Radarr and Lidarr.',
+  search: 'Searching',
+  searchWith: 'Search with',
+  searchWithTip:
+    'Prowlarr searches every name a title goes by and whole packs, so it finds more for stuck titles. Sonarr, Radarr and Lidarr search by their own ids and say which episode, film or album each release is. Both does both, and uses more of your indexers’ searches.',
+  searchArrs: 'Sonarr, Radarr and Lidarr',
+  searchBoth: 'Both',
   downloads: 'Downloads',
   torrentClient: 'Torrent packs go to',
   usenetClient: 'Usenet packs go to',
@@ -170,6 +176,7 @@ const SettingsBackfill = () => {
           try {
             await axios.put('/api/v1/settings/backfill', {
               enabled: values.enabled,
+              searchWith: values.searchWith,
               torrentClientId:
                 values.torrentClientId === ''
                   ? null
@@ -256,32 +263,56 @@ const SettingsBackfill = () => {
               </div>
 
               <h4 className="mt-8 text-lg font-semibold text-gray-200">
-                {intl.formatMessage(messages.prowlarr)}
+                {intl.formatMessage(messages.search)}
               </h4>
-              <p
-                className={`mt-2 text-sm ${
-                  prowlarrReady
-                    ? 'text-gray-400'
-                    : 'text-yellow-300 light:text-warning-text'
-                }`}
-              >
-                {intl.formatMessage(
-                  prowlarrReady
-                    ? messages.prowlarrAt
-                    : messages.prowlarrMissing,
-                  {
-                    address: prowlarrAddress,
-                    ServicesLink: (msg: React.ReactNode) => (
-                      <Link
-                        href="/settings/services"
-                        className="text-indigo-400 hover:underline light:text-accent-text"
-                      >
-                        {msg}
-                      </Link>
-                    ),
-                  }
-                )}
-              </p>
+              <div className="form-row">
+                <label htmlFor="searchWith" className="text-label">
+                  {intl.formatMessage(messages.searchWith)}
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.searchWithTip)}
+                  </span>
+                </label>
+                <div className="form-input-area">
+                  <Field as="select" id="searchWith" name="searchWith">
+                    <option value="prowlarr">
+                      {intl.formatMessage(messages.prowlarr)}
+                    </option>
+                    <option value="arrs">
+                      {intl.formatMessage(messages.searchArrs)}
+                    </option>
+                    <option value="both">
+                      {intl.formatMessage(messages.searchBoth)}
+                    </option>
+                  </Field>
+                </div>
+              </div>
+              {/* Only a choice that searches Prowlarr needs it. */}
+              {values.searchWith !== 'arrs' && (
+                <p
+                  className={`mt-2 text-sm ${
+                    prowlarrReady
+                      ? 'text-gray-400'
+                      : 'text-yellow-300 light:text-warning-text'
+                  }`}
+                >
+                  {intl.formatMessage(
+                    prowlarrReady
+                      ? messages.prowlarrAt
+                      : messages.prowlarrMissing,
+                    {
+                      address: prowlarrAddress,
+                      ServicesLink: (msg: React.ReactNode) => (
+                        <Link
+                          href="/settings/services"
+                          className="text-indigo-400 hover:underline light:text-accent-text"
+                        >
+                          {msg}
+                        </Link>
+                      ),
+                    }
+                  )}
+                </p>
+              )}
 
               <h4 className="mt-8 text-lg font-semibold text-gray-200">
                 {intl.formatMessage(messages.downloads)}

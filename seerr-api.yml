@@ -230,6 +230,15 @@ components:
       properties:
         enabled:
           type: boolean
+        searchWith:
+          type: string
+          enum: [prowlarr, arrs, both]
+          description: >-
+            Where Backfill searches: Prowlarr under every name a title goes by
+            (prowlarr), the title's own Sonarr, Radarr or Lidarr by its ids
+            (arrs), or both. Only a choice that includes Prowlarr needs it set
+            up. Left out, the saved choice stays. Installs from before it keep
+            Prowlarr if it was set up, else arrs; new installs start on arrs.
         prowlarr:
           type: object
           properties:
@@ -6363,7 +6372,7 @@ paths:
                 $ref: '#/components/schemas/BackfillAnswer'
     put:
       summary: 'Save Backfill settings'
-      description: 'With Backfill on, Prowlarr is tested first.'
+      description: 'With Backfill on and searching with Prowlarr, Prowlarr is tested first.'
       tags:
         - settings
       requestBody:
@@ -6423,7 +6432,7 @@ paths:
                 type: object
     put:
       summary: "Save Prowlarr's connection"
-      description: 'Tested first. A blank API key keeps the saved one; a blank address removes it, unless Backfill is on.'
+      description: 'Tested first. A blank API key keeps the saved one; a blank address removes it, unless Backfill is on and searching with Prowlarr.'
       tags:
         - settings
       requestBody:

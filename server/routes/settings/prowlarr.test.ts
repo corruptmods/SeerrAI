@@ -122,12 +122,16 @@ describe('Prowlarr, in Services', () => {
     assert.equal(getSettings().backfill.prowlarr.apiKey, 'k1');
   });
 
-  it('is removed with a blank address, but not while Backfill is on', async () => {
+  it('is removed with a blank address, but not while Backfill is on and searches with it', async () => {
     await call('put', '/prowlarr', { ...PROWLARR, apiKey: 'k1' });
-    getSettings().backfill = { ...getSettings().backfill, enabled: true };
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      enabled: true,
+      searchWith: 'both',
+    };
     const kept = await call('put', '/prowlarr', { ...PROWLARR, hostname: '' });
     assert.equal(kept.status, 400);
-    assert.match(kept.data.message, /Turn Backfill off first/);
+    assert.match(kept.data.message, /Turn Backfill off, or have it search/);
 
     getSettings().backfill = { ...getSettings().backfill, enabled: false };
     const gone = await call('put', '/prowlarr', { ...PROWLARR, hostname: '' });
@@ -150,16 +154,58 @@ describe('Prowlarr, in Services', () => {
     assert.equal(getSettings().backfill.prowlarr.apiKey, 'k1');
   });
 
-  it('is asked for when Backfill is turned on without it', async () => {
+  it('is asked for when Backfill is turned on to search with it', async () => {
     const form = withoutProwlarr();
-    const refused = await call('put', '', {
+    for (const searchWith of ['prowlarr', 'both']) {
+      const refused = await call('put', '', {
+        ...form,
+        enabled: true,
+        searchWith,
+        blockedGroups: undefined,
+        downloadCheck: undefined,
+      });
+      assert.equal(refused.status, 400, searchWith);
+      assert.match(refused.data.message, /set up in Settings → Services/);
+    }
+    assert.equal(getSettings().backfill.enabled, false);
+  });
+
+  it('is not needed when Backfill searches through Sonarr, Radarr and Lidarr', async () => {
+    const form = withoutProwlarr();
+    const saved = await call('put', '', {
       ...form,
       enabled: true,
+      searchWith: 'arrs',
       blockedGroups: undefined,
       downloadCheck: undefined,
     });
-    assert.equal(refused.status, 400);
-    assert.match(refused.data.message, /Set it up in Settings → Services/);
+    assert.equal(saved.status, 200, JSON.stringify(saved.data));
+    assert.equal(saved.data.searchWith, 'arrs');
+    assert.equal(getSettings().backfill.enabled, true);
+
+    // Prowlarr can then be removed with Backfill on.
+    await call('put', '/prowlarr', { ...PROWLARR, apiKey: 'k1' });
+    const gone = await call('put', '/prowlarr', { ...PROWLARR, hostname: '' });
+    assert.equal(gone.status, 200);
+
+    // A form without the choice keeps the saved one; an unknown one is
+    // refused.
+    const { searchWith: _left, ...older } = withoutProwlarr();
+    void _left;
+    const kept = await call('put', '', {
+      ...older,
+      blockedGroups: undefined,
+      downloadCheck: undefined,
+    });
+    assert.equal(kept.status, 200, JSON.stringify(kept.data));
+    assert.equal(getSettings().backfill.searchWith, 'arrs');
+    const odd = await call('put', '', {
+      ...older,
+      searchWith: 'jackett',
+      blockedGroups: undefined,
+      downloadCheck: undefined,
+    });
+    assert.equal(odd.status, 400);
   });
 });
 

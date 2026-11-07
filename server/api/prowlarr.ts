@@ -14,7 +14,9 @@ import { createHash, timingSafeEqual } from 'node:crypto';
  * Backfill searches every Prowlarr indexer and fetches a result's .torrent or
  * .nzb through Prowlarr. It searches Prowlarr directly, not via Sonarr: a
  * pack whose name Sonarr can't parse never reaches Sonarr's results, so
- * Backfill judges it here by the files inside.
+ * Backfill judges it here by the files inside. Releases from Sonarr's,
+ * Radarr's or Lidarr's search are fetched the same way, with or without
+ * Prowlarr set up.
  */
 
 export interface ProwlarrSettings {
@@ -224,11 +226,15 @@ class ProwlarrAPI {
     if (url.startsWith('magnet:')) {
       return magnetOf(url);
     }
-    const own = new URL(clientBaseUrl(this.settings)).origin;
+    // Without Prowlarr set up (Backfill searching the *arrs only), no link
+    // is Prowlarr's and no key is sent.
+    const own = this.settings.hostname
+      ? new URL(clientBaseUrl(this.settings)).origin
+      : null;
     // Send the API key only to Prowlarr, never to an indexer it redirects to
     // nor back to Prowlarr from one: an indexer must not pick what is asked
     // of Prowlarr with the key.
-    let keyed = true;
+    let keyed = own !== null;
     for (let hop = 0; hop < 4; hop++) {
       const target = new URL(url);
       if (target.protocol !== 'http:' && target.protocol !== 'https:') {
@@ -290,6 +296,7 @@ class ProwlarrAPI {
    * through a proxy, on another port carrying its API key.
    */
   private isProwlarr(target: URL): boolean {
+    if (!this.settings.hostname) return false;
     const own = new URL(clientBaseUrl(this.settings));
     if (originKey(target) === originKey(own)) return true;
     if (!/\/\d+\/download$/.test(target.pathname)) return false;

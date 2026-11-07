@@ -23,7 +23,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
 | **Settings → Features → Siri Shortcut** | The iCloud link to the "Fix this show" shortcut, offered on everyone's Siri page. See [Reporting with Siri](./siri.md#making-the-shortcut-admins). | Empty |
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
-| **Settings → Services → Prowlarr** | Searched directly by Backfill and for songs taken from albums; neither runs without it. Added and edited from its tile, like the other services; tested before it is saved. Delete disconnects it, unless Backfill is on. Its API key is never sent back to the browser. | None |
+| **Settings → Services → Prowlarr** | Searched directly for songs taken from albums, which don't run without it, and by Backfill when **Search with** includes Prowlarr. Added and edited from its tile, like the other services; tested before it is saved. Delete disconnects it, unless Backfill is on and searches with it. Its API key is never sent back to the browser. | None |
 | **Settings → Services → Soulseek** | slskd's address, API key (ReadWrite role) and downloads folder as Lidarr sees it, for songs taken from albums that no indexer has. Added and edited from its tile; saved once slskd answers and Lidarr sees the folder. Its API key is never sent back to the browser. Shown once music is set up. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; Jellyfin and Emby need nothing. Its API key is never sent back to the browser. | Port 8181 |
@@ -40,7 +40,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | **Settings → Services** | **Anime Check** report and **Run Check**. | |
 | **Settings → Quality** | Quality profiles Seerr AI creates in Radarr and Sonarr, per server: presets from Seerr AI or TRaSH Guides, adjustments, band step; **Fill gaps with Seerr AI** and **Apply updates automatically** for TRaSH Guides. Nothing is sent to a server until it is managed and applied. See [Quality profiles](./quality.md). | Every server Not managed; Fill gaps on; Apply updates automatically off; usenet at equal quality, torrents wait 2 hours when chosen, band step 100 |
 | **Settings → AI** | Provider, key, model, per-feature models (Advanced), **Daily Limit per Person**, credit. See [AI](./ai.md). | Off; 20 answers a day |
-| **Settings → Backfill** | Download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). **Download Check** (Off, Report only or On) is saved on its own and needs nothing else here; see [Download Check](./download-check.md). | Off; see below |
+| **Settings → Backfill** | Where to search (Prowlarr, Sonarr, Radarr and Lidarr, or both), download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). **Download Check** (Off, Report only or On) is saved on its own and needs nothing else here; see [Download Check](./download-check.md). | Off; see below |
 | **Settings → Notifications** | New types: **Plex Reauth** (always sent), **Backfill**, **Health** and **Wrong Match** (admins), and **List Activity** (each person's own settings, never a channel's). | Web push on; Wrong Match on wherever Health was |
 | **Settings → Health** | Checks, Search all, resources, and under Titles → Folders matched to another title: **Check new requests as they're imported**, **Fix matches from here** (Plex) and **Fix automatically**. See [Keeping it healthy](./health.md). | On; on; off |
 | **Settings → How It Works** | The admin overview. | |
@@ -50,6 +50,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | Setting | Default |
 |---|---|
 | Enabled | Off |
+| Search with | Sonarr, Radarr and Lidarr on a new server; servers from before it keep Prowlarr if it was set up |
 | Download Check | Off |
 | Movies too | On |
 | Stuck after (since Sonarr's or Radarr's last search) | 24 hours |

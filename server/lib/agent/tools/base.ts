@@ -81,6 +81,11 @@ export interface AgentTool extends ConverseTool {
   acts?: boolean;
   /** Read-only; several in one turn run in parallel. */
   readOnly?: boolean;
+  /**
+   * Why the tool can't be used with the current settings, or null; a tool
+   * that can't is not offered.
+   */
+  unavailable?: () => string | null;
   run(state: AgentState, input: Record<string, unknown>): Promise<string>;
 }
 

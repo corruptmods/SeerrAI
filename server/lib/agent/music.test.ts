@@ -195,6 +195,7 @@ beforeEach(() => {
   settings.backfill = {
     ...BACKFILL_DEFAULTS,
     enabled: true,
+    searchWith: 'prowlarr',
     prowlarr: {
       ...BACKFILL_DEFAULTS.prowlarr,
       hostname: 'prowlarr',

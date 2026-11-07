@@ -153,6 +153,9 @@ const EPISODES = FILES[0].size + FILES[1].size;
  */
 const lay = async (folder: string, sample: 'all' | 'shared' | 'none') => {
   const pack = join(folder, PACK);
+  // A client removes a deleted torrent's files after it leaves the list;
+  // give it time, so it doesn't take files laid here for the next check.
+  await sleep(1500);
   for (let i = 0; i < 20 && existsSync(pack); i++) {
     await sleep(250);
   }
@@ -692,8 +695,11 @@ describe('the real download clients', { skip }, () => {
         const done = await until(
           'finished',
           () => api.getJob(id),
+          // SABnzbd can list a job as completed a moment before its folder.
           (j) =>
-            j?.place === 'history' && /^(completed|failed)$/i.test(j.status),
+            j?.place === 'history' &&
+            (/^failed$/i.test(j.status) ||
+              (/^completed$/i.test(j.status) && !!j.storage)),
           90_000
         );
         assert.match(done!.status, /^completed$/i, JSON.stringify(done));

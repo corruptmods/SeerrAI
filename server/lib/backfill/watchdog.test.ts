@@ -55,7 +55,7 @@ describe('TorrentWatch', () => {
     assert.equal(watch.check(1, short(2 * GB), LIMITS, t + 50 * 60_000), null);
     assert.match(
       watch.check(1, short(3 * GB), LIMITS, t + 61 * 60_000) ?? '',
-      /from the start, so it could never finish/
+      /has a complete copy, so it could never finish/
     );
     // Waiting forever means forever.
     const patient = { stallHours: 0, slowHours: 0 };
@@ -72,7 +72,7 @@ describe('TorrentWatch', () => {
     assert.equal(watch.check(1, short(3 * GB), LIMITS, t + 6 * HOUR), null);
     assert.match(
       watch.check(1, short(4 * GB), LIMITS, t + 14 * HOUR) ?? '',
-      /on no one’s computer for 12 hours, so it could never finish/
+      /had a complete copy for 12 hours, so it could never finish/
     );
   });
 

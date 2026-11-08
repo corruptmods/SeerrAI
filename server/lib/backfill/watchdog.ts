@@ -121,7 +121,7 @@ export class TorrentWatch {
       now - start.at > firstLook
     ) {
       this.forget(id);
-      return 'No one sharing it has all of it: part of it was on no one’s computer from the start, so it could never finish.';
+      return 'Nobody sharing this torrent has a complete copy, so it could never finish. Backfill will try a different release.';
     }
 
     const seen = this.gains.get(id);
@@ -132,7 +132,7 @@ export class TorrentWatch {
       if (limits.stallHours > 0 && now - seen.at > limits.stallHours * HOUR) {
         this.forget(id);
         return incomplete
-          ? `Part of it was on no one’s computer for ${hoursText(limits.stallHours)}, so it could never finish.`
+          ? `Nobody sharing this torrent has had a complete copy for ${hoursText(limits.stallHours)}, so it could never finish. Backfill will try a different release.`
           : `Nothing downloaded for ${hoursText(limits.stallHours)}: nobody seems to be sharing it.`;
       }
     }

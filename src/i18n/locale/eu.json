@@ -3068,7 +3068,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Utzi hainbeste ordu baino gehiago beharko lukeen torrent bat",
   "components.Settings.SettingsBackfill.slowHoursTip": "Azken lau orduetako abiaduraren arabera epaitzen da. Pausan edo ilaran emandako denbora ez da zenbatzen. 0k ez du inoiz uzten.",
   "components.Settings.SettingsBackfill.stallHours": "Utzi torrent bat aurrerapenik gabeko hainbeste orduren ondoren",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Baita zati bat inork ez duenean denbora horretan, eta ezin denean amaitu. Pausan edo ilaran emandako denbora ez da zenbatzen. 0k betiko itxaroten du.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Baita partekatzen dutenetako inork ez duenean kopia osorik izan denbora horretan, eta ezin denean amaitu. Pausan edo ilaran emandako denbora ez da zenbatzen. 0k betiko itxaroten du.",
   "components.Settings.SettingsBackfill.stepDown": "Jaitsi kalitate-aurrezarpen bat",
   "components.Settings.SettingsBackfill.stepDownDays": "Jaitsi aurretik igaro beharreko egunak",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI-ren kalitate-aurrezarpenetako batean (Ezarpenak → Kalitatea) dagoen titulu batentzat ezer hartzen ez bada, hurrengo aurrezarpen malguagora pasatzen da, eta zerbait hartzen denean itzultzen da.",

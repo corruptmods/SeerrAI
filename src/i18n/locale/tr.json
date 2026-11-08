@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Bu kadar saatten uzun sürecek torrentten vazgeç",
   "components.Settings.SettingsBackfill.slowHoursTip": "Son dört saatteki hızına göre değerlendirilir. Duraklatılmış veya kuyrukta geçen süre sayılmaz. 0 asla vazgeçmez.",
   "components.Settings.SettingsBackfill.stallHours": "İlerleme olmadan bu kadar saat geçince torrentten vazgeç",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Bir kısmı bu kadar süre hiç kimsede yoksa ve bu yüzden bitemiyorsa da. Duraklatılmış veya kuyrukta geçen süre sayılmaz. 0 sonsuza dek bekler.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Paylaşanların hiçbirinde bu kadar süre tam bir kopya yoksa ve bu yüzden bitemiyorsa da. Duraklatılmış veya kuyrukta geçen süre sayılmaz. 0 sonsuza dek bekler.",
   "components.Settings.SettingsBackfill.stepDown": "Bir alt kalite hazır ayarına geç",
   "components.Settings.SettingsBackfill.stepDownDays": "Alt ayara geçmeden önceki gün sayısı",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI’nın kalite hazır ayarlarından birinde (Ayarlar → Kalite) olup kendisi için hiçbir şey alınmayan bir yapım, bir sonraki daha esnek hazır ayara geçer; bir şey alındığında geri döner.",

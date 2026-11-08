@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "种子预计耗时超过多少小时后放弃",
   "components.Settings.SettingsBackfill.slowHoursTip": "按最近四小时的速度判断。暂停或排队的时间不计入。0 则永不放弃。",
   "components.Settings.SettingsBackfill.stallHours": "种子在多少小时没有进展后放弃",
-  "components.Settings.SettingsBackfill.stallHoursTip": "若其中一部分这么久都没人拥有、无法完成，也会放弃。暂停或排队的时间不计入。0 则无限等待。",
+  "components.Settings.SettingsBackfill.stallHoursTip": "若分享它的人这么久都没有完整副本、无法完成，也会放弃。暂停或排队的时间不计入。0 则无限等待。",
   "components.Settings.SettingsBackfill.stepDown": "降一级质量预设",
   "components.Settings.SettingsBackfill.stepDownDays": "降级前等待天数",
   "components.Settings.SettingsBackfill.stepDownTip": "使用 Seerr AI 质量预设（设定 → 质量）的作品如果一直抓取不到任何内容，会改用下一个要求更宽松的预设，抓取到之后再改回来。",

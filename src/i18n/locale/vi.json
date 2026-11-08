@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Bỏ một torrent sẽ mất lâu hơn bấy nhiêu giờ",
   "components.Settings.SettingsBackfill.slowHoursTip": "Đánh giá theo tốc độ của nó trong bốn giờ gần nhất. Thời gian tạm dừng hoặc xếp hàng không được tính. 0 thì không bao giờ bỏ.",
   "components.Settings.SettingsBackfill.stallHours": "Bỏ một torrent sau bấy nhiêu giờ không có tiến triển",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Cả khi một phần của nó không ai có trong suốt thời gian đó, nên không thể xong. Thời gian tạm dừng hoặc xếp hàng không được tính. 0 thì chờ mãi.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Cả khi không ai đang chia sẻ có bản đầy đủ trong suốt thời gian đó, nên không thể xong. Thời gian tạm dừng hoặc xếp hàng không được tính. 0 thì chờ mãi.",
   "components.Settings.SettingsBackfill.stepDown": "Hạ một cấu hình sẵn chất lượng",
   "components.Settings.SettingsBackfill.stepDownDays": "Số ngày trước khi hạ",
   "components.Settings.SettingsBackfill.stepDownTip": "Một tựa đang dùng một trong các cấu hình sẵn chất lượng của Seerr AI (Cài đặt → Chất lượng) mà không lấy được gì sẽ chuyển sang cấu hình sẵn kế tiếp dễ hơn, rồi quay lại khi đã lấy được.",

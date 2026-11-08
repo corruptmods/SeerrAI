@@ -3074,7 +3074,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Отказаться от торрента, которому понадобится больше стольких часов",
   "components.Settings.SettingsBackfill.slowHoursTip": "Оценивается по скорости за последние четыре часа. Время на паузе или в очереди не считается. 0 — никогда не отказываться.",
   "components.Settings.SettingsBackfill.stallHours": "Отказаться от торрента после стольких часов без прогресса",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Также когда часть его так долго ни у кого нет, и он не может завершиться. Время на паузе или в очереди не считается. 0 — ждать бесконечно.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Также когда ни у кого из раздающих так долго нет полной копии, и он не может завершиться. Время на паузе или в очереди не считается. 0 — ждать бесконечно.",
   "components.Settings.SettingsBackfill.stepDown": "Понижать пресет качества",
   "components.Settings.SettingsBackfill.stepDownDays": "Дней до понижения",
   "components.Settings.SettingsBackfill.stepDownTip": "Если для тайтла на одном из пресетов качества Seerr AI («Настройки → Качество») ничего не скачивается, он переходит на следующий, менее строгий пресет, а когда что-то скачано — возвращается.",

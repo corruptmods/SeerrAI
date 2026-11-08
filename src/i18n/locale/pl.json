@@ -3077,7 +3077,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Porzuć torrent, który trwałby dłużej niż tyle godzin",
   "components.Settings.SettingsBackfill.slowHoursTip": "Oceniane po prędkości z ostatnich czterech godzin. Czas wstrzymania lub w kolejce się nie liczy. 0 nigdy nie porzuca.",
   "components.Settings.SettingsBackfill.stallHours": "Porzuć torrent po tylu godzinach bez postępu",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Także gdy części nie ma nikt przez tyle czasu, więc nie może się skończyć. Czas wstrzymania lub w kolejce się nie liczy. 0 czeka bez końca.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Także gdy nikt, kto go udostępnia, nie ma pełnej kopii przez tyle czasu, więc nie może się skończyć. Czas wstrzymania lub w kolejce się nie liczy. 0 czeka bez końca.",
   "components.Settings.SettingsBackfill.stepDown": "Obniżaj szablon jakości",
   "components.Settings.SettingsBackfill.stepDownDays": "Dni do obniżenia",
   "components.Settings.SettingsBackfill.stepDownTip": "Tytuł na jednym z szablonów jakości Seerr AI (Ustawienia → Jakość), dla którego nic nie zostało pobrane, przechodzi na następny, mniej wymagający szablon, a wraca, gdy coś się pobierze.",

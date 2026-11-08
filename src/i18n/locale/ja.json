@@ -3061,7 +3061,7 @@
   "components.Settings.SettingsBackfill.slowHours": "この時間より長くかかる torrent をあきらめる",
   "components.Settings.SettingsBackfill.slowHoursTip": "直近4時間の速度で判断します。一時停止中やキュー待ちの時間は数えません。0 ならあきらめません。",
   "components.Settings.SettingsBackfill.stallHours": "進まない torrent をあきらめるまでの時間",
-  "components.Settings.SettingsBackfill.stallHoursTip": "その間、一部を誰も持っておらず完了できない場合もあきらめます。一時停止中やキュー待ちの時間は数えません。0 なら無期限に待ちます。",
+  "components.Settings.SettingsBackfill.stallHoursTip": "その間、共有している誰も完全なコピーを持っておらず完了できない場合もあきらめます。一時停止中やキュー待ちの時間は数えません。0 なら無期限に待ちます。",
   "components.Settings.SettingsBackfill.stepDown": "画質プリセットを 1 段下げる",
   "components.Settings.SettingsBackfill.stepDownDays": "下げるまでの日数",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI の画質プリセット (設定 → 画質) を使うタイトルで何も取得されない場合、次の条件のゆるいプリセットに移り、何か取得されたら元に戻ります。",

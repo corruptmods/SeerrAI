@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Torrent aufgeben, der länger als so viele Stunden dauern würde",
   "components.Settings.SettingsBackfill.slowHoursTip": "Gemessen an seiner Geschwindigkeit der letzten vier Stunden. Pausierte oder wartende Zeit zählt nicht. 0 gibt nie auf.",
   "components.Settings.SettingsBackfill.stallHours": "Torrent nach so vielen Stunden ohne Fortschritt aufgeben",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Auch wenn ein Teil davon so lange bei niemandem vorhanden ist, sodass er nie fertig wird. Pausierte oder wartende Zeit zählt nicht. 0 wartet ewig.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Auch wenn so lange niemand, der ihn teilt, eine vollständige Kopie hat, sodass er nie fertig wird. Pausierte oder wartende Zeit zählt nicht. 0 wartet ewig.",
   "components.Settings.SettingsBackfill.stepDown": "Eine Qualitätsvorlage tiefer gehen",
   "components.Settings.SettingsBackfill.stepDownDays": "Tage, bis es eine Stufe tiefer geht",
   "components.Settings.SettingsBackfill.stepDownTip": "Ein Titel auf einer der Qualitätsvorlagen von Seerr AI (Einstellungen → Qualität), für den nichts genommen wird, wechselt zur nächst lockereren Vorlage und wieder zurück, sobald etwas genommen wurde.",

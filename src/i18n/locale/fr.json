@@ -3078,7 +3078,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Abandonner un torrent qui prendrait plus que ce nombre d’heures",
   "components.Settings.SettingsBackfill.slowHoursTip": "Jugé sur sa vitesse des quatre dernières heures. Le temps en pause ou en file ne compte pas. 0 n’abandonne jamais.",
   "components.Settings.SettingsBackfill.stallHours": "Abandonner un torrent après ce nombre d’heures sans progression",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Aussi quand une partie n’est chez personne pendant ce temps, si bien qu’il ne peut pas finir. Le temps en pause ou en file ne compte pas. 0 attend indéfiniment.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Aussi quand personne parmi ceux qui le partagent n’en a eu de copie complète pendant ce temps, si bien qu’il ne peut pas finir. Le temps en pause ou en file ne compte pas. 0 attend indéfiniment.",
   "components.Settings.SettingsBackfill.stepDown": "Descendre d’un préréglage de qualité",
   "components.Settings.SettingsBackfill.stepDownDays": "Jours avant de descendre",
   "components.Settings.SettingsBackfill.stepDownTip": "Un titre sur l’un des préréglages de qualité de Seerr AI (Paramètres → Qualité) pour lequel rien n’est récupéré passe au préréglage suivant, moins exigeant, puis revient dès que quelque chose l’est.",

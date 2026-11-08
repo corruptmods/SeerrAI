@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Hiq dorë nga një torrent që do të zgjaste më shumë se kaq orë",
   "components.Settings.SettingsBackfill.slowHoursTip": "Gjykohet nga shpejtësia e katër orëve të fundit. Koha në pauzë ose në radhë nuk llogaritet. 0 nuk heq dorë kurrë.",
   "components.Settings.SettingsBackfill.stallHours": "Hiq dorë nga një torrent pas kaq orësh pa përparim",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Edhe kur një pjesë e tij nuk e ka askush për kaq kohë, kështu që nuk mund të mbarojë. Koha në pauzë ose në radhë nuk llogaritet. 0 pret përgjithmonë.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Edhe kur askush që e shpërndan nuk ka një kopje të plotë për kaq kohë, kështu që nuk mund të mbarojë. Koha në pauzë ose në radhë nuk llogaritet. 0 pret përgjithmonë.",
   "components.Settings.SettingsBackfill.stepDown": "Zbrit një paravendosje cilësie",
   "components.Settings.SettingsBackfill.stepDownDays": "Ditë para se të zbresë",
   "components.Settings.SettingsBackfill.stepDownTip": "Një titull në një nga paravendosjet e cilësisë së Seerr AI (Cilësimet → Cilësia), për të cilin nuk merret asgjë, kalon te paravendosja tjetër më e lirshme dhe kthehet kur merret diçka.",

@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "וותר על טורנט שייקח יותר ממספר השעות הזה",
   "components.Settings.SettingsBackfill.slowHoursTip": "נמדד לפי המהירות שלו בארבע השעות האחרונות. זמן בהשהיה או בתור לא נספר. 0 לא מוותר אף פעם.",
   "components.Settings.SettingsBackfill.stallHours": "וותר על טורנט אחרי מספר השעות הזה בלי התקדמות",
-  "components.Settings.SettingsBackfill.stallHoursTip": "גם כשחלק ממנו לא נמצא אצל אף אחד במשך הזמן הזה, ולכן הוא לא יכול להסתיים. זמן בהשהיה או בתור לא נספר. 0 ממתין לנצח.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "גם כשלאף אחד מהמשתפים אותו אין עותק שלם במשך הזמן הזה, ולכן הוא לא יכול להסתיים. זמן בהשהיה או בתור לא נספר. 0 ממתין לנצח.",
   "components.Settings.SettingsBackfill.stepDown": "ירידה בתבנית איכות אחת",
   "components.Settings.SettingsBackfill.stepDownDays": "ימים עד הירידה",
   "components.Settings.SettingsBackfill.stepDownTip": "כותר שמשתמש באחת מתבניות האיכות של Seerr AI (הגדרות ← איכות) ושלא נלקח עבורו כלום עובר לתבנית הבאה, המקילה יותר, וחוזר ברגע שמשהו נלקח.",

@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Vzdať torrent, ktorý by trval dlhšie ako tento počet hodín",
   "components.Settings.SettingsBackfill.slowHoursTip": "Posudzuje sa podľa rýchlosti za posledné štyri hodiny. Čas pozastavenia alebo vo fronte sa nepočíta. 0 sa nikdy nevzdá.",
   "components.Settings.SettingsBackfill.stallHours": "Vzdať torrent po tomto počte hodín bez pokroku",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Aj keď časť nemá nikto tak dlho, takže nemôže skončiť. Čas pozastavenia alebo vo fronte sa nepočíta. 0 čaká navždy.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Aj keď nikto, kto ho zdieľa, nemá tak dlho úplnú kópiu, takže nemôže skončiť. Čas pozastavenia alebo vo fronte sa nepočíta. 0 čaká navždy.",
   "components.Settings.SettingsBackfill.stepDown": "Posunúť o predvoľbu kvality nižšie",
   "components.Settings.SettingsBackfill.stepDownDays": "Počet dní pred posunom nižšie",
   "components.Settings.SettingsBackfill.stepDownTip": "Titul na niektorej z predvolieb kvality Seerr AI (Nastavenia → Kvalita), pre ktorý sa nič nestiahne, sa presunie na najbližšiu voľnejšiu predvoľbu a späť, keď sa niečo stiahne.",

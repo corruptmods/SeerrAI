@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "التخلي عن التورنت إذا كان سيستغرق أكثر من هذا العدد من الساعات",
   "components.Settings.SettingsBackfill.slowHoursTip": "يُحكم عليه بسرعته في آخر أربع ساعات. وقت الإيقاف المؤقت أو الانتظار لا يُحتسب. 0 لا يتخلى أبدًا.",
   "components.Settings.SettingsBackfill.stallHours": "التخلي عن التورنت بعد هذا العدد من الساعات دون تقدم",
-  "components.Settings.SettingsBackfill.stallHoursTip": "وأيضًا إذا كان جزء منه غير موجود لدى أحد طوال هذه المدة، فلا يمكن أن يكتمل. وقت الإيقاف المؤقت أو الانتظار لا يُحتسب. 0 ينتظر إلى الأبد.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "وأيضًا إذا لم تكن لدى أيٍّ ممن يشاركونه نسخة كاملة طوال هذه المدة، فلا يمكن أن يكتمل. وقت الإيقاف المؤقت أو الانتظار لا يُحتسب. 0 ينتظر إلى الأبد.",
   "components.Settings.SettingsBackfill.stepDown": "النزول إعدادًا مسبقًا واحدًا في الجودة",
   "components.Settings.SettingsBackfill.stepDownDays": "الأيام قبل النزول",
   "components.Settings.SettingsBackfill.stepDownTip": "العنوان الذي على أحد إعدادات الجودة المسبقة في Seerr AI (الإعدادات ← الجودة) ولا يُؤخذ له شيء ينتقل إلى الإعداد المسبق الأقل تشددًا التالي، ثم يعود حين يُؤخذ له شيء.",

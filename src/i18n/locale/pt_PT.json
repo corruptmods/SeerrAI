@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Desistir de um torrent que demoraria mais do que este número de horas",
   "components.Settings.SettingsBackfill.slowHoursTip": "Avaliado pela velocidade das últimas quatro horas. O tempo em pausa ou em fila não conta. 0 nunca desiste.",
   "components.Settings.SettingsBackfill.stallHours": "Desistir de um torrent após este número de horas sem progresso",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Também quando ninguém tem uma parte dele durante esse tempo, pelo que não consegue terminar. O tempo em pausa ou em fila não conta. 0 espera para sempre.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Também quando ninguém que o partilha tem uma cópia completa durante esse tempo, pelo que não consegue terminar. O tempo em pausa ou em fila não conta. 0 espera para sempre.",
   "components.Settings.SettingsBackfill.stepDown": "Descer uma predefinição de qualidade",
   "components.Settings.SettingsBackfill.stepDownDays": "Dias antes de descer",
   "components.Settings.SettingsBackfill.stepDownTip": "Um título numa das predefinições de qualidade do Seerr AI (Definições → Qualidade) para o qual nada é obtido passa para a predefinição seguinte, menos exigente, e volta assim que algo for obtido.",

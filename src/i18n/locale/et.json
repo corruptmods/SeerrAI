@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Loobu torrentist, mis võtaks kauem kui nii mitu tundi",
   "components.Settings.SettingsBackfill.slowHoursTip": "Hinnatakse selle kiiruse järgi viimase nelja tunni jooksul. Peatatud või järjekorras oldud aeg ei loe. 0 ei loobu kunagi.",
   "components.Settings.SettingsBackfill.stallHours": "Loobu torrentist pärast nii mitut tundi ilma edenemiseta",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Ka siis, kui osa sellest pole nii kaua kellelgi olemas, nii et see ei saa valmis. Peatatud või järjekorras oldud aeg ei loe. 0 ootab igavesti.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Ka siis, kui kellelgi jagajatest pole nii kaua olnud täielikku koopiat, nii et see ei saa valmis. Peatatud või järjekorras oldud aeg ei loe. 0 ootab igavesti.",
   "components.Settings.SettingsBackfill.stepDown": "Lähe kvaliteedimallis aste allapoole",
   "components.Settings.SettingsBackfill.stepDownDays": "Päevi enne allapoole minekut",
   "components.Settings.SettingsBackfill.stepDownTip": "Kui Seerr AI kvaliteedimalliga (Seaded → Kvaliteet) pealkirjale midagi ei võeta, liigub see järgmisele leebemale mallile ja tuleb tagasi, kui midagi on võetud.",

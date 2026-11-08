@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Odustani od torenta kojem bi trebalo više od ovoliko sati",
   "components.Settings.SettingsBackfill.slowHoursTip": "Procenjuje se po brzini u poslednja četiri sata. Vreme pauze ili u redu čekanja se ne računa. 0 nikad ne odustaje.",
   "components.Settings.SettingsBackfill.stallHours": "Odustani od torenta posle ovoliko sati bez napretka",
-  "components.Settings.SettingsBackfill.stallHoursTip": "I kad deo nema niko toliko dugo, pa ne može da se završi. Vreme pauze ili u redu čekanja se ne računa. 0 čeka zauvek.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "I kad niko ko ga deli nema potpunu kopiju toliko dugo, pa ne može da se završi. Vreme pauze ili u redu čekanja se ne računa. 0 čeka zauvek.",
   "components.Settings.SettingsBackfill.stepDown": "Spusti se za jedan šablon kvaliteta",
   "components.Settings.SettingsBackfill.stepDownDays": "Broj dana pre spuštanja",
   "components.Settings.SettingsBackfill.stepDownTip": "Naslov na nekom od šablona kvaliteta Seerr AI (Podešavanja → Kvalitet) za koji se ništa ne preuzme prelazi na sledeći, blaži šablon, a vraća se kada se nešto preuzme.",

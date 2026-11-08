@@ -78,7 +78,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   maxMusicJobsTip: 'Albums, and songs taken from albums.',
   stallHours: 'Give up on a torrent after this many hours without progress',
   stallHoursTip:
-    'Also when part of it is on no one’s computer for that long, so it can’t finish. Paused or queued time doesn’t count. 0 waits forever.',
+    'Also when nobody sharing it has had a complete copy for that long, so it can’t finish. Paused or queued time doesn’t count. 0 waits forever.',
   slowHours: 'Give up on a torrent that would take longer than this many hours',
   slowHoursTip:
     'Judged by its speed over the last four hours. Paused or queued time doesn’t count. 0 never gives up.',

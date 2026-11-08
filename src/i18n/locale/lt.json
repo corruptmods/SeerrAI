@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Atsisakyti torrent, kuris užtruktų ilgiau nei tiek valandų",
   "components.Settings.SettingsBackfill.slowHoursTip": "Vertinama pagal greitį per paskutines keturias valandas. Pristabdytas ar eilėje praleistas laikas neskaičiuojamas. 0 niekada neatsisako.",
   "components.Settings.SettingsBackfill.stallHours": "Atsisakyti torrent po tiek valandų be pažangos",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Taip pat kai dalies tiek laiko neturi niekas, todėl jis negali baigtis. Pristabdytas ar eilėje praleistas laikas neskaičiuojamas. 0 laukia amžinai.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Taip pat kai nė vienas jį dalijantis tiek laiko neturi pilnos kopijos, todėl jis negali baigtis. Pristabdytas ar eilėje praleistas laikas neskaičiuojamas. 0 laukia amžinai.",
   "components.Settings.SettingsBackfill.stepDown": "Nusileisti kokybės šablonu žemiau",
   "components.Settings.SettingsBackfill.stepDownDays": "Dienos iki nusileidimo",
   "components.Settings.SettingsBackfill.stepDownTip": "Pavadinimas, esantis viename iš Seerr AI kokybės šablonų (Nustatymai → Kokybė), kuriam nieko nepaimama, perkeliamas į kitą, laisvesnį šabloną, o kai kas nors paimama – grąžinamas.",

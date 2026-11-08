@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Gi opp en torrent som ville tatt lenger enn så mange timer",
   "components.Settings.SettingsBackfill.slowHoursTip": "Bedømt etter farten de siste fire timene. Tid på pause eller i kø teller ikke. 0 gir aldri opp.",
   "components.Settings.SettingsBackfill.stallHours": "Gi opp en torrent etter så mange timer uten fremdrift",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Også når en del av den ikke finnes hos noen så lenge, så den ikke kan bli ferdig. Tid på pause eller i kø teller ikke. 0 venter for alltid.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Også når ingen som deler den, har hatt en komplett kopi så lenge, så den ikke kan bli ferdig. Tid på pause eller i kø teller ikke. 0 venter for alltid.",
   "components.Settings.SettingsBackfill.stepDown": "Gå ned én kvalitetsforhåndsinnstilling",
   "components.Settings.SettingsBackfill.stepDownDays": "Dager før den går ned",
   "components.Settings.SettingsBackfill.stepDownTip": "En tittel på en av Seerr AIs kvalitetsforhåndsinnstillinger (Innstillinger → Kvalitet) som ingenting blir hentet for, flyttes til den neste, løsere forhåndsinnstillingen, og tilbake når noe er hentet.",

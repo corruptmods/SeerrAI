@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Anef i torrent ara yawin ugar n waṭas-a n yisragen",
   "components.Settings.SettingsBackfill.slowHoursTip": "Yettwaktal s urured-is deg ukkuẓ n yisragen ineggura. Akud n usteɛfu neɣ n tebdart n uraǧu ur yettwaḥsab ara. 0 ur yettanef ara.",
   "components.Settings.SettingsBackfill.stallHours": "Anef i torrent deffir n waṭas-a n yisragen war asnerni",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Ula mi ara yili kra seg-s ur t-yesɛi yiwen akk akud-a, ihi ur yezmir ara ad yemmed. Akud n usteɛfu neɣ n tebdart n uraǧu ur yettwaḥsab ara. 0 yettraju i lebda.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Ula mi ara yili ula d yiwen seg wid i t-yettbeṭṭun ur yesɛi anɣel ummid akk akud-a, ihi ur yezmir ara ad yemmed. Akud n usteɛfu neɣ n tebdart n uraǧu ur yettwaḥsab ara. 0 yettraju i lebda.",
   "components.Settings.SettingsBackfill.stepDown": "Ader s yiwet n tmudemt n teɣara",
   "components.Settings.SettingsBackfill.stepDownDays": "Ussan send ad yader",
   "components.Settings.SettingsBackfill.stepDownTip": "Azwel yellan ɣef yiwet seg timudmin n teɣara n Seerr AI (Iɣewwaṛen → Taɣara) ur yettwaṭṭfen ara kra ad iɛeddi ɣer tmudemt d-iteddun, ifessusen ugar, syin ad d-yuɣal mi ara yettwaṭṭef kra.",

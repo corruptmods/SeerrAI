@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Откажи се от торент, който ще отнеме повече от толкова часа",
   "components.Settings.SettingsBackfill.slowHoursTip": "Преценява се по скоростта му през последните четири часа. Времето на пауза или в опашка не се брои. 0 никога не се отказва.",
   "components.Settings.SettingsBackfill.stallHours": "Откажи се от торент след толкова часа без напредък",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Също и когато част от него не е у никого толкова време, така че не може да завърши. Времето на пауза или в опашка не се брои. 0 чака безкрайно.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Също и когато никой от споделящите го няма пълно копие толкова време, така че не може да завърши. Времето на пауза или в опашка не се брои. 0 чака безкрайно.",
   "components.Settings.SettingsBackfill.stepDown": "Слизане с един шаблон за качество",
   "components.Settings.SettingsBackfill.stepDownDays": "Дни преди слизане",
   "components.Settings.SettingsBackfill.stepDownTip": "Заглавие с някой от шаблоните за качество на Seerr AI (Настройки → Качество), за което нищо не е взето, минава към следващия, по-свободен шаблон и се връща, щом нещо бъде взето.",

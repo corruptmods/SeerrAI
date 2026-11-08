@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "En Torrent opginn, dee méi laang wéi esou vill Stonnen dauere géif",
   "components.Settings.SettingsBackfill.slowHoursTip": "Gemooss u senger Vitess vun de leschte véier Stonnen. Paus- oder Waardeschlaangzäit zielt net. 0 gëtt ni op.",
   "components.Settings.SettingsBackfill.stallHours": "En Torrent no esou vill Stonnen ouni Fortschrëtt opginn",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Och wann en Deel dovun esou laang bei kengem do ass, sou datt en ni fäerdeg gëtt. Paus- oder Waardeschlaangzäit zielt net. 0 waart fir ëmmer.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Och wann esou laang keen, deen en deelt, eng komplett Kopie huet, sou datt en ni fäerdeg gëtt. Paus- oder Waardeschlaangzäit zielt net. 0 waart fir ëmmer.",
   "components.Settings.SettingsBackfill.stepDown": "E Qualitéitspreset erofgoen",
   "components.Settings.SettingsBackfill.stepDownDays": "Deeg, ier et erofgeet",
   "components.Settings.SettingsBackfill.stepDownTip": "En Titel op engem vun de Qualitéitspresete vu Seerr AI (Astellungen → Qualitéit), fir deen näischt geholl gëtt, geet op den nächste méi lockere Preset, an zréck, soubal eppes geholl ass.",

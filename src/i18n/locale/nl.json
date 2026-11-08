@@ -3077,7 +3077,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Een torrent opgeven die langer dan zoveel uur zou duren",
   "components.Settings.SettingsBackfill.slowHoursTip": "Beoordeeld op de snelheid van de laatste vier uur. Gepauzeerde of wachtende tijd telt niet. 0 geeft nooit op.",
   "components.Settings.SettingsBackfill.stallHours": "Een torrent opgeven na zoveel uur zonder voortgang",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Ook als een deel ervan zo lang bij niemand te vinden is, zodat hij nooit klaar kan komen. Gepauzeerde of wachtende tijd telt niet. 0 wacht eindeloos.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Ook als niemand die hem deelt al zo lang een volledige kopie heeft, zodat hij nooit klaar kan komen. Gepauzeerde of wachtende tijd telt niet. 0 wacht eindeloos.",
   "components.Settings.SettingsBackfill.stepDown": "Een kwaliteitsvoorinstelling omlaag",
   "components.Settings.SettingsBackfill.stepDownDays": "Dagen voordat hij omlaag gaat",
   "components.Settings.SettingsBackfill.stepDownTip": "Een titel op een van de kwaliteitsvoorinstellingen van Seerr AI (Instellingen → Kwaliteit) waarvoor niets wordt opgehaald, gaat naar de volgende, ruimere voorinstelling, en terug zodra er iets is opgehaald.",

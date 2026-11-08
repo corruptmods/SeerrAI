@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Renunță la un torrent care ar dura mai mult de atâtea ore",
   "components.Settings.SettingsBackfill.slowHoursTip": "Judecat după viteza din ultimele patru ore. Timpul în pauză sau în coadă nu contează. 0 nu renunță niciodată.",
   "components.Settings.SettingsBackfill.stallHours": "Renunță la un torrent după atâtea ore fără progres",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Și când o parte din el nu o are nimeni atâta timp, așa că nu se poate termina. Timpul în pauză sau în coadă nu contează. 0 așteaptă la nesfârșit.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Și când nimeni dintre cei care îl partajează nu are o copie completă atâta timp, așa că nu se poate termina. Timpul în pauză sau în coadă nu contează. 0 așteaptă la nesfârșit.",
   "components.Settings.SettingsBackfill.stepDown": "Coborâre cu o presetare de calitate",
   "components.Settings.SettingsBackfill.stepDownDays": "Zile până la coborâre",
   "components.Settings.SettingsBackfill.stepDownTip": "Un titlu pe una dintre presetările de calitate Seerr AI (Setări → Calitate) pentru care nu se preia nimic trece la următoarea presetare, mai permisivă, și revine când se preia ceva.",

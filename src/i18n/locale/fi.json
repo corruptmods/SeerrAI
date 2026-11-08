@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Luovu torrentista, joka kestäisi kauemmin kuin näin monta tuntia",
   "components.Settings.SettingsBackfill.slowHoursTip": "Arvioidaan sen nopeudesta viimeisten neljän tunnin ajalta. Tauolla tai jonossa oloa ei lasketa. 0 ei luovu koskaan.",
   "components.Settings.SettingsBackfill.stallHours": "Luovu torrentista, jos se ei ole edennyt näin moneen tuntiin",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Myös kun osaa siitä ei ole kenelläkään niin kauan, joten se ei voi valmistua. Tauolla tai jonossa oloa ei lasketa. 0 odottaa ikuisesti.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Myös kun kenelläkään jakajista ei ole ollut täydellistä kopiota niin kauan, joten se ei voi valmistua. Tauolla tai jonossa oloa ei lasketa. 0 odottaa ikuisesti.",
   "components.Settings.SettingsBackfill.stepDown": "Laske laatuesiasetusta yhdellä",
   "components.Settings.SettingsBackfill.stepDownDays": "Päiviä ennen laskemista",
   "components.Settings.SettingsBackfill.stepDownTip": "Nimike, joka käyttää jotakin Seerr AI:n laatuesiasetusta (Asetukset → Laatu) ja jolle ei ladata mitään, siirtyy seuraavaan väljempään esiasetukseen ja palaa takaisin, kun jotain ladataan.",

@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Opusti torrent, ki bi trajal dlje od toliko ur",
   "components.Settings.SettingsBackfill.slowHoursTip": "Presoja se po hitrosti v zadnjih štirih urah. Čas premora ali čakanja v vrsti se ne šteje. 0 nikoli ne odneha.",
   "components.Settings.SettingsBackfill.stallHours": "Opusti torrent po toliko urah brez napredka",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Tudi ko dela tako dolgo nima nihče, zato se ne more končati. Čas premora ali čakanja v vrsti se ne šteje. 0 čaka večno.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Tudi ko nihče, ki ga deli, tako dolgo nima celotne kopije, zato se ne more končati. Čas premora ali čakanja v vrsti se ne šteje. 0 čaka večno.",
   "components.Settings.SettingsBackfill.stepDown": "Spusti se za eno prednastavitev kakovosti",
   "components.Settings.SettingsBackfill.stepDownDays": "Dnevi do spusta",
   "components.Settings.SettingsBackfill.stepDownTip": "Naslov na eni od prednastavitev kakovosti Seerr AI (Nastavitve → Kakovost), za katerega se nič ne prevzame, se premakne na naslednjo ohlapnejšo prednastavitev in nazaj, ko se kaj prevzame.",

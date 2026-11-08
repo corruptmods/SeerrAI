@@ -3077,7 +3077,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Egy torrent feladása, ha tovább tartana ennyi óránál",
   "components.Settings.SettingsBackfill.slowHoursTip": "Az utolsó négy óra sebessége alapján. A szüneteltetett vagy sorban álló idő nem számít. 0 sosem adja fel.",
   "components.Settings.SettingsBackfill.stallHours": "Egy torrent feladása ennyi óra előrehaladás nélkül",
-  "components.Settings.SettingsBackfill.stallHoursTip": "Akkor is, ha egy része ennyi ideig senkinél sincs meg, így nem tud befejeződni. A szüneteltetett vagy sorban álló idő nem számít. 0 örökké vár.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "Akkor is, ha a megosztók közül ennyi ideig senkinél sincs meg teljes másolat, így nem tud befejeződni. A szüneteltetett vagy sorban álló idő nem számít. 0 örökké vár.",
   "components.Settings.SettingsBackfill.stepDown": "Visszalépés egy minőségi sablonnal",
   "components.Settings.SettingsBackfill.stepDownDays": "Napok a visszalépés előtt",
   "components.Settings.SettingsBackfill.stepDownTip": "Ha a Seerr AI egyik minőségi sablonját (Beállítások → Minőség) használó címhez semmi sem töltődik le, átkerül a következő, megengedőbb sablonra, majd vissza, amint valami letöltődik.",

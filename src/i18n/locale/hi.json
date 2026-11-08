@@ -3060,7 +3060,7 @@
   "components.Settings.SettingsBackfill.slowHours": "इतने घंटों से ज़्यादा लगने वाला टोरेंट छोड़ दें",
   "components.Settings.SettingsBackfill.slowHoursTip": "पिछले चार घंटों की उसकी रफ़्तार से आँका जाता है। रुका या कतार में बिताया समय नहीं गिना जाता। 0 कभी नहीं छोड़ता।",
   "components.Settings.SettingsBackfill.stallHours": "इतने घंटे तक कोई प्रगति न होने पर टोरेंट छोड़ दें",
-  "components.Settings.SettingsBackfill.stallHoursTip": "तब भी जब उसका कोई हिस्सा इतने समय तक किसी के पास न हो, इसलिए वह पूरा नहीं हो सकता। रुका या कतार में बिताया समय नहीं गिना जाता। 0 हमेशा इंतज़ार करता है।",
+  "components.Settings.SettingsBackfill.stallHoursTip": "तब भी जब इसे साझा करने वाले किसी के पास इतने समय तक पूरी कॉपी न हो, इसलिए वह पूरा नहीं हो सकता। रुका या कतार में बिताया समय नहीं गिना जाता। 0 हमेशा इंतज़ार करता है।",
   "components.Settings.SettingsBackfill.stepDown": "क्वालिटी प्रीसेट एक कदम नीचे करें",
   "components.Settings.SettingsBackfill.stepDownDays": "नीचे जाने से पहले के दिन",
   "components.Settings.SettingsBackfill.stepDownTip": "Seerr AI के किसी क्वालिटी प्रीसेट (सेटिंग्स → क्वालिटी) पर मौजूद टाइटल के लिए अगर कुछ नहीं लिया जाता, तो वह अगले ढीले प्रीसेट पर चला जाता है, और कुछ मिलते ही वापस आ जाता है।",

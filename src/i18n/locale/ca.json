@@ -3061,7 +3061,7 @@
   "components.Settings.SettingsBackfill.slowHours": "Abandona un torrent que trigaria més d'aquestes hores",
   "components.Settings.SettingsBackfill.slowHoursTip": "Es jutja per la seva velocitat de les últimes quatre hores. El temps en pausa o a la cua no compta. 0 no l'abandona mai.",
   "components.Settings.SettingsBackfill.stallHours": "Abandona un torrent després d'aquestes hores sense progrés",
-  "components.Settings.SettingsBackfill.stallHoursTip": "També quan una part no la té ningú durant aquest temps, i per tant no pot acabar. El temps en pausa o a la cua no compta. 0 espera per sempre.",
+  "components.Settings.SettingsBackfill.stallHoursTip": "També quan ningú que el comparteix no n’ha tingut una còpia completa durant aquest temps, i per tant no pot acabar. El temps en pausa o a la cua no compta. 0 espera per sempre.",
   "components.Settings.SettingsBackfill.stepDown": "Baixa una plantilla de qualitat",
   "components.Settings.SettingsBackfill.stepDownDays": "Dies abans de baixar",
   "components.Settings.SettingsBackfill.stepDownTip": "Un títol amb una de les plantilles de qualitat de Seerr AI (Configuració → Qualitat) per al qual no s’agafa res passa a la plantilla següent, menys exigent, i torna quan se n’agafa alguna cosa.",

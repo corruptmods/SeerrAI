@@ -11,6 +11,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Approve or decline requests from Discord with Seerr AI's own bot (Settings → Notifications → **Discord Bot**, off to start). It posts each request waiting for approval to a channel you pick, with Approve and Decline buttons; Decline asks for an optional reason. It needs no open port, and the page walks you through creating the bot, inviting it, picking the channel and linking approvers.
 - Approve or decline straight from ntfy (Settings → Notifications → ntfy → **Approve and Decline Buttons**; needs the Application URL) and from Telegram (Settings → Notifications → Telegram → **Approve and Decline Buttons**; no port to open).
 - Following a series now requests each new season as soon as it's announced and Sonarr has it, so the first episode is grabbed on air day; the premiere is still the fallback.
+- **Remove Users Who Lose Access** (Settings → Users, off to start): every hour, deletes the Seerr AI account and requests of anyone no longer shared on your Plex server or deleted from Jellyfin or Emby. It waits for two checks in a row, removes nobody if a server can't be read or every user looks gone, and never removes admins.
+- Deleting a user can now take them off their media server too (admins only): **Also remove them as a friend on Plex**, or **Also disable their Jellyfin account** (or Emby). If the server refuses, the user isn't deleted.
 - **Followed Series** notifications: a followed series' new season was announced and requested for you, a season starts, or the series ended or was cancelled, which ends the follow. It starts on wherever you had Request Available on.
 
 ### Changed

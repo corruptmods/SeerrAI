@@ -1030,6 +1030,9 @@ components:
         autoImportPlexUsers:
           type: boolean
           description: Give everyone the server owner shares Plex with an account, hourly.
+        removeUsersWithoutAccess:
+          type: boolean
+          description: Hourly, delete the accounts (and requests) of people no longer shared on the Plex server or deleted from Jellyfin or Emby. Someone must be missing on two checks in a row; the owner and admins are never removed.
         overQuotaRequests:
           type: boolean
           description: Let people request past their quota. Such requests wait for an admin, are never approved automatically and are marked as over quota. Off unless turned on.
@@ -12176,6 +12179,13 @@ paths:
           required: true
           schema:
             type: number
+        - in: query
+          name: fromMediaServer
+          required: false
+          description: Also take them off their media server first (admins only) - ends a Plex friendship, or disables a Jellyfin or Emby account. If that fails, the user is not deleted.
+          schema:
+            type: string
+            enum: ['true', 'false']
       responses:
         '200':
           description: User successfully deleted
@@ -12183,6 +12193,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '400':
+          description: Their media server is not connected, or they have no account there.
+        '403':
+          description: Only admins can remove someone from the media server.
+        '409':
+          description: The media server account can't be removed from Seerr AI (a Plex Home member, or a Jellyfin or Emby administrator).
+        '502':
+          description: The media server refused; the user was not deleted.
   /user/jellyfin/{jellyfinUserId}:
     get:
       summary: Get user by Jellyfin user ID

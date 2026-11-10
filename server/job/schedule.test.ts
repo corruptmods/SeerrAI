@@ -39,6 +39,7 @@ import { radarrScanner } from '@server/lib/scanners/radarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import userAccessCheck from '@server/lib/userAccessCheck';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
 import schedule from 'node-schedule';
@@ -76,6 +77,7 @@ const stubEveryJob = () => {
     [downloadTracker, 'resetDownloadTracker'],
     [episodeSync, 'run'],
     [plexUserImport, 'run'],
+    [userAccessCheck, 'run'],
     [futureSeasons, 'run'],
     [notificationReconciler, 'run'],
     [ImageProxy, 'clearCache'],

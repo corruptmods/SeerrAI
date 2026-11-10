@@ -1,4 +1,12 @@
 {
+  "components.Settings.SettingsJobsCache.user-access-check": "Benotzerzougangskontroll",
+  "components.Settings.SettingsUsers.removeUsersWithoutAccess": "Benotzer ewechhuelen, déi den Zougang verléieren",
+  "components.Settings.SettingsUsers.removeUsersWithoutAccessTip": "All Stonn de Kont an d'Ufroe vun all deenen läschen, mat deenen Äre Plex-Server net méi gedeelt ass oder déi aus Jellyfin oder Emby geläscht goufen. Si mussen bei zwou Kontrollen hannereneen feelen; Admine ginn ni ewechgeholl.",
+  "components.UserList.disableonserver": "Och säi {mediaServerName}-Kont desaktivéieren",
+  "components.UserList.disableonserverTip": "Hie kann sech net méi bei {mediaServerName} umellen; säi Kont a säi Kuckverlaf bleiwen do",
+  "components.UserList.notdeleted": "De Benotzer gouf net geläscht: {detail}",
+  "components.UserList.unfriendplex": "Och als Frënd op Plex ewechhuelen",
+  "components.UserList.unfriendplexTip": "Mécht Är Plex-Frëndschaft op en Enn, sou datt keen vun Äre Plex-Serveren méi mat him gedeelt gëtt",
   "components.UserProfile.UserSettings.UserGeneralSettings.email": "E-Mail",
   "components.UserProfile.UserSettings.UserGeneralSettings.general": "Allgemeng",
   "components.UserProfile.UserSettings.UserGeneralSettings.generalsettings": "Allgemeng Astellungen",

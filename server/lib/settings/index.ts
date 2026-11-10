@@ -728,6 +728,11 @@ export interface MainSettings {
   animeExcludedCountries: string[];
   /** Create accounts for everyone the owner shares the Plex server with. */
   autoImportPlexUsers: boolean;
+  /**
+   * Delete the accounts of people the media server no longer has (no longer
+   * shared on Plex, deleted from Jellyfin or Emby), hourly.
+   */
+  removeUsersWithoutAccess: boolean;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
@@ -1068,6 +1073,7 @@ export type JobId =
   | 'episode-sync'
   | 'future-seasons'
   | 'plex-user-import'
+  | 'user-access-check'
   | 'jellyfin-recently-added-scan'
   | 'jellyfin-full-scan'
   | 'emby-recently-added-scan'
@@ -1168,6 +1174,7 @@ class Settings {
         disabledFeatures: [],
         animeExcludedCountries: [],
         autoImportPlexUsers: false,
+        removeUsersWithoutAccess: false,
         hideAvailable: false,
         hideBlocklisted: false,
         hideRequested: false,
@@ -1407,6 +1414,10 @@ class Settings {
         // No-op unless Auto-Import Plex Users is on.
         'plex-user-import': {
           schedule: '0 25 */1 * * *',
+        },
+        // No-op unless Remove Users Who Lose Access is on.
+        'user-access-check': {
+          schedule: '0 35 */1 * * *',
         },
         'jellyfin-recently-added-scan': {
           schedule: '0 */5 * * * *',

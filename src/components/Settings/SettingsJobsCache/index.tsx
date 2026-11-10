@@ -100,6 +100,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'episode-sync': 'Episode Sync',
     'future-seasons': 'Future Season Requests',
     'plex-user-import': 'Plex User Import',
+    'user-access-check': 'User Access Check',
     'image-cache-cleanup': 'Image Cache Cleanup',
     'process-blocklisted-tags': 'Process Blocklisted Tags',
     'anime-check': 'Anime Check',

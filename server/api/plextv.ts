@@ -96,6 +96,8 @@ interface UsersResponse {
         username: string;
         email: string;
         thumb: string;
+        /** '1' for a member of the owner's Plex Home. */
+        home?: string;
       };
       Server: ServerResponse[];
     }[];
@@ -716,6 +718,30 @@ class PlexTvAPI extends ExternalAPI {
         },
       }
     );
+  }
+
+  /**
+   * Ends a Plex friendship, which also stops sharing every server this
+   * account owns with them. Plex's own web app does the same. Someone who is
+   * already not a friend counts as done.
+   */
+  public async removeFriend(plexId: number): Promise<void> {
+    try {
+      await this.axios.delete(
+        `/api/v2/friends/${encodeURIComponent(String(plexId))}`,
+        {
+          headers: {
+            'X-Plex-Client-Identifier': getSettings().clientId,
+            'X-Plex-Product': 'Seerr AI',
+          },
+        }
+      );
+    } catch (e) {
+      if (e.response?.status === 404) {
+        return;
+      }
+      throw e;
+    }
   }
 
   public async pingToken() {

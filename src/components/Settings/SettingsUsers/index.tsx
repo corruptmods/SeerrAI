@@ -46,6 +46,9 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   autoImportPlexUsers: 'Auto-Import Plex Users',
   autoImportPlexUsersTip:
     'Hourly, give everyone you share your Plex server with an account, with the default permissions below',
+  removeUsersWithoutAccess: 'Remove Users Who Lose Access',
+  removeUsersWithoutAccessTip:
+    'Hourly, delete the account and requests of anyone no longer shared on your Plex server or deleted from Jellyfin or Emby. They must be missing on two checks in a row; admins are never removed.',
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
   musicRequestLimitLabel: 'Global Album Request Limit',
@@ -174,6 +177,7 @@ const SettingsUsers = () => {
             mediaServerLogin: data?.mediaServerLogin,
             newPlexLogin: data?.newPlexLogin,
             autoImportPlexUsers: data?.autoImportPlexUsers ?? false,
+            removeUsersWithoutAccess: data?.removeUsersWithoutAccess ?? false,
             personalApiKeys: data?.personalApiKeys ?? 'off',
             movieQuotaLimit: data?.defaultQuotas.movie.quotaLimit ?? 0,
             movieQuotaDays: data?.defaultQuotas.movie.quotaDays ?? 7,
@@ -196,6 +200,7 @@ const SettingsUsers = () => {
                 mediaServerLogin: values.mediaServerLogin,
                 newPlexLogin: values.newPlexLogin,
                 autoImportPlexUsers: values.autoImportPlexUsers,
+                removeUsersWithoutAccess: values.removeUsersWithoutAccess,
                 personalApiKeys: values.personalApiKeys,
                 defaultQuotas: {
                   movie: {
@@ -362,6 +367,30 @@ const SettingsUsers = () => {
                     </div>
                   </div>
                 )}
+                <div className="form-row">
+                  <label
+                    htmlFor="removeUsersWithoutAccess"
+                    className="checkbox-label"
+                  >
+                    {intl.formatMessage(messages.removeUsersWithoutAccess)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.removeUsersWithoutAccessTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="removeUsersWithoutAccess"
+                      name="removeUsersWithoutAccess"
+                      onChange={() => {
+                        setFieldValue(
+                          'removeUsersWithoutAccess',
+                          !values.removeUsersWithoutAccess
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
                 <div className="form-row">
                   <label htmlFor="personalApiKeys" className="checkbox-label">
                     {intl.formatMessage(messages.personalApiKeys)}

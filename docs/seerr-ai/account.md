@@ -92,3 +92,7 @@ Once an admin has set up Trakt, anyone allowed to auto-request can enter their T
 If Plex stops accepting your sign-in, your Plex watchlist stops syncing. You get a notification and a banner; signing out and back in with Plex fixes it.
 
 Admins can give everyone the Plex server is shared with an account automatically (**Settings → Users → Auto-Import Plex Users**, hourly). Someone an admin deletes isn't imported again.
+
+**Settings → Users → Remove Users Who Lose Access** (off to start) works the other way: every hour it deletes the account, with its requests, of anyone no longer shared on the Plex server or deleted from Jellyfin or Emby. Someone has to be missing on two checks in a row, so it takes about an hour; if a server can't be read, or every one of its users looks gone at once, nobody is removed. The owner and admins are never removed, and someone removed this way is imported again if the Plex server is shared with them again.
+
+When an admin deletes a user (**Users → Delete**), the dialog can also take them off their media server: **Also remove them as a friend on Plex** ends the Plex friendship, which stops sharing all of the owner's Plex servers with them, and **Also disable their Jellyfin account** (or Emby) disables the account there, keeping it and its watch history. This is done first; if the server refuses, the user isn't deleted. Plex Home members and Jellyfin or Emby administrators are left alone, with a message saying so. Only admins see this option.

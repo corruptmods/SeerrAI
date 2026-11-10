@@ -7,7 +7,6 @@ import { watchlistSortOf } from '@server/constants/watchlistSort';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
-import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import type { WatchlistResponse } from '@server/interfaces/api/discoverInterfaces';
@@ -43,7 +42,11 @@ import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
-import { endSessions } from '@server/lib/signIn';
+import {
+  MediaServerRemovalError,
+  removeFromMediaServer,
+  removeSeerrUser,
+} from '@server/lib/userRemoval';
 import {
   attachRequestCount,
   attachRequestCounts,
@@ -786,27 +789,42 @@ router.delete<{ id: string }>(
         });
       }
 
-      const requestRepository = getRepository(MediaRequest);
-
-      // Remove requests explicitly: cascade deletes skip removal listeners, so
-      // pending titles' Media would not revert to unknown.
-      await requestRepository.remove(user.requests, {
-        // Chunked, or over 1000 requests hits SQLite's "Expression tree is
-        // too large". https://typeorm.io/repository-api#additional-options
-        chunk: user.requests.length / 1000,
-      });
-
-      // Otherwise the automatic Plex import would re-add them.
-      if (user.plexId) {
-        await getRepository(RemovedPlexAccount).upsert(
-          { plexId: user.plexId },
-          { conflictPaths: ['plexId'] }
-        );
+      // Also off their media server: ends a Plex friendship, or disables a
+      // Jellyfin or Emby account. First, so a refusal leaves both in place.
+      if (req.query.fromMediaServer === 'true') {
+        if (!req.user?.hasPermission(Permission.ADMIN)) {
+          return next({
+            status: 403,
+            message: 'Only admins can remove someone from the media server.',
+          });
+        }
+        try {
+          const server = await removeFromMediaServer(user);
+          logger.info('Removed a user from the media server', {
+            label: 'API',
+            userId: user.id,
+            server,
+            removedBy: req.user.id,
+          });
+        } catch (e) {
+          if (e instanceof MediaServerRemovalError) {
+            return next({ status: e.status, message: e.message });
+          }
+          logger.error('Could not remove a user from the media server', {
+            label: 'API',
+            userId: user.id,
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+          return next({
+            status: 502,
+            message:
+              'The media server could not remove them, so the user was not deleted.',
+          });
+        }
       }
 
-      await userRepository.delete(user.id);
-      // Their sessions go with them, should the id ever be used again.
-      await endSessions(user.id);
+      // Kept out, or the automatic Plex import would re-add them.
+      await removeSeerrUser(user, { keepOut: true });
       return res.status(200).json(user.filter());
     } catch (e) {
       logger.error('Something went wrong deleting a user', {

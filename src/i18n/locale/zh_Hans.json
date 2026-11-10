@@ -1,4 +1,12 @@
 {
+  "components.Settings.SettingsJobsCache.user-access-check": "用户访问检查",
+  "components.Settings.SettingsUsers.removeUsersWithoutAccess": "移除失去访问权限的用户",
+  "components.Settings.SettingsUsers.removeUsersWithoutAccessTip": "每小时删除不再共享你的 Plex 服务器、或已从 Jellyfin 或 Emby 删除的人的账户及其请求。需连续两次检查都不存在才会删除；管理员永远不会被移除。",
+  "components.UserList.disableonserver": "同时停用其 {mediaServerName} 账户",
+  "components.UserList.disableonserverTip": "其将无法再登录 {mediaServerName}；账户和观看记录仍保留在那里",
+  "components.UserList.notdeleted": "未删除该用户：{detail}",
+  "components.UserList.unfriendplex": "同时在 Plex 上解除好友关系",
+  "components.UserList.unfriendplexTip": "解除你们在 Plex 上的好友关系，这会停止与其共享你所有的 Plex 服务器",
   "components.UserList.validationpasswordminchars": "至少使用 8 个字符",
   "components.UserList.validationEmail": "需要提供电子邮件",
   "components.UserList.userssaved": "用户权限保存成功！",

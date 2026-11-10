@@ -20,7 +20,7 @@ import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
+import { SERVER_NAMES, mainServerOf } from '@app/utils/mediaServerAccounts';
 import { Transition } from '@headlessui/react';
 import {
   BarsArrowDownIcon,
@@ -70,6 +70,13 @@ const messages = defineMessages('components.UserList', {
   userdeleteerror: 'Something went wrong while deleting the user.',
   deleteconfirm:
     'Delete this user? All their request data is permanently removed.',
+  unfriendplex: 'Also remove them as a friend on Plex',
+  unfriendplexTip:
+    'Ends your Plex friendship, which stops sharing all your Plex servers with them',
+  disableonserver: 'Also disable their {mediaServerName} account',
+  disableonserverTip:
+    'They can no longer sign in to {mediaServerName}; their account and watch history stay there',
+  notdeleted: 'The user was not deleted: {detail}',
   createlocaluser: 'Create Local User',
   creating: 'Creating…',
   create: 'Create',
@@ -176,6 +183,13 @@ const UserList = () => {
   }>({
     isOpen: false,
   });
+  const [fromMediaServer, setFromMediaServer] = useState(false);
+  // Admins may also take them off the connected server their account is from.
+  const deleteServer = deleteModal.user && mainServerOf(deleteModal.user);
+  const canRemoveFromServer =
+    currentHasPermission(Permission.ADMIN) &&
+    !!deleteServer &&
+    importServers.includes(deleteServer);
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;
   }>({
@@ -358,18 +372,26 @@ const UserList = () => {
     setDeleting(true);
 
     try {
-      await axios.delete(`/api/v1/user/${deleteModal.user?.id}`);
+      await axios.delete(`/api/v1/user/${deleteModal.user?.id}`, {
+        params:
+          canRemoveFromServer && fromMediaServer
+            ? { fromMediaServer: 'true' }
+            : undefined,
+      });
 
       addToast(intl.formatMessage(messages.userdeleted), {
         autoDismiss: true,
         appearance: 'success',
       });
       setDeleteModal({ isOpen: false, user: deleteModal.user });
-    } catch {
-      addToast(intl.formatMessage(messages.userdeleteerror), {
-        autoDismiss: true,
-        appearance: 'error',
-      });
+    } catch (e) {
+      const detail = axios.isAxiosError(e) && e.response?.data?.message;
+      addToast(
+        detail && fromMediaServer
+          ? intl.formatMessage(messages.notdeleted, { detail })
+          : intl.formatMessage(messages.userdeleteerror),
+        { autoDismiss: true, appearance: 'error' }
+      );
     } finally {
       setDeleting(false);
       revalidate();
@@ -441,6 +463,33 @@ const UserList = () => {
           subTitle={deleteModal.user?.username}
         >
           {intl.formatMessage(messages.deleteconfirm)}
+          {canRemoveFromServer && deleteServer && (
+            <div className="mt-4 flex items-start space-x-3">
+              <input
+                checked={fromMediaServer}
+                id="fromMediaServer"
+                className="mt-1 h-4 w-4 rounded border-strong bg-field text-indigo-600"
+                onChange={(e) => setFromMediaServer(e.target.checked)}
+                type="checkbox"
+              />
+              <label htmlFor="fromMediaServer">
+                <span className="block font-medium text-strong">
+                  {deleteServer === 'plex'
+                    ? intl.formatMessage(messages.unfriendplex)
+                    : intl.formatMessage(messages.disableonserver, {
+                        mediaServerName: SERVER_NAMES[deleteServer],
+                      })}
+                </span>
+                <span className="block text-sm text-muted">
+                  {deleteServer === 'plex'
+                    ? intl.formatMessage(messages.unfriendplexTip)
+                    : intl.formatMessage(messages.disableonserverTip, {
+                        mediaServerName: SERVER_NAMES[deleteServer],
+                      })}
+                </span>
+              </label>
+            </div>
+          )}
         </Modal>
       </Transition>
 
@@ -1019,7 +1068,10 @@ const UserList = () => {
                       (currentUser?.id !== 1 &&
                         hasPermission(Permission.ADMIN, user.permissions))
                     }
-                    onClick={() => setDeleteModal({ isOpen: true, user })}
+                    onClick={() => {
+                      setFromMediaServer(false);
+                      setDeleteModal({ isOpen: true, user });
+                    }}
                   >
                     {intl.formatMessage(globalMessages.delete)}
                   </Button>

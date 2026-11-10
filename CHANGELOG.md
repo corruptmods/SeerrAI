@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.4.3 (10 November 2026)
+
+Plex Lists in Seerr AI, approving requests from Discord, ntfy and Telegram, Backfill without Prowlarr, new seasons as soon as they're announced, removing people who lose access, trailers in the page, and fixes from upstream Seerr.
 
 ### New
 

@@ -8,7 +8,26 @@ export interface PlayButtonLink {
   text: string;
   url: string;
   svg: React.ReactNode;
+  /** Opens it in the page instead; the link still works in a new tab. */
+  onOpen?: () => void;
 }
+
+/** A click that opens in the page, unless it asks for a new tab or window. */
+const openHere =
+  (link: PlayButtonLink) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (
+      !link.onOpen ||
+      e.button !== 0 ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey
+    ) {
+      return;
+    }
+    e.preventDefault();
+    link.onOpen();
+  };
 
 const PlayButton = ({ links }: PlayButtonProps) => {
   if (!links || !links.length) {
@@ -27,6 +46,8 @@ const PlayButton = ({ links }: PlayButtonProps) => {
       }
       href={links[0].url}
       target="_blank"
+      rel="noopener noreferrer"
+      onClick={openHere(links[0])}
     >
       {links.length > 1 &&
         links.slice(1).map((link, i) => {
@@ -36,6 +57,8 @@ const PlayButton = ({ links }: PlayButtonProps) => {
               buttonType="ghost"
               href={link.url}
               target="_blank"
+              rel="noopener noreferrer"
+              onClick={openHere(link)}
             >
               {link.svg}
               <span>{link.text}</span>

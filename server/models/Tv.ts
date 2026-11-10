@@ -10,6 +10,7 @@ import type { DownloadStage } from '@server/constants/downloads';
 import type Media from '@server/entity/Media';
 import type { Video } from './Movie';
 import type {
+  AlternativeTitle,
   Cast,
   Crew,
   ExternalIds,
@@ -21,6 +22,7 @@ import type {
 } from './common';
 import {
   mapAggregateCast,
+  mapAlternativeTitles,
   mapCrew,
   mapExternalIds,
   mapVideos,
@@ -128,6 +130,8 @@ export interface TvDetails {
   };
   externalIds: ExternalIds;
   keywords: Keyword[];
+  /** Other names it goes by, each with where (country codes). */
+  alternativeTitles?: AlternativeTitle[];
   mediaInfo?: Media;
   watchProviders?: WatchProviders[];
   onUserWatchlist?: boolean;
@@ -267,6 +271,10 @@ export const mapTvDetails = (
     id: keyword.id,
     name: keyword.name,
   })),
+  alternativeTitles: mapAlternativeTitles(show.alternative_titles?.results, [
+    show.name,
+    show.original_name,
+  ]),
   mediaInfo: media,
   watchProviders: mapWatchProviders(show['watch/providers']?.results ?? {}),
   onUserWatchlist: userWatchlist,

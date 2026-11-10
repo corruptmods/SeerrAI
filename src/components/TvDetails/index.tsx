@@ -7,6 +7,7 @@ import Spinner from '@app/assets/spinner.svg';
 import TmdbLogo from '@app/assets/tmdb_logo.svg';
 import AddToList from '@app/components/AddToList';
 import CatchMeUp from '@app/components/Ai/CatchMeUp';
+import AlternativeTitles from '@app/components/AlternativeTitles';
 import BackfillForTitle from '@app/components/Backfill/ForTitle';
 import BackfillTitleButton from '@app/components/Backfill/TitleButton';
 import BlocklistModal from '@app/components/BlocklistModal';
@@ -39,6 +40,7 @@ import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import { SeasonSubtitleBadge } from '@app/components/Subtitles/EpisodeSubtitles';
 import SubtitlesCard from '@app/components/Subtitles/SubtitlesCard';
+import TrailerModal from '@app/components/TrailerModal';
 import FutureSeasonsButton from '@app/components/TvDetails/FutureSeasonsButton';
 import Season from '@app/components/TvDetails/Season';
 import WatchedBy from '@app/components/WatchedBy';
@@ -158,6 +160,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   const [isBlocklistUpdating, setIsBlocklistUpdating] =
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
   const { addToast } = useToasts();
 
   const {
@@ -186,10 +189,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   useEffect(() => {
     if (router.query.manage === '1') {
       setShowManager(true);
-      router.replace({
-        pathname: router.pathname,
-        query: { tvId: router.query.tvId },
-      });
+      // Shallow: closing the panel shouldn't reload the page.
+      router.replace(
+        { pathname: router.pathname, query: { tvId: router.query.tvId } },
+        undefined,
+        { shallow: true }
+      );
     }
   }, [router, router.query.manage]);
 
@@ -262,11 +267,15 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       ? `${settings.currentSettings.youtubeUrl}${trailerVideo?.key}`
       : trailerVideo?.url;
 
+  // YouTube's own trailers play in the page; a self-hosted YouTube opens.
+  const playsHere =
+    trailerVideo?.site === 'YouTube' && !settings.currentSettings.youtubeUrl;
   if (trailerUrl) {
     mediaLinks.push({
       text: intl.formatMessage(messages.watchtrailer),
       url: trailerUrl,
       svg: <FilmIcon />,
+      onOpen: playsHere ? () => setShowTrailer(true) : undefined,
     });
   }
 
@@ -564,6 +573,13 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         </div>
       )}
       <PageTitle title={data.name} />
+      <TrailerModal
+        videoKey={trailerVideo?.key}
+        name={trailerVideo?.name}
+        url={trailerUrl}
+        show={showTrailer}
+        onClose={() => setShowTrailer(false)}
+      />
       <BlocklistModal
         tmdbId={data.id}
         type="tv"
@@ -612,10 +628,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         mediaType="tv"
         onClose={() => {
           setShowManager(false);
-          router.replace({
-            pathname: router.pathname,
-            query: { tvId: router.query.tvId },
-          });
+          router.replace(
+            { pathname: router.pathname, query: { tvId: router.query.tvId } },
+            undefined,
+            { shallow: true }
+          );
         }}
         revalidate={() => revalidate()}
         show={showManager}
@@ -1366,6 +1383,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   <span className="media-fact-value">{data.originalName}</span>
                 </div>
               )}
+            <AlternativeTitles titles={data.alternativeTitles} />
             {(data.mediaInfo?.animeSetting ?? isAnime(data)) && (
               <div className="media-fact">
                 <span>{intl.formatMessage(messages.showtype)}</span>

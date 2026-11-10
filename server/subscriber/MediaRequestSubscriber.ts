@@ -18,6 +18,7 @@ import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import { markAwaitingSonarr } from '@server/lib/awaitingSeasons';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { lidarrApi } from '@server/lib/music/access';
 import { notifyAvailableMusic } from '@server/lib/music/completion';
@@ -1107,6 +1108,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               sonarrSeries.id as number,
               entity
             );
+            // Seasons announced but not yet on TheTVDB: monitored by the
+            // Sonarr scan once Sonarr lists them.
+            await markAwaitingSonarr(entity, sonarrSeries);
           })
           .catch(async () => {
             try {

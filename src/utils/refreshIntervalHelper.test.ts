@@ -196,6 +196,26 @@ describe('watching a title for a download to start', () => {
     );
   });
 
+  it('keeps checking while a season is on its way', () => {
+    assert.equal(
+      interval({
+        status: MediaStatus.AVAILABLE,
+        seasons: [
+          { status: MediaStatus.AVAILABLE },
+          { status: MediaStatus.PROCESSING },
+        ],
+      }),
+      30_000
+    );
+    assert.equal(
+      interval({
+        status: MediaStatus.AVAILABLE,
+        seasons: [{ status: MediaStatus.AVAILABLE }],
+      }),
+      0
+    );
+  });
+
   it('checks often while downloading, and not at all once it is here', () => {
     assert.equal(
       interval({

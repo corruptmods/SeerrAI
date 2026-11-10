@@ -697,7 +697,11 @@ const ManageSlideOver = ({
               onSaved={revalidate}
             />
           )}
-        {hasPermission(Permission.ADMIN) &&
+        {/* Request managers may mark a title available, as the API allows;
+            clearing its data stays with admins. */}
+        {hasPermission([Permission.ADMIN, Permission.MANAGE_REQUESTS], {
+          type: 'or',
+        }) &&
           data?.mediaInfo &&
           data.mediaInfo.status !== MediaStatus.BLOCKLISTED && (
             <div>
@@ -738,31 +742,40 @@ const ManageSlideOver = ({
                       </span>
                     </Button>
                   )}
-                <div>
-                  <ConfirmButton
-                    onClick={() => deleteMedia()}
-                    confirmText={intl.formatMessage(globalMessages.areyousure)}
-                    className="w-full"
-                  >
-                    <DocumentMinusIcon />
-                    <span>
-                      {intl.formatMessage(messages.manageModalClearMedia)}
-                    </span>
-                  </ConfirmButton>
-                  <div className="mt-2 text-xs text-gray-400">
-                    {intl.formatMessage(messages.manageModalClearMediaWarning, {
-                      mediaType: intl.formatMessage(
-                        mediaType === 'movie' ? messages.movie : messages.tvshow
-                      ),
-                      mediaServerName: intl.formatList(
-                        settings.currentSettings.mediaServers.map(
-                          (server) => SERVER_NAMES[server.kind]
-                        ),
-                        { type: 'disjunction' }
-                      ),
-                    })}
+                {hasPermission(Permission.ADMIN) && (
+                  <div>
+                    <ConfirmButton
+                      onClick={() => deleteMedia()}
+                      confirmText={intl.formatMessage(
+                        globalMessages.areyousure
+                      )}
+                      className="w-full"
+                    >
+                      <DocumentMinusIcon />
+                      <span>
+                        {intl.formatMessage(messages.manageModalClearMedia)}
+                      </span>
+                    </ConfirmButton>
+                    <div className="mt-2 text-xs text-gray-400">
+                      {intl.formatMessage(
+                        messages.manageModalClearMediaWarning,
+                        {
+                          mediaType: intl.formatMessage(
+                            mediaType === 'movie'
+                              ? messages.movie
+                              : messages.tvshow
+                          ),
+                          mediaServerName: intl.formatList(
+                            settings.currentSettings.mediaServers.map(
+                              (server) => SERVER_NAMES[server.kind]
+                            ),
+                            { type: 'disjunction' }
+                          ),
+                        }
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}

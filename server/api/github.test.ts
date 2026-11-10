@@ -25,6 +25,21 @@ describe('GitHub commits', () => {
     assert.equal(config.params.sha, PROJECT_DEV_BRANCH);
     assert.equal('branch' in config.params, false);
   });
+
+  it('keeps what GitHub sent for six hours, not five minutes', async (t) => {
+    const get = mock.method(
+      ExternalAPI.prototype as unknown as {
+        get: (path: string, config: unknown, ttl?: number) => Promise<unknown>;
+      },
+      'get',
+      async () => []
+    );
+    t.after(() => get.mock.restore());
+
+    await new GithubAPI().getSeerrReleases();
+
+    assert.equal(get.mock.calls[0].arguments[2], 6 * 60 * 60);
+  });
 });
 
 describe('GitHub failing', () => {

@@ -8,6 +8,7 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { ApiError } from '@server/types/error';
 import { getAppVersion } from '@server/utils/appVersion';
+import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 
 export interface JellyfinUserResponse {
   Name: string;
@@ -710,8 +711,14 @@ class JellyfinAPI extends ExternalAPI {
         }
       );
 
+      // Specials that air within a season come back with it; their SeasonId
+      // is the specials season's.
+      const idOf = (id: string) => normalizeJellyfinGuid(id) ?? id;
+      const season = idOf(seasonID);
       return episodeResponse.Items.filter(
-        (item: JellyfinLibraryItem) => item.LocationType !== 'Virtual'
+        (item: JellyfinLibraryItem) =>
+          item.LocationType !== 'Virtual' &&
+          (!item.SeasonId || idOf(item.SeasonId) === season)
       );
     } catch (e) {
       logger.error(

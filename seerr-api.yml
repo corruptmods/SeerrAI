@@ -1030,6 +1030,15 @@ components:
         autoImportPlexUsers:
           type: boolean
           description: Give everyone the server owner shares Plex with an account, hourly.
+        removedTitleRequests:
+          type: string
+          enum: ['off', 'approve', 'refuse']
+          description: New requests for titles removed from the library before (deleted from the media server, or their files removed from Seerr AI), from anyone but admins and request managers. approve makes them wait for an admin; refuse turns them down.
+        removedTitleTimes:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: How many times a title must have been removed before removedTitleRequests applies.
         removeUsersWithoutAccess:
           type: boolean
           description: Hourly, delete the accounts (and requests) of people no longer shared on the Plex server or deleted from Jellyfin or Emby. Someone must be missing on two checks in a row; the owner and admins are never removed.
@@ -2770,6 +2779,19 @@ components:
     MovieDetails:
       type: object
       properties:
+        alternativeTitles:
+          type: array
+          description: Other names it goes by (from TMDB), once each, with the countries using each. Leaves out the title and its original title.
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              countries:
+                type: array
+                items:
+                  type: string
+                  example: GB
         id:
           type: number
           example: 123
@@ -2964,6 +2986,19 @@ components:
     TvDetails:
       type: object
       properties:
+        alternativeTitles:
+          type: array
+          description: Other names it goes by (from TMDB), once each, with the countries using each. Leaves out the title and its original title.
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              countries:
+                type: array
+                items:
+                  type: string
+                  example: GB
         id:
           type: number
           example: 123
@@ -3828,6 +3863,10 @@ components:
               type: string
             sound:
               type: string
+            priority:
+              type: string
+              enum: [low, normal, problems, high]
+              description: low, normal or high for every notification; problems (the default) is high for declined and failed requests and new issues, normal otherwise.
     GotifySettings:
       type: object
       properties:
@@ -16461,6 +16500,11 @@ paths:
                   type: string
                 languageProfileId:
                   type: number
+                tags:
+                  type: array
+                  description: The Radarr or Sonarr tag ids to add. Like serverId, profileId, rootFolder and languageProfileId, kept only from someone with Advanced Requests or Manage Requests; for anyone else the server's own are used.
+                  items:
+                    type: number
                 seriesType:
                   type: string
                   nullable: true
@@ -16881,6 +16925,11 @@ paths:
                   type: string
                 languageProfileId:
                   type: number
+                tags:
+                  type: array
+                  description: The Radarr or Sonarr tag ids. Like serverId, profileId, rootFolder and languageProfileId, kept only from someone with Advanced Requests or Manage Requests; for anyone else the request keeps its own.
+                  items:
+                    type: number
                 seriesType:
                   type: string
                   nullable: true

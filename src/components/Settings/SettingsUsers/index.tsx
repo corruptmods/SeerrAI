@@ -52,6 +52,14 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
   musicRequestLimitLabel: 'Global Album Request Limit',
+  removedTitleRequests: 'Requests for Removed Titles',
+  removedTitleRequestsTip:
+    'For titles removed from the library before. Admins and request managers aren’t affected.',
+  'removedTitleRequests-off': 'Allowed as usual',
+  'removedTitleRequests-approve': 'Wait for an admin',
+  'removedTitleRequests-refuse': 'Refused',
+  removedTitleTimes: 'After Being Removed',
+  removedTitleTimesValue: '{count, plural, one {Once} other {# times}}',
   overQuotaRequests: 'Send Requests Over the Limit to Admins',
   overQuotaRequestsTip:
     'Someone over their limit can still request. It waits for an admin, is never approved automatically and is marked as over the limit',
@@ -186,6 +194,8 @@ const SettingsUsers = () => {
             musicQuotaLimit: data?.defaultQuotas.music?.quotaLimit ?? 0,
             musicQuotaDays: data?.defaultQuotas.music?.quotaDays ?? 7,
             overQuotaRequests: data?.overQuotaRequests ?? false,
+            removedTitleRequests: data?.removedTitleRequests ?? 'off',
+            removedTitleTimes: data?.removedTitleTimes ?? 1,
             defaultPermissions: data?.defaultPermissions ?? 0,
             defaultWatchlistSyncMovies:
               data?.defaultWatchlistSyncMovies ?? false,
@@ -217,6 +227,8 @@ const SettingsUsers = () => {
                   },
                 },
                 overQuotaRequests: values.overQuotaRequests,
+                removedTitleRequests: values.removedTitleRequests,
+                removedTitleTimes: Number(values.removedTitleTimes),
                 defaultPermissions: values.defaultPermissions,
                 defaultWatchlistSyncMovies: values.defaultWatchlistSyncMovies,
                 defaultWatchlistSyncTv: values.defaultWatchlistSyncTv,
@@ -508,6 +520,56 @@ const SettingsUsers = () => {
                     />
                   </div>
                 </div>
+                <div className="form-row">
+                  <label htmlFor="removedTitleRequests" className="text-label">
+                    {intl.formatMessage(messages.removedTitleRequests)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.removedTitleRequestsTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <Field
+                        as="select"
+                        id="removedTitleRequests"
+                        name="removedTitleRequests"
+                      >
+                        {(['off', 'approve', 'refuse'] as const).map((rule) => (
+                          <option key={rule} value={rule}>
+                            {intl.formatMessage(
+                              messages[`removedTitleRequests-${rule}`]
+                            )}
+                          </option>
+                        ))}
+                      </Field>
+                    </div>
+                  </div>
+                </div>
+                {values.removedTitleRequests !== 'off' && (
+                  <div className="form-row">
+                    <label htmlFor="removedTitleTimes" className="text-label">
+                      {intl.formatMessage(messages.removedTitleTimes)}
+                    </label>
+                    <div className="form-input-area">
+                      <div className="form-input-field">
+                        <Field
+                          as="select"
+                          id="removedTitleTimes"
+                          name="removedTitleTimes"
+                        >
+                          {[1, 2, 3, 4, 5].map((count) => (
+                            <option key={count} value={count}>
+                              {intl.formatMessage(
+                                messages.removedTitleTimesValue,
+                                { count }
+                              )}
+                            </option>
+                          ))}
+                        </Field>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div
                   role="group"
                   aria-labelledby="watchlist-sync-label"

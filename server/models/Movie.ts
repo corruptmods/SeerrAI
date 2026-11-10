@@ -5,6 +5,7 @@ import type {
 } from '@server/api/themoviedb/interfaces';
 import type Media from '@server/entity/Media';
 import type {
+  AlternativeTitle,
   Cast,
   Crew,
   ExternalIds,
@@ -14,6 +15,7 @@ import type {
   WatchProviders,
 } from './common';
 import {
+  mapAlternativeTitles,
   mapCast,
   mapCrew,
   mapExternalIds,
@@ -85,6 +87,8 @@ export interface MovieDetails {
   mediaUrl?: string;
   watchProviders?: WatchProviders[];
   keywords: Keyword[];
+  /** Other names it goes by, each with where (country codes). */
+  alternativeTitles?: AlternativeTitle[];
   onUserWatchlist?: boolean;
 }
 
@@ -150,5 +154,9 @@ export const mapMovieDetails = (
     id: keyword.id,
     name: keyword.name,
   })),
+  alternativeTitles: mapAlternativeTitles(movie.alternative_titles?.titles, [
+    movie.title,
+    movie.original_title,
+  ]),
   onUserWatchlist: userWatchlist,
 });

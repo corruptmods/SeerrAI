@@ -5,6 +5,8 @@ import ExternalAPI, { DEFAULT_REQUEST_TIMEOUT_MS } from './externalapi';
 
 /** After GitHub fails, how long until it is asked again. */
 const RETRY_AFTER_FAILURE_MS = 5 * 60 * 1000;
+/** Releases and commits change rarely; the github cache's own lifetime. */
+const KEEP_SECONDS = 6 * 60 * 60;
 
 /** When each GitHub list last failed, by endpoint and parameters. */
 const failedAt = new Map<string, number>();
@@ -99,7 +101,7 @@ class GithubAPI extends ExternalAPI {
       return [];
     }
     try {
-      const data = await this.get<T[]>(endpoint, { params });
+      const data = await this.get<T[]>(endpoint, { params }, KEEP_SECONDS);
       failedAt.delete(key);
       return data;
     } catch (e) {

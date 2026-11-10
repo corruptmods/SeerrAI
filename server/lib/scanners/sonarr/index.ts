@@ -10,6 +10,7 @@ import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { detectAnime } from '@server/lib/animeDecision';
+import { settleAwaitingSeasons } from '@server/lib/awaitingSeasons';
 import type {
   ProcessableSeason,
   RunnableScanner,
@@ -232,6 +233,15 @@ class SonarrScanner
       // unmonitored would decline its request.
       const seasonsNotListedYet =
         sonarrSeries.seasons.length === 0 && sonarrSeries.monitored;
+      // Requested before Sonarr listed them: coming, and monitored now if
+      // Sonarr has started listing them.
+      const awaiting = await settleAwaitingSeasons({
+        sonarr: this.sonarrApi,
+        series: sonarrSeries,
+        tmdbId,
+        serverId: this.currentServer.id,
+        is4k: server4k,
+      });
 
       const filteredSeasons = tvShow.seasons
         .filter(
@@ -245,12 +255,15 @@ class SonarrScanner
             return {
               seasonNumber: season.season_number,
               episodeCount: season.episode_count,
-              monitored: seasonsNotListedYet,
+              monitored:
+                seasonsNotListedYet || awaiting.has(season.season_number),
               statistics: {
                 episodeFileCount: 0,
                 totalEpisodeCount: season.episode_count,
               },
             };
+          } else if (awaiting.has(season.season_number)) {
+            return { ...sonarrSeason, monitored: true };
           } else {
             return sonarrSeason;
           }

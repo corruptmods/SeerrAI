@@ -3,6 +3,7 @@ import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import type { OidcClaimRule } from '@server/constants/oidc';
 import { oidcApplicationUrl, requiredClaimsFrom } from '@server/constants/oidc';
+import type { PushoverPriority } from '@server/constants/pushover';
 import type { ProfileFolder } from '@server/constants/requestDefaults';
 import type { MediaServerKind } from '@server/constants/server';
 import {
@@ -22,6 +23,7 @@ import {
   ADJUSTMENT_DEFAULTS,
   QUALITY_DEFAULTS,
 } from '@server/lib/quality/types';
+import type { RemovedTitleRequests } from '@server/lib/removedTitles';
 import type { SeasonCalendar, SeasonsSettings } from '@server/lib/seasons';
 import { seasonCalendar, seasonSettings } from '@server/lib/seasons';
 import {
@@ -733,6 +735,13 @@ export interface MainSettings {
    * shared on Plex, deleted from Jellyfin or Emby), hourly.
    */
   removeUsersWithoutAccess: boolean;
+  /**
+   * New requests for titles removed from the library before, from anyone but
+   * admins and request managers: as usual, waiting for an admin, or refused.
+   */
+  removedTitleRequests?: RemovedTitleRequests;
+  /** Removals before removedTitleRequests applies. */
+  removedTitleTimes?: number;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
@@ -976,6 +985,11 @@ export interface NotificationAgentPushover extends NotificationAgentConfig {
     accessToken: string;
     userToken: string;
     sound: string;
+    /**
+     * 'problems' (the default): high for declined and failed requests and new
+     * issues, normal otherwise. The rest apply to every notification.
+     */
+    priority?: PushoverPriority;
   };
 }
 
@@ -1175,6 +1189,8 @@ class Settings {
         animeExcludedCountries: [],
         autoImportPlexUsers: false,
         removeUsersWithoutAccess: false,
+        removedTitleRequests: 'off',
+        removedTitleTimes: 1,
         hideAvailable: false,
         hideBlocklisted: false,
         hideRequested: false,

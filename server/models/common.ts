@@ -1,5 +1,6 @@
 import type {
   TmdbAggregateCreditCast,
+  TmdbAlternativeTitle,
   TmdbCreditCast,
   TmdbCreditCrew,
   TmdbExternalIds,
@@ -84,6 +85,40 @@ export interface WatchProviderDetails {
   id: number;
   name: string;
 }
+
+/** Another name a title goes by, and where (country codes). */
+export interface AlternativeTitle {
+  title: string;
+  countries: string[];
+}
+
+/** Room for every country's name without sending TMDB's longest lists. */
+const MAX_ALTERNATIVE_TITLES = 60;
+
+/**
+ * TMDB's alternative titles, once each (with every country that uses it),
+ * leaving out the names already shown: the title and its original title.
+ */
+export const mapAlternativeTitles = (
+  titles: TmdbAlternativeTitle[] | undefined,
+  shown: (string | undefined)[]
+): AlternativeTitle[] => {
+  const key = (title: string) => title.trim().toLocaleLowerCase();
+  const skip = new Set(shown.filter((t): t is string => !!t).map(key));
+  const byName = new Map<string, AlternativeTitle>();
+  for (const { title, iso_3166_1 } of titles ?? []) {
+    const name = title?.trim();
+    if (!name || skip.has(key(name))) {
+      continue;
+    }
+    const entry = byName.get(key(name)) ?? { title: name, countries: [] };
+    if (iso_3166_1 && !entry.countries.includes(iso_3166_1)) {
+      entry.countries.push(iso_3166_1);
+    }
+    byName.set(key(name), entry);
+  }
+  return [...byName.values()].slice(0, MAX_ALTERNATIVE_TITLES);
+};
 
 export const mapCast = (person: TmdbCreditCast): Cast => ({
   castId: person.cast_id,

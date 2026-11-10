@@ -45,6 +45,7 @@ export const watchMedia = (
         status4k?: MediaStatus;
         downloadStatus?: DownloadingItem[];
         downloadStatus4k?: DownloadingItem[];
+        seasons?: { status?: MediaStatus; status4k?: MediaStatus }[];
       }
     | undefined
 ): Watched | undefined =>
@@ -52,11 +53,18 @@ export const watchMedia = (
     ? {
         downloadStatus: media.downloadStatus,
         downloadStatus4k: media.downloadStatus4k,
-        waiting: [media.status, media.status4k].some(
-          (status) =>
-            status === MediaStatus.PROCESSING ||
-            status === MediaStatus.PARTIALLY_AVAILABLE
-        ),
+        // A season can be on its way while the series as a whole isn't.
+        waiting:
+          [media.status, media.status4k].some(
+            (status) =>
+              status === MediaStatus.PROCESSING ||
+              status === MediaStatus.PARTIALLY_AVAILABLE
+          ) ||
+          (media.seasons ?? []).some(
+            (season) =>
+              season.status === MediaStatus.PROCESSING ||
+              season.status4k === MediaStatus.PROCESSING
+          ),
       }
     : undefined;
 

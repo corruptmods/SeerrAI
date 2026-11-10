@@ -218,6 +218,14 @@ export interface TmdbMovieDetails {
   keywords: {
     keywords: TmdbKeyword[];
   };
+  alternative_titles?: { titles?: TmdbAlternativeTitle[] };
+}
+
+/** Another name a title goes by, where (TMDB's country code). */
+export interface TmdbAlternativeTitle {
+  iso_3166_1: string;
+  title: string;
+  type?: string;
 }
 
 export interface TmdbVideo {
@@ -324,6 +332,7 @@ export interface TmdbTvDetails {
   keywords: {
     results: TmdbKeyword[];
   };
+  alternative_titles?: { results?: TmdbAlternativeTitle[] };
   videos: TmdbVideoResult;
   'watch/providers'?: {
     id: number;

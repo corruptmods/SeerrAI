@@ -6,6 +6,7 @@ import ImdbLogo from '@app/assets/services/imdb.svg';
 import Spinner from '@app/assets/spinner.svg';
 import TmdbLogo from '@app/assets/tmdb_logo.svg';
 import AddToList from '@app/components/AddToList';
+import AlternativeTitles from '@app/components/AlternativeTitles';
 import BackfillForTitle from '@app/components/Backfill/ForTitle';
 import BackfillTitleButton from '@app/components/Backfill/TitleButton';
 import BlocklistModal from '@app/components/BlocklistModal';
@@ -34,6 +35,7 @@ import RequestedBy from '@app/components/RequestedBy';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import SubtitlesCard from '@app/components/Subtitles/SubtitlesCard';
+import TrailerModal from '@app/components/TrailerModal';
 import WatchedBy from '@app/components/WatchedBy';
 import useLocale from '@app/hooks/useLocale';
 import usePlayLinks from '@app/hooks/usePlayLinks';
@@ -146,6 +148,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   const [isBlocklistUpdating, setIsBlocklistUpdating] =
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
   const { addToast } = useToasts();
 
   const {
@@ -172,10 +175,12 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   useEffect(() => {
     if (router.query.manage === '1') {
       setShowManager(true);
-      router.replace({
-        pathname: router.pathname,
-        query: { movieId: router.query.movieId },
-      });
+      // Shallow: closing the panel shouldn't reload the page.
+      router.replace(
+        { pathname: router.pathname, query: { movieId: router.query.movieId } },
+        undefined,
+        { shallow: true }
+      );
     }
   }, [router, router.query.manage]);
 
@@ -249,11 +254,15 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       ? `${settings.currentSettings.youtubeUrl}${trailerVideo?.key}`
       : trailerVideo?.url;
 
+  // YouTube's own trailers play in the page; a self-hosted YouTube opens.
+  const playsHere =
+    trailerVideo?.site === 'YouTube' && !settings.currentSettings.youtubeUrl;
   if (trailerUrl) {
     mediaLinks.push({
       text: intl.formatMessage(messages.watchtrailer),
       url: trailerUrl,
       svg: <FilmIcon />,
+      onOpen: playsHere ? () => setShowTrailer(true) : undefined,
     });
   }
 
@@ -482,13 +491,24 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         mediaType="movie"
         onClose={() => {
           setShowManager(false);
-          router.replace({
-            pathname: router.pathname,
-            query: { movieId: router.query.movieId },
-          });
+          router.replace(
+            {
+              pathname: router.pathname,
+              query: { movieId: router.query.movieId },
+            },
+            undefined,
+            { shallow: true }
+          );
         }}
         revalidate={() => revalidate()}
         show={showManager}
+      />
+      <TrailerModal
+        videoKey={trailerVideo?.key}
+        name={trailerVideo?.name}
+        url={trailerUrl}
+        show={showTrailer}
+        onClose={() => setShowTrailer(false)}
       />
       <BlocklistModal
         tmdbId={data.id}
@@ -938,6 +958,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                   <span className="media-fact-value">{data.originalTitle}</span>
                 </div>
               )}
+            <AlternativeTitles titles={data.alternativeTitles} />
             <div className="media-fact">
               <span>{intl.formatMessage(globalMessages.status)}</span>
               <span className="media-fact-value">{data.status}</span>

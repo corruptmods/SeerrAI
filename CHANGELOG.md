@@ -13,6 +13,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Following a series now requests each new season as soon as it's announced and Sonarr has it, so the first episode is grabbed on air day; the premiere is still the fallback.
 - **Remove Users Who Lose Access** (Settings → Users, off to start): every hour, deletes the Seerr AI account and requests of anyone no longer shared on your Plex server or deleted from Jellyfin or Emby. It waits for two checks in a row, removes nobody if a server can't be read or every user looks gone, and never removes admins.
 - Deleting a user can now take them off their media server too (admins only): **Also remove them as a friend on Plex**, or **Also disable their Jellyfin account** (or Emby). If the server refuses, the user isn't deleted.
+- Trailers play in a player on the title page instead of opening YouTube.
+- **Also Known As** on movie and series pages: the other names a title goes by, with their countries.
+- **Requests for Removed Titles** (Settings → Users, off to start): requests for titles removed from the library before can wait for an admin or be refused, after one or more removals.
+- A **Priority** setting for Pushover: keep problems loud, or send everything at normal, low or high priority.
 - **Followed Series** notifications: a followed series' new season was announced and requested for you, a season starts, or the series ended or was cancelled, which ends the follow. It starts on wherever you had Request Available on.
 
 ### Changed
@@ -24,6 +28,14 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Fixed
 
 - A finished series with a season TMDB never dated no longer stays followed forever.
+- A season requested before Sonarr lists it is no longer declined as abandoned; it's monitored and searched once Sonarr lists it.
+- Marking a requested title available (after downloading it another way) no longer sends the request to Radarr or Sonarr to download again.
+- **Process Blocklisted Tags** no longer deletes and recreates its titles on every run, which brought them back into Recently Added, and leaves titles already in your library alone.
+- Request managers can mark a title available from its Manage panel, as the API already allowed.
+- Jellyfin specials that air within a season no longer count as that season's episodes.
+- Seerr AI checks GitHub for updates every six hours, not every five minutes.
+- Closing a title's Manage panel no longer reloads the page.
+- Fresh installs on SQLite builds that don't accept double-quoted strings no longer stop on three old migrations.
 
 ## 2.4.2 (6 November 2026)
 

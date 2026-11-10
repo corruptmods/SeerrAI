@@ -30,6 +30,7 @@ import { mediaEvent } from '@server/lib/notifications/eventTitles';
 import overrideRules from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
 import { radarrRouting } from '@server/lib/radarrRouting';
+import { removedTitleRule } from '@server/lib/removedTitles';
 import { savedProfileFor } from '@server/lib/requestDefaults';
 import { expectedOnApproval } from '@server/lib/requestEta';
 import type { RequestServerIssue } from '@server/lib/requestServers';
@@ -140,6 +141,10 @@ export const overQuotaWaits = (alwaysRefused = false): boolean =>
 
 /** Notification field marking a request made over its requester's quota. */
 const OVER_QUOTA_FIELD = { name: 'Quota', value: 'Over the requester’s limit' };
+const removedField = (times: number) => ({
+  name: 'Removed Before',
+  value: times === 1 ? 'Once' : `${times} times`,
+});
 
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
@@ -785,6 +790,17 @@ export class MediaRequest {
       }
     }
 
+    // Settings → Users → Requests for Removed Titles.
+    const removed = user.hasPermission(Permission.MANAGE_REQUESTS)
+      ? { rule: 'off' as const, times: 0 }
+      : await removedTitleRule(requestBody.mediaId, requestBody.mediaType);
+    if (removed.rule === 'refuse') {
+      throw new RequestPermissionError(
+        'This title was removed from the library before, so it can’t be requested again.'
+      );
+    }
+    const waitsForAdmin = removed.rule === 'approve';
+
     const tmdbMedia =
       requestBody.mediaType === MediaType.MOVIE
         ? await tmdb.getMovie({ movieId: requestBody.mediaId })
@@ -1060,6 +1076,7 @@ export class MediaRequest {
     // unless over quota: then approving it is an admin's choice.
     const autoApproves = (kind: 'movie' | 'tv') =>
       !overQuota &&
+      !waitsForAdmin &&
       user.hasPermission(
         [
           requestBody.is4k
@@ -1098,6 +1115,7 @@ export class MediaRequest {
         isAutoRequest: options.isAutoRequest ?? false,
         ignoreQuota,
         overQuota,
+        removedTimes: waitsForAdmin ? removed.times : undefined,
       });
 
       await requestRepository.save(request);
@@ -1203,6 +1221,7 @@ export class MediaRequest {
         isAutoRequest: options.isAutoRequest ?? false,
         ignoreQuota,
         overQuota,
+        removedTimes: waitsForAdmin ? removed.times : undefined,
       });
 
       await requestRepository.save(request);
@@ -1374,6 +1393,12 @@ export class MediaRequest {
    */
   public historyNote?: string;
 
+  /**
+   * How often the title was removed, when that's why it waits for an admin.
+   * For the pending notification; never stored.
+   */
+  public removedTimes?: number;
+
   constructor(init?: Partial<MediaRequest>) {
     Object.assign(this, init);
   }
@@ -1399,7 +1424,12 @@ export class MediaRequest {
         media,
         Notification.MEDIA_PENDING,
         undefined,
-        this.overQuota ? [OVER_QUOTA_FIELD] : undefined
+        this.overQuota || this.removedTimes
+          ? [
+              ...(this.overQuota ? [OVER_QUOTA_FIELD] : []),
+              ...(this.removedTimes ? [removedField(this.removedTimes)] : []),
+            ]
+          : undefined
       );
 
       if (this.isAutoRequest) {

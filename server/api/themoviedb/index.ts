@@ -162,7 +162,7 @@ const TV_DETAILS_TTL = 43200;
 const SCAN_TTL = 900;
 
 const TV_DETAILS_APPEND_TO_RESPONSE =
-  'aggregate_credits,credits,external_ids,keywords,videos,content_ratings,watch/providers';
+  'aggregate_credits,credits,external_ids,keywords,videos,content_ratings,watch/providers,alternative_titles';
 
 const TV_SCAN_APPEND_TO_RESPONSE = 'keywords,external_ids';
 
@@ -354,7 +354,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
           params: {
             language,
             append_to_response:
-              'credits,external_ids,videos,keywords,release_dates,watch/providers',
+              'credits,external_ids,videos,keywords,release_dates,watch/providers,alternative_titles',
             include_video_language: language,
           },
         },

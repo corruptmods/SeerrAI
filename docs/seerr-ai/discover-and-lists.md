@@ -108,6 +108,11 @@ A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by p
 
 On a list with two or more titles: **Movie Roulette**, **Show Roulette** or **Surprise Me** spins through what is ready to watch and you haven't watched, and lands on one. **Spin again** avoids the last pick.
 
+## Title pages
+
+- **Trailers play in the page:** **Watch Trailer** opens the trailer in a player over the page (YouTube's privacy-enhanced player, which stores nothing until it plays). Esc or a click outside closes it and stops it; **Open on YouTube** is there too, and opening the button in a new tab still goes to YouTube. With a self-hosted YouTube set in Settings → General, the trailer opens there as before.
+- **Also Known As:** the other names a movie or series goes by on TMDB, with each one's country flags; the first three, then **Show More**.
+
 ## Release calendar
 
 **Calendar** in the sidebar: upcoming cinema, digital and physical releases and episode air dates for everything Radarr and Sonarr monitor, whether requested here or not. Four weeks at a time, up to twelve, filtered by movies or series. Switch: `releaseCalendar`.

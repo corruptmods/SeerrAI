@@ -15,6 +15,7 @@ import { User } from '@server/entity/User';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import { Permission } from '@server/lib/permissions';
+import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { MediaSubscriber } from '@server/subscriber/MediaSubscriber';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
@@ -116,6 +117,57 @@ const approvedRequest = async (media: Media, seasons?: number[]) => {
 };
 
 describe('"now available" when a scan marks the title available', () => {
+  it('completes a pending request without sending it to Radarr', async (t) => {
+    const sentToRadarr = t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToRadarr',
+      async () => undefined
+    );
+    // Requested, then downloaded by hand and marked available.
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 9103,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.PENDING,
+      })
+    );
+    const request = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.MOVIE,
+        media,
+        requestedBy: user,
+        status: MediaRequestStatus.PENDING,
+        is4k: false,
+      })
+    );
+    sentToRadarr.mock.resetCalls();
+    sent = [];
+
+    const fresh = await getRepository(Media).findOneOrFail({
+      where: { id: media.id },
+    });
+    fresh.status = MediaStatus.AVAILABLE;
+    await getRepository(Media).save(fresh);
+
+    const after = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: request.id },
+    });
+    assert.equal(after.status, MediaRequestStatus.COMPLETED);
+    assert.equal(
+      sentToRadarr.mock.calls.filter(
+        (call) =>
+          (call.arguments[0] as MediaRequest).status ===
+          MediaRequestStatus.APPROVED
+      ).length,
+      0
+    );
+    assert.ok(!sent.includes(Notification.MEDIA_APPROVED));
+    assert.equal(
+      sent.filter((type) => type === Notification.MEDIA_AVAILABLE).length,
+      1
+    );
+  });
+
   it('goes out during the save for a movie, once', async () => {
     const media = await getRepository(Media).save(
       new Media({

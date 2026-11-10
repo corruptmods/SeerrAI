@@ -178,6 +178,23 @@ class SonarrAPI extends ServarrBase<{
     }
   }
 
+  /** Monitors these seasons of a series Sonarr already has. */
+  public async monitorSeasons(
+    seriesId: number,
+    seasonNumbers: number[]
+  ): Promise<void> {
+    const series = await this.getSeriesById(seriesId);
+    const toMonitor = series.seasons.filter(
+      (season) =>
+        seasonNumbers.includes(season.seasonNumber) && !season.monitored
+    );
+    if (!toMonitor.length) {
+      return;
+    }
+    toMonitor.forEach((season) => (season.monitored = true));
+    await this.axios.put<SonarrSeries>('/series', series);
+  }
+
   public async getSeriesByTitle(title: string): Promise<SonarrSeries[]> {
     try {
       const response = await this.axios.get<SonarrSeries[]>('/series/lookup', {

@@ -23,6 +23,13 @@ class SeasonRequest {
   @Column({ type: 'int', default: MediaRequestStatus.PENDING })
   public status: MediaRequestStatus;
 
+  /**
+   * Sent before Sonarr listed this season (announced, not yet on TheTVDB).
+   * The Sonarr scan keeps it coming and monitors it once Sonarr lists it.
+   */
+  @Column({ default: false })
+  public awaitingSonarr: boolean;
+
   @ManyToOne(() => MediaRequest, (request) => request.seasons, {
     onDelete: 'CASCADE',
   })

@@ -16,6 +16,7 @@ import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import { markAwaitingSonarr } from '@server/lib/awaitingSeasons';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -1629,6 +1630,131 @@ describe('Sonarr Scanner', () => {
       });
 
       assert.strictEqual(updated.status, MediaRequestStatus.COMPLETED);
+    });
+  });
+
+  describe('a season requested before Sonarr listed it', () => {
+    const waitingRequest = async (tmdbId: number, tvdbId: number) => {
+      const request = await seedShowRequest(
+        tmdbId,
+        tvdbId,
+        MediaStatus.PARTIALLY_AVAILABLE,
+        [MediaStatus.AVAILABLE, MediaStatus.PROCESSING],
+        [2]
+      );
+      await markAwaitingSonarr(request, {
+        seasons: [sonarrSeason(1, true, 10)],
+      });
+      return request;
+    };
+    const seasonTwo = async (tmdbId: number) =>
+      (
+        await getRepository(Media).findOneOrFail({
+          where: { tmdbId },
+          relations: ['seasons'],
+        })
+      ).seasons.find((s) => s.seasonNumber === 2);
+    const awaiting = async (requestId: number) =>
+      (
+        await getRepository(SeasonRequest).findOneOrFail({
+          where: { request: { id: requestId }, seasonNumber: 2 },
+        })
+      ).awaitingSonarr;
+
+    it('stays requested while Sonarr still lists only the earlier ones', async () => {
+      const request = await waitingRequest(2310, 810);
+      configureSonarr();
+      getTvShowImpl = async () => twoSeasonTmdbShow(2310);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({ tvdbId: 810, seasons: [sonarrSeason(1, true, 10)] }),
+      ];
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      assert.strictEqual(
+        (
+          await getRepository(MediaRequest).findOneOrFail({
+            where: { id: request.id },
+          })
+        ).status,
+        MediaRequestStatus.APPROVED
+      );
+      assert.strictEqual(
+        (await seasonTwo(2310))?.status,
+        MediaStatus.PROCESSING
+      );
+      assert.strictEqual(await awaiting(request.id), true);
+    });
+
+    it('is monitored once Sonarr lists it, even unmonitored', async (t) => {
+      const request = await waitingRequest(2320, 820);
+      const monitored = t.mock.method(
+        SonarrAPI.prototype,
+        'monitorSeasons',
+        async () => undefined
+      );
+      t.mock.method(SonarrAPI.prototype, 'getEpisodes', async () => []);
+      configureSonarr();
+      getTvShowImpl = async () => twoSeasonTmdbShow(2320);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({
+          tvdbId: 820,
+          seasons: [sonarrSeason(1, true, 10), sonarrSeason(2, false, 0)],
+        }),
+      ];
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      assert.deepStrictEqual(monitored.mock.calls[0].arguments, [1, [2]]);
+      assert.strictEqual(
+        (
+          await getRepository(MediaRequest).findOneOrFail({
+            where: { id: request.id },
+          })
+        ).status,
+        MediaRequestStatus.APPROVED
+      );
+      assert.strictEqual(
+        (await seasonTwo(2320))?.status,
+        MediaStatus.PROCESSING
+      );
+      assert.strictEqual(await awaiting(request.id), false);
+    });
+
+    it('is still declined as usual once Sonarr has listed it and it is unmonitored', async (t) => {
+      // Not waiting: an admin unmonitored a season Sonarr already had.
+      const request = await seedShowRequest(
+        2330,
+        830,
+        MediaStatus.PARTIALLY_AVAILABLE,
+        [MediaStatus.AVAILABLE, MediaStatus.PROCESSING],
+        [2]
+      );
+      const monitored = t.mock.method(
+        SonarrAPI.prototype,
+        'monitorSeasons',
+        async () => undefined
+      );
+      configureSonarr();
+      getTvShowImpl = async () => twoSeasonTmdbShow(2330);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({
+          tvdbId: 830,
+          seasons: [sonarrSeason(1, true, 10), sonarrSeason(2, false, 0)],
+        }),
+      ];
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      assert.strictEqual(monitored.mock.callCount(), 0);
+      assert.strictEqual(
+        (
+          await getRepository(MediaRequest).findOneOrFail({
+            where: { id: request.id },
+          })
+        ).status,
+        MediaRequestStatus.DECLINED
+      );
     });
   });
 });

@@ -1,5 +1,6 @@
 import { IssueStatus, IssueTypeName } from '@server/constants/issue';
 import { MediaStatus } from '@server/constants/media';
+import type { PushoverPriority } from '@server/constants/pushover';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
@@ -27,6 +28,13 @@ interface PushoverImagePayload {
   attachment_base64: string;
   attachment_type: string;
 }
+
+/** Pushover's values: -1 is quiet, 1 bypasses the person's quiet hours. */
+const PRIORITY_VALUES: Record<Exclude<PushoverPriority, 'problems'>, number> = {
+  low: -1,
+  normal: 0,
+  high: 1,
+};
 
 interface PushoverPayload extends PushoverImagePayload {
   token: string;
@@ -109,6 +117,7 @@ class PushoverAgent
     const event = eventText(payload, intl);
     const title = event ?? payload.subject;
     let message = event ? `<b>${escapeHtml(payload.subject)}</b>` : '';
+    // Raised to high below for problems, when that's the setting.
     let priority = 0;
 
     const summary = payload.message
@@ -213,12 +222,13 @@ class PushoverAgent
       }
     }
 
+    const chosen = this.getSettings().options.priority ?? 'problems';
     return {
       title,
       message,
       url,
       url_title,
-      priority,
+      priority: chosen === 'problems' ? priority : PRIORITY_VALUES[chosen],
       html: 1,
       attachment_base64,
       attachment_type,

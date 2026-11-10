@@ -19,28 +19,6 @@ import { EventSubscriber, In } from 'typeorm';
 
 @EventSubscriber()
 export class MediaSubscriber implements EntitySubscriberInterface<Media> {
-  private async updateChildRequestStatus(
-    manager: EntityManager,
-    event: Media,
-    is4k: boolean
-  ) {
-    const requestRepository = manager.getRepository(MediaRequest);
-
-    const requests = await requestRepository.find({
-      where: { media: { id: event.id } },
-    });
-
-    for (const request of requests) {
-      if (
-        request.is4k === is4k &&
-        request.status === MediaRequestStatus.PENDING
-      ) {
-        request.status = MediaRequestStatus.APPROVED;
-        await requestRepository.save(request);
-      }
-    }
-  }
-
   private async updateRelatedMediaRequest(
     manager: EntityManager,
     event: Media,
@@ -61,7 +39,14 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
       },
       where: {
         media: { id: event.id },
-        status: In([MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED]),
+        // Pending ones too: a title that turns up (added by hand, or marked
+        // available) completes them. Approving them instead would send them
+        // to Radarr or Sonarr and download it again.
+        status: In([
+          MediaRequestStatus.PENDING,
+          MediaRequestStatus.APPROVED,
+          MediaRequestStatus.FAILED,
+        ]),
         is4k,
       },
     });
@@ -73,11 +58,15 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
       for (const request of relatedRequests) {
         let shouldComplete = false;
 
+        // Only availability completes a pending request; a deleted title
+        // leaves it waiting.
+        const pending = request.status === MediaRequestStatus.PENDING;
         if (
           (event[request.is4k ? 'status4k' : 'status'] ===
             MediaStatus.AVAILABLE ||
-            event[request.is4k ? 'status4k' : 'status'] ===
-              MediaStatus.DELETED) &&
+            (!pending &&
+              event[request.is4k ? 'status4k' : 'status'] ===
+                MediaStatus.DELETED)) &&
           event.mediaType === MediaType.MOVIE
         ) {
           shouldComplete = true;
@@ -112,7 +101,7 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
               (hasStatusChanged ||
                 requestSeason.status === MediaRequestStatus.COMPLETED) &&
               (currentSeasonStatus === MediaStatus.AVAILABLE ||
-                currentSeasonStatus === MediaStatus.DELETED);
+                (!pending && currentSeasonStatus === MediaStatus.DELETED));
 
             if (shouldUpdate) {
               requestSeason.status = MediaRequestStatus.COMPLETED;
@@ -148,64 +137,6 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
   public async beforeUpdate(event: UpdateEvent<Media>): Promise<void> {
     if (!event.entity || !event.databaseEntity) {
       return;
-    }
-
-    // An artist is available once every wanted album is, which says nothing
-    // about a pending request's albums: those still await approval.
-    const isMusic =
-      (event.entity.mediaType ?? event.databaseEntity.mediaType) ===
-      MediaType.MUSIC;
-
-    try {
-      if (
-        !isMusic &&
-        event.entity.status === MediaStatus.AVAILABLE &&
-        event.databaseEntity?.status === MediaStatus.PENDING
-      ) {
-        await withNestedTransaction(event.manager, async (manager) => {
-          await this.updateChildRequestStatus(
-            manager,
-            event.entity as Media,
-            false
-          );
-        });
-      }
-    } catch (e) {
-      logger.error(
-        'Error while updating child request status in beforeUpdate subscriber',
-        {
-          label: 'Media',
-          mediaId: event.entity.id,
-          is4k: false,
-          errorMessage: e instanceof Error ? e.message : String(e),
-        }
-      );
-    }
-
-    try {
-      if (
-        !isMusic &&
-        event.entity.status4k === MediaStatus.AVAILABLE &&
-        event.databaseEntity?.status4k === MediaStatus.PENDING
-      ) {
-        await withNestedTransaction(event.manager, async (manager) => {
-          await this.updateChildRequestStatus(
-            manager,
-            event.entity as Media,
-            true
-          );
-        });
-      }
-    } catch (e) {
-      logger.error(
-        'Error while updating child request status in beforeUpdate subscriber',
-        {
-          label: 'Media',
-          mediaId: event.entity.id,
-          is4k: true,
-          errorMessage: e instanceof Error ? e.message : String(e),
-        }
-      );
     }
 
     // Load seasons into databaseEntity for seasonStatusCheck in afterUpdate.

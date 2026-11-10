@@ -7,7 +7,11 @@ import type {
   TmdbSearchTvResponse,
 } from '@server/api/themoviedb/interfaces';
 import type { VideoMediaType } from '@server/constants/media';
-import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
+import {
+  MediaStatus,
+  MediaType,
+  VIDEO_MEDIA_TYPES,
+} from '@server/constants/media';
 import dataSource from '@server/datasource';
 import { Blocklist } from '@server/entity/Blocklist';
 import Media from '@server/entity/Media';
@@ -19,22 +23,37 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { createTmdbWithBlocklistSettings } from '@server/routes/discover';
 import type { EntityManager } from 'typeorm';
+import { In } from 'typeorm';
 
 const TMDB_API_DELAY_MS = 250;
 class AbortTransaction extends Error {}
+
+const keyOf = (mediaType: string, tmdbId: number) => `${mediaType}:${tmdbId}`;
+
+/** Already in the library: tags only keep new titles out. */
+const IN_LIBRARY = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
 
 class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
   private running = false;
   private progress = 0;
   private total = 0;
+  /** Titles this run found under each tag, by keyOf. */
+  private found = new Map<string, Set<string>>();
+  /** A TMDB lookup failed, so not finding a title proves nothing. */
+  private incomplete = false;
 
   public async run() {
     this.running = true;
+    this.found = new Map();
+    this.incomplete = false;
 
     try {
+      // Titles still matched keep their rows; only entries no tag matches
+      // any more are removed, so titles aren't recreated (and shown as newly
+      // added) on every run.
       await dataSource.transaction(async (em) => {
-        await this.cleanBlocklist(em);
         await this.createBlocklistEntries(em);
+        await this.cleanBlocklist(em);
       });
     } catch (err) {
       if (err instanceof AbortTransaction) {
@@ -181,6 +200,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
           query = 0;
         }
       } catch (error) {
+        this.incomplete = true;
         logger.error('Error processing keyword in blocklisted tags', {
           label: 'Blocklisted Tags Processor',
           keywordId: tag,
@@ -197,11 +217,23 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
     em: EntityManager
   ) {
     const blocklistRepository = em.getRepository(Blocklist);
+    const mediaRepository = em.getRepository(Media);
 
     for (const entry of response.results) {
+      const key = keyOf(mediaType, entry.id);
       const blocklistEntry = await blocklistRepository.findOne({
         where: { tmdbId: entry.id, mediaType },
       });
+
+      if (!blocklistEntry) {
+        const media = await mediaRepository.findOne({
+          where: { tmdbId: entry.id, mediaType },
+        });
+        if (media && IN_LIBRARY.includes(media.status)) {
+          continue;
+        }
+      }
+      this.found.set(key, (this.found.get(key) ?? new Set()).add(keywordId));
 
       if (blocklistEntry) {
         // Skip manual blocklists; add this tag to the entry if it isn't there
@@ -231,26 +263,65 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
     }
   }
 
+  /**
+   * Removes titles blocklisted by tags that no tag matches any more (with
+   * their blocklist entries), and drops tags no longer matching from the rest.
+   * Skipped when a lookup failed: what wasn't seen may still match.
+   */
   private async cleanBlocklist(em: EntityManager) {
-    // Remove media (and blocklist entries) blocklisted by tags.
+    if (this.incomplete) {
+      logger.warn(
+        'Some blocklisted tag lookups failed; titles no longer matching are removed next run',
+        { label: 'Blocklisted Tags Processor' }
+      );
+      return;
+    }
+    const blocklistRepository = em.getRepository(Blocklist);
     const mediaRepository = em.getRepository(Media);
-    const mediaToRemove = await mediaRepository
-      .createQueryBuilder('media')
-      .innerJoinAndSelect(
-        Blocklist,
-        'blist',
-        'blist.tmdbId = media.tmdbId AND blist.mediaType = media.mediaType'
-      )
-      .where(`blist.blocklistedTags IS NOT NULL`)
-      .andWhere('media.mediaType IN (:...videoTypes)', {
+    const tagged = await blocklistRepository
+      .createQueryBuilder('blist')
+      .where('blist.blocklistedTags IS NOT NULL')
+      .andWhere('blist.mediaType IN (:...videoTypes)', {
         videoTypes: VIDEO_MEDIA_TYPES,
       })
       .getMany();
 
-    // Batched to keep queries small; removing media cascades to their blocklist
-    // entries.
-    for (let i = 0; i < mediaToRemove.length; i += 500) {
-      await mediaRepository.remove(mediaToRemove.slice(i, i + 500));
+    const stale: Blocklist[] = [];
+    for (const entry of tagged) {
+      const tags = this.found.get(keyOf(entry.mediaType, entry.tmdbId));
+      if (!tags) {
+        stale.push(entry);
+        continue;
+      }
+      const current = `,${[...tags].sort().join(',')},`;
+      if (entry.blocklistedTags !== current) {
+        await blocklistRepository.update(entry.id, {
+          blocklistedTags: current,
+        });
+      }
+    }
+    if (!stale.length) {
+      return;
+    }
+
+    logger.info('Removing titles no blocklisted tag matches any more', {
+      label: 'Blocklisted Tags Processor',
+      count: stale.length,
+    });
+    // Batched to keep queries small. Removing a title cascades to its
+    // blocklist entry; an entry left without a title is removed after.
+    for (let i = 0; i < stale.length; i += 200) {
+      const batch = stale.slice(i, i + 200);
+      const media = await mediaRepository.find({
+        where: batch.map((entry) => ({
+          tmdbId: entry.tmdbId,
+          mediaType: entry.mediaType,
+        })),
+      });
+      await mediaRepository.remove(media);
+      await blocklistRepository.delete({
+        id: In(batch.map((entry) => entry.id)),
+      });
     }
   }
 }

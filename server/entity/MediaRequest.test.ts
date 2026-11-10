@@ -9,10 +9,12 @@ import {
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaEvent, { MediaEventType } from '@server/entity/MediaEvent';
 import {
   DuplicateMediaRequestError,
   MediaRequest,
   QuotaRestrictedError,
+  RequestPermissionError,
 } from '@server/entity/MediaRequest';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
@@ -584,5 +586,92 @@ describe('a request over the quota, when such requests wait for an admin', () =>
     assert.deepStrictEqual(pending[1].arguments[4], [
       { name: 'Quota', value: 'Over the requester’s limit' },
     ]);
+  });
+});
+
+describe('requests for titles removed from the library before', () => {
+  const settings = getSettings();
+
+  const removedOnce = async (tmdbId: number, times = 1) => {
+    for (let i = 0; i < times; i++) {
+      await getRepository(MediaEvent).save(
+        new MediaEvent({
+          tmdbId,
+          mediaType: MediaType.MOVIE,
+          type: MediaEventType.REMOVED,
+          is4k: false,
+          occurredAt: new Date(),
+        })
+      );
+    }
+  };
+
+  afterEach(() => {
+    settings.main.removedTitleRequests = 'off';
+    settings.main.removedTitleTimes = 1;
+  });
+
+  it('wait for an admin, even from someone who auto-approves', async (t) => {
+    const notify = t.mock.method(
+      MediaRequest,
+      'sendNotification',
+      async () => true
+    );
+    settings.main.removedTitleRequests = 'approve';
+    const requester = await createRequester(
+      'removed@example.invalid',
+      Permission.REQUEST | Permission.AUTO_APPROVE
+    );
+    await removedOnce(42001);
+
+    const request = await MediaRequest.request(
+      { mediaId: 42001, mediaType: MediaType.MOVIE, is4k: false },
+      requester
+    );
+    assert.equal(request.status, MediaRequestStatus.PENDING);
+    const pending = notify.mock.calls.find(
+      (call) => call.arguments[2] === Notification.MEDIA_PENDING
+    );
+    assert.deepEqual(pending?.arguments[4], [
+      { name: 'Removed Before', value: 'Once' },
+    ]);
+
+    // Not removed before: approved as usual.
+    const other = await MediaRequest.request(
+      { mediaId: 42002, mediaType: MediaType.MOVIE, is4k: false },
+      requester
+    );
+    assert.equal(other.status, MediaRequestStatus.APPROVED);
+  });
+
+  it('are refused when set, only after the times chosen, and never for request managers', async () => {
+    settings.main.removedTitleRequests = 'refuse';
+    settings.main.removedTitleTimes = 2;
+    const requester = await createRequester('refused@example.invalid');
+    await removedOnce(42003);
+
+    // Once is not yet twice.
+    await MediaRequest.request(
+      { mediaId: 42003, mediaType: MediaType.MOVIE, is4k: false },
+      requester
+    );
+    await removedOnce(42004, 2);
+    await assert.rejects(
+      () =>
+        MediaRequest.request(
+          { mediaId: 42004, mediaType: MediaType.MOVIE, is4k: false },
+          requester
+        ),
+      RequestPermissionError
+    );
+
+    const manager = await createRequester(
+      'manager@example.invalid',
+      Permission.REQUEST | Permission.MANAGE_REQUESTS
+    );
+    await MediaRequest.request(
+      { mediaId: 42004, mediaType: MediaType.MOVIE, is4k: false },
+      manager
+    );
   });
 });

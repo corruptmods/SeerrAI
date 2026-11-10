@@ -7,6 +7,7 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import type { PushoverSound } from '@server/api/pushover';
+import { PUSHOVER_PRIORITIES } from '@server/constants/pushover';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useState } from 'react';
@@ -27,6 +28,12 @@ const messages = defineMessages(
       'Your 30-character <UsersGroupsLink>user or group identifier</UsersGroupsLink>',
     sound: 'Notification Sound',
     deviceDefault: 'Device Default',
+    priority: 'Priority',
+    priorityTip: 'High rings during quiet hours; low arrives silently',
+    'priority-problems': 'High for problems, normal otherwise',
+    'priority-normal': 'Normal',
+    'priority-low': 'Low',
+    'priority-high': 'High',
     validationAccessTokenRequired: 'You must provide a valid application token',
     validationUserTokenRequired: 'You must provide a valid user or group key',
     pushoversettingssaved: 'Pushover notification settings saved successfully!',
@@ -102,6 +109,7 @@ const NotificationsPushover = () => {
         accessToken: data?.options.accessToken,
         userToken: data?.options.userToken,
         sound: data?.options.sound,
+        priority: data?.options.priority ?? 'problems',
       }}
       validationSchema={NotificationsPushoverSchema}
       onSubmit={async (values) => {
@@ -114,6 +122,7 @@ const NotificationsPushover = () => {
               accessToken: values.accessToken,
               userToken: values.userToken,
               sound: values.sound,
+              priority: values.priority,
             },
           });
           addToast(intl.formatMessage(messages.pushoversettingssaved), {
@@ -161,6 +170,7 @@ const NotificationsPushover = () => {
                 accessToken: values.accessToken,
                 userToken: values.userToken,
                 sound: values.sound,
+                priority: values.priority,
               },
             });
 
@@ -281,6 +291,25 @@ const NotificationsPushover = () => {
                     {soundsData?.map((sound, index) => (
                       <option key={`sound-${index}`} value={sound.name}>
                         {sound.description}
+                      </option>
+                    ))}
+                  </Field>
+                </div>
+              </div>
+            </div>
+            <div className="form-row">
+              <label htmlFor="priority" className="text-label">
+                {intl.formatMessage(messages.priority)}
+                <span className="label-tip">
+                  {intl.formatMessage(messages.priorityTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <div className="form-input-field">
+                  <Field as="select" id="priority" name="priority">
+                    {PUSHOVER_PRIORITIES.map((priority) => (
+                      <option key={priority} value={priority}>
+                        {intl.formatMessage(messages[`priority-${priority}`])}
                       </option>
                     ))}
                   </Field>

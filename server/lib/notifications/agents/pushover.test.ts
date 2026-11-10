@@ -11,6 +11,7 @@ import { before, describe, it } from 'node:test';
 const request: NotificationPayload = {
   subject: 'Static Garden (2024)',
   notifySystem: true,
+  notifyAdmin: false,
   request: {
     id: 7,
     requestedBy: { displayName: 'Someone' } as User,

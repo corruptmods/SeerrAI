@@ -5,6 +5,7 @@ import { MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import type AgentRun from '@server/entity/AgentRun';
+import AiSpend from '@server/entity/AiSpend';
 import AiUsage from '@server/entity/AiUsage';
 import Media from '@server/entity/Media';
 import { MediaList, MediaListMember } from '@server/entity/MediaList';
@@ -1692,8 +1693,16 @@ describe('credit', () => {
     }[];
   }
 
-  /** Usage is written just after the answer is sent. */
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
+  /** Usage is written just after the answer is sent: waits for it. */
+  const settle = async (requests: number) => {
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const rows = await getRepository(AiSpend).find();
+      const counted = rows.reduce((sum, row) => sum + row.requests, 0);
+      if (counted >= requests || Date.now() > deadline) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
 
   const report = async () =>
     (await call<Report>('GET', '/api/v1/settings/ai/credit')).body;
@@ -1711,7 +1720,7 @@ describe('credit', () => {
     answers = ['{"r":"ok","titles":[]}', '{"r":"ok","titles":[]}'];
     await call('POST', '/api/v1/ai/chat', { message: 'one' });
     await call('POST', '/api/v1/ai/chat', { message: 'two' });
-    await settle();
+    await settle(2);
 
     actingAs = admin;
     let body = await report();

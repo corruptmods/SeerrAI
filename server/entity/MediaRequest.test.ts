@@ -550,6 +550,8 @@ describe('a request over the quota, when such requests wait for an admin', () =>
     assert.deepStrictEqual(await requestMissing(41010, 'movie', requester), {
       outcome: 'failed',
       message: 'Your request limit has been reached.',
+      // The limit frees up in time, so a list's auto-request tries again.
+      retryLater: true,
     });
     assert.strictEqual((await requester.getQuota()).movie.used, 1);
   });

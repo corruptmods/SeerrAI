@@ -596,10 +596,16 @@ requestRoutes.post('/missing', async (req, res, next) => {
       continue;
     }
     seen.add(key);
+    const { outcome, message } = await requestMissing(
+      tmdbId,
+      mediaType,
+      req.user as User
+    );
     results.push({
       tmdbId,
       mediaType,
-      ...(await requestMissing(tmdbId, mediaType, req.user as User)),
+      outcome,
+      ...(message !== undefined && { message }),
     });
   }
   return res.status(200).json({ results });

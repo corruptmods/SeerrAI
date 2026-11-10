@@ -12466,6 +12466,306 @@ paths:
                       type: number
         '400':
           description: No valid tmdbId or tmdbIds
+  /list/plex:
+    get:
+      summary: The signed-in person's Plex lists
+      description: Read from Plex with their Plex sign-in. Without one, `available` is false and there are no lists.
+      tags:
+        - list
+      responses:
+        '200':
+          description: Their Plex lists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+                  canAutoRequest:
+                    type: boolean
+                  lists:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        owner:
+                          type: string
+                        slug:
+                          type: string
+                        title:
+                          type: string
+                        itemCount:
+                          type: number
+                        privacy:
+                          type: string
+                          enum:
+                            [ANYONE, PLEX, FRIENDS_OF_FRIENDS, FRIENDS, PRIVATE]
+                        autoRequest:
+                          type: boolean
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+    post:
+      summary: Start a Plex list
+      description: A new, private list on the person's Plex account.
+      tags:
+        - list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  maxLength: 100
+                ranked:
+                  type: boolean
+                tmdbId:
+                  type: integer
+                  minimum: 1
+                  description: A title to put on the new list
+                mediaType:
+                  type: string
+                  enum: [movie, tv]
+      responses:
+        '201':
+          description: The new list; with a title, whether adding it requested it
+        '400':
+          description: No name, one too long, or a title without its type
+        '422':
+          description: Plex doesn't have the title; no list was started
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+  /list/plex/contains:
+    get:
+      summary: Which of the person's Plex lists have a title
+      tags:
+        - list
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv]
+      responses:
+        '200':
+          description: Each of their Plex lists, saying whether it has the title
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    owner:
+                      type: string
+                    slug:
+                      type: string
+                    title:
+                      type: string
+                    contains:
+                      type: boolean
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+  /list/plex/{owner}/{slug}:
+    get:
+      summary: One of the person's Plex lists, its titles matched to TMDB
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The list and its titles, in order
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+  /list/plex/{owner}/{slug}/copy:
+    post:
+      summary: Copy a Plex list into a new Seerr AI watch list
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: The new list, and how many titles were added and couldn't be matched
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+  /list/plex/{owner}/{slug}/auto-request:
+    put:
+      summary: Turn auto-request on or off for a Plex list
+      description: On, titles added to the list on Plex later are requested for the person, within their permissions and limits.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: The new setting
+        '403':
+          description: The person may not have titles auto-requested
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+  /list/plex/{owner}/{slug}/item:
+    post:
+      summary: Add a title to a Plex list
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tmdbId
+                - mediaType
+              properties:
+                tmdbId:
+                  type: integer
+                  minimum: 1
+                mediaType:
+                  type: string
+                  enum: [movie, tv]
+      responses:
+        '201':
+          description: Added; with auto-request on, whether it was requested
+        '400':
+          description: No title, or no type for it
+        '422':
+          description: Plex doesn't have this title
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
+    delete:
+      summary: Take a title off a Plex list
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv]
+      responses:
+        '204':
+          description: Taken off
+        '400':
+          description: No title, or no type for it
+        '401':
+          description: Plex refused the person's sign-in
+        '404':
+          description: No Plex sign-in, or not one of the person's Plex lists
+        '502':
+          description: Plex couldn't be reached, or answered in an unknown form
   /list/suggestions:
     get:
       summary: Pending removal suggestions for the caller's lists
@@ -12866,6 +13166,8 @@ paths:
       responses:
         '204':
           description: Taken off
+        '400':
+          description: No title, or no type for it
   /list/{listId}/song/{songId}/retry:
     post:
       summary: Look for a playlist song again

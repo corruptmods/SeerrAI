@@ -78,6 +78,16 @@ Anyone signed in can make lists of movies and series and add to them from **Add 
 - **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.
 
+### Plex Lists
+
+People signed in with Plex see a third section, **Plex Lists**: their own lists from Plex's **My Lists**, read from Plex with their Plex sign-in. Plex's lists don't come through an official API, so if Plex changes how they work the section says so instead of guessing.
+
+- **A list's page** shows its titles in Plex's order, numbered when the list is ranked, as poster cards you can request from. Titles Plex can't match to TMDB are counted, not shown. **Open in Plex** goes to it on watch.plex.tv.
+- **Start a Plex list:** type a name (and tick **Ranked** for a numbered one) and **Start Plex List**. It's private on Plex until you change that in Plex. **Add to List** on any title can start one too, with that title on it (if Plex has the title).
+- **Adding from Seerr AI:** **Add to List** lists your Plex lists under your own; ticking one adds the title to that list on Plex, unticking takes it off. A title Plex doesn't have can't go on a Plex list.
+- **Copy to a Seerr AI List** makes a watch list with the same name and titles, in the same order, so you can share it, track watching and use Pick for the Room. Copying requests nothing.
+- **Request titles added to this list on Plex** (off to start; for people allowed to auto-request): what's on the list when you tick it is left alone, and anything added later, on Plex or from Seerr AI, is requested for you, in non-4K, a series with every season, within your request limits. Each list is checked about every 10 minutes, with **Watchlist Sync**; if a check fails, the list's page says why. A title over your limit, or one Plex can't match to TMDB yet, is tried again at a later check. A list deleted on Plex stops being checked; a renamed one carries on.
+
 ### Playlists
 
 A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by pasting its share link. No account or key is needed: Seerr AI reads the playlist's public page.

@@ -3,6 +3,8 @@ import Header from '@app/components/Common/Header';
 import { ListCardsSkeleton } from '@app/components/Common/PageSkeleton';
 import PageTitle from '@app/components/Common/PageTitle';
 import ListCard from '@app/components/MediaLists/ListCard';
+import type { PlexListsResponse } from '@app/components/MediaLists/PlexLists';
+import PlexLists from '@app/components/MediaLists/PlexLists';
 import ShareListModal from '@app/components/MediaLists/ShareListModal';
 import useFeature from '@app/hooks/useFeature';
 import useToasts from '@app/hooks/useToasts';
@@ -60,6 +62,8 @@ const MediaLists = () => {
     null
   );
   const { data: lists, mutate, error } = useSWR<ListSummary[]>('/api/v1/list');
+  // Same key as the Plex Lists section: whether it shows.
+  const { data: plex } = useSWR<PlexListsResponse>('/api/v1/list/plex');
 
   const create = async () => {
     const name = newName.trim();
@@ -107,6 +111,8 @@ const MediaLists = () => {
       lists: (lists ?? []).filter((list) => (list.kind ?? 'watch') === kind),
     }))
     .filter((section) => section.lists.length);
+  // Headings once there's more than one kind of list to tell apart.
+  const showHeadings = sections.length > 1 || !!plex?.available;
 
   return (
     <>
@@ -173,57 +179,59 @@ const MediaLists = () => {
         </div>
       </div>
 
-      {lists?.length ? (
-        <div className="space-y-10">
-          {sections.map((section) => (
-            <section key={section.kind}>
-              {/* Headings only when both kinds are shown. */}
-              {sections.length > 1 && (
-                <h2 className="mb-4 flex items-center gap-2 border-b border-subtle pb-2 text-xl font-bold text-strong">
-                  {section.kind === 'music' ? (
-                    <MusicalNoteIcon className="h-5 w-5 text-muted" />
-                  ) : (
-                    <FilmIcon className="h-5 w-5 text-muted" />
-                  )}
-                  <span>
-                    {intl.formatMessage(
-                      section.kind === 'music'
-                        ? messages.playlists
-                        : messages.watchLists
+      <div className="space-y-10">
+        {lists?.length ? (
+          <div className="space-y-10">
+            {sections.map((section) => (
+              <section key={section.kind}>
+                {showHeadings && (
+                  <h2 className="mb-4 flex items-center gap-2 border-b border-subtle pb-2 text-xl font-bold text-strong">
+                    {section.kind === 'music' ? (
+                      <MusicalNoteIcon className="h-5 w-5 text-muted" />
+                    ) : (
+                      <FilmIcon className="h-5 w-5 text-muted" />
                     )}
-                  </span>
-                  <span className="text-sm font-normal text-muted">
-                    {section.lists.length}
-                  </span>
-                </h2>
-              )}
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {section.lists.map((list) => (
-                  <li key={`list-${list.id}`}>
-                    <ListCard
-                      id={list.id}
-                      index={lists.indexOf(list)}
-                      isOwner={list.isOwner}
-                      itemCount={list.itemCount}
-                      watchedCount={list.watchedCount}
-                      memberCount={list.memberCount}
-                      name={list.name}
-                      owner={list.owner}
-                      previews={list.previews ?? []}
-                      kind={list.kind ?? 'watch'}
-                      covers={list.covers ?? []}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      ) : (
-        <p className="text-muted">
-          {intl.formatMessage(musicOn ? messages.empty : messages.emptyWatch)}
-        </p>
-      )}
+                    <span>
+                      {intl.formatMessage(
+                        section.kind === 'music'
+                          ? messages.playlists
+                          : messages.watchLists
+                      )}
+                    </span>
+                    <span className="text-sm font-normal text-muted">
+                      {section.lists.length}
+                    </span>
+                  </h2>
+                )}
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {section.lists.map((list) => (
+                    <li key={`list-${list.id}`}>
+                      <ListCard
+                        id={list.id}
+                        index={lists.indexOf(list)}
+                        isOwner={list.isOwner}
+                        itemCount={list.itemCount}
+                        watchedCount={list.watchedCount}
+                        memberCount={list.memberCount}
+                        name={list.name}
+                        owner={list.owner}
+                        previews={list.previews ?? []}
+                        kind={list.kind ?? 'watch'}
+                        covers={list.covers ?? []}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted">
+            {intl.formatMessage(musicOn ? messages.empty : messages.emptyWatch)}
+          </p>
+        )}
+        <PlexLists />
+      </div>
     </>
   );
 };

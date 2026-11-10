@@ -35,6 +35,7 @@ import MusicMetadata from '@server/entity/MusicMetadata';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
 import OidcLink from '@server/entity/OidcLink';
 import OverrideRule from '@server/entity/OverrideRule';
+import PlexListFollow from '@server/entity/PlexListFollow';
 import QualityApply from '@server/entity/QualityApply';
 import QualityGrabNote from '@server/entity/QualityGrabNote';
 import QualityManaged from '@server/entity/QualityManaged';
@@ -103,6 +104,7 @@ const entities = [
   NotificationDelivery,
   OidcLink,
   OverrideRule,
+  PlexListFollow,
   QualityApply,
   QualityGrabNote,
   QualityManaged,

@@ -31,7 +31,19 @@ export interface RequestMissingResult {
   outcome: RequestMissingOutcome;
   /** Why it couldn't be requested, in user-facing words. */
   message?: string;
+  /**
+   * Refused only for now (the request limit, or a failure that wasn't about
+   * the title): worth trying again later.
+   */
+  retryLater?: boolean;
 }
+
+/** Refusals that will stand: asking again later gets the same answer. */
+const settled = (e: unknown): boolean =>
+  e instanceof RequestPermissionError ||
+  e instanceof BlocklistedMediaError ||
+  e instanceof DuplicateMediaRequestError ||
+  e instanceof NoSeasonsAvailableError;
 
 /** A refusal reason in plain words. */
 const refusal = (e: unknown): string => {
@@ -63,7 +75,11 @@ const refusal = (e: unknown): string => {
 export const requestMissing = async (
   tmdbId: number,
   mediaType: 'movie' | 'tv',
-  user: User
+  user: User,
+  options: {
+    /** Made by a sync on the person's behalf, as watchlist sync's are. */
+    isAutoRequest?: boolean;
+  } = {}
 ): Promise<RequestMissingResult> => {
   const media = await getRepository(Media).findOne({
     where: {
@@ -115,13 +131,13 @@ export const requestMissing = async (
       await MediaRequest.request(
         { mediaId: tmdbId, mediaType: MediaType.TV, seasons },
         user,
-        { refuseOverQuota: true }
+        { refuseOverQuota: true, isAutoRequest: options.isAutoRequest }
       );
     } else {
       await MediaRequest.request(
         { mediaId: tmdbId, mediaType: MediaType.MOVIE },
         user,
-        { refuseOverQuota: true }
+        { refuseOverQuota: true, isAutoRequest: options.isAutoRequest }
       );
     }
 
@@ -133,6 +149,12 @@ export const requestMissing = async (
       mediaType,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
-    return { outcome: 'failed', message: refusal(e) };
+    return {
+      outcome: 'failed',
+      message: refusal(e),
+      // Over the limit now, or something that wasn't about this title (TMDB
+      // or the database failing): either may work later.
+      ...(!settled(e) && { retryLater: true }),
+    };
   }
 };

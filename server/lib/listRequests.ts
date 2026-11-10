@@ -41,9 +41,12 @@ export const requestListAdd = async (
     return undefined;
   }
   try {
-    return await titleLock.dispatch(`${mediaType}:${tmdbId}`, () =>
-      requestMissing(tmdbId, mediaType, user)
+    // Whether to retry is for syncs, not for the person adding.
+    const { outcome, message } = await titleLock.dispatch(
+      `${mediaType}:${tmdbId}`,
+      () => requestMissing(tmdbId, mediaType, user)
     );
+    return { outcome, ...(message !== undefined && { message }) };
   } catch (e) {
     logger.warn('Could not request a title added to a list', {
       label: 'API',

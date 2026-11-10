@@ -6,6 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
+- **Plex Lists** on the Lists page, for people signed in with Plex: your own lists from Plex's **My Lists**, numbered when ranked. Start a new one (private to begin with), copy one into a Seerr AI list, or tick **Request titles added to this list on Plex** so what you add to it later is requested for you. **Add to List** on any title now includes your Plex lists too, and adding there puts the title on the list on Plex.
 - Backfill can search through Sonarr, Radarr and Lidarr instead of Prowlarr, or both (Settings → Backfill → **Search with**), so it works without Prowlarr. Prowlarr searches under every name a title goes by and finds more for stuck titles; the *arrs search with their own ids. Setups with Prowlarr keep using it.
 - Approve or decline requests from Discord with Seerr AI's own bot (Settings → Notifications → **Discord Bot**, off to start). It posts each request waiting for approval to a channel you pick, with Approve and Decline buttons; Decline asks for an optional reason. It needs no open port, and the page walks you through creating the bot, inviting it, picking the channel and linking approvers.
 - Approve or decline straight from ntfy (Settings → Notifications → ntfy → **Approve and Decline Buttons**; needs the Application URL) and from Telegram (Settings → Notifications → Telegram → **Approve and Decline Buttons**; no port to open).
@@ -16,6 +17,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - The Docker image no longer carries npm, npx, corepack or yarn, which Seerr AI never uses, and runs Node directly instead of through npm.
 - Nightly **Database Maintenance** also clears the Discord bot's records of requests that were dealt with over a day ago.
+- When Backfill gives up on a torrent that nobody sharing it has a complete copy of, it now says so in those words, and that it will try a different release.
 
 ### Fixed
 

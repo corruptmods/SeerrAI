@@ -1,3 +1,4 @@
+import PlexListPicker from '@app/components/AddToList/PlexListPicker';
 import Button from '@app/components/Common/Button';
 import Modal from '@app/components/Common/Modal';
 import { messages as requestMessages } from '@app/hooks/useBulkRequest';
@@ -234,6 +235,12 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
           <PlusIcon className="h-4 w-4" />
         </button>
       </div>
+
+      <PlexListPicker
+        mediaType={mediaType}
+        onRequest={reportRequest}
+        tmdbId={tmdbId}
+      />
     </>
   );
 

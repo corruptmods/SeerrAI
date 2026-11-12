@@ -10,12 +10,43 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `b185621e` (2 November 2026).
-Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
-people's details and issues in a title's media info) by `mediaForViewer`,
-done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
-credentials in every embedded user) by `User.toJSON`. Start the next read
-from that commit.
+Upstream `develop` has been read through `a05a7978` (12 November 2026).
+Start the next read from that commit.
+
+From `3f7d5c3b` to `a05a7978`, three security fixes landed (`8828c519`,
+`eeead16f`, `66d31daf`) and all three were already covered here:
+- A password change accepted a wrong current password, because the check
+  read a user loaded without the password: the fork's check was already on
+  `userWithPassword`.
+- A user manager could demote another admin, then delete them or reset
+  their password: `mayManageUser` already lets only the owner change another
+  admin, stops anyone changing their own permissions, and guards every
+  route upstream patched plus the fork's own (devices, API keys, passkeys,
+  linked accounts).
+- The image cache grew without limit and kept dot-segment, encoded and
+  repeated-slash copies of a path: each source here takes only its own file
+  path shape, only signed-in users add images, and the admin's size limit
+  removes the least recently used on every write. What upstream added that
+  was missing: the proxy now refuses requests while image caching is off,
+  as nothing in the app links to it then.
+#3711 (Node.js 22.23.5, the November 2026 security release) is taken with
+the same image digest. #3677 (allowing Node 24) isn't: CI here reads the
+Node version from `engines`, so it would move CI onto Node 24. #3712 (the
+Trivy step order) doesn't apply; the signing job here doesn't check out
+the repository. The rest was translations.
+
+From `b185621e` to `3f7d5c3b` (2.4.3): fixes taken, improved on: Jellyfin
+specials inside a season, the SQLite migrations with double-quoted names
+(and every SQLite migration replayed with that quoting off, which found no
+others), GitHub caching for six hours, a shallow Manage panel close and
+season-aware polling. The advanced-request permission fix, the Helm
+scale-to-0 change and the label fixes were already here.
+
+Before that, through `b185621e` (2 November 2026), the two security
+advisories are covered: GHSA-xc6j-6p6h-p799 (other people's details and
+issues in a title's media info) by `mediaForViewer`, done here before
+upstream's fix; GHSA-8j73-j6rc-q8xh (notification credentials in every
+embedded user) by `User.toJSON`.
 
 From `c0759ce07` to `b185621e`: #3579 is taken (abandoned seasons settled
 at the end of a Sonarr run). It keeps the fork's own rules: a series Sonarr

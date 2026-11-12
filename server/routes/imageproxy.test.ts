@@ -1,4 +1,5 @@
 import { musicImageProxy, tmdbImageProxy } from '@server/lib/imageproxy';
+import { getSettings } from '@server/lib/settings';
 import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
 import axios from 'axios';
 import cookieParser from 'cookie-parser';
@@ -38,6 +39,7 @@ const cookieFor = (sid: string) => {
 const SIGNED_IN = { cookie: cookieFor('signed-in') };
 
 before(async () => {
+  getSettings().main.cacheImages = true;
   realJpeg = await sharp({
     create: { width: 1920, height: 800, channels: 3, background: '#3a6ea5' },
   })
@@ -198,6 +200,18 @@ describe('GET /imageproxy/tmdb/...', () => {
     assert.equal(res.status, 404);
     // The browser needn't revalidate while the server wouldn't either.
     assert.equal(res.headers.get('cache-control'), 'public, max-age=600');
+  });
+
+  it('stores nothing while image caching is off', async () => {
+    getSettings().main.cacheImages = false;
+    upstream = [];
+    try {
+      const res = await get(poster('off'), SIGNED_IN);
+      assert.equal(res.status, 404);
+      assert.deepEqual(upstream, []);
+    } finally {
+      getSettings().main.cacheImages = true;
+    }
   });
 
   it('refuses anything that is not an image path', async () => {

@@ -2,6 +2,13 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Security
+
+- Node.js 22.23.5, the November 2026 security release ([release notes](https://nodejs.org/en/blog/release/v22.23.5)).
+- With image caching off, the image proxy stores nothing at all.
+
 ## 2.4.3 (10 November 2026)
 
 Plex Lists in Seerr AI, approving requests from Discord, ntfy and Telegram, Backfill without Prowlarr, new seasons as soon as they're announced, removing people who lose access, trailers in the page, and fixes from upstream Seerr.

@@ -18,6 +18,7 @@ import {
   MUSIC_IMAGE_ORIGINS,
   TADB_PATH,
 } from '@server/lib/music/imageSources';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { MUSIC_NOT_SET_UP, MUSIC_OFF } from '@server/middleware/music';
 import cookieParser from 'cookie-parser';
@@ -375,6 +376,12 @@ router.get<{
   type: string;
   path: string[];
 }>('/:type/*path', async (req, res, next) => {
+  // The app links here only while image caching is on (Settings → General);
+  // with it off, nothing should be stored on the server's disk.
+  if (!getSettings().main.cacheImages) {
+    return next({ status: 404, message: 'Image caching is off.' });
+  }
+
   // Most backdrop URLs in the app have a double slash
   // ("/w1920_and_h800_multi_faces//x.jpg"). TMDB accepts either, so collapse
   // them.

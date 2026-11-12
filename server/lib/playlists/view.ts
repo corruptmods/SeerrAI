@@ -97,6 +97,30 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
     where: { listId: list.id, state: Not('removed') },
     order: { position: 'ASC' },
   });
+  const waitingToSearch = await albumsWaitingToSearch(
+    songs
+      .filter(
+        (song) =>
+          (song.state === 'requested' || song.state === 'approval') &&
+          song.recordingMbid
+      )
+      .map((song) => song.recordingMbid!)
+  );
+  return {
+    waitingToSearch,
+    sourceUrl: list.sourceUrl ?? null,
+    sourceService: list.sourceService ?? null,
+    sourceName: list.sourceName ?? null,
+    sourceReadAt: list.sourceReadAt ?? null,
+    sourceProblem: list.sourceProblem ?? null,
+    songs: await songViews(songs),
+  };
+};
+
+/** Playlist songs as shown, each following its request. */
+export const songViews = async (
+  songs: MediaListSong[]
+): Promise<PlaylistSongView[]> => {
   const requestIds = [
     ...new Set(
       songs.map((s) => s.requestId).filter((id): id is number => !!id)
@@ -139,44 +163,27 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
   const progress = await songProgress(
     requests.flatMap((request) => request.songs ?? [])
   );
-  const waitingToSearch = await albumsWaitingToSearch(
-    songs
-      .filter(
-        (song) =>
-          (song.state === 'requested' || song.state === 'approval') &&
-          song.recordingMbid
-      )
-      .map((song) => song.recordingMbid!)
-  );
-  return {
-    waitingToSearch,
-    sourceUrl: list.sourceUrl ?? null,
-    sourceService: list.sourceService ?? null,
-    sourceName: list.sourceName ?? null,
-    sourceReadAt: list.sourceReadAt ?? null,
-    sourceProblem: list.sourceProblem ?? null,
-    songs: songs.map((song) => ({
-      id: song.id,
-      title: song.title,
-      artistName: song.artistName,
-      length: song.length ?? null,
-      artistMbid: song.artistMbid ?? null,
-      recordingMbid: song.recordingMbid ?? null,
-      albumMbid: song.albumMbid ?? null,
-      state: shownState(song, song.requestId ? statusOf(song) : undefined),
-      problem:
-        song.state === 'failed' ||
-        (song.state === 'waiting' && song.problem && song.problem !== 'limit')
-          ? (song.problem ?? null)
-          : null,
-      progress:
-        song.requestId && song.recordingMbid
-          ? (progress.get(song.recordingMbid) ?? null)
-          : null,
-      addToMusicBrainz:
-        song.state === 'unmatched' && song.catalog?.albumId
-          ? addToMusicBrainzUrl(song.catalog.albumId)
-          : null,
-    })),
-  };
+  return songs.map((song) => ({
+    id: song.id,
+    title: song.title,
+    artistName: song.artistName,
+    length: song.length ?? null,
+    artistMbid: song.artistMbid ?? null,
+    recordingMbid: song.recordingMbid ?? null,
+    albumMbid: song.albumMbid ?? null,
+    state: shownState(song, song.requestId ? statusOf(song) : undefined),
+    problem:
+      song.state === 'failed' ||
+      (song.state === 'waiting' && song.problem && song.problem !== 'limit')
+        ? (song.problem ?? null)
+        : null,
+    progress:
+      song.requestId && song.recordingMbid
+        ? (progress.get(song.recordingMbid) ?? null)
+        : null,
+    addToMusicBrainz:
+      song.state === 'unmatched' && song.catalog?.albumId
+        ? addToMusicBrainzUrl(song.catalog.albumId)
+        : null,
+  }));
 };

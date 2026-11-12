@@ -103,6 +103,7 @@ A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by p
 - **On the home page:** an import shows as one card, **Playlist import**, in **Recent Music Requests**, with a status pill and how its songs are getting on. Both update by themselves while songs are on their way.
 - **Finding songs takes time:** each is looked up on MusicBrainz, which answers one request a second, after anything you're browsing. It carries on in the background and after a restart, so you can leave the page.
 - **Unlink** stops new songs coming in; the songs stay. A song taken off a linked playlist isn't read back in.
+- **Adding one song:** apps such as Pluet add a song at a time through the API (`POST /api/v1/list/{id}/song`), with its title and artist, and its album, length and MusicBrainz ids when the media server has them. Those ids find the very recording; the album picks the version on it. It goes at the end and is requested in the owner's name like the rest, and it stays on a linked playlist. A song already on the playlist isn't added again, and one taken off is put back. The owner and people who accepted the playlist may add.
 
 ### Roulette
 

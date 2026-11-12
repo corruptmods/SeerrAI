@@ -895,6 +895,8 @@ interface FullPublicSettings extends PublicSettings {
    * CSS is allowed.
    */
   customCss: { server: string | null; personal: boolean };
+  /** POST /list/:listId/song adds one song to a playlist. */
+  playlistSongAdd: true;
 }
 
 export interface NotificationAgentConfig {
@@ -1846,6 +1848,7 @@ class Settings {
         server: cssVersion(this.appearance.serverCss),
         personal: this.appearance.personalCss === true,
       },
+      playlistSongAdd: true,
     };
   }
 

@@ -1149,3 +1149,182 @@ describe('a song Deezer lists', () => {
     );
   });
 });
+
+describe('a song added to a playlist', () => {
+  const OTHER_ALBUM = 'a1b2c3d4-0010-4000-8000-000000000010';
+  const HARBOUR_LIGHTS = '9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a';
+  const TRACK = 'f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f';
+  const onAlbum: MbRecording = {
+    id: OTHER_ALBUM,
+    title: 'Lantern Song',
+    length: 214_000,
+    'artist-credit': credit,
+    releases: [onRelease(HARBOUR_LIGHTS, 'Harbour Lights', 'Album')],
+  };
+  let idSearches: string[][];
+
+  beforeEach(() => {
+    idSearches = [];
+    RECORDINGS.push(onAlbum);
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordingsByIds',
+      async (ids: string[]) => {
+        idSearches.push(ids);
+        const found = RECORDINGS.filter(
+          (r) => ids.includes(r.id) || (ids.includes(TRACK) && r.id === LANTERN)
+        );
+        return { count: found.length, offset: 0, recordings: found };
+      }
+    );
+    mock.method(
+      MusicBrainz.prototype,
+      'searchReleaseGroupsByIds',
+      async (ids: string[]) => ({
+        count: ids.includes(HARBOUR_LIGHTS) ? 1 : 0,
+        offset: 0,
+        'release-groups': ids.includes(HARBOUR_LIGHTS)
+          ? [{ id: HARBOUR_LIGHTS, title: 'Harbour Lights' }]
+          : [],
+      })
+    );
+    mock.method(MusicBrainz.prototype, 'keepRecordings', async () => undefined);
+  });
+
+  afterEach(() => {
+    RECORDINGS.splice(RECORDINGS.indexOf(onAlbum), 1);
+  });
+
+  const stored = async (list: MediaList, title: string) =>
+    getRepository(MediaListSong).findOneByOrFail({ listId: list.id, title });
+
+  it('goes at the end, matched and requested for the owner', async () => {
+    const list = await linked();
+    const { added, song } = await playlists.addSong(list, {
+      title: 'Night Swim',
+      artistName: 'Someone Else',
+      length: 190_000,
+    });
+    assert.equal(added, true);
+    assert.equal(song.position, 3);
+    assert.equal(song.requestForId, user.id);
+    assert.ok(song.sourceId.startsWith('added:'));
+    await playlists.settled();
+    assert.equal((await stored(list, 'Night Swim')).listId, list.id);
+  });
+
+  it('is not added twice, by title and artist or by recording', async () => {
+    const list = await makePlaylist();
+    const first = await playlists.addSong(list, {
+      title: 'Lantern Song',
+      artistName: 'Glasswing',
+      mbids: [LANTERN],
+    });
+    await playlists.settled();
+    const again = await playlists.addSong(list, {
+      title: ' lantern song ',
+      artistName: 'GLASSWING',
+    });
+    assert.equal(again.added, false);
+    assert.equal(again.song.id, first.song.id);
+    const byId = await playlists.addSong(list, {
+      title: 'Lantern Song (Radio Edit)',
+      artistName: 'Glasswing',
+      mbids: [LANTERN.toUpperCase()],
+    });
+    assert.equal(byId.added, false);
+    assert.equal(
+      await getRepository(MediaListSong).count({ where: { listId: list.id } }),
+      1
+    );
+  });
+
+  it('is put back when it had been taken off', async () => {
+    const list = await makePlaylist();
+    const { song } = await playlists.addSong(list, {
+      title: 'Unheard Tune',
+      artistName: 'Glasswing',
+    });
+    await playlists.settled();
+    await getRepository(MediaListSong).update(song.id, { state: 'removed' });
+    const again = await playlists.addSong(list, {
+      title: 'Unheard Tune',
+      artistName: 'Glasswing',
+    });
+    assert.equal(again.added, false);
+    assert.notEqual(again.song.state, 'removed');
+    await playlists.settled();
+    assert.notEqual((await stored(list, 'Unheard Tune')).state, 'removed');
+  });
+
+  it('is the recording its MusicBrainz recording id names', async () => {
+    const list = await makePlaylist();
+    await playlists.addSong(list, {
+      title: 'Lantern Song',
+      artistName: 'Glasswing',
+      // The album take, though the radio edit is nearer this length.
+      length: 214_000,
+      mbids: [LANTERN_ALBUM, 'not-an-id'],
+    });
+    await playlists.settled();
+    assert.deepEqual(idSearches[0], [LANTERN_ALBUM]);
+    assert.equal(
+      (await stored(list, 'Lantern Song')).recordingMbid,
+      LANTERN_ALBUM
+    );
+  });
+
+  it('is the recording its track id is of', async () => {
+    const list = await makePlaylist();
+    await playlists.addSong(list, {
+      title: 'Lantern Song',
+      artistName: 'Glasswing',
+      mbids: [TRACK],
+    });
+    await playlists.settled();
+    assert.equal((await stored(list, 'Lantern Song')).recordingMbid, LANTERN);
+  });
+
+  it('prefers the album it is on, by id or by title', async () => {
+    const byId = await makePlaylist();
+    await playlists.addSong(byId, {
+      title: 'Lantern Song',
+      artistName: 'Glasswing',
+      length: 214_000,
+      mbids: [HARBOUR_LIGHTS],
+    });
+    const byTitle = await makePlaylist();
+    await playlists.addSong(byTitle, {
+      title: 'Lantern Song',
+      artistName: 'Glasswing',
+      albumTitle: 'Harbour Lights',
+      length: 214_000,
+    });
+    await playlists.settled();
+    assert.equal(
+      (await stored(byId, 'Lantern Song')).recordingMbid,
+      OTHER_ALBUM
+    );
+    assert.equal(
+      (await stored(byTitle, 'Lantern Song')).recordingMbid,
+      OTHER_ALBUM
+    );
+  });
+
+  it('stays on a linked playlist after its next read', async () => {
+    const list = await linked();
+    await playlists.addSong(list, {
+      title: 'Static Garden',
+      artistName: 'Glasswing',
+    });
+    await playlists.settled();
+    // A day later, so the playlist is read again.
+    await playlists.sync(Date.now() + 2 * 24 * 60 * 60_000);
+    await playlists.settled();
+    assert.equal(
+      (await stored(list, 'Static Garden')).sourceId,
+      'added:static garden|glasswing'
+    );
+    assert.notEqual((await stored(list, 'Static Garden')).state, 'removed');
+  });
+});

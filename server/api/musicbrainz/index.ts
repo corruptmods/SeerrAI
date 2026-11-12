@@ -463,6 +463,51 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
+   * Recordings named by any of these ids, as a recording id or as a track
+   * id (a recording's appearance on one release): media servers store
+   * either, and a search answers both at once, with nothing for an id that
+   * is neither.
+   */
+  public searchRecordingsByIds(
+    ids: string[],
+    priority: MbPriority = 'background'
+  ): Promise<MbRecordingSearchResponse> {
+    const wanted = [...new Set(ids.filter(isMbid))].sort();
+    if (!wanted.length) {
+      return Promise.resolve({ count: 0, offset: 0, recordings: [] });
+    }
+    const any = `(${wanted.join(' OR ')})`;
+    return this.searched(`search-rec-ids:${wanted.join(',')}`, () =>
+      this.request<MbRecordingSearchResponse>(priority, '/ws/2/recording', {
+        query: `rid:${any} OR tid:${any}`,
+        limit: 25,
+      })
+    );
+  }
+
+  /**
+   * Release groups named by any of these ids, as a release group or as one
+   * of its releases, so a media server's album id of either kind finds it.
+   */
+  public searchReleaseGroupsByIds(
+    ids: string[],
+    priority: MbPriority = 'background'
+  ): Promise<MbReleaseGroupSearchResponse> {
+    const wanted = [...new Set(ids.filter(isMbid))].sort();
+    if (!wanted.length) {
+      return Promise.resolve({ count: 0, offset: 0, 'release-groups': [] });
+    }
+    const any = `(${wanted.join(' OR ')})`;
+    return this.searched(`search-rg-ids:${wanted.join(',')}`, () =>
+      this.request<MbReleaseGroupSearchResponse>(
+        priority,
+        '/ws/2/release-group',
+        { query: `rgid:${any} OR reid:${any}`, limit: 25 }
+      )
+    );
+  }
+
+  /**
    * Caches search results as recording lookups, which use the same search
    * by id, so requesting the song later needs no second request.
    */

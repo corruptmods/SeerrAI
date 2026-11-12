@@ -1,3 +1,4 @@
+import { isMbid, musicBrainz } from '@server/api/musicbrainz';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { PlaylistSongState } from '@server/entity/MediaList';
@@ -16,14 +17,19 @@ import { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import type { CatalogSong } from '@server/lib/music/catalogSong';
 import { catalogOn, catalogSong } from '@server/lib/music/catalogSong';
-import { songByIsrc, songNamed } from '@server/lib/music/charts';
+import { plainName, songByIsrc, songNamed } from '@server/lib/music/charts';
 import {
   NotTheArtistsSongError,
   UnrequestableSongError,
 } from '@server/lib/music/requestSongs';
 import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import type { Song, SongVersion } from '@server/lib/music/songs';
-import { albumFor, otherTake, singleFor } from '@server/lib/music/songs';
+import {
+  albumFor,
+  otherTake,
+  singleFor,
+  toVersion,
+} from '@server/lib/music/songs';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
@@ -64,6 +70,22 @@ const LENGTH_SLACK_MS = 8000;
 
 export class PlaylistLinkError extends Error {}
 
+/** A song added one at a time, as a media server knows it. */
+export interface AddedSong {
+  title: string;
+  artistName: string;
+  albumTitle?: string | null;
+  /** Milliseconds. */
+  length?: number | null;
+  /** MusicBrainz ids of any kind: recording, track, release, release group. */
+  mbids?: string[];
+}
+
+/** A song added one at a time has this before its source id. */
+export const ADDED_PREFIX = 'added:';
+/** Ids kept for a song; more says nothing a media server would. */
+export const MOST_SONG_IDS = 8;
+
 /**
  * True when a version is on the artist's single or EP, or on their album
  * while taking songs from albums is possible. Compilation-only versions
@@ -73,20 +95,30 @@ const fetchable = (version: SongVersion): boolean =>
   !!version.releaseGroups &&
   (!!singleFor(version) || (!songFetchProblem() && !!albumFor(version)));
 
+/** The album a song is on, as its adder named it: ids, title, or both. */
+export interface AlbumHint {
+  releaseGroupIds?: string[];
+  title?: string | null;
+}
+
 /**
- * The version a playlist means: nearest in length, else best known,
- * preferring requestable ones. Never a take the title doesn't name (live,
- * remix…), even if nearer in length. Undefined if only those exist.
+ * The version a playlist means: on the album named, when one is and a
+ * version is on it; then nearest in length, else best known, preferring
+ * requestable ones. Never a take the title doesn't name (live, remix…), even
+ * if nearer in length. Undefined if only those exist.
  */
 export const versionFor = (
   song: Song,
   length: number | null | undefined,
-  title: string
+  title: string,
+  album?: AlbumHint
 ): SongVersion | undefined => {
-  const same = song.versions.filter(
+  let same = song.versions.filter(
     (v) => !otherTake(`${v.title} ${v.version ?? ''}`, title)
   );
   if (!same.length) return undefined;
+  const onAlbum = album ? same.filter((v) => isOnAlbum(v, album)) : [];
+  if (onAlbum.length) same = onAlbum;
   const requestable = same.filter(fetchable);
   const versions = requestable.length ? requestable : same;
   if (length) {
@@ -105,7 +137,51 @@ export const versionFor = (
   return versions[0];
 };
 
+/** Whether a version is on the album named (by id, else by title). */
+const isOnAlbum = (version: SongVersion, album: AlbumHint): boolean => {
+  if (album.releaseGroupIds?.length) {
+    return version.releaseGroups.some((group) =>
+      album.releaseGroupIds!.includes(group.mbId)
+    );
+  }
+  const wanted = album.title && plainName(album.title);
+  return (
+    !!wanted &&
+    version.releaseGroups.some((group) => plainName(group.title) === wanted)
+  );
+};
+
 const describe = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * What a media server's MusicBrainz ids say about a song: the recording
+ * itself (by recording or track id) when it's a real one, and the albums it
+ * names (by release group or release id). Throws when MusicBrainz can't be
+ * reached, so the song waits for the next pass.
+ */
+const fromMediaServerIds = async (
+  ids: string[]
+): Promise<{ version?: SongVersion; releaseGroupIds: string[] }> => {
+  const mb = musicBrainz();
+  const recordings =
+    (await mb.searchRecordingsByIds(ids, 'background')).recordings ?? [];
+  // A recording id over a track id, should both find one.
+  const ordered = [
+    ...recordings.filter((r) => ids.includes(r.id)),
+    ...recordings.filter((r) => !ids.includes(r.id)),
+  ];
+  for (const recording of ordered) {
+    const version = toVersion(recording);
+    if (version) {
+      await mb.keepRecordings([recording]);
+      return { version, releaseGroupIds: [] };
+    }
+  }
+  const groups =
+    (await mb.searchReleaseGroupsByIds(ids, 'background'))['release-groups'] ??
+    [];
+  return { releaseGroupIds: groups.map((group) => group.id) };
+};
 
 class Playlists {
   private running = false;
@@ -239,6 +315,71 @@ class Playlists {
       sourceReadAt: null,
       sourceProblem: null,
     });
+  }
+
+  /**
+   * Adds one song, matched and requested for the playlist's owner like a
+   * linked one. A song already on it (the same recording, or the same title
+   * and artist) isn't added twice; one removed from it is put back.
+   */
+  public async addSong(
+    list: MediaList,
+    input: AddedSong
+  ): Promise<{ added: boolean; song: MediaListSong }> {
+    const repo = getRepository(MediaListSong);
+    const title = input.title.trim().slice(0, 250);
+    const artistName = input.artistName.trim().slice(0, 250);
+    const ids = [
+      ...new Set((input.mbids ?? []).map((id) => id.trim().toLowerCase())),
+    ].filter(isMbid);
+    const key = `${plainName(title)}|${plainName(artistName)}`;
+
+    const onList = await repo.find({ where: { listId: list.id } });
+    const already =
+      onList.find((s) => s.recordingMbid && ids.includes(s.recordingMbid)) ??
+      onList.find(
+        (s) => `${plainName(s.title)}|${plainName(s.artistName)}` === key
+      );
+    if (already) {
+      if (already.state === 'removed') {
+        // Requested before, or not: matching again sorts out which.
+        already.state = already.recordingMbid ? 'matched' : 'matching';
+        already.problem = null;
+        await repo.update(
+          { id: already.id, state: 'removed' },
+          { state: already.state, problem: null }
+        );
+        this.kick();
+      }
+      return { added: false, song: already };
+    }
+
+    const last = onList.reduce((max, s) => Math.max(max, s.position), -1);
+    const song = new MediaListSong({
+      listId: list.id,
+      // Not any service's id, so a linked playlist's next read keeps it.
+      sourceId: `${ADDED_PREFIX}${key}`.slice(0, 250),
+      position: last + 1,
+      title,
+      artistName,
+      albumTitle: input.albumTitle?.trim().slice(0, 250) || null,
+      length: input.length ?? null,
+      sourceMbids: ids.length ? ids.slice(0, MOST_SONG_IDS) : null,
+      state: 'matching',
+      requestForId: list.ownerId,
+    });
+    try {
+      await repo.save(song);
+    } catch (e) {
+      // Added at the same moment by someone else.
+      const twin = await repo.findOne({
+        where: { listId: list.id, sourceId: song.sourceId },
+      });
+      if (twin) return { added: false, song: twin };
+      throw e;
+    }
+    this.kick();
+    return { added: true, song };
   }
 
   /** Appends new songs for matching. Returns how many were added. */
@@ -383,7 +524,37 @@ class Playlists {
       take: MATCH_PER_PASS + 1,
     });
     for (const song of songs.slice(0, MATCH_PER_PASS)) {
-      const pick = (s: Song) => versionFor(s, song.length, song.title);
+      // A song added from a media server names its recording or album.
+      let album: AlbumHint = { title: song.albumTitle };
+      if (song.sourceMbids?.length) {
+        let hinted: Awaited<ReturnType<typeof fromMediaServerIds>>;
+        try {
+          hinted = await fromMediaServerIds(song.sourceMbids);
+        } catch (e) {
+          logger.debug('Could not look a song’s MusicBrainz ids up', {
+            label: LABEL,
+            errorMessage: describe(e),
+          });
+          return false;
+        }
+        if (hinted.version) {
+          await repo.update(
+            { id: song.id, state: 'matching' },
+            {
+              state: 'matched',
+              recordingMbid: hinted.version.mbId,
+              artistMbid: hinted.version.artistMbid,
+              albumMbid: hinted.version.from?.mbId ?? null,
+              problem: null,
+            }
+          );
+          continue;
+        }
+        if (hinted.releaseGroupIds.length) {
+          album = { ...album, releaseGroupIds: hinted.releaseGroupIds };
+        }
+      }
+      const pick = (s: Song) => versionFor(s, song.length, song.title, album);
       // Deezer listing for the ISRC. If Deezer fails, match by name.
       let catalog: CatalogSong | null | undefined;
       if (catalogOn()) {

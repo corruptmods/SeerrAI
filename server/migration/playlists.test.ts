@@ -3,8 +3,10 @@ import { MediaList, MediaListSong } from '@server/entity/MediaList';
 import { User } from '@server/entity/User';
 import { AddPlaylists1796800000000 as PostgresMigration } from '@server/migration/postgres/1796800000000-AddPlaylists';
 import { AddPlaylistSongCatalog1797500000000 as PostgresCatalog } from '@server/migration/postgres/1797500000000-AddPlaylistSongCatalog';
+import { AddPlaylistSongHints1798500000000 as PostgresHints } from '@server/migration/postgres/1798500000000-AddPlaylistSongHints';
 import { AddPlaylists1796800000000 as SqliteMigration } from '@server/migration/sqlite/1796800000000-AddPlaylists';
 import { AddPlaylistSongCatalog1797500000000 as SqliteCatalog } from '@server/migration/sqlite/1797500000000-AddPlaylistSongCatalog';
+import { AddPlaylistSongHints1798500000000 as SqliteHints } from '@server/migration/sqlite/1798500000000-AddPlaylistSongHints';
 import { setupTestDb } from '@server/test/db';
 import { isPgsql } from '@server/utils/dbType';
 import assert from 'node:assert/strict';
@@ -26,6 +28,7 @@ describe('the playlists migration', () => {
     );
     const migration = isPgsql ? new PostgresMigration() : new SqliteMigration();
     const catalog = isPgsql ? new PostgresCatalog() : new SqliteCatalog();
+    const hints = isPgsql ? new PostgresHints() : new SqliteHints();
     const runner = dataSource.createQueryRunner();
     try {
       await migration.down(runner);
@@ -37,6 +40,7 @@ describe('the playlists migration', () => {
 
       await migration.up(runner);
       await catalog.up(runner);
+      await hints.up(runner);
       const old = await getRepository(MediaList).findOneByOrFail({
         name: 'Friday films',
       });
@@ -50,6 +54,22 @@ describe('the playlists migration', () => {
         .map((q) => q.query)
         .filter((q) => /media_list/.test(q));
       assert.deepEqual(ours, []);
+
+      // The song hints come off and go back on.
+      await hints.down(runner);
+      assert.equal(
+        await runner.hasColumn('media_list_song', 'albumTitle'),
+        false
+      );
+      assert.equal(
+        await runner.hasColumn('media_list_song', 'sourceMbids'),
+        false
+      );
+      await hints.up(runner);
+      assert.equal(
+        await runner.hasColumn('media_list_song', 'sourceMbids'),
+        true
+      );
     } finally {
       await runner.release();
     }

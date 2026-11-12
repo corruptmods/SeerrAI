@@ -2166,6 +2166,10 @@ components:
               nullable: true
             personal:
               type: boolean
+        playlistSongAdd:
+          type: boolean
+          description: True when POST /list/{listId}/song adds songs to playlists.
+          example: true
         mediaServers:
           type: array
           description: The connected media servers, the primary one first.
@@ -13203,6 +13207,80 @@ paths:
       responses:
         '204':
           description: Unlinked
+  /list/{listId}/song:
+    post:
+      summary: Add a song to a playlist
+      description: Adds one song to the end of the playlist, as a media server knows it. It's matched on MusicBrainz (by its ids when given, else by title, artist, album and length) and requested for the playlist's owner, as linked songs are. On a linked playlist it stays after the next sync. The owner and members who accepted may add.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - artistName
+              properties:
+                title:
+                  type: string
+                  maxLength: 250
+                artistName:
+                  type: string
+                  maxLength: 250
+                albumTitle:
+                  type: string
+                  maxLength: 250
+                length:
+                  type: integer
+                  minimum: 1
+                  description: Length in milliseconds
+                mbids:
+                  type: array
+                  maxItems: 20
+                  description: MusicBrainz ids the media server has for it, in any mix of recording, track, album and release-group ids
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Already on the playlist (put back if it had been taken off)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: boolean
+                    example: false
+                  song:
+                    type: object
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: boolean
+                    example: true
+                  song:
+                    type: object
+        '400':
+          description: No title or artist, or a field that isn't valid
+        '403':
+          description: Not a member who accepted, or music is turned off
+        '404':
+          description: No such playlist that this person can see
+        '429':
+          description: Too many songs added lately, or too many of the owner's songs still being matched
   /list/{listId}/song/{songId}:
     delete:
       summary: Take a song off a playlist

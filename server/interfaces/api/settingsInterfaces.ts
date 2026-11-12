@@ -89,6 +89,8 @@ export interface PublicSettingsResponse {
   seasons: SeasonCalendar;
   /** Server CSS version (null for none); whether users may add their own. */
   customCss: { server: string | null; personal: boolean };
+  /** POST /list/:listId/song adds one song to a playlist. */
+  playlistSongAdd?: boolean;
 }
 
 export interface CacheItem {

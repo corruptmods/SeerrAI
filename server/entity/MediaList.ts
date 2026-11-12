@@ -208,6 +208,18 @@ export class MediaListSong {
   @Column({ type: 'integer', nullable: true })
   public length?: number | null;
 
+  /** The album its adder named, to pick the right version when matching. */
+  @Column({ type: 'varchar', nullable: true })
+  public albumTitle?: string | null;
+
+  /**
+   * MusicBrainz ids a media server gave for a song added one at a time:
+   * recording, track, release or release group ids, whichever it has. The
+   * match tries them before the title.
+   */
+  @Column({ type: 'simple-json', nullable: true })
+  public sourceMbids?: string[] | null;
+
   /** The matched MusicBrainz recording. */
   @Column({ type: 'varchar', nullable: true })
   @Index()

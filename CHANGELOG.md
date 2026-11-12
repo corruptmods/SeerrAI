@@ -4,6 +4,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Coming next
 
+### New
+
+- Apps such as Pluet can add one song at a time to a playlist. Its MusicBrainz ids, when the media server has them, find the exact recording; otherwise it's matched by title, artist, album and length. It's requested in the owner's name like the playlist's other songs, and stays on a linked playlist.
+
 ### Security
 
 - Node.js 22.23.5, the November 2026 security release ([release notes](https://nodejs.org/en/blog/release/v22.23.5)).

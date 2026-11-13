@@ -95,7 +95,7 @@ const Season = ({
     <div className="flex flex-col justify-center divide-y divide-subtle">
       <SeasonMissingBar tvId={tvId} seasonNumber={seasonNumber} />
       {onRequestSeason && missing > 0 && (
-        <div className="flex flex-col items-start justify-between gap-2 pb-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-start justify-between gap-2 py-4 sm:flex-row sm:items-center">
           <p className="text-sm text-muted">
             {intl.formatMessage(messages.missing, { count: missing })}
           </p>

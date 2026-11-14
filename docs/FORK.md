@@ -10,8 +10,11 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `a05a7978` (12 November 2026).
+Upstream `develop` has been read through `e59ffce7` (13 November 2026).
 Start the next read from that commit.
+
+From `a05a7978` to `e59ffce7`, only `e59ffce7` landed: newer GitHub Actions.
+The fork's workflows take the same versions, pinned by commit as before.
 
 From `3f7d5c3b` to `a05a7978`, three security fixes landed (`8828c519`,
 `eeead16f`, `66d31daf`) and all three were already covered here:

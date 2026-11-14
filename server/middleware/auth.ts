@@ -6,6 +6,7 @@ import type {
 } from '@server/lib/permissions';
 import type { ApiKeyOutcome } from '@server/lib/personalApiKeys';
 import { authenticateApiKey } from '@server/lib/personalApiKeys';
+import { sessionUser } from '@server/lib/sessionUser';
 import { getSettings } from '@server/lib/settings';
 import { endSessions, stillMaySignInNow } from '@server/lib/signIn';
 import logger from '@server/logger';
@@ -81,11 +82,7 @@ export const checkUser: Middleware = async (req, res, next) => {
     user = outcome.user;
     req.authMethod = 'personalKey';
   } else if (req.session?.userId) {
-    const userRepository = getRepository(User);
-
-    const found = await userRepository.findOne({
-      where: { id: req.session.userId },
-    });
+    const found = await sessionUser(req.session.userId);
     // Someone the media server no longer lets in is signed out everywhere,
     // as their keys stop working.
     if (found && !stillMaySignInNow(found)) {

@@ -11,6 +11,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Faster
 
 - Movie, series and collection pages open straight away when you tap a card, and their details are downloaded once instead of twice.
+- Each request to the server does less database work.
 
 ### Fixed
 

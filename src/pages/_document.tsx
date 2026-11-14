@@ -27,6 +27,8 @@ import { localDay, shownSeason } from '@server/lib/seasons';
 import type { AppProps } from 'next/app';
 import type { DocumentContext, DocumentInitialProps } from 'next/document';
 import Document, { Head, Html, Main, NextScript } from 'next/document';
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
 
 import type { JSX } from 'react';
 
@@ -43,6 +45,35 @@ type ThemedDocumentProps = DocumentInitialProps & {
   season?: SeasonId;
   /** The script nonce in this page's Content-Security-Policy. */
   nonce?: string;
+  interLatin?: string;
+};
+
+let interLatin: string | null | undefined;
+
+/**
+ * Where the build put Inter's Latin file (its name carries a hash), looked up
+ * once. Preloading it lets text paint in Inter instead of swapping from a
+ * fallback. Production builds only: a development server names it otherwise.
+ */
+const interLatinUrl = (): string | undefined => {
+  if (interLatin === undefined) {
+    interLatin = null;
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        const found = readdirSync(
+          path.join(process.cwd(), '.next/static/media')
+        ).filter((name) =>
+          /^inter-latin-wght-normal\.[\w-]+\.woff2$/.test(name)
+        );
+        if (found.length === 1) {
+          interLatin = `/_next/static/media/${found[0]}`;
+        }
+      } catch {
+        // Not found: no preload, the stylesheet still loads it.
+      }
+    }
+  }
+  return interLatin ?? undefined;
 };
 
 /** The script nonce the server put in this page's Content-Security-Policy. */
@@ -125,11 +156,18 @@ class MyDocument extends Document<ThemedDocumentProps> {
       </>
     );
 
-    return { ...initialProps, appearance, season, nonce, styles };
+    return {
+      ...initialProps,
+      appearance,
+      season,
+      nonce,
+      styles,
+      interLatin: interLatinUrl(),
+    };
   }
 
   render(): JSX.Element {
-    const { appearance, season, nonce } = this.props;
+    const { appearance, season, nonce, interLatin } = this.props;
     // The browser loads strings as a cached file (_app's startStrings); drop
     // them from page data (about 400 KB).
     delete (this.props.__NEXT_DATA__.props as { messages?: unknown }).messages;
@@ -138,6 +176,15 @@ class MyDocument extends Document<ThemedDocumentProps> {
     return (
       <Html {...themeAttributes(appearance, season)}>
         <Head nonce={nonce}>
+          {interLatin && (
+            <link
+              rel="preload"
+              href={interLatin}
+              as="font"
+              type="font/woff2"
+              crossOrigin="anonymous"
+            />
+          )}
           <style
             id={THEME_STYLE_ID}
             dangerouslySetInnerHTML={{ __html: themeCss(appearance, season) }}

@@ -29,7 +29,7 @@ import type { NavItem } from '@server/constants/navigation';
 import { sortByNavOrder, withoutHiddenNav } from '@server/constants/navigation';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useRef } from 'react';
 import { useIntl } from 'react-intl';
 
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
@@ -53,8 +53,6 @@ interface SidebarProps {
   setClosed: () => void;
   pendingRequestsCount: number;
   openIssuesCount: number;
-  revalidateIssueCount: () => void;
-  revalidateRequestsCount: () => void;
 }
 
 interface SidebarLinkProps {
@@ -191,8 +189,6 @@ const Sidebar = ({
   setClosed,
   pendingRequestsCount,
   openIssuesCount,
-  revalidateIssueCount,
-  revalidateRequestsCount,
 }: SidebarProps) => {
   const navRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -230,21 +226,6 @@ const Sidebar = ({
         onChange={setDraft}
       />
     ) : null;
-
-  useEffect(() => {
-    if (openIssuesCount) {
-      revalidateIssueCount();
-    }
-
-    if (pendingRequestsCount) {
-      revalidateRequestsCount();
-    }
-  }, [
-    revalidateIssueCount,
-    revalidateRequestsCount,
-    pendingRequestsCount,
-    openIssuesCount,
-  ]);
 
   return (
     <>

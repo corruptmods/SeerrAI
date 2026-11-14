@@ -60,8 +60,6 @@ const messages = defineMessages('components.Layout.MobileMenu', {
 interface MobileMenuProps {
   pendingRequestsCount: number;
   openIssuesCount: number;
-  revalidateIssueCount: () => void;
-  revalidateRequestsCount: () => void;
 }
 
 interface MenuLink {
@@ -83,8 +81,6 @@ interface MenuLink {
 const MobileMenu = ({
   pendingRequestsCount,
   openIssuesCount,
-  revalidateIssueCount,
-  revalidateRequestsCount,
 }: MobileMenuProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -249,21 +245,6 @@ const MobileMenu = ({
   useEffect(() => {
     setIsOpen(false);
   }, [editing]);
-
-  useEffect(() => {
-    if (openIssuesCount) {
-      revalidateIssueCount();
-    }
-
-    if (pendingRequestsCount) {
-      revalidateRequestsCount();
-    }
-  }, [
-    revalidateIssueCount,
-    revalidateRequestsCount,
-    pendingRequestsCount,
-    openIssuesCount,
-  ]);
 
   return (
     // Above Discover's Save bar while arranging the menu.

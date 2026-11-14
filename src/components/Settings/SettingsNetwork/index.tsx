@@ -9,6 +9,7 @@ import {
   proxyListFromText,
   proxyListToText,
 } from '@app/components/Settings/SettingsNetwork/proxyList';
+import { isStatusKey } from '@app/hooks/useAppStatus';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -212,7 +213,7 @@ const SettingsNetwork = () => {
                 apiRequestTimeout: Number(values.apiRequestTimeout) * 1000,
               });
               mutate('/api/v1/settings/public');
-              mutate('/api/v1/status?checkUpdateAvailable=false');
+              mutate(isStatusKey);
 
               addToast(intl.formatMessage(messages.toastSettingsSuccess), {
                 autoDismiss: true,

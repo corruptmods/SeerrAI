@@ -9,6 +9,7 @@ import RegionSelector from '@app/components/RegionSelector';
 import CopyButton from '@app/components/Settings/CopyButton';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
 import { availableLanguages } from '@app/context/LanguageContext';
+import { isStatusKey } from '@app/hooks/useAppStatus';
 import useLocale from '@app/hooks/useLocale';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -241,7 +242,7 @@ const SettingsMain = () => {
                 versionCheck: values?.versionCheck,
               });
               mutate('/api/v1/settings/public');
-              mutate('/api/v1/status?checkUpdateAvailable=false');
+              mutate(isStatusKey);
 
               if (setLocale) {
                 setLocale(

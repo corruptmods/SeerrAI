@@ -59,8 +59,11 @@ export const SettingsProvider = ({
   children,
   currentSettings,
 }: SettingsContextProps) => {
+  // The server sent them with the page: not fetched again straight away.
+  // Later changes come by focus and by the settings pages refreshing them.
   const { data } = useSWR<PublicSettingsResponse>('/api/v1/settings/public', {
     fallbackData: currentSettings,
+    revalidateOnMount: false,
   });
 
   // SWR keeps the last settings on a failed refresh; defaults would turn

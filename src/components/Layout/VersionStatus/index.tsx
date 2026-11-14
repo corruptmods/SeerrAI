@@ -1,4 +1,4 @@
-import useSettings from '@app/hooks/useSettings';
+import useAppStatus from '@app/hooks/useAppStatus';
 import defineMessages from '@app/utils/defineMessages';
 import {
   ArrowUpCircleIcon,
@@ -6,10 +6,8 @@ import {
   CodeBracketIcon,
   ServerIcon,
 } from '@heroicons/react/24/outline';
-import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
 
 const messages = defineMessages('components.Layout.VersionStatus', {
   streamdevelop: 'Seerr AI Develop',
@@ -23,14 +21,8 @@ interface VersionStatusProps {
 }
 
 const VersionStatus = ({ onClick }: VersionStatusProps) => {
-  const settings = useSettings();
   const intl = useIntl();
-  const { data } = useSWR<StatusResponse>(
-    `/api/v1/status?checkUpdateAvailable=${settings.currentSettings.versionCheck}`,
-    {
-      refreshInterval: 60 * 1000,
-    }
-  );
+  const { data } = useAppStatus();
 
   if (!data) {
     return null;

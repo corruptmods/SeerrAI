@@ -21,7 +21,13 @@ export const UserContext = ({ initialUser, children }: UserContextProps) => {
   const router = useRouter();
   const routing = useRef(false);
 
+  // Checked on each new page, but not the first when the server sent the user.
+  const checkedPage = useRef(initialUser ? router.pathname : undefined);
   useEffect(() => {
+    if (checkedPage.current === router.pathname) {
+      return;
+    }
+    checkedPage.current = router.pathname;
     revalidate();
   }, [router.pathname, revalidate]);
 

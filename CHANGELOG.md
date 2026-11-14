@@ -11,7 +11,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Faster
 
 - Movie, series and collection pages open straight away when you tap a card, and their details are downloaded once instead of twice.
+- Pages start with fewer requests, with nothing asked for twice.
+- The sidebar no longer re-checks the request and issue counts each time you scroll or change page.
 - Each request to the server does less database work.
+- Text shows in Inter from the start, rather than switching font as the page loads.
 
 ### Fixed
 

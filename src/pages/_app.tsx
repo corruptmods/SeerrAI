@@ -1,3 +1,4 @@
+import AppBadge from '@app/components/AppBadge';
 import Layout from '@app/components/Layout';
 import LoadingBar from '@app/components/LoadingBar';
 import PWAHeader, { ThemeColour } from '@app/components/PWAHeader';
@@ -13,7 +14,6 @@ import { UserContext } from '@app/context/UserContext';
 import { PushDeviceProvider } from '@app/hooks/usePushDeviceState';
 import useResumePage from '@app/hooks/useResumePage';
 import type { User } from '@app/hooks/useUser';
-import { Permission, useUser } from '@app/hooks/useUser';
 import '@app/styles/globals.css';
 import { retryWithFreshCsrfToken } from '@app/utils/csrfRetry';
 import { loginUrl, safeRedirect } from '@app/utils/loginRedirect';
@@ -229,49 +229,6 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
     };
   }, [currentLocale]);
 
-  const { hasPermission } = useUser();
-  // A boolean, not the function, which is new each render and would re-run
-  // the effect below.
-  const isAdmin = hasPermission(Permission.ADMIN);
-
-  useEffect(() => {
-    const requestsCount = async () => {
-      const response = await axios.get('/api/v1/request/count');
-      return response.data;
-    };
-
-    // The badge methods aren't in the DOM typings.
-    const newNavigator = navigator as unknown as {
-      setAppBadge?: (count: number) => Promise<void>;
-      clearAppBadge?: () => Promise<void>;
-    };
-
-    const handleBadgeUpdate = () => {
-      if ('setAppBadge' in newNavigator) {
-        // Badge failures are ignored rather than surfacing as unhandled errors.
-        if (!router.pathname.match(/(login|setup|resetpassword)/) && isAdmin) {
-          requestsCount()
-            .then((data) =>
-              data.pending > 0
-                ? newNavigator.setAppBadge?.(data.pending)
-                : newNavigator.clearAppBadge?.()
-            )
-            .catch(() => undefined);
-        } else {
-          newNavigator.clearAppBadge?.()?.catch(() => undefined);
-        }
-      }
-    };
-
-    handleBadgeUpdate();
-
-    window.addEventListener('focus', handleBadgeUpdate);
-
-    return () => {
-      window.removeEventListener('focus', handleBadgeUpdate);
-    };
-  }, [isAdmin, router.pathname]);
-
   if (router.pathname.match(/(login|setup|resetpassword)/)) {
     component = <Component {...pageProps} />;
   } else {
@@ -328,6 +285,7 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
                 <CustomCss />
                 <NoticeQueueProvider>
                   <StatusChecker />
+                  <AppBadge />
                   <ServiceWorkerSetup />
                   <UserContext initialUser={user}>
                     <PushDeviceProvider>{component}</PushDeviceProvider>

@@ -38,18 +38,12 @@ const Layout = ({ children }: LayoutProps) => {
   const router = useRouter();
   const { currentSettings } = useSettings();
   const { setLocale } = useLocale();
-  const { data: requestResponse, mutate: revalidateRequestsCount } = useSWR(
-    '/api/v1/request/count',
-    {
-      revalidateOnMount: true,
-    }
-  );
-  const { data: issueResponse, mutate: revalidateIssueCount } = useSWR(
-    '/api/v1/issue/count',
-    {
-      revalidateOnMount: true,
-    }
-  );
+  const { data: requestResponse } = useSWR('/api/v1/request/count', {
+    revalidateOnMount: true,
+  });
+  const { data: issueResponse } = useSWR('/api/v1/issue/count', {
+    revalidateOnMount: true,
+  });
 
   useEffect(() => {
     if (setLocale && user) {
@@ -171,15 +165,11 @@ const Layout = ({ children }: LayoutProps) => {
           setClosed={() => setSidebarOpen(false)}
           pendingRequestsCount={requestResponse?.pending ?? 0}
           openIssuesCount={issueResponse?.open ?? 0}
-          revalidateIssueCount={() => revalidateIssueCount()}
-          revalidateRequestsCount={() => revalidateRequestsCount()}
         />
         <div className="sm:hidden">
           <MobileMenu
             pendingRequestsCount={requestResponse?.pending ?? 0}
             openIssuesCount={issueResponse?.open ?? 0}
-            revalidateIssueCount={() => revalidateIssueCount()}
-            revalidateRequestsCount={() => revalidateRequestsCount()}
           />
         </div>
 

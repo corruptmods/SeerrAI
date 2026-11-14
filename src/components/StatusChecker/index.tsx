@@ -1,12 +1,11 @@
 import Modal from '@app/components/Common/Modal';
 import { useNotice } from '@app/context/NoticeQueue';
+import useAppStatus from '@app/hooks/useAppStatus';
 import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
-import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
 import { Fragment } from 'react';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
 
 const messages = defineMessages('components.StatusChecker', {
   appUpdated: '{applicationTitle} Updated',
@@ -17,12 +16,7 @@ const messages = defineMessages('components.StatusChecker', {
 const StatusChecker = () => {
   const intl = useIntl();
   const settings = useSettings();
-  const { data, error } = useSWR<StatusResponse>(
-    '/api/v1/status?checkUpdateAvailable=false',
-    {
-      refreshInterval: 60 * 1000,
-    }
-  );
+  const { data, error } = useAppStatus();
   const wanted = !!data && data.commitTag !== process.env.commitTag;
   // Loading counts as hidden: updates are rare and jump the queue anyway.
   const myTurn = useNotice('appUpdated', wanted ? 'show' : 'hide');

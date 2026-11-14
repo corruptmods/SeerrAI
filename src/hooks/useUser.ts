@@ -6,7 +6,7 @@ import type { NotificationAgentKey } from '@server/lib/settings';
 import { useRouter } from 'next/router';
 import { useCallback } from 'react';
 import type { MutatorCallback } from 'swr';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 export { Permission, UserType };
 export type { PermissionCheckOptions };
@@ -88,6 +88,9 @@ export const useUser = ({
     router.pathname
   );
 
+  // The user the server rendered the first page for, moments ago.
+  const fromServer = useSWRConfig().fallback['/api/v1/auth/me'] !== undefined;
+
   const {
     data,
     error,
@@ -96,17 +99,18 @@ export const useUser = ({
     fallbackData: initialData,
     // Dozens of components read the user; only one instance polls and
     // revalidates, or /auth/me calls grow with the page. Others fetch only
-    // when nothing is cached.
+    // when nothing is cached and the server sent no user.
     ...(id || primary
       ? {
           refreshInterval: !isAuthPage ? 30000 : 0,
           revalidateOnFocus: !isAuthPage,
-          revalidateOnMount: !isAuthPage,
+          // Not again straight after the server sent it; polling follows.
+          revalidateOnMount: !isAuthPage && !(primary && initialData),
           revalidateOnReconnect: !isAuthPage,
         }
       : {
           // Nobody to fetch on the sign-in pages.
-          revalidateOnMount: isAuthPage ? false : undefined,
+          revalidateOnMount: isAuthPage || fromServer ? false : undefined,
           revalidateIfStale: false,
           revalidateOnFocus: false,
           revalidateOnReconnect: false,

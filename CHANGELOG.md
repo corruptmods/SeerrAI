@@ -8,6 +8,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Apps such as Pluet can add one song at a time to a playlist. Its MusicBrainz ids, when the media server has them, find the exact recording; otherwise it's matched by title, artist, album and length. It's requested in the owner's name like the playlist's other songs, and stays on a linked playlist.
 
+### Faster
+
+- Movie, series and collection pages open straight away when you tap a card, and their details are downloaded once instead of twice.
+
 ### Fixed
 
 - **Request Season** no longer sits against the season's header.

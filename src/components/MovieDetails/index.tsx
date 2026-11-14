@@ -40,6 +40,7 @@ import WatchedBy from '@app/components/WatchedBy';
 import useLocale from '@app/hooks/useLocale';
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
+import useTitleDetails from '@app/hooks/useTitleDetails';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -49,10 +50,7 @@ import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
 import { titleBackdrop, titlePoster } from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
-import {
-  refreshIntervalHelper,
-  watchMedia,
-} from '@app/utils/refreshIntervalHelper';
+import { watchMedia } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowRightCircleIcon,
   CloudIcon,
@@ -142,9 +140,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   const [showMoreStudios, setShowMoreStudios] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [toggleWatchlist, setToggleWatchlist] = useState<boolean>(
-    !movie?.onUserWatchlist
-  );
+  // Set by the watchlist buttons; until then, from the details.
+  const [onWatchlist, setOnWatchlist] = useState<boolean>();
   const [isBlocklistUpdating, setIsBlocklistUpdating] =
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
@@ -155,13 +152,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     data,
     error,
     mutate: revalidate,
-  } = useSWR<MovieDetailsType>(`/api/v1/movie/${router.query.movieId}`, {
-    fallbackData: movie,
-    refreshInterval: refreshIntervalHelper<MovieDetailsType>(
-      (latest) => watchMedia(latest.mediaInfo),
-      movie
-    ),
-  });
+  } = useTitleDetails<MovieDetailsType>(
+    `/api/v1/movie/${router.query.movieId}`,
+    movie,
+    (latest) => watchMedia(latest.mediaInfo)
+  );
 
   const { data: ratingData } = useSWR<RatingResponse>(
     `/api/v1/movie/${router.query.movieId}/ratingscombined`
@@ -200,9 +195,10 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   }
 
   if (!data) {
-    return <ErrorPage statusCode={404} />;
+    return <ErrorPage statusCode={error?.response?.status ?? 404} />;
   }
 
+  const toggleWatchlist = !(onWatchlist ?? data.onUserWatchlist);
   const showAllStudios = data.productionCompanies.length <= minStudios + 1;
   const mediaLinks: PlayButtonLink[] = [];
 
@@ -336,16 +332,16 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
 
     try {
       const response = await axios.post('/api/v1/watchlist', {
-        tmdbId: movie?.id,
+        tmdbId: data.id,
         mediaType: MediaType.MOVIE,
-        title: movie?.title,
+        title: data.title,
       });
 
       if (response.data) {
         addToast(
           <span>
             {intl.formatMessage(messages.watchlistSuccess, {
-              title: movie?.title,
+              title: data.title,
               strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
             })}
           </span>,
@@ -360,20 +356,20 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     }
 
     setIsUpdating(false);
-    setToggleWatchlist((prevState) => !prevState);
+    setOnWatchlist(true);
   };
 
   const onClickDeleteWatchlistBtn = async (): Promise<void> => {
     setIsUpdating(true);
     try {
       await axios.delete(
-        `/api/v1/watchlist/${movie?.id}?mediaType=${MediaType.MOVIE}`
+        `/api/v1/watchlist/${data.id}?mediaType=${MediaType.MOVIE}`
       );
 
       addToast(
         <span>
           {intl.formatMessage(messages.watchlistDeleted, {
-            title: movie?.title,
+            title: data.title,
             strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
           })}
         </span>,
@@ -386,7 +382,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       });
     } finally {
       setIsUpdating(false);
-      setToggleWatchlist((prevState) => !prevState);
+      setOnWatchlist(false);
     }
   };
 
@@ -397,9 +393,9 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       const res = await axios.post<{
         failed?: { service: string }[];
       }>('/api/v1/blocklist', {
-        tmdbId: movie?.id,
+        tmdbId: data.id,
         mediaType: 'movie',
-        title: movie?.title,
+        title: data.title,
         user: user?.id,
         reason,
         removeFiles: blocklist.removesFiles,
@@ -408,7 +404,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       addToast(
         <span>
           {intl.formatMessage(globalMessages.blocklistSuccess, {
-            title: movie?.title,
+            title: data.title,
             strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
           })}
         </span>,
@@ -432,7 +428,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         addToast(
           <span>
             {intl.formatMessage(globalMessages.blocklistDuplicateError, {
-              title: movie?.title,
+              title: data.title,
               strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
             })}
           </span>,

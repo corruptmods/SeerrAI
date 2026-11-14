@@ -11,13 +11,13 @@ import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import TitleCard from '@app/components/TitleCard';
 import useSettings from '@app/hooks/useSettings';
+import useTitleDetails from '@app/hooks/useTitleDetails';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import { titleBackdrop, titlePoster } from '@app/utils/imageSources';
-import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowDownTrayIcon,
   EyeIcon,
@@ -77,14 +77,11 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
     data,
     error,
     mutate: revalidate,
-  } = useSWR<Collection>(`/api/v1/collection/${router.query.collectionId}`, {
-    fallbackData: collection,
-    revalidateOnMount: true,
-    refreshInterval: refreshIntervalHelper<Collection>(
-      returnCollectionDownloadItems,
-      collection
-    ),
-  });
+  } = useTitleDetails<Collection>(
+    `/api/v1/collection/${router.query.collectionId}`,
+    collection,
+    returnCollectionDownloadItems
+  );
 
   const { data: genres } =
     useSWR<{ id: number; name: string }[]>(`/api/v1/genres/movie`);
@@ -167,7 +164,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
   }
 
   if (!data) {
-    return <ErrorPage statusCode={404} />;
+    return <ErrorPage statusCode={error?.response?.status ?? 404} />;
   }
 
   let collectionStatus = MediaStatus.UNKNOWN;

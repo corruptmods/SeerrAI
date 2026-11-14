@@ -48,6 +48,7 @@ import useIsAnime from '@app/hooks/useIsAnime';
 import useLocale from '@app/hooks/useLocale';
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
+import useTitleDetails from '@app/hooks/useTitleDetails';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -57,10 +58,7 @@ import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
 import { titleBackdrop, titlePoster } from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
-import {
-  refreshIntervalHelper,
-  watchMedia,
-} from '@app/utils/refreshIntervalHelper';
+import { watchMedia } from '@app/utils/refreshIntervalHelper';
 import {
   Disclosure,
   DisclosureButton,
@@ -154,9 +152,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   const { mutate: mutateCache } = useSWRConfig();
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [toggleWatchlist, setToggleWatchlist] = useState<boolean>(
-    !tv?.onUserWatchlist
-  );
+  // Set by the watchlist buttons; until then, from the details.
+  const [onWatchlist, setOnWatchlist] = useState<boolean>();
   const [isBlocklistUpdating, setIsBlocklistUpdating] =
     useState<boolean>(false);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
@@ -167,13 +164,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     data,
     error,
     mutate: revalidate,
-  } = useSWR<TvDetailsType>(`/api/v1/tv/${router.query.tvId}`, {
-    fallbackData: tv,
-    refreshInterval: refreshIntervalHelper<TvDetailsType>(
-      (latest) => watchMedia(latest.mediaInfo),
-      tv
-    ),
-  });
+  } = useTitleDetails<TvDetailsType>(
+    `/api/v1/tv/${router.query.tvId}`,
+    tv,
+    (latest) => watchMedia(latest.mediaInfo)
+  );
 
   const { data: ratings } = useSWR<RatingResponse>(
     `/api/v1/tv/${router.query.tvId}/ratingscombined`
@@ -214,8 +209,10 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
   }
 
   if (!data) {
-    return <ErrorPage statusCode={404} />;
+    return <ErrorPage statusCode={error?.response?.status ?? 404} />;
   }
+
+  const toggleWatchlist = !(onWatchlist ?? data.onUserWatchlist);
 
   const mediaLinks: PlayButtonLink[] = [];
 
@@ -394,14 +391,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
     try {
       await axios.post('/api/v1/watchlist', {
-        tmdbId: tv?.id,
+        tmdbId: data.id,
         mediaType: MediaType.TV,
-        title: tv?.name,
+        title: data.name,
       });
       addToast(
         <span>
           {intl.formatMessage(messages.watchlistSuccess, {
-            title: tv?.name,
+            title: data.name,
             strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
           })}
         </span>,
@@ -409,7 +406,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       );
 
       setIsUpdating(false);
-      setToggleWatchlist((prevState) => !prevState);
+      setOnWatchlist(true);
     } catch {
       addToast(intl.formatMessage(messages.watchlistError), {
         appearance: 'error',
@@ -425,13 +422,13 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
     try {
       await axios.delete(
-        `/api/v1/watchlist/${tv?.id}?mediaType=${MediaType.TV}`
+        `/api/v1/watchlist/${data.id}?mediaType=${MediaType.TV}`
       );
 
       addToast(
         <span>
           {intl.formatMessage(messages.watchlistDeleted, {
-            title: tv?.name,
+            title: data.name,
             strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
           })}
         </span>,
@@ -439,7 +436,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       );
 
       setIsUpdating(false);
-      setToggleWatchlist((prevState) => !prevState);
+      setOnWatchlist(false);
     } catch {
       addToast(intl.formatMessage(messages.watchlistError), {
         appearance: 'error',
@@ -457,9 +454,9 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       const res = await axios.post<{
         failed?: { service: string }[];
       }>('/api/v1/blocklist', {
-        tmdbId: tv?.id,
+        tmdbId: data.id,
         mediaType: 'tv',
-        title: tv?.name,
+        title: data.name,
         user: user?.id,
         reason,
         removeFiles: blocklist.removesFiles,
@@ -469,7 +466,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         addToast(
           <span>
             {intl.formatMessage(globalMessages.blocklistSuccess, {
-              title: tv?.name,
+              title: data.name,
               strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
             })}
           </span>,
@@ -494,7 +491,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         addToast(
           <span>
             {intl.formatMessage(globalMessages.blocklistDuplicateError, {
-              title: tv?.name,
+              title: data.name,
               strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
             })}
           </span>,

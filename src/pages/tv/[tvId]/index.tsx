@@ -1,8 +1,7 @@
 import TvDetails from '@app/components/TvDetails';
-import { getHostAndPort } from '@app/utils/urlHelper';
+import { segment, serverDetails } from '@app/utils/titlePageProps';
 import type { TvDetails as TvDetailsType } from '@server/models/Tv';
-import axios from 'axios';
-import type { GetServerSideProps, NextPage } from 'next';
+import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
 
 interface TvPageProps {
@@ -15,23 +14,8 @@ const TvPage: NextPage<TvPageProps> = ({ tv }) => {
   return <TvDetails key={String(router.query.tvId)} tv={tv} />;
 };
 
-export const getServerSideProps: GetServerSideProps<TvPageProps> = async (
-  ctx
-) => {
-  const response = await axios.get<TvDetailsType>(
-    `http://${getHostAndPort()}/api/v1/tv/${ctx.query.tvId}`,
-    {
-      headers: ctx.req?.headers?.cookie
-        ? { cookie: ctx.req.headers.cookie }
-        : undefined,
-    }
-  );
-
-  return {
-    props: {
-      tv: response.data,
-    },
-  };
-};
+TvPage.getInitialProps = async (ctx) => ({
+  tv: await serverDetails<TvDetailsType>(ctx, `tv/${segment(ctx.query.tvId)}`),
+});
 
 export default TvPage;

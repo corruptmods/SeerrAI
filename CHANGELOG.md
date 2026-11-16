@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.4.4 (15 November 2026)
+
+Faster page loads, adding one song to a playlist from apps such as Pluet, and the November Node.js security release.
 
 ### New
 

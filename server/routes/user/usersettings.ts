@@ -127,6 +127,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         tvQuotaDays: user.tvQuotaDays,
         musicQuotaLimit: user.musicQuotaLimit,
         musicQuotaDays: user.musicQuotaDays,
+        playlistLink: user.playlistLink,
         globalMovieQuotaDays: defaultQuotas.movie.quotaDays,
         globalMovieQuotaLimit: defaultQuotas.movie.quotaLimit,
         globalTvQuotaDays: defaultQuotas.tv.quotaDays,
@@ -229,6 +230,10 @@ userSettingsRoutes.post<
       user.tvQuotaLimit = req.body.tvQuotaLimit;
       user.musicQuotaDays = req.body.musicQuotaDays;
       user.musicQuotaLimit = req.body.musicQuotaLimit;
+      // Left as it is by pages and apps that don't send it.
+      if (typeof req.body.playlistLink === 'boolean') {
+        user.playlistLink = req.body.playlistLink;
+      }
     }
 
     // A Trakt username in Trakt's format; blank clears it.

@@ -91,6 +91,8 @@ export interface PublicSettingsResponse {
   customCss: { server: string | null; personal: boolean };
   /** POST /list/:listId/song adds one song to a playlist. */
   playlistSongAdd?: boolean;
+  /** POST /list/:listId/link imports a Spotify or Apple Music playlist. */
+  playlistLink?: boolean;
 }
 
 export interface CacheItem {

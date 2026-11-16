@@ -949,6 +949,10 @@ components:
           nullable: true
           description: 'Time period in days for the music quota'
           example: 7
+        playlistLink:
+          type: boolean
+          description: 'False once a user manager stops this user importing Spotify and Apple Music playlists. Only user managers change it.'
+          example: true
         globalMusicQuotaLimit:
           type: number
           nullable: true
@@ -2170,6 +2174,10 @@ components:
           type: boolean
           description: True when POST /list/{listId}/song adds songs to playlists.
           example: true
+        playlistLink:
+          type: boolean
+          description: True when POST /list/{listId}/link imports Spotify and Apple Music playlists; false once an admin turns importing off. A user it is turned off for has playlistLink false on GET /auth/me.
+          example: true
         mediaServers:
           type: array
           description: The connected media servers, the primary one first.
@@ -2545,6 +2553,9 @@ components:
           type: number
           minimum: 1
           maximum: 1000
+        importing:
+          type: boolean
+          description: False stops everyone importing Spotify and Apple Music playlists, and stops linked playlists being re-read. Left as saved when not sent.
     SongQuota:
       type: object
       description: Songs a person may ask for in so many days. No limit (0) counts each song as one item of their music limit instead.
@@ -13192,6 +13203,8 @@ paths:
             application/json:
               schema:
                 type: object
+        '403':
+          description: Not the owner, music is off, or an admin turned playlist importing off (for everyone or for this user)
         '429':
           description: Too many links lately, or too many of this person's songs still being matched
     delete:
@@ -13207,6 +13220,31 @@ paths:
       responses:
         '204':
           description: Unlinked
+  /list/{listId}/sync:
+    post:
+      summary: Check a linked playlist for new songs now
+      description: Re-reads the playlist's Spotify or Apple Music page now, not at its daily read, and brings in the songs added to it since. Only the owner. Limited together with linking.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: The playlist's link and songs, as linking returns
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: The playlist isn't linked, or its source couldn't be read
+        '403':
+          description: Not the owner, music is off, or an admin turned playlist importing off (for everyone or for this user)
+        '429':
+          description: Too many links and checks lately, or too many of the linker's songs still being matched
   /list/{listId}/song:
     post:
       summary: Add a song to a playlist

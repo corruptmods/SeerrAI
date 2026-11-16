@@ -82,6 +82,8 @@ const messages = defineMessages(
       'Automatically request series on your public Trakt watchlist',
     bothwatchlistsyncmoviestip:
       'Automatically request movies on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> and your public Trakt watchlist',
+    playlistLink: 'Playlist Imports',
+    playlistLinkTip: 'This user can import Spotify and Apple Music playlists.',
     bothwatchlistsyncseriestip:
       'Automatically request series on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> and your public Trakt watchlist',
   }
@@ -203,6 +205,7 @@ const UserGeneralSettings = () => {
           tvQuotaDays: data?.tvQuotaDays,
           musicQuotaLimit: data?.musicQuotaLimit ?? undefined,
           musicQuotaDays: data?.musicQuotaDays ?? undefined,
+          playlistLink: data?.playlistLink !== false,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
           traktUsername: data?.traktUsername ?? '',
@@ -233,6 +236,7 @@ const UserGeneralSettings = () => {
                 ? values.musicQuotaLimit
                 : null,
               musicQuotaDays: musicQuotaEnabled ? values.musicQuotaDays : null,
+              playlistLink: values.playlistLink,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
               ...(currentSettings.traktReady
@@ -596,6 +600,27 @@ const UserGeneralSettings = () => {
                         </div>
                       </div>
                     )}
+                    {currentSettings.musicReady &&
+                      currentSettings.playlistLink !== false && (
+                        <div className="form-row">
+                          <label
+                            htmlFor="playlistLink"
+                            className="checkbox-label"
+                          >
+                            {intl.formatMessage(messages.playlistLink)}
+                            <span className="label-tip">
+                              {intl.formatMessage(messages.playlistLinkTip)}
+                            </span>
+                          </label>
+                          <div className="form-input-area">
+                            <Field
+                              type="checkbox"
+                              id="playlistLink"
+                              name="playlistLink"
+                            />
+                          </div>
+                        </div>
+                      )}
                   </>
                 )}
               {traktWatchlist &&

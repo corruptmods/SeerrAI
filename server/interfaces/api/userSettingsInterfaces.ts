@@ -14,6 +14,8 @@ export interface UserSettingsGeneralResponse {
   tvQuotaDays?: number;
   musicQuotaLimit?: number | null;
   musicQuotaDays?: number | null;
+  /** False once a user manager stops them importing playlists. */
+  playlistLink?: boolean;
   globalMovieQuotaDays?: number;
   globalMovieQuotaLimit?: number;
   globalTvQuotaLimit?: number;

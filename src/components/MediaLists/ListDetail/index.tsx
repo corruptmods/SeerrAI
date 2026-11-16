@@ -11,7 +11,9 @@ import Roulette from '@app/components/MediaLists/Roulette';
 import ShareListModal from '@app/components/MediaLists/ShareListModal';
 import type { ListItem, SeriesProgress } from '@app/hooks/useListDetail';
 import { useListDetail } from '@app/hooks/useListDetail';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
+import { useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import type { ListSort } from '@app/utils/listSort';
@@ -39,6 +41,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.MediaLists.ListDetail', {
   searchingAgain: 'Searching again now',
+  checkedNow: 'Checked for new songs',
   empty: 'Nothing here yet. Use Add to List on any movie or series.',
   share: 'Share',
   rename: 'Rename',
@@ -81,6 +84,8 @@ const SORT_KEY = 'list-sort';
 
 const ListDetail = () => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
+  const { user } = useUser();
   const router = useRouter();
 
   const {
@@ -196,6 +201,23 @@ const ListDetail = () => {
     }
     try {
       await axios.delete(`/api/v1/list/${data.id}/link`);
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
+  // Importing playlists can be turned off, for everyone or for this user.
+  const canImportPlaylists =
+    currentSettings.playlistLink !== false && user?.playlistLink !== false;
+
+  const checkPlaylistNow = async () => {
+    try {
+      await axios.post(`/api/v1/list/${data.id}/sync`);
+      addToast(intl.formatMessage(messages.checkedNow), {
+        appearance: 'success',
+        autoDismiss: true,
+      });
       mutate();
     } catch (e) {
       showFailure(e);
@@ -429,10 +451,12 @@ const ListDetail = () => {
               <PencilIcon />
               <span>{intl.formatMessage(messages.rename)}</span>
             </Button>
-            <Button buttonSize="sm" onClick={() => setImporting(true)}>
-              <ArrowUpTrayIcon />
-              <span>{intl.formatMessage(messages.import)}</span>
-            </Button>
+            {(!isPlaylist || canImportPlaylists) && (
+              <Button buttonSize="sm" onClick={() => setImporting(true)}>
+                <ArrowUpTrayIcon />
+                <span>{intl.formatMessage(messages.import)}</span>
+              </Button>
+            )}
             <Button buttonSize="sm" onClick={() => setSharing(true)}>
               <UsersIcon />
               <span>{intl.formatMessage(messages.share)}</span>
@@ -473,6 +497,8 @@ const ListDetail = () => {
         <PlaylistSongs
           playlist={data.playlist}
           isOwner={data.isOwner}
+          canImport={canImportPlaylists}
+          onCheckNow={checkPlaylistNow}
           onUnlink={unlinkPlaylist}
           onRemove={removeSong}
           onRetry={retrySong}

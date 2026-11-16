@@ -1,6 +1,6 @@
 /**
- * Playlists: linking to a Spotify or Apple Music playlist, unlinking, and
- * adding and removing songs.
+ * Playlists: linking to a Spotify or Apple Music playlist, re-reading it,
+ * unlinking, and adding and removing songs.
  */
 import { getRepository } from '@server/datasource';
 import { MediaListSong } from '@server/entity/MediaList';
@@ -9,6 +9,7 @@ import { searchAgainNow } from '@server/lib/music/songFetchWaits';
 import playlists, { PlaylistLinkError } from '@server/lib/playlists';
 import { PlaylistSourceError } from '@server/lib/playlists/sources';
 import {
+  importRefusal,
   musicAllowed,
   playlistView,
   songViews,
@@ -44,6 +45,18 @@ const searchAgainRate = perUserRateLimit({ windowMs: 10 * 60_000, limit: 5 });
 /** Max songs a user may have awaiting a match before linking is refused. */
 export const MOST_SONGS_MATCHING = 1000;
 
+const STILL_MATCHING = {
+  status: 429,
+  message:
+    'Songs from your playlists are still being looked for. Try again once they are found.',
+};
+
+/** Whether so many of a user's songs await a match that no more are read. */
+const tooManyMatching = async (userId: number): Promise<boolean> =>
+  (await getRepository(MediaListSong).count({
+    where: { requestForId: userId, state: 'matching' },
+  })) >= MOST_SONGS_MATCHING;
+
 /** Links a playlist; its songs are read now and requested for the linker. */
 playlistRoutes.post<{ listId: string }>(
   '/:listId/link',
@@ -64,15 +77,12 @@ playlistRoutes.post<{ listId: string }>(
       if (!musicAllowed(req.user)) {
         return next({ status: 403, message: 'Music is turned off.' });
       }
-      const matching = await getRepository(MediaListSong).count({
-        where: { requestForId: req.user!.id, state: 'matching' },
-      });
-      if (matching >= MOST_SONGS_MATCHING) {
-        return next({
-          status: 429,
-          message:
-            'Songs from your playlists are still being looked for. Try again once they are found.',
-        });
+      const refusal = importRefusal(req.user);
+      if (refusal) {
+        return next({ status: 403, message: refusal });
+      }
+      if (await tooManyMatching(req.user!.id)) {
+        return next(STILL_MATCHING);
       }
       await playlists.link(access.list, String(req.body.url ?? ''), req.user!);
       // Re-read as linked; missing if deleted meanwhile.
@@ -90,6 +100,63 @@ playlistRoutes.post<{ listId: string }>(
         errorMessage: e instanceof Error ? e.message : String(e),
       });
       return next({ status: 500, message: 'Could not link the playlist.' });
+    }
+  }
+);
+
+/**
+ * Re-reads a linked playlist now, not at its daily read, and brings in the
+ * songs added to it since. Limited with linking, as each reads the source.
+ */
+playlistRoutes.post<{ listId: string }>(
+  '/:listId/sync',
+  isAuthenticated(),
+  linkRate,
+  async (req, res, next) => {
+    try {
+      const access = await playlistFor(req);
+      if (!access) {
+        return next(NOT_FOUND);
+      }
+      if (!access.isOwner) {
+        return next({
+          status: 403,
+          message: 'Only the playlist’s owner can check it for new songs.',
+        });
+      }
+      if (!musicAllowed(req.user)) {
+        return next({ status: 403, message: 'Music is turned off.' });
+      }
+      const refusal = importRefusal(req.user);
+      if (refusal) {
+        return next({ status: 403, message: refusal });
+      }
+      // New songs are requested for whoever linked it.
+      if (
+        access.list.sourceUserId &&
+        (await tooManyMatching(access.list.sourceUserId))
+      ) {
+        return next(STILL_MATCHING);
+      }
+      await playlists.checkNow(access.list);
+      // Re-read with what came in; missing if deleted meanwhile.
+      const checked = await playlistFor(req);
+      if (!checked) {
+        return next(NOT_FOUND);
+      }
+      return res.status(200).json(await playlistView(checked.list));
+    } catch (e) {
+      if (e instanceof PlaylistLinkError || e instanceof PlaylistSourceError) {
+        return next({ status: 400, message: e.message });
+      }
+      logger.error('Could not check a playlist for new songs', {
+        label: 'API',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return next({
+        status: 500,
+        message: 'Could not check the playlist for new songs.',
+      });
     }
   }
 );

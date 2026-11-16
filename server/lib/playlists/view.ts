@@ -10,11 +10,26 @@ import { addToMusicBrainzUrl } from '@server/lib/music/catalogSong';
 import { albumsWaitingToSearch } from '@server/lib/music/songFetchWaits';
 import type { SongProgress } from '@server/lib/music/songProgress';
 import { songProgress } from '@server/lib/music/songProgress';
+import { getSettings } from '@server/lib/settings';
 import { In, Not } from 'typeorm';
 
 /** True when music is set up and enabled for this user. */
 export const musicAllowed = (user: User | undefined): boolean =>
   !!user && musicReady() && featureEnabled('music', user);
+
+/**
+ * Why this user can't import a Spotify or Apple Music playlist, or re-read a
+ * linked one: an admin turned importing off, for everyone or for them.
+ */
+export const importRefusal = (user: User | undefined): string | undefined => {
+  if (!getSettings().music.playlists.importing) {
+    return 'Importing playlists is turned off.';
+  }
+  if (user?.playlistLink === false) {
+    return 'Importing playlists is turned off for your account.';
+  }
+  return undefined;
+};
 
 /**
  * A playlist song's displayed state. Requested songs follow their request:

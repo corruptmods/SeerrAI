@@ -55,6 +55,8 @@ const musicBody = z.object({
     .object({
       overLimit: z.enum(['wait', 'approve']),
       approveOver: z.coerce.number().int().min(1).max(1000),
+      // Missing from older pages: left as saved.
+      importing: z.boolean().optional(),
     })
     .optional(),
   // Sent only when the admin changes it; extra fields from older pages are
@@ -103,7 +105,12 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     songRequests: body.songRequests ?? !!saved.songRequests,
     songsFromAlbums: body.songsFromAlbums ?? !!saved.songsFromAlbums,
     songQuota: body.songQuota ?? saved.songQuota,
-    playlists: body.playlists ?? saved.playlists,
+    playlists: body.playlists
+      ? {
+          ...body.playlists,
+          importing: body.playlists.importing ?? saved.playlists.importing,
+        }
+      : saved.playlists,
     theAudioDbApiKey: body.removeTheAudioDbApiKey
       ? ''
       : body.theAudioDbApiKey || saved.theAudioDbApiKey,

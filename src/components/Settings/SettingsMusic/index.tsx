@@ -38,6 +38,9 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   songQuota: 'Song Limit',
   songQuotaTip:
     'Songs each person may ask for. Unlimited counts each song as one album against their music limit instead.',
+  playlistImporting: 'Playlist Imports',
+  playlistImportingTip:
+    'People can import Spotify and Apple Music playlists, and linked playlists are checked each day for new songs. Off stops both for everyone; songs already imported are still requested. To stop one person, use their settings.',
   playlistOverLimit: 'Big Playlist Imports',
   playlistOverLimitTip:
     'When a playlist brings in more songs than its person may request.',
@@ -63,7 +66,11 @@ export interface ShownMusicSettings {
   songRequests: boolean;
   songsFromAlbums: boolean;
   songQuota: { quotaLimit: number; quotaDays: number };
-  playlists: { overLimit: 'wait' | 'approve'; approveOver: number };
+  playlists: {
+    overLimit: 'wait' | 'approve';
+    approveOver: number;
+    importing: boolean;
+  };
   hasTheAudioDbApiKey: boolean;
   search: { inAll: boolean };
 }
@@ -80,6 +87,7 @@ export interface MusicSourceValues {
   songsFromAlbums: boolean;
   songQuotaLimit: number;
   songQuotaDays: number;
+  playlistImporting: boolean;
   playlistOverLimit: 'wait' | 'approve';
   playlistApproveOver: number | string;
 }
@@ -102,6 +110,7 @@ export const musicSourceValues = (
   songsFromAlbums: data.songsFromAlbums,
   songQuotaLimit: data.songQuota.quotaLimit,
   songQuotaDays: data.songQuota.quotaDays,
+  playlistImporting: data.playlists?.importing !== false,
   playlistOverLimit: data.playlists?.overLimit ?? 'wait',
   playlistApproveOver: data.playlists?.approveOver ?? 25,
 });
@@ -110,6 +119,7 @@ export const musicSourceValues = (
 export const musicSourceBody = ({
   songQuotaLimit,
   songQuotaDays,
+  playlistImporting,
   playlistOverLimit,
   playlistApproveOver,
   ...sources
@@ -120,6 +130,7 @@ export const musicSourceBody = ({
   playlists: {
     overLimit: playlistOverLimit,
     approveOver: Math.max(1, Number(playlistApproveOver) || 25),
+    importing: playlistImporting,
   },
 });
 
@@ -321,6 +332,23 @@ const MusicSources = ({
       )}
       {values.songRequests && (
         <div className="form-row">
+          <label htmlFor="playlistImporting" className="checkbox-label">
+            {intl.formatMessage(messages.playlistImporting)}
+            <span className="label-tip">
+              {intl.formatMessage(messages.playlistImportingTip)}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <Field
+              type="checkbox"
+              id="playlistImporting"
+              name="playlistImporting"
+            />
+          </div>
+        </div>
+      )}
+      {values.songRequests && values.playlistImporting && (
+        <div className="form-row">
           <label htmlFor="playlistOverLimit" className="text-label">
             {intl.formatMessage(messages.playlistOverLimit)}
             <span className="label-tip">
@@ -339,25 +367,27 @@ const MusicSources = ({
           </div>
         </div>
       )}
-      {values.songRequests && values.playlistOverLimit === 'approve' && (
-        <div className="form-row">
-          <label htmlFor="playlistApproveOver" className="text-label">
-            {intl.formatMessage(messages.playlistApproveOver)}
-            <span className="label-tip">
-              {intl.formatMessage(messages.playlistApproveOverTip)}
-            </span>
-          </label>
-          <div className="form-input-area">
-            <Field
-              id="playlistApproveOver"
-              name="playlistApproveOver"
-              type="text"
-              inputMode="numeric"
-              className="short"
-            />
+      {values.songRequests &&
+        values.playlistImporting &&
+        values.playlistOverLimit === 'approve' && (
+          <div className="form-row">
+            <label htmlFor="playlistApproveOver" className="text-label">
+              {intl.formatMessage(messages.playlistApproveOver)}
+              <span className="label-tip">
+                {intl.formatMessage(messages.playlistApproveOverTip)}
+              </span>
+            </label>
+            <div className="form-input-area">
+              <Field
+                id="playlistApproveOver"
+                name="playlistApproveOver"
+                type="text"
+                inputMode="numeric"
+                className="short"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </>
   );
 };

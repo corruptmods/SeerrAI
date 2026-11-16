@@ -304,7 +304,7 @@ describe('music settings', () => {
       songRequests: true,
       songsFromAlbums: true,
       songQuota: { quotaLimit: 0, quotaDays: 7 },
-      playlists: { overLimit: 'wait', approveOver: 25 },
+      playlists: { overLimit: 'wait', approveOver: 25, importing: true },
       hasTheAudioDbApiKey: true,
       search: { inAll: false },
     });
@@ -329,6 +329,41 @@ describe('music settings', () => {
       ],
       false
     );
+  });
+
+  it('turn playlist importing off and on, and keep it when it isn’t sent', async () => {
+    assert.equal(getSettings().fullPublicSettings.playlistLink, true);
+    const off = await call('POST', '/settings/music', {
+      playlists: { overLimit: 'wait', approveOver: 25, importing: false },
+    });
+    assert.equal(off.status, 200);
+    assert.equal(getSettings().music.playlists.importing, false);
+    assert.equal(getSettings().fullPublicSettings.playlistLink, false);
+
+    // A page from before the switch sends the rest without it.
+    await call('POST', '/settings/music', {
+      playlists: { overLimit: 'approve', approveOver: 10 },
+    });
+    assert.deepEqual(getSettings().music.playlists, {
+      overLimit: 'approve',
+      approveOver: 10,
+      importing: false,
+    });
+
+    await call('POST', '/settings/music', {
+      playlists: { overLimit: 'wait', approveOver: 25, importing: true },
+    });
+    assert.equal(getSettings().fullPublicSettings.playlistLink, true);
+  });
+
+  it('start with playlist importing on, where settings were saved before it', () => {
+    const settings = getSettings();
+    settings.music = {
+      ...settings.music,
+      playlists: { overLimit: 'wait', approveOver: 25 } as never,
+    };
+    assert.equal(settings.music.playlists.importing, true);
+    assert.equal(settings.fullPublicSettings.playlistLink, true);
   });
 
   it('start with songs on, even where music was set up before them', () => {

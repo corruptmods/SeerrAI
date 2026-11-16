@@ -19,12 +19,15 @@ import type {
   PlaylistView,
 } from '@server/lib/playlists/view';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   linkedTo: 'Linked to {name} on {service}',
   readAt: 'read {time}',
   unlink: 'Unlink',
+  checkNow: 'Check for New Songs',
+  emptyNoImport: 'No songs yet.',
   readProblem: 'It couldn’t be read last time: {problem}',
   empty:
     'No songs yet. Import a Spotify or Apple Music playlist’s share link to bring its songs in, and they’re requested for you.',
@@ -107,6 +110,9 @@ const BADGE: Record<
 interface PlaylistSongsProps {
   playlist: PlaylistView;
   isOwner: boolean;
+  /** The owner may import playlists and re-read linked ones. */
+  canImport: boolean;
+  onCheckNow: () => Promise<void>;
   onUnlink: () => void;
   onRemove: (song: PlaylistSongView) => void;
   onRetry: (song: PlaylistSongView) => void;
@@ -125,6 +131,8 @@ const SERVICE_NAMES: Record<string, string> = {
 const PlaylistSongs = ({
   playlist,
   isOwner,
+  canImport,
+  onCheckNow,
   onUnlink,
   onRemove,
   onRetry,
@@ -132,6 +140,7 @@ const PlaylistSongs = ({
 }: PlaylistSongsProps) => {
   const intl = useIntl();
   const { currentSettings } = useSettings();
+  const [isChecking, setChecking] = useState(false);
   const found = playlist.songs.filter((s) => s.state !== 'unmatched');
   const notFound = playlist.songs.filter((s) => s.state === 'unmatched');
   const count = (states: PlaylistSongShown[]) =>
@@ -383,6 +392,23 @@ const PlaylistSongs = ({
               </span>
             )}
           </div>
+          {isOwner && canImport && (
+            <Button
+              buttonSize="sm"
+              disabled={isChecking}
+              onClick={async () => {
+                setChecking(true);
+                try {
+                  await onCheckNow();
+                } finally {
+                  setChecking(false);
+                }
+              }}
+            >
+              <ArrowPathIcon className={isChecking ? 'animate-spin' : ''} />
+              <span>{intl.formatMessage(messages.checkNow)}</span>
+            </Button>
+          )}
           {isOwner && (
             <Button buttonSize="sm" onClick={onUnlink}>
               {intl.formatMessage(messages.unlink)}
@@ -391,7 +417,8 @@ const PlaylistSongs = ({
         </div>
       ) : (
         playlist.songs.length > 0 &&
-        isOwner && (
+        isOwner &&
+        canImport && (
           <p className="mb-4 text-sm text-muted">
             {intl.formatMessage(messages.notLinked)}
           </p>
@@ -407,7 +434,11 @@ const PlaylistSongs = ({
       )}
 
       {!playlist.songs.length ? (
-        <p className="text-muted">{intl.formatMessage(messages.empty)}</p>
+        <p className="text-muted">
+          {intl.formatMessage(
+            canImport ? messages.empty : messages.emptyNoImport
+          )}
+        </p>
       ) : (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

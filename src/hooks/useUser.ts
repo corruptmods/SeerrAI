@@ -28,6 +28,8 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   requestCount: number;
+  /** False once a user manager stops them importing playlists. */
+  playlistLink?: boolean;
   settings?: UserSettings;
 }
 

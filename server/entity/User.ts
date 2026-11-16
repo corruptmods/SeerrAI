@@ -95,6 +95,7 @@ export class User {
     'settings',
     // Whether someone's Plex sign-in lapsed is only for them and admins.
     'plexTokenExpiredAt',
+    'playlistLink',
   ];
 
   public displayName: string;
@@ -226,6 +227,13 @@ export class User {
 
   @Column({ type: 'int', nullable: true })
   public musicQuotaDays?: number | null;
+
+  /**
+   * False once a user manager stops this user importing Spotify and Apple
+   * Music playlists.
+   */
+  @Column({ type: 'boolean', default: true })
+  public playlistLink: boolean;
 
   @OneToOne(() => UserSettings, (settings) => settings.user, {
     cascade: true,

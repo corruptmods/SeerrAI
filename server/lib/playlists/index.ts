@@ -439,47 +439,107 @@ class Playlists {
       },
       { state: 'matching' }
     );
-    const lists = await getRepository(MediaList).find({
-      where: { kind: 'music', sourceUrl: Not(IsNull()) },
-    });
-    const due = lists.filter(
-      (list) =>
-        !list.sourceReadAt ||
-        now - new Date(list.sourceReadAt).getTime() >= READ_EVERY_MS
-    );
-    for (const list of due) {
-      const link: PlaylistLink | null = parsePlaylistLink(list.sourceUrl ?? '');
-      if (!link || !list.sourceUserId) continue;
+    for (const list of await this.dueARead(now)) {
       try {
-        const playlist = await readPlaylist(link);
-        const added = await this.addSongs(
-          list.id,
-          playlist.songs,
-          list.sourceUserId
-        );
-        await getRepository(MediaList).update(list.id, {
-          sourceName: playlist.name,
-          sourceReadAt: new Date(),
-          sourceProblem: null,
-        });
-        if (added) {
-          logger.info(`${added} new songs on a linked playlist`, {
-            label: LABEL,
-            listId: list.id,
-          });
-        }
+        await this.read(list);
       } catch (e) {
-        const problem = (
-          e instanceof PlaylistSourceError ? e.message : 'It could not be read.'
-        ).slice(0, 250);
-        await getRepository(MediaList).update(list.id, {
-          sourceProblem: problem,
-        });
+        const problem = await this.noteProblem(list, e);
         // Notify only when the problem starts; reads continue daily.
         if (!list.sourceProblem) await tellUnreadable(list, problem);
       }
     }
     this.kick();
+  }
+
+  /**
+   * Linked playlists not read for a day. None while importing is off, and
+   * not those linked by someone it's off for: they wait as they are.
+   */
+  private async dueARead(now: number): Promise<MediaList[]> {
+    if (!getSettings().music.playlists.importing) {
+      return [];
+    }
+    const lists = (
+      await getRepository(MediaList).find({
+        where: { kind: 'music', sourceUrl: Not(IsNull()) },
+      })
+    ).filter(
+      (list) =>
+        !list.sourceReadAt ||
+        now - new Date(list.sourceReadAt).getTime() >= READ_EVERY_MS
+    );
+    const linkers = [
+      ...new Set(lists.flatMap((list) => list.sourceUserId ?? [])),
+    ];
+    const stopped = new Set(
+      linkers.length
+        ? (
+            await getRepository(User).find({
+              select: { id: true },
+              where: { id: In(linkers), playlistLink: false },
+            })
+          ).map((user) => user.id)
+        : []
+    );
+    return lists.filter(
+      (list) => !!list.sourceUserId && !stopped.has(list.sourceUserId)
+    );
+  }
+
+  /**
+   * Re-reads a linked playlist now, for its owner, and returns once its new
+   * songs are in. Throws PlaylistLinkError if it isn't linked, or
+   * PlaylistSourceError if unreadable.
+   */
+  public async checkNow(list: MediaList): Promise<void> {
+    if (!list.sourceUrl || !list.sourceUserId) {
+      throw new PlaylistLinkError(
+        'This playlist isn’t linked to a Spotify or Apple Music playlist.'
+      );
+    }
+    try {
+      await this.read(list);
+    } catch (e) {
+      await this.noteProblem(list, e);
+      throw e;
+    }
+    this.kick();
+  }
+
+  /** Reads a linked playlist's source and adds the songs new to it. */
+  private async read(list: MediaList): Promise<void> {
+    const link: PlaylistLink | null = parsePlaylistLink(list.sourceUrl ?? '');
+    if (!link || !list.sourceUserId) {
+      throw new PlaylistSourceError('It could not be read.');
+    }
+    const playlist = await readPlaylist(link);
+    const added = await this.addSongs(
+      list.id,
+      playlist.songs,
+      list.sourceUserId
+    );
+    await getRepository(MediaList).update(list.id, {
+      sourceName: playlist.name,
+      sourceReadAt: new Date(),
+      sourceProblem: null,
+    });
+    if (added) {
+      logger.info(`${added} new songs on a linked playlist`, {
+        label: LABEL,
+        listId: list.id,
+      });
+    }
+  }
+
+  /** Keeps why a read failed on the playlist, and returns it. */
+  private async noteProblem(list: MediaList, e: unknown): Promise<string> {
+    const problem = (
+      e instanceof PlaylistSourceError ? e.message : 'It could not be read.'
+    ).slice(0, 250);
+    await getRepository(MediaList).update(list.id, {
+      sourceProblem: problem,
+    });
+    return problem;
   }
 
   /** Matches and requests waiting songs in the background. */

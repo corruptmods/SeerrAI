@@ -766,6 +766,57 @@ describe('settings an admin saves for someone else', () => {
   });
 });
 
+describe('whether someone may import playlists', () => {
+  it('is set by whoever manages users, never by the person, and shown on /auth/me', async () => {
+    const users = getRepository(User);
+    const friend = await users.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    assert.strictEqual(friend.playlistLink, true);
+
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+    const stopped = await admin.agent
+      .post(`/user/${friend.id}/settings/main`)
+      .send({ username: 'friend', playlistLink: false });
+    assert.strictEqual(stopped.status, 200);
+    assert.strictEqual(
+      (await admin.agent.get(`/user/${friend.id}/settings/main`)).body
+        .playlistLink,
+      false
+    );
+
+    // Saved again by a page or app that doesn't send it: left as it is.
+    await admin.agent
+      .post(`/user/${friend.id}/settings/main`)
+      .send({ username: 'friend' });
+    assert.strictEqual(
+      (await users.findOneByOrFail({ id: friend.id })).playlistLink,
+      false
+    );
+
+    const own = await loginAs('friend@seerr.dev', 'test1234');
+    assert.strictEqual(
+      (await own.agent.get('/auth/me')).body.playlistLink,
+      false
+    );
+    await own.agent
+      .post(`/user/${friend.id}/settings/main`)
+      .send({ username: 'friend', playlistLink: true });
+    assert.strictEqual(
+      (await users.findOneByOrFail({ id: friend.id })).playlistLink,
+      false
+    );
+
+    await admin.agent
+      .post(`/user/${friend.id}/settings/main`)
+      .send({ username: 'friend', playlistLink: true });
+    assert.strictEqual(
+      (await own.agent.get('/auth/me')).body.playlistLink,
+      true
+    );
+  });
+});
+
 /*
  * A non-admin user manager and a non-owner admin: only the owner changes an
  * admin's account.

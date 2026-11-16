@@ -120,7 +120,7 @@ export const musicDefaults = (): MusicSettings => ({
   songRequests: true,
   songsFromAlbums: true,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
-  playlists: { overLimit: 'wait', approveOver: 25 },
+  playlists: { overLimit: 'wait', approveOver: 25, importing: true },
   soulseek: { url: '', apiKey: '', downloadsPath: '' },
   search: {},
 });
@@ -582,6 +582,11 @@ export const soulseekOf = (
 export interface PlaylistImportSettings {
   overLimit: 'wait' | 'approve';
   approveOver: number;
+  /**
+   * Off: nobody imports a Spotify or Apple Music playlist, and linked ones
+   * aren't re-read. Songs already in are still matched and requested.
+   */
+  importing: boolean;
 }
 
 /**
@@ -897,6 +902,8 @@ interface FullPublicSettings extends PublicSettings {
   customCss: { server: string | null; personal: boolean };
   /** POST /list/:listId/song adds one song to a playlist. */
   playlistSongAdd: true;
+  /** POST /list/:listId/link imports a Spotify or Apple Music playlist. */
+  playlistLink: boolean;
 }
 
 export interface NotificationAgentConfig {
@@ -1723,6 +1730,9 @@ class Settings {
     if (!this.data.music.playlists) {
       this.data.music.playlists = musicDefaults().playlists;
     }
+    if (this.data.music.playlists.importing === undefined) {
+      this.data.music.playlists.importing = true;
+    }
     // Older settings lack these; use defaults.
     if (this.data.music.songRequests === undefined) {
       this.data.music.songRequests = musicDefaults().songRequests;
@@ -1849,6 +1859,7 @@ class Settings {
         personal: this.appearance.personalCss === true,
       },
       playlistSongAdd: true,
+      playlistLink: this.music.playlists.importing,
     };
   }
 

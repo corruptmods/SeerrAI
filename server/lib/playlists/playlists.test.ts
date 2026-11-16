@@ -18,7 +18,10 @@ import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
-import playlists, { versionFor } from '@server/lib/playlists';
+import playlists, {
+  PlaylistLinkError,
+  versionFor,
+} from '@server/lib/playlists';
 import {
   LONGEST_MS,
   QUIET_MS,
@@ -30,6 +33,7 @@ import {
   withoutPlaylistRequests,
 } from '@server/lib/playlists/requestGroups';
 import {
+  PlaylistSourceError,
   parsePlaylistLink,
   readApplePage,
   readSpotifyPage,
@@ -450,7 +454,11 @@ describe('a linked playlist', () => {
   it('sends a big import to an admin as one batch, outside the limit, when chosen', async () => {
     const settings = getSettings();
     settings.music.songQuota = { quotaLimit: 1, quotaDays: 7 };
-    settings.music.playlists = { overLimit: 'approve', approveOver: 1 };
+    settings.music.playlists = {
+      ...settings.music.playlists,
+      overLimit: 'approve',
+      approveOver: 1,
+    };
     await getRepository(User).update(user.id, {
       permissions: Permission.REQUEST | Permission.AUTO_APPROVE,
     });
@@ -468,7 +476,11 @@ describe('a linked playlist', () => {
 
   it('asks for none of a big import while some of it is still being found', async () => {
     const settings = getSettings();
-    settings.music.playlists = { overLimit: 'approve', approveOver: 1 };
+    settings.music.playlists = {
+      ...settings.music.playlists,
+      overLimit: 'approve',
+      approveOver: 1,
+    };
     await getRepository(User).update(user.id, {
       permissions: Permission.REQUEST | Permission.AUTO_APPROVE,
     });
@@ -1326,5 +1338,83 @@ describe('a song added to a playlist', () => {
       'added:static garden|glasswing'
     );
     assert.notEqual((await stored(list, 'Static Garden')).state, 'removed');
+  });
+});
+
+describe('a linked playlist with importing turned off', () => {
+  const LATER = 2 * 24 * 60 * 60_000;
+  const withANewSong = () =>
+    spotifyPage([
+      ...TRACKS,
+      { id: 'trk4', title: 'Harbour Lights', artists: 'Glasswing' },
+    ]);
+  const titles = async (list: MediaList) =>
+    (await playlistView(list)).songs.map((song) => song.title);
+
+  it('isn’t read again for anyone, and is once importing is back on', async () => {
+    const list = await linked();
+    page = withANewSong();
+    getSettings().music.playlists.importing = false;
+    await playlists.sync(Date.now() + LATER);
+    await playlists.settled();
+    assert.equal((await titles(list)).includes('Harbour Lights'), false);
+
+    getSettings().music.playlists.importing = true;
+    await playlists.sync(Date.now() + LATER);
+    await playlists.settled();
+    assert.equal((await titles(list)).includes('Harbour Lights'), true);
+  });
+
+  it('isn’t read again while it’s off for whoever linked it', async () => {
+    const list = await linked();
+    page = withANewSong();
+    await getRepository(User).update(user.id, { playlistLink: false });
+    await playlists.sync(Date.now() + LATER);
+    await playlists.settled();
+    assert.equal((await titles(list)).includes('Harbour Lights'), false);
+
+    await getRepository(User).update(user.id, { playlistLink: true });
+    await playlists.sync(Date.now() + LATER);
+    await playlists.settled();
+    assert.equal((await titles(list)).includes('Harbour Lights'), true);
+  });
+});
+
+describe('a playlist checked for new songs now', () => {
+  it('brings in what was added since, without waiting a day', async () => {
+    const list = await linked();
+    page = spotifyPage([
+      ...TRACKS,
+      { id: 'trk4', title: 'Harbour Lights', artists: 'Glasswing' },
+    ]);
+    await playlists.checkNow(list);
+    await playlists.settled();
+    const view = await playlistView(list);
+    assert.equal(view.songs.length, TRACKS.length + 1);
+    assert.equal(view.songs.at(-1)?.title, 'Harbour Lights');
+  });
+
+  it('says so when the playlist isn’t linked', async () => {
+    const list = await makePlaylist();
+    await assert.rejects(
+      playlists.checkNow(list),
+      (e: Error) =>
+        e instanceof PlaylistLinkError &&
+        e.message ===
+          'This playlist isn’t linked to a Spotify or Apple Music playlist.'
+    );
+  });
+
+  it('keeps why it couldn’t be read on the playlist', async () => {
+    const list = await linked();
+    page = '<html></html>';
+    await assert.rejects(
+      playlists.checkNow(list),
+      (e: Error) => e instanceof PlaylistSourceError
+    );
+    const after = await getRepository(MediaList).findOneByOrFail({
+      id: list.id,
+    });
+    assert.ok(after.sourceProblem);
   });
 });

@@ -197,6 +197,159 @@ describe('linking a playlist', () => {
   });
 });
 
+describe('importing turned off', () => {
+  it('refuses a link for everyone, and reads nothing', async () => {
+    const list = await makePlaylist();
+    getSettings().music.playlists.importing = false;
+    const res = await link(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message: 'Importing playlists is turned off.',
+    });
+    assert.equal(pageReads.mock.callCount(), 0, 'Spotify is not asked');
+    assert.equal(getSettings().fullPublicSettings.playlistLink, false);
+
+    getSettings().music.playlists.importing = true;
+    assert.equal(getSettings().fullPublicSettings.playlistLink, true);
+    assert.equal((await link(list.id)).status, 200);
+  });
+
+  it('refuses a link from the one person it’s off for', async () => {
+    const list = await makePlaylist();
+    await getRepository(User).update(user.id, { playlistLink: false });
+    actingAs = await getRepository(User).findOneByOrFail({ id: user.id });
+    const res = await link(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message: 'Importing playlists is turned off for your account.',
+    });
+    assert.equal(pageReads.mock.callCount(), 0, 'Spotify is not asked');
+  });
+
+  it('still unlinks, and still adds a song by hand', async () => {
+    const list = await makePlaylist();
+    assert.equal((await link(list.id)).status, 200);
+    getSettings().music.playlists.importing = false;
+    const added = await fetch(
+      `http://127.0.0.1:${port}/api/v1/list/${list.id}/song`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Static Garden',
+          artistName: 'Glasswing',
+        }),
+      }
+    );
+    assert.equal(added.status, 201);
+    const unlinked = await fetch(
+      `http://127.0.0.1:${port}/api/v1/list/${list.id}/link`,
+      { method: 'DELETE' }
+    );
+    assert.equal(unlinked.status, 204);
+  });
+});
+
+describe('checking a linked playlist for new songs', () => {
+  const check = async (listId: number) =>
+    fetch(`http://127.0.0.1:${port}/api/v1/list/${listId}/sync`, {
+      method: 'POST',
+    });
+
+  it('reads it now and answers as linking does', async () => {
+    const list = await makePlaylist();
+    assert.equal((await link(list.id)).status, 200);
+    const reads = pageReads.mock.callCount();
+    const res = await check(list.id);
+    assert.equal(res.status, 200);
+    const view = (await res.json()) as {
+      sourceUrl: string;
+      songs: { title: string }[];
+    };
+    assert.equal(view.sourceUrl, PLAYLIST);
+    assert.deepEqual(
+      view.songs.map((s) => s.title),
+      ['Lantern Song']
+    );
+    assert.equal(pageReads.mock.callCount(), reads + 1, 'read once more');
+  });
+
+  it('says so when the playlist isn’t linked', async () => {
+    const list = await makePlaylist();
+    const res = await check(list.id);
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), {
+      message:
+        'This playlist isn’t linked to a Spotify or Apple Music playlist.',
+    });
+  });
+
+  it('is only for its owner, and only one they can see', async () => {
+    const list = await makePlaylist();
+    assert.equal((await link(list.id)).status, 200);
+    const member = await getRepository(User).save(
+      new User({
+        email: `check-${Math.random()}@test.local`,
+        avatar: '',
+        permissions: Permission.REQUEST,
+      })
+    );
+    actingAs = member;
+    assert.equal((await check(list.id)).status, 404);
+    await getRepository(MediaListMember).save(
+      Object.assign(new MediaListMember(), {
+        listId: list.id,
+        userId: member.id,
+        acceptedAt: new Date(),
+      })
+    );
+    const res = await check(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message: 'Only the playlist’s owner can check it for new songs.',
+    });
+  });
+
+  it('is refused while importing or Music is off', async () => {
+    const list = await makePlaylist();
+    assert.equal((await link(list.id)).status, 200);
+    const reads = pageReads.mock.callCount();
+
+    getSettings().music.playlists.importing = false;
+    let res = await check(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message: 'Importing playlists is turned off.',
+    });
+    getSettings().music.playlists.importing = true;
+
+    await getRepository(User).update(user.id, { playlistLink: false });
+    actingAs = await getRepository(User).findOneByOrFail({ id: user.id });
+    res = await check(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+      message: 'Importing playlists is turned off for your account.',
+    });
+    actingAs = user;
+
+    getSettings().main.disabledFeatures = ['music'];
+    res = await check(list.id);
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), { message: 'Music is turned off.' });
+    assert.equal(pageReads.mock.callCount(), reads, 'Spotify is not asked');
+  });
+
+  it('counts toward the same limit as linking', async () => {
+    const someone = (id: number) => Object.assign(new User(), { id });
+    actingAs = someone(777_003);
+    for (let i = 0; i < 10; i++) {
+      assert.equal((await link(999_999)).status, 404);
+      assert.equal((await check(999_999)).status, 404);
+    }
+    assert.equal((await check(999_999)).status, 429);
+  });
+});
+
 describe('a playlist shared with someone', () => {
   it('is only tried again, or searched again, by its owner', async () => {
     const list = await makePlaylist();

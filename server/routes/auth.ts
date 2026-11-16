@@ -110,6 +110,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
     email: user.email,
     plexId: user.plexId,
     plexTokenExpiredAt: user.plexTokenExpiredAt,
+    playlistLink: user.playlistLink,
     settings: user.settings && {
       locale: user.settings.locale,
       discoverRegion: user.settings.discoverRegion,

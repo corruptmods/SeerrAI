@@ -2,6 +2,14 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### New
+
+- **Playlist Imports** (Settings → Music, on to start): turn off importing Spotify and Apple Music playlists for everyone. Or turn it off for one person on their settings page. Playlists already imported stay, and aren't checked for new songs while it's off.
+- **Check for New Songs** on a linked playlist reads it again straight away, instead of waiting for its daily read.
+- Apps such as Pluet can tell whether playlist importing is on, and can check a linked playlist for new songs.
+
 ## 2.4.4 (15 November 2026)
 
 Faster page loads, adding one song to a playlist from apps such as Pluet, and the November Node.js security release.

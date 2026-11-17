@@ -10,6 +10,7 @@ import {
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
+import { allowedBrowserOrigin } from '@server/lib/browserApps';
 import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -37,7 +38,10 @@ import type { Request } from 'express';
  * create keys.
  *
  * A Siri key (scope 'siri', made on the Siri page) works only on
- * /api/v1/now-playing and requires Siri reports, not keys, to be on.
+ * /api/v1/now-playing and requires Siri reports, not keys, to be on. A
+ * browser key (scope 'browser', made by linking a browser app) works only
+ * from an allowed browser app's site and requires browser apps, not keys,
+ * to be on.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -118,6 +122,7 @@ export const keySummary = (key: UserApiKey): ApiKeySummary => ({
   expiresAt: key.expiresAt ? key.expiresAt.toISOString() : null,
   lastUsedAt: key.lastUsedAt ? key.lastUsedAt.toISOString() : null,
   expired: isExpired(key.expiresAt),
+  browser: key.scope === 'browser',
 });
 
 /*
@@ -275,10 +280,29 @@ export const authenticateApiKey = async (
     return { status: 401, message: INVALID };
   }
 
+  // A browser key works from an allowed browser app's site, whether or not
+  // its owner may make keys: an admin allowed the app.
+  if (key.scope === 'browser') {
+    if (!getSettings().network.browserApps.enabled) {
+      logRefusal(req, 'switchedOff', details);
+      return {
+        status: 401,
+        message: 'Browser apps are turned off on this server.',
+      };
+    }
+    if (!allowedBrowserOrigin(req.header('Origin'))) {
+      logRefusal(req, 'outsideScope', details);
+      return {
+        status: 403,
+        message: 'This key only works in the browser app it was linked to.',
+      };
+    }
+  }
+
   // A Siri key only reports what is playing, for anyone allowed to report via
   // Siri, whether or not they may make keys. Any non-null scope is limited, and
   // an unknown scope works nowhere: a key never does more than it was made for.
-  if (key.scope) {
+  if (key.scope && key.scope !== 'browser') {
     if (key.scope !== 'siri') {
       logRefusal(req, 'outsideScope', details);
       return { status: 403, message: 'This API key cannot be used here.' };

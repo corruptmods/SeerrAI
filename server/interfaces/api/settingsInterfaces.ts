@@ -46,6 +46,8 @@ export interface PublicSettingsResponse {
   mediaServerLogin: boolean;
   /** Who may create personal API keys (profile API Keys tab). */
   personalApiKeys: PersonalApiKeyAccess;
+  /** Browser apps may link (Settings → Network); their keys show there too. */
+  browserApps?: boolean;
   /** Connected media servers, primary first. */
   mediaServers: {
     kind: MediaServerKind;
@@ -131,4 +133,8 @@ export interface StatusResponse {
   commitTag: string;
   updateAvailable?: boolean;
   commitsBehind?: number;
+  /** Only to a browser app on an allowed site: it may call the API. */
+  browserAccess?: true;
+  /** Only to a browser app on an allowed site: it may link with a code. */
+  appLink?: true;
 }

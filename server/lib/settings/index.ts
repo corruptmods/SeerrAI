@@ -820,6 +820,14 @@ export interface NetworkSettings {
   proxy: ProxySettings;
   dnsCache: DnsCacheSettings;
   apiRequestTimeout: number;
+  /** Web apps on these sites may call the API (lib/browserApps). */
+  browserApps: BrowserAppsSettings;
+}
+
+export interface BrowserAppsSettings {
+  enabled: boolean;
+  /** Exact origins, such as https://watch.pluet.app. */
+  origins: string[];
 }
 
 interface PublicSettings {
@@ -853,6 +861,8 @@ interface FullPublicSettings extends PublicSettings {
   mediaServerLogin: boolean;
   /** Who may create personal API keys (profile API Keys tab). */
   personalApiKeys: PersonalApiKeyAccess;
+  /** Browser apps may link (Settings → Network); their keys show there too. */
+  browserApps: boolean;
   /** Connected media servers, primary first. */
   mediaServers: PublicMediaServer[];
   /** Enabled OIDC providers; empty until the Application URL is set. */
@@ -1533,6 +1543,7 @@ class Settings {
           forceMaxTtl: -1,
         },
         apiRequestTimeout: 10000,
+        browserApps: { enabled: false, origins: [] },
       },
       // New installs already match 0010's result (running it later would
       // disconnect servers connected at setup) and know Wrong Match (0014).
@@ -1795,6 +1806,7 @@ class Settings {
       localLogin: this.data.main.localLogin,
       mediaServerLogin: this.data.main.mediaServerLogin,
       personalApiKeys: this.data.main.personalApiKeys ?? 'off',
+      browserApps: this.network.browserApps.enabled,
       mediaServers: connectedKindsOf(this.data).map((kind, index) => ({
         kind,
         name: this.data[kind]?.name ?? '',
@@ -1892,6 +1904,8 @@ class Settings {
   }
 
   get network(): NetworkSettings {
+    // Settings saved before browser apps; in effect without a restart.
+    this.data.network.browserApps ??= { enabled: false, origins: [] };
     return this.data.network;
   }
 

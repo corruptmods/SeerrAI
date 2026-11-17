@@ -82,7 +82,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import net from 'net';
-import { IsNull, LessThan, MoreThan, Not } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Not, Or } from 'typeorm';
 import { canMakePermissionsChange } from '.';
 import personalCssRoutes from './customCss';
 
@@ -1646,6 +1646,9 @@ userSettingsRoutes.delete<{ id: string; passkeyId: string }>(
  * creation; as with passkeys, only the owner touches the owner's or another
  * admin's.
  */
+/** Keys listed with a person's API keys: their own and browser apps'. */
+const LISTED_SCOPE = Or(IsNull(), In(['browser']));
+
 const apiKeyOwner = async (
   req: Request<{ id: string }>
 ): Promise<User | { status: number; message: string }> => {
@@ -1678,9 +1681,9 @@ userSettingsRoutes.get<{ id: string }, ApiKeyListResponse>(
       if (!(user instanceof User)) {
         return next(user);
       }
-      // Siri keys are listed on the Siri page.
+      // Siri keys are listed on the Siri page; browser apps' keys here.
       const keys = await getRepository(UserApiKey).find({
-        where: { userId: user.id, scope: IsNull() },
+        where: { userId: user.id, scope: LISTED_SCOPE },
         order: { createdAt: 'ASC', id: 'ASC' },
       });
       return res.status(200).json({
@@ -1748,8 +1751,8 @@ userSettingsRoutes.post<
     });
     const live = await repository.count({
       where: [
-        { userId: user.id, scope: IsNull(), expiresAt: IsNull() },
-        { userId: user.id, scope: IsNull(), expiresAt: MoreThan(now) },
+        { userId: user.id, scope: LISTED_SCOPE, expiresAt: IsNull() },
+        { userId: user.id, scope: LISTED_SCOPE, expiresAt: MoreThan(now) },
       ],
     });
     if (live >= MAX_API_KEYS_PER_PERSON) {
@@ -1801,7 +1804,7 @@ userSettingsRoutes.delete<{ id: string; keyId: string }>(
         where: {
           id: Number(req.params.keyId),
           userId: user.id,
-          scope: IsNull(),
+          scope: LISTED_SCOPE,
         },
       });
       if (!key) {

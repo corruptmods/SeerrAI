@@ -14,6 +14,10 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
+import {
+  PLUET_BROWSER_ORIGIN,
+  browserOriginFrom,
+} from '@server/constants/browserApps';
 import type { NetworkSettings } from '@server/lib/settings';
 import axios, { isAxiosError } from 'axios';
 import { Field, Form, Formik } from 'formik';
@@ -33,6 +37,14 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
   csrfProtectionTip:
     'Stops other sites making changes through a signed-in browser.',
   csrfProtectionHoverTip: 'API key requests aren’t affected.',
+  browserApps: 'Allow Browser Apps',
+  browserAppsTip:
+    'Web apps on the sites below, such as Pluet in the browser, can use Seerr AI. Each person links the app to their account with a code, and it can then do what they can. Sign-ins and the server’s API key never work from these sites.',
+  browserAppsSites: 'Allowed Sites',
+  browserAppsSitesTip:
+    'Exact addresses, such as https://watch.pluet.app, separated by commas.',
+  validationBrowserAppsSite:
+    '{entry} is not a site address, such as https://watch.pluet.app.',
   trustProxy: 'Enable Proxy Support',
   trustProxyLocalTip:
     'Trust a reverse proxy on this machine, your local network or Tailscale for people’s addresses.',
@@ -75,6 +87,10 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
     'Seconds to wait for services like Radarr and Sonarr. 0 for no limit.',
   validationApiRequestTimeout: 'You must provide a valid timeout value',
 });
+
+/** The first entry that isn't an exact site address, if any. */
+const firstNonSite = (text: string | undefined): string | undefined =>
+  proxyListFromText(text).find((entry) => !browserOriginFrom(entry));
 
 const SettingsNetwork = () => {
   const { addToast } = useToasts();
@@ -129,6 +145,20 @@ const SettingsNetwork = () => {
         ),
       otherwise: (schema) => schema.nullable(),
     }),
+    // Checked only while the field is shown, with browser apps on.
+    browserAppsSites: Yup.string().when('browserAppsEnabled', {
+      is: true,
+      then: (schema) =>
+        schema.test(
+          'sites',
+          ({ value }) =>
+            intl.formatMessage(messages.validationBrowserAppsSite, {
+              entry: firstNonSite(value),
+            }),
+          (value) => firstNonSite(value) === undefined
+        ),
+      otherwise: (schema) => schema.nullable(),
+    }),
     apiRequestTimeout: Yup.number()
       .typeError(intl.formatMessage(messages.validationApiRequestTimeout))
       .required(intl.formatMessage(messages.validationApiRequestTimeout))
@@ -167,6 +197,8 @@ const SettingsNetwork = () => {
             trustProxy: data?.trustProxy,
             trustCloudflare: data?.trustCloudflare,
             trustedProxies: proxyListToText(data?.trustedProxies),
+            browserAppsEnabled: data?.browserApps?.enabled ?? false,
+            browserAppsSites: proxyListToText(data?.browserApps?.origins),
             proxyEnabled: data?.proxy?.enabled,
             proxyHostname: data?.proxy?.hostname,
             proxyPort: data?.proxy?.port,
@@ -195,6 +227,13 @@ const SettingsNetwork = () => {
                       trustedProxies: proxyListFromText(values.trustedProxies),
                     }
                   : {}),
+                browserApps: {
+                  enabled: values.browserAppsEnabled,
+                  // Only while shown: hidden, they stay as saved.
+                  ...(values.browserAppsEnabled && {
+                    origins: proxyListFromText(values.browserAppsSites),
+                  }),
+                },
                 dnsCache: {
                   enabled: values.dnsCacheEnabled,
                   forceMinTtl: Number(values.dnsCacheForceMinTtl),
@@ -220,6 +259,19 @@ const SettingsNetwork = () => {
                 appearance: 'success',
               });
             } catch (e) {
+              // The server names an entry that isn't a site address.
+              const invalidOrigin = isAxiosError(e)
+                ? (e.response?.data as { invalidOrigin?: string } | undefined)
+                    ?.invalidOrigin
+                : undefined;
+              if (invalidOrigin !== undefined) {
+                setFieldError(
+                  'browserAppsSites',
+                  intl.formatMessage(messages.validationBrowserAppsSite, {
+                    entry: invalidOrigin,
+                  })
+                );
+              }
               // The server names a non-address entry in Also Trust These Proxies.
               const invalidProxy = isAxiosError(e)
                 ? (e.response?.data as { invalidProxy?: string } | undefined)
@@ -357,6 +409,68 @@ const SettingsNetwork = () => {
                     </Tooltip>
                   </div>
                 </div>
+                <div className="form-row">
+                  <label
+                    htmlFor="browserAppsEnabled"
+                    className="checkbox-label"
+                  >
+                    <span className="mr-2">
+                      {intl.formatMessage(messages.browserApps)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.browserAppsTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="browserAppsEnabled"
+                      name="browserAppsEnabled"
+                      onChange={() => {
+                        const on = !values.browserAppsEnabled;
+                        setFieldValue('browserAppsEnabled', on);
+                        // Pluet's site to start with; others can be added.
+                        if (on && !values.browserAppsSites.trim()) {
+                          setFieldValue(
+                            'browserAppsSites',
+                            PLUET_BROWSER_ORIGIN
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                {values.browserAppsEnabled && (
+                  <div className="ml-4 mr-2">
+                    <div className="form-row">
+                      <label htmlFor="browserAppsSites" className="text-label">
+                        <span className="mr-2">
+                          {intl.formatMessage(messages.browserAppsSites)}
+                        </span>
+                        <span className="label-tip">
+                          {intl.formatMessage(messages.browserAppsSitesTip)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <div className="form-input-field">
+                          <Field
+                            id="browserAppsSites"
+                            name="browserAppsSites"
+                            type="text"
+                            placeholder={PLUET_BROWSER_ORIGIN}
+                          />
+                        </div>
+                        {errors.browserAppsSites &&
+                          touched.browserAppsSites &&
+                          typeof errors.browserAppsSites === 'string' && (
+                            <div className="error">
+                              {errors.browserAppsSites}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="form-row">
                   <label htmlFor="forceIpv4First" className="checkbox-label">
                     <span className="mr-2">

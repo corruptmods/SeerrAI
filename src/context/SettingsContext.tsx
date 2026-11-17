@@ -21,6 +21,7 @@ const defaultSettings = {
   localLogin: true,
   mediaServerLogin: true,
   personalApiKeys: 'off' as const,
+  browserApps: false,
   mediaServers: [],
   oidcProviders: [],
   movie4kEnabled: false,

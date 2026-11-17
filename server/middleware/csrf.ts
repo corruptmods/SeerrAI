@@ -37,10 +37,14 @@ export const csrfProtection = (): RequestHandler[] => [
 /**
  * ntfy's Approve and Decline buttons, sent from a phone with no session or
  * cookie: their one-time token is the credential (routes/requestAction), so
- * there is nothing for another site to ride. Exactly this method and path.
+ * there is nothing for another site to ride. And a browser app starting a
+ * link (routes/appLink): it carries no credential and only shows a code its
+ * person must approve while signed in. Exactly these methods and paths.
  */
 const tokenOnly = (method: string, path: string) =>
-  method === 'POST' && path === REQUEST_ACTION_PATH;
+  method === 'POST' && (path === REQUEST_ACTION_PATH || path === APP_LINK_PATH);
+
+const APP_LINK_PATH = '/api/v1/auth/app-link';
 
 /**
  * CSRF protection that follows the setting as it is saved: requests are

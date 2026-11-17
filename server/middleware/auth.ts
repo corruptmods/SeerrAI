@@ -1,5 +1,6 @@
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import { allowedBrowserOrigin } from '@server/lib/browserApps';
 import type {
   Permission,
   PermissionCheckOptions,
@@ -42,6 +43,20 @@ export const checkUser: Middleware = async (req, res, next) => {
   const apiKey = req.header('X-API-Key');
 
   if (apiKey && isServerKey(apiKey, settings.main.apiKey)) {
+    // Never from a browser app's site: a page there can't act as admin.
+    if (allowedBrowserOrigin(req.header('Origin'))) {
+      logger.warn('Server API key refused from a browser app', {
+        label: 'API Key',
+        origin: req.header('Origin'),
+        ip: req.ip,
+      });
+      res.status(403).json({
+        status: 403,
+        message:
+          'The server’s API key can’t be used from a browser app. Link the app to your account instead.',
+      });
+      return;
+    }
     const userRepository = getRepository(User);
 
     // X-API-User acts on that user's behalf; else the original admin account.

@@ -594,6 +594,9 @@ components:
           description: Recorded at most once a minute.
         expired:
           type: boolean
+        browser:
+          type: boolean
+          description: Made by linking a browser app. Works only from an allowed browser app's site, while browser apps are on.
       required:
         - id
         - name
@@ -1174,6 +1177,20 @@ components:
             forceMaxTtl:
               type: number
               example: -1
+        browserApps:
+          type: object
+          description: Web apps on these sites may call the API from a visitor's browser, with a personal API key only (never the session cookie or the server's key). Left as saved when not sent; origins left as saved when not sent.
+          properties:
+            enabled:
+              type: boolean
+              example: false
+            origins:
+              type: array
+              maxItems: 20
+              items:
+                type: string
+              example: ['https://watch.pluet.app']
+              description: Exact origins (scheme, host and port if not the usual one). No paths or wildcards.
     PlexLibrary:
       type: object
       properties:
@@ -2132,6 +2149,9 @@ components:
           type: string
           enum: ['off', 'managers', 'everyone']
           description: Who may make their own API keys.
+        browserApps:
+          type: boolean
+          description: Browser apps on allowed sites may link (Settings → Network).
         musicReady:
           type: boolean
           description: A default Lidarr is set up and music is not turned off for everyone.
@@ -4604,6 +4624,12 @@ paths:
                     type: boolean
                   commitsBehind:
                     type: number
+                  browserAccess:
+                    type: boolean
+                    description: Only to a browser app on an allowed site (its Origin header), while browser apps are on. It may call the API with a personal API key.
+                  appLink:
+                    type: boolean
+                    description: As browserAccess. It may link with a code (POST /auth/app-link).
   /status/appdata:
     get:
       summary: Get application data volume status
@@ -11152,6 +11178,178 @@ paths:
               required:
                 - email
                 - password
+  /auth/app-link:
+    post:
+      summary: Start linking a browser app
+      description: For a browser app on an allowed site (Settings → Network → Allow Browser Apps), decided by the request's Origin header. Answers a code for its person to enter at /link while signed in, and the id the app waits on. No sign-in. Links last ten minutes.
+      security: []
+      tags:
+        - auth
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app:
+                  type: string
+                  description: What the app calls itself, shown to its person. Up to 32 characters.
+                  example: Pluet
+                origin:
+                  type: string
+                  description: Ignored; the Origin header decides.
+      responses:
+        '201':
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: K7M-Q2X
+                  linkId:
+                    type: string
+                  expiresIn:
+                    type: number
+                    description: Seconds.
+                    example: 600
+                  url:
+                    type: string
+                    description: The page to enter the code on, with it filled in. Only when the Application URL is set.
+                    example: https://seerr.example.com/link?code=K7MQ2X
+        '403':
+          description: Browser apps are off, or this site isn't allowed
+        '429':
+          description: Too many links started from this address
+        '503':
+          description: Too many links waiting
+  /auth/app-link/check:
+    post:
+      summary: Which app a link code is for
+      description: Signed in with a session, not a key. The app and site to show before approving.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: K7M-Q2X
+              required:
+                - code
+      responses:
+        '200':
+          description: The link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  app:
+                    type: string
+                  site:
+                    type: string
+                    example: watch.pluet.app
+                  origin:
+                    type: string
+                  expiresIn:
+                    type: number
+        '404':
+          description: No waiting link has that code
+  /auth/app-link/approve:
+    post:
+      summary: Approve linking a browser app
+      description: Signed in with a session, not a key. Makes a browser key for the signed-in person, lasting a year, for the app to collect.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+              required:
+                - code
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    $ref: '#/components/schemas/ApiKeySummary'
+        '400':
+          description: The most API keys already
+        '404':
+          description: No waiting link has that code
+  /auth/app-link/decline:
+    post:
+      summary: Decline linking a browser app
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+              required:
+                - code
+      responses:
+        '204':
+          description: Declined
+        '404':
+          description: No waiting link has that code
+  /auth/app-link/{linkId}:
+    get:
+      summary: Wait on a browser app link
+      description: From the site that started it (Origin header). Waiting, declined, or approved with the key, which is handed over once; the link then ends.
+      security: []
+      tags:
+        - auth
+      parameters:
+        - in: path
+          name: linkId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Where the link stands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [waiting, approved, declined]
+                  expiresIn:
+                    type: number
+                    description: While waiting, seconds left.
+                  apiKey:
+                    type: string
+                    description: Once approved, the key, for X-Api-Key. Shown this once.
+                  expiresAt:
+                    type: string
+                    nullable: true
+        '404':
+          description: Expired, collected, or never started from this site
   /ai/status:
     get:
       summary: The AI features on for this user, and answers left today

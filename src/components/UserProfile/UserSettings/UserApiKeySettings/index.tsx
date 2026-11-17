@@ -4,6 +4,7 @@ import ConfirmButton from '@app/components/Common/ConfirmButton';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -141,6 +142,7 @@ export const NewKey = ({ secret, hint }: { secret: string; hint?: string }) => {
 
 const UserApiKeySettings = () => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
   const router = useRouter();
   const { addToast } = useToasts();
   const { user: currentUser, hasPermission } = useUser();
@@ -259,16 +261,21 @@ const UserApiKeySettings = () => {
         <Alert type="error" title={intl.formatMessage(messages.loadFailed)} />
       )}
 
-      {data && data.status !== 'on' && (data.keys.length > 0 || isOwn) && (
-        <div className="mb-4">
-          <Alert
-            type="warning"
-            title={intl.formatMessage(
-              data.status === 'off' ? messages.switchedOff : messages.notAllowed
-            )}
-          />
-        </div>
-      )}
+      {data &&
+        data.status !== 'on' &&
+        (data.keys.some((key) => !key.browser) ||
+          (isOwn && !currentSettings.browserApps)) && (
+          <div className="mb-4">
+            <Alert
+              type="warning"
+              title={intl.formatMessage(
+                data.status === 'off'
+                  ? messages.switchedOff
+                  : messages.notAllowed
+              )}
+            />
+          </div>
+        )}
       {isOwn && data?.status === 'on' && liveKeys >= data.limit && (
         <div className="mb-4">
           <Alert

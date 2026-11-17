@@ -9,6 +9,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Playlist Imports** (Settings → Music, on to start): turn off importing Spotify and Apple Music playlists for everyone. Or turn it off for one person on their settings page. Playlists already imported stay, and aren't checked for new songs while it's off.
 - **Check for New Songs** on a linked playlist reads it again straight away, instead of waiting for its daily read.
 - Apps such as Pluet can tell whether playlist importing is on, and can check a linked playlist for new songs.
+- **Allow Browser Apps** (Settings → Network, off to start): web apps on sites you allow, such as Pluet in the browser, can use Seerr AI. Each person links the app with a code at /link. Its key works only from those sites, and is listed and revoked under API Keys. Sign-ins and the server's API key never work from them.
 
 ## 2.4.4 (15 November 2026)
 

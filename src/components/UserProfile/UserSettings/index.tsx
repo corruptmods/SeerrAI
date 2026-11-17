@@ -106,16 +106,20 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       text: intl.formatMessage(messages.menuApiKeys),
       route: '/settings/api-keys',
       regex: /\/settings\/api-keys/,
-      // Own keys when allowed; managers see others' while keys are on.
+      // Own keys when allowed; managers see others' while keys are on. Keys
+      // from linked browser apps show while those are on.
       hidden:
-        settings.currentSettings.personalApiKeys === 'off' ||
-        (currentUser?.id === user.id
-          ? settings.currentSettings.personalApiKeys === 'managers' &&
-            !hasPermission(
-              Permission.MANAGE_USERS,
-              currentUser?.permissions ?? 0
-            )
-          : cannotManageThem),
+        currentUser?.id === user.id
+          ? !settings.currentSettings.browserApps &&
+            (settings.currentSettings.personalApiKeys === 'off' ||
+              (settings.currentSettings.personalApiKeys === 'managers' &&
+                !hasPermission(
+                  Permission.MANAGE_USERS,
+                  currentUser?.permissions ?? 0
+                )))
+          : cannotManageThem ||
+            (settings.currentSettings.personalApiKeys === 'off' &&
+              !settings.currentSettings.browserApps),
     },
     {
       text: intl.formatMessage(messages.menuSiri),

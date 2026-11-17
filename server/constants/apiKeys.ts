@@ -37,6 +37,8 @@ export interface ApiKeySummary {
   expiresAt: string | null;
   lastUsedAt: string | null;
   expired: boolean;
+  /** Made by linking a browser app: works while browser apps are on. */
+  browser: boolean;
 }
 
 export interface ApiKeyListResponse {
@@ -53,9 +55,14 @@ export interface ApiKeyCreatedResponse {
 
 /**
  * Restrictions on top of the owner's permissions: 'siri' keys may only report
- * problems with what's playing (/api/v1/now-playing).
+ * problems with what's playing (/api/v1/now-playing); 'browser' keys, made by
+ * linking a browser app (routes/appLink), only work from a browser app's
+ * allowed site while browser apps are on.
  */
-export const API_KEY_SCOPES = ['siri'] as const;
+export const API_KEY_SCOPES = ['siri', 'browser'] as const;
+
+/** How long a key made by linking a browser app lasts. */
+export const BROWSER_KEY_LIFETIME: ApiKeyLifetime = 365;
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
 /** A user's Siri page: their Siri key and what the shortcut needs. */

@@ -44,6 +44,10 @@ The list shows when each key was made, last used and expires. **Revoke** stops o
 
 Keys also stop working while an admin has keys turned off, and when you can no longer sign in (for example, no longer shared on Plex). Deleting your account deletes them.
 
+### Linking a browser app
+
+When an admin allows browser apps, a web app such as Pluet in the browser can use Seerr AI as you. The app shows a code: open **/link** on Seerr AI (or the link the app gives you), enter the code, check the app and site it names, and press **Allow**. Only allow a code you just started yourself on that site. The app's key shows on your **API Keys** page, named after the app and site, and **Revoke** unlinks it. It lasts a year.
+
 ## Siri
 
 **Profile → Settings → Siri** sets up "Fix this show": add the shortcut, then give it the server address and a Siri key, which can only report problems with what you're watching. See [Reporting with Siri](./siri.md).

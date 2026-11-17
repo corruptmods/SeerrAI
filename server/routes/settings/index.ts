@@ -2,6 +2,10 @@ import PlexAPI from '@server/api/plexapi';
 import PlexTvAPI from '@server/api/plextv';
 import type { PersonalApiKeyAccess } from '@server/constants/apiKeys';
 import { PERSONAL_API_KEY_ACCESS } from '@server/constants/apiKeys';
+import {
+  MOST_BROWSER_APP_SITES,
+  browserOriginFrom,
+} from '@server/constants/browserApps';
 import { ApiErrorCode } from '@server/constants/error';
 import { MIN_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import { MediaType } from '@server/constants/media';
@@ -344,8 +348,13 @@ settingsRoutes.get('/network', (req, res) => {
 
 settingsRoutes.post('/network', async (req, res) => {
   const settings = getSettings();
-  const { trustedProxies: asked, ...rest } = req.body as {
+  const {
+    trustedProxies: asked,
+    browserApps: browserAsked,
+    ...rest
+  } = req.body as {
     trustedProxies?: string[];
+    browserApps?: { enabled?: boolean; origins?: string[] };
   };
 
   // Trust These Proxies: kept as entered, each checked as Express will parse
@@ -361,11 +370,42 @@ settingsRoutes.post('/network', async (req, res) => {
     });
   }
 
+  // Allowed Sites: exact origins, each once.
+  const browserEntries = browserAsked?.origins
+    ?.map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  const invalidOrigin = browserEntries?.find(
+    (entry) => !browserOriginFrom(entry)
+  );
+  if (invalidOrigin !== undefined) {
+    return res.status(400).json({
+      message: `"${invalidOrigin}" is not a site address, such as https://watch.pluet.app.`,
+      invalidOrigin,
+    });
+  }
+  const browserOrigins = browserEntries && [
+    ...new Set(browserEntries.map((entry) => browserOriginFrom(entry) ?? '')),
+  ];
+  if (browserOrigins && browserOrigins.length > MOST_BROWSER_APP_SITES) {
+    return res.status(400).json({
+      message: `Allow up to ${MOST_BROWSER_APP_SITES} sites.`,
+    });
+  }
+
   const previous = structuredClone(settings.network);
   settings.network = merge(settings.network, rest);
   // Set, not merged: a merge keeps entries past the end of a shorter list.
   if (trustedProxies) {
     settings.network.trustedProxies = trustedProxies;
+  }
+  if (browserAsked) {
+    settings.network.browserApps = {
+      enabled:
+        typeof browserAsked.enabled === 'boolean'
+          ? browserAsked.enabled
+          : settings.network.browserApps.enabled,
+      origins: browserOrigins ?? settings.network.browserApps.origins,
+    };
   }
   await settings.save();
   // In effect from the next request; the proxy check runs in the background.

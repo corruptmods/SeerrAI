@@ -9,6 +9,7 @@ import { PROJECT_DEV_BRANCH } from '@server/constants/project';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
+import { allowedBrowserOrigin } from '@server/lib/browserApps';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -19,6 +20,7 @@ import { mapNetwork } from '@server/models/Tv';
 import { mapWatchProviderDetails } from '@server/models/common';
 import agentRoutes from '@server/routes/agent';
 import aiRoutes from '@server/routes/ai';
+import appLinkRoutes from '@server/routes/appLink';
 import backfillRoutes from '@server/routes/backfill';
 import backfillStatusRoutes from '@server/routes/backfillStatus';
 import listRoutes from '@server/routes/list';
@@ -104,10 +106,13 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
     }
   }
 
+  // A browser app on an allowed site learns it may link (lib/browserApps).
+  const browserApp = !!allowedBrowserOrigin(req.header('Origin'));
   return res.status(200).json({
     version: getAppVersion(),
     commitTag: getCommitTag(),
     ...(checkUpdate && { updateAvailable, commitsBehind }),
+    ...(browserApp && { browserAccess: true, appLink: true }),
   });
 });
 
@@ -198,6 +203,8 @@ router.use('/service', isAuthenticated(), serviceRoutes);
 router.use('/issue', isAuthenticated(), issueRoutes);
 router.use('/issueComment', isAuthenticated(), issueCommentRoutes);
 router.use('/now-playing', isAuthenticated(), nowPlayingRoutes);
+// Before /auth: starting and waiting on a link need no sign-in.
+router.use('/auth/app-link', appLinkRoutes);
 router.use('/auth', authRoutes);
 router.use('/style', styleRoutes);
 // Signed-in only at the group, like every other group. Each list route also

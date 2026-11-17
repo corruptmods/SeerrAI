@@ -35,6 +35,7 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import apiPathCase from '@server/middleware/apiPathCase';
 import { unlessApiKey } from '@server/middleware/auth';
+import { browserAppsCors } from '@server/middleware/browserApps';
 import clearCookies from '@server/middleware/clearcookies';
 import { csrfWhileOn } from '@server/middleware/csrf';
 import { aiChatBody, jsonBody } from '@server/middleware/jsonBody';
@@ -251,6 +252,9 @@ app
     );
     // The API base path as the spec writes it, whatever case it came in.
     server.use(apiPathCase);
+    // Browser apps on other sites (Settings → Network), before anything that
+    // could refuse their preflight.
+    server.use('/api/v1', browserAppsCors);
     // Every cookie is Secure for a browser on https (an https Application
     // URL's host included); other hosts over plain http work as before.
     server.use(secureCookies);

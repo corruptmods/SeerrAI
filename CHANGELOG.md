@@ -11,6 +11,11 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Apps such as Pluet can tell whether playlist importing is on, and can check a linked playlist for new songs.
 - **Allow Browser Apps** (Settings → Network, off to start): web apps on sites you allow, such as Pluet in the browser, can use Seerr AI. Each person links the app with a code at /link. Its key works only from those sites, and is listed and revoked under API Keys. Sign-ins and the server's API key never work from them.
 
+### Security
+
+- Next.js 16.4.6, past two advisories about its `use cache` feature ([GHSA-mfr8-8qww-v76h](https://github.com/advisories/GHSA-mfr8-8qww-v76h), [GHSA-vc7v-qv4w-wrv8](https://github.com/advisories/GHSA-vc7v-qv4w-wrv8)). Seerr AI doesn't use that feature.
+- picomatch is no longer in the image ([GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), no fixed version yet). Only the tool that builds sqlite3 during install used it.
+
 ## 2.4.4 (15 November 2026)
 
 Faster page loads, adding one song to a playlist from apps such as Pluet, and the November Node.js security release.

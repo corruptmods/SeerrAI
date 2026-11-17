@@ -45,8 +45,8 @@ RUN if [ -d node_modules/.pnpm ]; then \
 # Build tools that other packages bring along but the running server never
 # loads: Next's compiler (next.config is plain JavaScript), and @swc/core,
 # ts-node and typescript (the server runs compiled from dist/); node-gyp
-# and the download cache it uses, which only build sqlite3 at install. Source
-# maps go too: nothing reads them.
+# and the download cache and file matching it uses, which only build sqlite3
+# at install. Source maps go too: nothing reads them.
 RUN rm -rf \
   node_modules/.pnpm/@next+swc-* \
   node_modules/.pnpm/@swc+core* \
@@ -55,6 +55,9 @@ RUN rm -rf \
   node_modules/.pnpm/node-gyp@* \
   node_modules/.pnpm/make-fetch-happen@* \
   node_modules/.pnpm/http-cache-semantics@* \
+  node_modules/.pnpm/tinyglobby@* \
+  node_modules/.pnpm/fdir@* \
+  node_modules/.pnpm/picomatch@* \
   node_modules/node-gyp && \
   find node_modules/.pnpm -name '*.map' -type f -delete
 

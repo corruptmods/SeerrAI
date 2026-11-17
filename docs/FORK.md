@@ -345,7 +345,9 @@ below it on its own (`pnpm why <package>`).
 [CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). One advisory is knowingly
 left: [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (http-cache-semantics, no
 fixed version), inside node-gyp, which only runs if sqlite3 has to be
-built. And [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+built. So is [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+(picomatch, no fixed version): only node-gyp's tinyglobby brings it, with
+node-gyp's own patterns, and the image deletes all three with node-gyp. And [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
 (minimatch, fixed only in 11) is left in minimatch 3 under
 email-templates' @ladjs/i18n: its multimatch is only called by that
 package's Koa redirect middleware, which nothing here uses, and minimatch

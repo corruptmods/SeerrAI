@@ -33,7 +33,7 @@ const HARBOUR: RadarrMovieDetail = {
   movieFileId: 0,
 };
 
-type Details = Partial<Pick<TmdbMovieDetails, 'release_date'>> & {
+type Details = Partial<Pick<TmdbMovieDetails, 'release_date' | 'status'>> & {
   release_dates?: {
     results: {
       iso_3166_1: string;
@@ -132,11 +132,98 @@ describe('Backfill: films Radarr has no date for', () => {
       { date: '2004-04-01T00:00:00.000Z', kind: 'digital' },
       'a cinema release is Radarr’s to have; not counted here'
     );
-    assert.deepEqual(tmdbFilmDate({ release_date: '2004-03-12' }), {
-      date: '2004-03-12T00:00:00.000Z',
-      kind: 'primary',
+    assert.deepEqual(
+      tmdbFilmDate({ release_date: '2004-03-12', status: 'Released' }),
+      { date: '2004-03-12T00:00:00.000Z', kind: 'primary' },
+      'released, and no typed dates at all'
+    );
+    assert.equal(
+      tmdbFilmDate({ release_date: '', status: 'Released' }),
+      undefined
+    );
+  });
+
+  it('goes by the primary date only for a released film made for TV or with no typed dates', () => {
+    const typed = (...rows: { type: number; release_date: string }[]) => ({
+      results: [{ release_dates: rows }],
     });
-    assert.equal(tmdbFilmDate({ release_date: '' }), undefined);
+    const at = (days: number) =>
+      new Date(Date.now() + days * 24 * HOUR).toISOString();
+    // A festival premiere only: not out anywhere yet.
+    assert.equal(
+      tmdbFilmDate({
+        release_date: '2004-03-12',
+        status: 'Released',
+        release_dates: typed({ type: 1, release_date: '2004-03-12' }),
+      }),
+      undefined
+    );
+    assert.equal(
+      tmdbFilmDate({
+        release_date: '2004-03-12',
+        status: 'Released',
+        genres: [{ id: 10770 }],
+        release_dates: typed({ type: 1, release_date: '2004-03-12' }),
+      }),
+      undefined,
+      'made for TV, but only premiered'
+    );
+    // Cinema dates still to come.
+    assert.equal(
+      tmdbFilmDate({
+        release_date: '2004-03-12',
+        status: 'Released',
+        release_dates: typed(
+          { type: 1, release_date: '2004-03-12' },
+          { type: 3, release_date: at(30) }
+        ),
+      }),
+      undefined
+    );
+    // Not released, by TMDB's word.
+    assert.equal(
+      tmdbFilmDate({ release_date: '2004-03-12', status: 'Post Production' }),
+      undefined
+    );
+    assert.equal(tmdbFilmDate({ release_date: '2004-03-12' }), undefined);
+    // Made for TV, with a past cinema date Radarr didn't take.
+    assert.deepEqual(
+      tmdbFilmDate({
+        release_date: '2004-03-12',
+        status: 'Released',
+        genres: [{ id: 18 }, { id: 10770 }],
+        release_dates: typed({ type: 3, release_date: at(-400) }),
+      }),
+      { date: '2004-03-12T00:00:00.000Z', kind: 'primary' }
+    );
+    // Not made for TV, with typed dates that aren't TV, digital or physical.
+    assert.equal(
+      tmdbFilmDate({
+        release_date: '2004-03-12',
+        status: 'Released',
+        release_dates: typed({ type: 3, release_date: at(-400) }),
+      }),
+      undefined
+    );
+  });
+
+  it('leaves a film with only a festival premiere not out', async () => {
+    details = {
+      release_date: '2004-03-12',
+      status: 'Released',
+      release_dates: {
+        results: [
+          {
+            iso_3166_1: 'FR',
+            rating: '',
+            release_dates: [
+              { certification: '', release_date: '2004-03-12', type: 1 },
+            ],
+          },
+        ],
+      },
+    };
+    assert.deepEqual(await filmOut(HARBOUR), { out: false, tmdb: undefined });
   });
 
   it('counts the film out by TMDB’s date, after the new-release wait', () => {

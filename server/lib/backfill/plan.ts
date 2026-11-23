@@ -102,19 +102,31 @@ const TMDB_RELEASE_KINDS: Record<number, TmdbFilmDate['kind']> = {
   6: 'tv',
 };
 
+/** TMDB's genre for a film made for TV. */
+const TMDB_TV_MOVIE = 10770;
+/** TMDB's release types: 1 premiere, 2 limited and 3 theatrical. */
+const TMDB_PREMIERE = 1;
+const TMDB_THEATRICAL = [2, 3];
+
 /**
  * The date Backfill goes by for a film Radarr has no date for: TMDB's
  * earliest TV, digital or physical release in any country, else its primary
- * release date.
+ * release date, but only for a film TMDB calls released that is made for TV
+ * or has no typed release dates at all. A film with only a festival
+ * premiere, or cinema dates still to come, has no date here.
  */
 export const tmdbFilmDate = (details: {
   release_date?: string;
+  status?: string;
+  genres?: { id: number }[];
   release_dates?: {
     results?: { release_dates?: { release_date?: string; type: number }[] }[];
   };
 }): TmdbFilmDate | undefined => {
-  const dated = (details.release_dates?.results ?? [])
-    .flatMap((country) => country.release_dates ?? [])
+  const rows = (details.release_dates?.results ?? []).flatMap(
+    (country) => country.release_dates ?? []
+  );
+  const dated = rows
     .filter(
       (r) =>
         !!TMDB_RELEASE_KINDS[r.type] &&
@@ -128,7 +140,22 @@ export const tmdbFilmDate = (details: {
       kind: TMDB_RELEASE_KINDS[dated[0].type],
     };
   }
-  if (details.release_date && !Number.isNaN(Date.parse(details.release_date))) {
+  // Only premieres, or cinema dates still to come: not out anywhere yet.
+  const notOutYet =
+    rows.length > 0 &&
+    rows.every(
+      (r) =>
+        r.type === TMDB_PREMIERE ||
+        (TMDB_THEATRICAL.includes(r.type) &&
+          (!r.release_date || !(Date.parse(r.release_date) <= Date.now())))
+    );
+  const tvMovie = (details.genres ?? []).some((g) => g.id === TMDB_TV_MOVIE);
+  if (
+    details.status === 'Released' &&
+    (rows.length === 0 || (tvMovie && !notOutYet)) &&
+    details.release_date &&
+    !Number.isNaN(Date.parse(details.release_date))
+  ) {
     return {
       date: new Date(details.release_date).toISOString(),
       kind: 'primary',

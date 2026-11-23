@@ -27,9 +27,9 @@ import {
   titleRef,
 } from '@server/lib/agent/tools/base';
 import backfill from '@server/lib/backfill/engine';
+import { filmOut } from '@server/lib/backfill/filmDates';
 import {
   airedAWhile,
-  filmOutAWhile,
   newReleaseWaitHours,
   underWait,
 } from '@server/lib/backfill/plan';
@@ -478,9 +478,10 @@ export const titleStatus: AgentTool = {
       const radarr = backfill.radarrFor(title.serverId);
       const movie = await radarr.getMovieDetail(title.arrId);
       state.bind(title, movie.title);
-      const [file, queued] = await Promise.all([
+      const [file, queued, out] = await Promise.all([
         movie.hasFile ? radarr.getMovieFile(movie.id) : null,
         radarr.getMovieQueueCount(movie.id),
+        movie.hasFile ? null : filmOut(movie),
       ]);
       return [
         `${movie.title} (${movie.year}) — ${titleRef(title)}, Radarr. Original language: ${
@@ -493,10 +494,12 @@ export const titleStatus: AgentTool = {
                 : ''
             }.`
           : `Not on disk; ${
-              !movie.isAvailable
-                ? 'not released yet'
-                : filmOutAWhile(movie)
-                  ? 'released'
+              out?.out
+                ? out.tmdb
+                  ? `released (Radarr has no release date for it, so it counts it as not out; by TMDB's date, ${out.tmdb.date.slice(0, 10)}, it is)`
+                  : 'released'
+                : !movie.isAvailable
+                  ? 'not released yet'
                   : `out ${underWait()}, left to Radarr for now: don't fetch it`
             }; ${movie.monitored ? 'monitored' : 'not monitored'}.`,
         queued ? `Downloading in Radarr: ${queued} item(s).` : '',

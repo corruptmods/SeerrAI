@@ -238,7 +238,12 @@ export interface SeriesDetail {
     profile: string;
     minFormatScore: number;
     names: string[];
+    /** Radarr counts it as available. */
     available: boolean;
+    /** Backfill counts it as out (Radarr's date, or TMDB's when it has none). */
+    out?: boolean;
+    /** TMDB's release date, when Radarr has none and Backfill goes by it. */
+    tmdbRelease?: { date: string; kind: string };
     file?: { quality: string; score?: number; belowCutoff?: boolean };
   };
   album?: {

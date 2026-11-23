@@ -5,6 +5,7 @@ import type { BackfillKind } from '@server/entity/BackfillSeries';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { agentWorkingOn, workedKey } from '@server/lib/agent/working';
 import backfill, { isMissing } from '@server/lib/backfill/engine';
+import { filmOut } from '@server/lib/backfill/filmDates';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import { selectEntries } from '@server/lib/backfill/plan';
 import { getSettings } from '@server/lib/settings';
@@ -568,7 +569,12 @@ interface MovieOnDisk {
   profile: string;
   minFormatScore: number;
   names: string[];
+  /** Radarr counts it as available. */
   available: boolean;
+  /** Backfill counts it as out (Radarr's date, or TMDB's when it has none). */
+  out: boolean;
+  /** TMDB's release date, when Radarr has none and Backfill goes by it. */
+  tmdbRelease?: { date: string; kind: string };
   file?: { quality: string; score?: number; belowCutoff?: boolean };
 }
 
@@ -660,6 +666,7 @@ const seriesOnDisk = async (row: BackfillSeries): Promise<SeriesOnDisk> => {
 /** A movie and its file as Radarr has them. */
 const movieOnDisk = async (row: BackfillSeries): Promise<MovieOnDisk> => {
   const ctx = await backfill.movieContext(row);
+  const { out, tmdb } = await filmOut(ctx.movie);
   return {
     title: ctx.movie.title,
     year: ctx.movie.year,
@@ -667,6 +674,8 @@ const movieOnDisk = async (row: BackfillSeries): Promise<MovieOnDisk> => {
     minFormatScore: ctx.profile.minFormatScore,
     names: ctx.names,
     available: ctx.movie.isAvailable,
+    out,
+    tmdbRelease: tmdb,
     file: ctx.file
       ? {
           quality: ctx.file.quality.quality.name,

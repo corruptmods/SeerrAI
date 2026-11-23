@@ -500,6 +500,7 @@
   "components.Backfill.SeriesReview.movieMissing": "Radarr has no file for this movie.",
   "components.Backfill.SeriesReview.movieNotOut": "Radarr does not count this movie as released yet.",
   "components.Backfill.SeriesReview.movieOnDisk": "On disk",
+  "components.Backfill.SeriesReview.movieTmdbDate": "Radarr has no release date for this film, so it counts it as not out; Backfill goes by TMDB’s date, {date}.",
   "components.Backfill.SeriesReview.noCandidates": "No packs yet.",
   "components.Backfill.SeriesReview.noHistory": "None yet.",
   "components.Backfill.SeriesReview.openJob": "Open the running backfill",

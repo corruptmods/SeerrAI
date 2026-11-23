@@ -46,6 +46,7 @@ import {
   seriesSearches,
 } from '@server/lib/backfill/arrSearch';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
+import { filmOut } from '@server/lib/backfill/filmDates';
 import type { IndexerRef } from '@server/lib/backfill/indexerLimit';
 import {
   IndexerLimitReached,
@@ -76,7 +77,6 @@ import {
 import type { PlanEntry, PlanSummary } from '@server/lib/backfill/plan';
 import {
   airedAWhile,
-  filmOutAWhile,
   multiMustWait,
   rankCandidates,
   selectEntries,
@@ -1383,8 +1383,17 @@ class Backfill {
       ? await radarr.getWanted('cutoff')
       : { records: [], complete: true };
     // Radarr's to fetch for its first hours out, as a new episode is Sonarr's.
-    const missing = missingList.records.filter(
-      (movie) => movie.isAvailable && filmOutAWhile(movie)
+    // A film Radarr has no date for (made for TV) goes by TMDB's.
+    const missing: RadarrMovieDetail[] = [];
+    for (const movie of missingList.records) {
+      if (run.cancelled) return;
+      if ((await filmOut(movie)).out) missing.push(movie);
+    }
+    // Missing but not out yet: still wanted, so not done.
+    const notOut = new Set(
+      missingList.records
+        .filter((movie) => !missing.includes(movie))
+        .map((movie) => movie.id)
     );
     const wanted = new Map<
       number,
@@ -1444,7 +1453,9 @@ class Backfill {
       }
     }
     if (missingList.complete && cutoffList.complete) {
-      await this.markDone(known.filter((row) => !wanted.has(row.arrId)));
+      await this.markDone(
+        known.filter((row) => !wanted.has(row.arrId) && !notOut.has(row.arrId))
+      );
     } else {
       logger.warn(
         `Radarr's wanted list is too long to read whole; movies not in the part read are left as they are`,
@@ -1801,12 +1812,7 @@ class Backfill {
         title: ctx.movie.title,
         poster: posterOf(ctx.movie.images),
         names: ctx.names,
-        missing:
-          !ctx.movie.hasFile &&
-          ctx.movie.isAvailable &&
-          filmOutAWhile(ctx.movie)
-            ? 1
-            : 0,
+        missing: !ctx.movie.hasFile && (await filmOut(ctx.movie)).out ? 1 : 0,
         categories: MOVIE_CATEGORIES,
         extraTerms: [],
         wants: () => 0,
@@ -3045,7 +3051,7 @@ class Backfill {
       const fileId = movie.hasFile ? movie.movieFileId : 0;
       return {
         files: new Map([[movie.id, fileId]]),
-        missing: !fileId && movie.isAvailable && filmOutAWhile(movie) ? 1 : 0,
+        missing: !fileId && (await filmOut(movie)).out ? 1 : 0,
       };
     }
     const includeSpecials = getSettings().backfill.includeSpecials;

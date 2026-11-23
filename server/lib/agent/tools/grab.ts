@@ -34,6 +34,7 @@ import { filesOf, releaseOf } from '@server/lib/agent/tools/search';
 import { musicOn, sameRelease } from '@server/lib/agent/tools/titles';
 import { judgeAlbumPack } from '@server/lib/backfill/albums';
 import backfill from '@server/lib/backfill/engine';
+import { filmOut } from '@server/lib/backfill/filmDates';
 import type { PackFile } from '@server/lib/backfill/matcher';
 import { mentionsShow } from '@server/lib/backfill/matcher';
 import { movieName } from '@server/lib/backfill/movies';
@@ -42,7 +43,6 @@ import type { PlanEntry } from '@server/lib/backfill/plan';
 import {
   airedAWhile,
   airedUnder,
-  filmOutAWhile,
   qualityAllowed,
   summarize,
   underWait,
@@ -73,11 +73,20 @@ const tooNew = (
   !adminPresent(state.run) &&
   episodes.some((ep) => !ep.hasFile && !airedAWhile(ep));
 
-/** On its own, a film Radarr still has its first hours out with. */
-const filmTooNew = (state: AgentState, film: RadarrMovieDetail): void => {
-  if (adminPresent(state.run) || film.hasFile || filmOutAWhile(film)) return;
+/**
+ * On its own, a film Radarr still has its first hours out with, or that
+ * isn't out (by Radarr's date, or TMDB's when Radarr has none).
+ */
+const filmTooNew = async (
+  state: AgentState,
+  film: RadarrMovieDetail
+): Promise<void> => {
+  if (adminPresent(state.run) || film.hasFile) return;
+  if ((await filmOut(film)).out) return;
   throw new Refused(
-    `That film came out ${underWait()}: Radarr gets new films first. Leave it for now.`
+    film.isAvailable
+      ? `That film came out ${underWait()}: Radarr gets new films first. Leave it for now.`
+      : `That film is not out yet by its release date: Radarr gets new films first. Leave it for now.`
   );
 };
 
@@ -299,7 +308,7 @@ const prepareWhole = async (
       parsed.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
       parsed.customFormatScore ?? 0
     );
-    filmTooNew(state, movieCtx.movie);
+    await filmTooNew(state, movieCtx.movie);
     Object.assign(entry, {
       // A movie's plan entry carries the movie's id, as Backfill's own do.
       episodeIds: [movie.id],
@@ -689,7 +698,7 @@ const prepareGrab = async (
       parsed?.parsedMovieInfo?.quality ?? UNKNOWN_QUALITY,
       parsed?.customFormatScore ?? 0
     );
-    filmTooNew(state, ctx.movie);
+    await filmTooNew(state, ctx.movie);
     plan.push({
       index: file.index,
       path: file.path,

@@ -1,6 +1,7 @@
 import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI from '@server/api/prowlarr';
+import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -15,6 +16,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import type { SearchOptions } from '@server/lib/backfill/engine';
 import backfill, { MAX_FAILED_PER_DAY } from '@server/lib/backfill/engine';
+import { forgetFilmDates } from '@server/lib/backfill/filmDates';
 import { mentionsShow, sameShow } from '@server/lib/backfill/matcher';
 import type { MovieContext } from '@server/lib/backfill/movies';
 import { judgeMoviePack, movieName } from '@server/lib/backfill/movies';
@@ -1054,6 +1056,88 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
       where: { kind: 'movie', arrId: 55 },
     });
     assert.equal(row.status, 'found');
+  });
+
+  it('goes by TMDB’s date for a film Radarr has no date for, as one made for TV', async () => {
+    const hour = 60 * 60 * 1000;
+    let tvDate = '';
+    Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
+      get() {
+        return async () => ({
+          release_date: '',
+          release_dates: {
+            results: [
+              {
+                iso_3166_1: 'US',
+                release_dates: tvDate
+                  ? [{ certification: '', release_date: tvDate, type: 6 }]
+                  : [],
+              },
+            ],
+          },
+        });
+      },
+      set() {},
+      configurable: true,
+    });
+    try {
+      forgetFilmDates();
+      // Never available to Radarr, so never searched by it.
+      movie = {
+        ...SECRETS,
+        tmdbId: 990673,
+        isAvailable: false,
+        minimumAvailability: 'released',
+        lastSearchTime: undefined,
+        added: new Date(Date.now() - 48 * hour).toISOString(),
+      };
+      await backfill.scan();
+      assert.equal(
+        await getRepository(BackfillSeries).count(),
+        0,
+        'no date from TMDB either: not out'
+      );
+
+      forgetFilmDates();
+      tvDate = '2004-03-12T00:00:00.000Z';
+      await backfill.scan();
+      const row = await getRepository(BackfillSeries).findOneOrFail({
+        where: { kind: 'movie', arrId: 55 },
+      });
+      assert.equal(row.status, 'found');
+      assert.equal(row.missing, 1);
+    } finally {
+      delete (TheMovieDb.prototype as unknown as { getMovie?: unknown })
+        .getMovie;
+      forgetFilmDates();
+    }
+  });
+
+  it('keeps what a search found for a film that isn’t out yet', async () => {
+    movie = {
+      ...SECRETS,
+      isAvailable: false,
+      minimumAvailability: 'released',
+      digitalRelease: new Date(Date.now() + 30 * 24 * 3_600_000).toISOString(),
+    };
+    const row = await backfill.track('movie', 0, movie.id, true);
+    await backfill.search(row.id, undefined, { autoApprove: false });
+    assert.ok(
+      await getRepository(BackfillCandidate).count({
+        where: { seriesId: row.id, status: 'ready' },
+      })
+    );
+    await backfill.scan({ searches: false });
+    const after = await getRepository(BackfillSeries).findOneByOrFail({
+      id: row.id,
+    });
+    assert.equal(after.status, 'found', 'still wanted: not done');
+    assert.ok(
+      await getRepository(BackfillCandidate).count({
+        where: { seriesId: row.id, status: 'ready' },
+      }),
+      'its packs are still there to approve'
+    );
   });
 
   describe('searching right after Radarr finds nothing', () => {

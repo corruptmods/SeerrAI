@@ -68,6 +68,8 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   movieOnDisk: 'On disk',
   movieMissing: 'Radarr has no file for this movie.',
   movieNotOut: 'Radarr does not count this movie as released yet.',
+  movieTmdbDate:
+    'Radarr has no release date for this film, so it counts it as not out; Backfill goes by TMDB’s date, {date}.',
   movieFile: '{quality}, score {score}',
   movieBelowCutoff: 'below the profile’s cutoff',
   why: 'Why {app} missed this',
@@ -544,11 +546,18 @@ const SeriesReview = () => {
                     ]
                       .filter(Boolean)
                       .join(' · ')
-                  : intl.formatMessage(
-                      movie.available
-                        ? messages.movieMissing
-                        : messages.movieNotOut
-                    )}
+                  : movie.available
+                    ? intl.formatMessage(messages.movieMissing)
+                    : movie.tmdbRelease
+                      ? intl.formatMessage(messages.movieTmdbDate, {
+                          date: intl.formatDate(movie.tmdbRelease.date, {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            timeZone: 'UTC',
+                          }),
+                        })
+                      : intl.formatMessage(messages.movieNotOut)}
               </p>
             </section>
           )}

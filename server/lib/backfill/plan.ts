@@ -71,6 +71,85 @@ export const filmOutAWhile = (film: FilmRelease): boolean => {
   return !since || outAWhile(since);
 };
 
+/**
+ * Radarr counts the film as not out only because it has no date of the kind
+ * its Minimum Availability waits for: no cinema, digital or physical release
+ * at all, as for a film made for TV (TMDB gives those only a TV release).
+ * Radarr then never counts it as available, and never searches for it.
+ */
+export const radarrHasNoDate = (
+  film: FilmRelease & { isAvailable?: boolean }
+): boolean =>
+  !film.isAvailable &&
+  film.minimumAvailability !== 'announced' &&
+  film.minimumAvailability !== 'tba' &&
+  !film.inCinemas &&
+  !film.releaseDate &&
+  !film.digitalRelease &&
+  !film.physicalRelease;
+
+/** A film's release date as TMDB has it, and which release it is. */
+export interface TmdbFilmDate {
+  date: string;
+  /** A TV, digital or physical release, or TMDB's primary release date. */
+  kind: 'tv' | 'digital' | 'physical' | 'primary';
+}
+
+/** TMDB's release types: 4 digital, 5 physical, 6 TV. */
+const TMDB_RELEASE_KINDS: Record<number, TmdbFilmDate['kind']> = {
+  4: 'digital',
+  5: 'physical',
+  6: 'tv',
+};
+
+/**
+ * The date Backfill goes by for a film Radarr has no date for: TMDB's
+ * earliest TV, digital or physical release in any country, else its primary
+ * release date.
+ */
+export const tmdbFilmDate = (details: {
+  release_date?: string;
+  release_dates?: {
+    results?: { release_dates?: { release_date?: string; type: number }[] }[];
+  };
+}): TmdbFilmDate | undefined => {
+  const dated = (details.release_dates?.results ?? [])
+    .flatMap((country) => country.release_dates ?? [])
+    .filter(
+      (r) =>
+        !!TMDB_RELEASE_KINDS[r.type] &&
+        !!r.release_date &&
+        !Number.isNaN(Date.parse(r.release_date))
+    )
+    .sort((a, b) => Date.parse(a.release_date!) - Date.parse(b.release_date!));
+  if (dated[0]) {
+    return {
+      date: new Date(dated[0].release_date!).toISOString(),
+      kind: TMDB_RELEASE_KINDS[dated[0].type],
+    };
+  }
+  if (details.release_date && !Number.isNaN(Date.parse(details.release_date))) {
+    return {
+      date: new Date(details.release_date).toISOString(),
+      kind: 'primary',
+    };
+  }
+  return undefined;
+};
+
+/**
+ * Whether Backfill counts a film as out long enough to fetch: Radarr's
+ * verdict, counted with the new-release wait; or, when Radarr has no date
+ * for it at all, TMDB's date, counted the same way.
+ */
+export const filmIsOut = (
+  film: FilmRelease & { isAvailable?: boolean },
+  tmdbDate?: string | null
+): boolean => {
+  if (film.isAvailable) return filmOutAWhile(film);
+  return radarrHasNoDate(film) && !!tmdbDate && outAWhile(tmdbDate);
+};
+
 /*
  * A pack's effect on a series, file by file, judged as Sonarr does: profile
  * quality order, then revision (v2, v3), then custom format score. Never

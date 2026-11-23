@@ -42,7 +42,12 @@ let admin: User;
 let bear: Media;
 let film: Media;
 let playing: NowPlaying[] = [];
-let started: { issueId: number; kind?: string; language?: string }[] = [];
+let started: {
+  issueId: number;
+  kind?: string;
+  language?: string;
+  all?: boolean;
+}[] = [];
 let modelAsked: { system: string; prompt: string }[] = [];
 let modelAnswer = '{"kind":"unclear"}';
 
@@ -113,12 +118,13 @@ beforeEach(async () => {
     'fromIssue',
     async (
       issueId: number,
-      options: { asked?: { kind: string; language?: string } }
+      options: { asked?: { kind: string; language?: string; all?: boolean } }
     ) => {
       started.push({
         issueId,
         kind: options.asked?.kind,
         language: options.asked?.language,
+        ...(options.asked?.all && { all: true }),
       });
       return undefined;
     }
@@ -445,6 +451,84 @@ describe('Siri: a report', () => {
     assert.deepEqual(
       started.map((s) => [s.kind, s.language]),
       [['subtitles', 'fr']]
+    );
+  });
+
+  it('keeps to the episode playing unless asked for all of it in so many words', async () => {
+    // Loose words: the episode playing, only what it needs.
+    const loose = await call('POST', '/now-playing/report', {
+      problem: 'the subtitles are all out of sync',
+    });
+    assert.equal(
+      loose.body.say,
+      'Reported. I’m looking for subtitles now. You’ll be told how it goes.'
+    );
+    // All of its subtitles, but still only the episode playing.
+    playing = [episode(2, 4)];
+    const existing = await call('POST', '/now-playing/report', {
+      problem: 'replace all the subtitles',
+    });
+    assert.match(existing.body.say, /looking for subtitles now/);
+    // The season: every episode of it.
+    playing = [episode(2, 5)];
+    const season = await call('POST', '/now-playing/report', {
+      problem: 'replace the subtitles of every episode',
+    });
+    assert.match(
+      season.body.say,
+      /^Reported\. The subtitles of season 2 are being replaced, one episode at a time\./
+    );
+    // The whole series.
+    playing = [episode(2, 6)];
+    const series = await call('POST', '/now-playing/report', {
+      problem: 'replace the subtitles of the whole series',
+    });
+    assert.match(
+      series.body.say,
+      /^Reported\. The subtitles of The Otterkin are being replaced, one episode at a time\./
+    );
+    const filed = (await issues()).map((i) => [
+      i.problemSeason,
+      i.problemEpisode,
+    ]);
+    assert.deepEqual(filed, [
+      [2, 3],
+      [2, 4],
+      [2, 0],
+      [0, 0],
+    ]);
+    assert.deepEqual(
+      started.map((s) => s.all),
+      [undefined, true, true, true]
+    );
+  });
+
+  it('says how to ask for all of a series when only what is missing is looked for', async () => {
+    playing = [{ ...episode(), season: undefined, episode: undefined }];
+    const { body } = await call('POST', '/now-playing/report', {
+      problem: 'the subtitles are out of sync',
+    });
+    assert.equal(
+      body.say,
+      'Reported. I’m looking for subtitles now. You’ll be told how it goes. Say “replace the subtitles of every episode” to replace existing ones too.'
+    );
+    assert.deepEqual(
+      started.map((s) => s.all),
+      [undefined]
+    );
+  });
+
+  it('drops all of it when only the model read it', async () => {
+    turnOnAi();
+    modelAnswer = '{"kind":"subtitles","wrongSubtitles":true,"allOfIt":true}';
+    const { body } = await call('POST', '/now-playing/report', {
+      problem: 'the words at the bottom never match what they say',
+    });
+    assert.match(body.say, /looking for subtitles now/);
+    assert.equal(modelAsked.length, 1);
+    assert.deepEqual(
+      started.map((s) => [s.kind, s.all]),
+      [['subtitles', undefined]]
     );
   });
 

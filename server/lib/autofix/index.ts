@@ -289,13 +289,54 @@ const SUBTITLE_WRONG =
 const BROKEN =
   /\b(broken|corrupt\w*|won'?t (play|load|start)|doesn'?t (play|load|work)|can'?t (play|watch)|no (sound|audio|picture|video)|black screen|green screen|stutter\w*|freez\w*|glitch\w*|pixelat\w*|artifact\w*|cuts? (out|off)|audio (is )?(out of sync|missing|wrong)|bad (quality|file|copy|encode))\b/i;
 
-/** Asking for subtitles again, or a transcription made again. */
-const REDO = /\b(re-?do(ne|ing)?|again|re-?transcrib\w*|from scratch)\b/i;
-/** Even where subtitles are there already. */
-const EVEN_IF =
-  /\beven (if|where|when|though|for)\b|\b(existing|regardless|already (there|have|has))\b/i;
-/** All of the title or season. */
-const ALL_OF = /(?<!\bat\s)\ball\b|\b(every|whole|entire|complete)\b/i;
+/** A transcription asked to be made again, in so many words. */
+const REDO_TRANSCRIPTION =
+  /\bre-?transcrib\w*|\bre-?do(ne|ing)?\s+(the\s+|its\s+|their\s+|a\s+)?transcri\w*|\btranscribe\b[^.]{0,40}\b(again|from scratch)\b/i;
+/**
+ * Every episode in scope, in so many words: "all episodes", "every
+ * episode", "the whole season/series/show", "the entire season/series",
+ * "all of season 2", "all of it".
+ */
+const SCOPE_ALL =
+  /\b(all|every)\s+(of\s+)?(the\s+|its\s+|their\s+)?(\d{1,3}\s+)?(episodes?|seasons)\b|\bevery\s+season\b|\b(whole|entire)\s+(season|series|show)\b|\ball\s+of\s+(it|season\b|the\s+(season|series|show)\b)/i;
+/** "All of" a title, by its capitalised name: "all of Glasswing". */
+const ALL_OF_TITLE = /\b[Aa]ll\s+of\s+(?!a\s+sudden\b|I\b)(the\s+)?[A-Z0-9]/;
+/** "All the subtitles". */
+const ALL_SUBTITLES =
+  /\ball\s+(of\s+)?(the\s+|its\s+|their\s+)?(sub(title)?s|captions)\b/i;
+/**
+ * Subtitles there already, in so many words: "even if they exist", "even
+ * where there are some", "episodes that already have subtitles".
+ */
+const EVEN_EXISTING =
+  /\beven\b[^.]{0,40}\b(exists?|existing|there are (some|subtitles|subs)|already\s+(ha(ve|s|d)|there))\b|\balready\s+ha(ve|s)\s+(subtitles|subs|captions)\b/i;
+
+/**
+ * Whether these words name every episode in scope ("every episode", "the
+ * whole season", "all of Glasswing") rather than one.
+ */
+export const asksForEveryEpisode = (text: string): boolean =>
+  SCOPE_ALL.test(text) || ALL_OF_TITLE.test(text);
+
+/**
+ * Whether these words ask, in so many words, for subtitles or a
+ * transcription of all of it, even where subtitles exist. Loose words (a
+ * bare "all", "whole", "already", "again", or asking to replace) don't.
+ */
+export const asksForAll = (text: string): boolean =>
+  EVEN_EXISTING.test(text) ||
+  REDO_TRANSCRIPTION.test(text) ||
+  ((asksForEveryEpisode(text) || ALL_SUBTITLES.test(text)) &&
+    !/\bmissing\b/i.test(text) &&
+    seasonEpisodeIn(text).episode === undefined);
+
+/** Whether these words ask for a transcription made again. */
+export const asksForRedo = (text: string): boolean =>
+  REDO_TRANSCRIPTION.test(text);
+
+/** How to ask for all of it, said after a search for what is missing. */
+export const HOW_TO_ASK_ALL =
+  'Say “replace the subtitles of every episode” to replace existing ones too.';
 
 /** What a report asks for. */
 type Reading = ReadReport;
@@ -312,17 +353,10 @@ export const classify = (
   const language = languageIn(text);
   const subtitles = (): Reading => {
     const transcribe = TRANSCRIBE.test(text);
-    // "Again" asks for a transcription made again; for subtitles it may
-    // only mean they went missing again.
-    const redo = transcribe ? REDO.test(text) : /\bre-?do\w*\b/i.test(text);
-    // Everything in scope, existing subtitles too: "all of it", "redo",
-    // "even if they exist", or replacing a whole season or series.
-    const all =
-      EVEN_IF.test(text) ||
-      (transcribe && redo) ||
-      (seasonEpisodeIn(text).episode === undefined &&
-        !/\bmissing\b/i.test(text) &&
-        (redo || REPLACE_WORDS.test(text) || ALL_OF.test(text)));
+    const redo = transcribe && asksForRedo(text);
+    // Everything in scope, existing subtitles too: only when asked for in
+    // so many words.
+    const all = asksForAll(text);
     return transcribe
       ? {
           kind: 'transcribe',
@@ -337,7 +371,7 @@ export const classify = (
             issueType === IssueType.SUBTITLES ||
             SUBTITLE_WRONG.test(text) ||
             REPLACE_WORDS.test(text) ||
-            redo
+            /\bre-?do\w*\b/i.test(text)
               ? true
               : undefined,
           ...(all && { all: true }),
@@ -379,7 +413,22 @@ export const readReport = async (
   const rule = classify(text);
   if (rule) return { ...rule, by: 'rules' };
   const read = await askAboutReport(text, { user, episode });
-  return read ? { ...read, by: 'ai' } : undefined;
+  return read ? { ...allInTheirWords(read, text), by: 'ai' } : undefined;
+};
+
+/**
+ * The model's reading with all of it, and a redo, kept only when the words
+ * ask for them in so many words.
+ */
+const allInTheirWords = (read: ReadReport, text: string): ReadReport => {
+  const subtitles = read.kind === 'subtitles' || read.kind === 'transcribe';
+  return {
+    kind: read.kind,
+    language: read.language,
+    replace: read.replace,
+    ...(subtitles && asksForAll(text) && { all: true }),
+    ...(read.kind === 'transcribe' && asksForRedo(text) && { redo: true }),
+  };
 };
 
 /** The title's server and id; 4K only when it's the only one. */
@@ -1141,8 +1190,7 @@ class AutoFix {
       );
       return {
         ok: true,
-        message:
-          'Asked Bazarr to search for every subtitle this series is missing. Episodes it finds nothing for are then transcribed from the audio, when Bazarr has Whisper.',
+        message: `Asked Bazarr to search for every subtitle this series is missing. Episodes it finds nothing for are then transcribed from the audio, when Bazarr has Whisper. ${HOW_TO_ASK_ALL}`,
         link: `/tv/${req.media.tmdbId}`,
       };
     }
@@ -1272,7 +1320,7 @@ class AutoFix {
       message: added
         ? `Transcribing ${added} episode${added === 1 ? '' : 's'} with Whisper, one at a time.`
         : scope === 'missing'
-          ? 'No episode is missing subtitles that has not been transcribed already. To have episodes with subtitles transcribed too, ask to transcribe all of it.'
+          ? 'No episode is missing subtitles that has not been transcribed already. Say “transcribe every episode” to have episodes with subtitles transcribed too.'
           : 'Those episodes are already transcribed or queued.',
       link: `/tv/${req.media.tmdbId}`,
     };
@@ -2149,7 +2197,7 @@ class AutoFix {
           );
           return undefined;
         }
-        asked = { ...read, unconfirmed: true };
+        asked = { ...allInTheirWords(read, text), unconfirmed: true };
       }
       // Filed on All Seasons but the text names one: use it and set it on the
       // issue.
@@ -2168,6 +2216,15 @@ class AutoFix {
             problemEpisode: episodeNumber ?? 0,
           });
         }
+      }
+      // An episode the issue names is never widened to all of a season or
+      // series: all of it then means only that episode's subtitles.
+      if (
+        issue.problemEpisode &&
+        seasonNumber === undefined &&
+        (asked.all || asked.redo)
+      ) {
+        asked = { ...asked, all: undefined, redo: undefined };
       }
       const result = await this.run({
         ...asked,

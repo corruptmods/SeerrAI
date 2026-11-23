@@ -16,7 +16,13 @@ import { label, withLibraryStatus } from '@server/lib/ai/context';
 import type { NamedMusic } from '@server/lib/ai/music';
 import { musicFor, resolveMusic } from '@server/lib/ai/music';
 import type { FixKind, FixResult } from '@server/lib/autofix';
-import autofix, { classify, seasonEpisodeIn } from '@server/lib/autofix';
+import autofix, {
+  asksForAll,
+  asksForEveryEpisode,
+  asksForRedo,
+  classify,
+  seasonEpisodeIn,
+} from '@server/lib/autofix';
 import { Permission } from '@server/lib/permissions';
 import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
@@ -308,27 +314,25 @@ export const readFix = (
         (said.season === undefined || said.season === fix.seasonNumber
           ? fix.episodeNumber
           : undefined));
-  // Subtitles or a transcription for all of it: their words or the model's.
-  const words = classify(message);
-  const ownWords = words?.kind === kind ? words : undefined;
-  const all =
-    (kind === 'subtitles' || kind === 'transcribe') &&
-    !!(fix.all || fix.redo || ownWords?.all);
-  const redo = kind === 'transcribe' && !!(fix.redo || ownWords?.redo);
-  // The whole series: no season from earlier, and no episode the model
-  // read from a count ("all 10 episodes").
+  // Subtitles or a transcription for all of it: only when their own words
+  // ask for it, never the model's reading alone.
+  const subtitles = kind === 'subtitles' || kind === 'transcribe';
+  const all = subtitles && asksForAll(message);
+  const redo = kind === 'transcribe' && asksForRedo(message);
+  // Every episode in their words: the model's episode is dropped (often a
+  // count, "all 10 episodes"); otherwise it is kept.
+  const everyEpisode =
+    all && said.episode === undefined && asksForEveryEpisode(message);
+  // The whole series: no season from earlier.
   const wholeSeries =
-    all && said.season === undefined && WHOLE_SERIES.test(message);
+    everyEpisode && said.season === undefined && WHOLE_SERIES.test(message);
   return {
     ...fix,
+    all: undefined,
+    redo: undefined,
     kind,
     seasonNumber: wholeSeries ? undefined : seasonNumber,
-    episodeNumber:
-      all &&
-      said.episode === undefined &&
-      (wholeSeries || seasonNumber === undefined)
-        ? undefined
-        : episodeNumber,
+    episodeNumber: everyEpisode ? undefined : episodeNumber,
     ...(all && { all: true }),
     ...(redo && { redo: true }),
   };
@@ -528,7 +532,16 @@ export const fixFromChat = async (
   const issueType = ISSUE_TYPE[fix.kind];
   if (issueType === undefined) {
     const name = 'title' in result ? result.title : result.name;
-    if (!askedInTheirWords(fix.kind, [name, fix.title?.t], message, earlier)) {
+    // All of a season or series is always offered first: it can replace
+    // many episodes' subtitles.
+    const many =
+      !!(fix.all || fix.redo) &&
+      mediaType === MediaType.TV &&
+      (fix.episodeNumber === undefined || fix.seasonNumber === undefined);
+    if (
+      many ||
+      !askedInTheirWords(fix.kind, [name, fix.title?.t], message, earlier)
+    ) {
       return {
         reply: offerText(
           fix.kind,
@@ -544,7 +557,9 @@ export const fixFromChat = async (
           seasonNumber:
             mediaType === MediaType.TV ? fix.seasonNumber : undefined,
           episodeNumber:
-            mediaType === MediaType.TV ? fix.episodeNumber : undefined,
+            mediaType === MediaType.TV && !(many && !episode)
+              ? fix.episodeNumber
+              : undefined,
           language: fix.language,
           ...(fix.all && { all: true }),
           ...(fix.redo && { redo: true }),

@@ -7,7 +7,12 @@ import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
 import type { FixKind } from '@server/lib/autofix';
-import autofix, { readReport, seasonEpisodeIn } from '@server/lib/autofix';
+import autofix, {
+  asksForEveryEpisode,
+  HOW_TO_ASK_ALL,
+  readReport,
+  seasonEpisodeIn,
+} from '@server/lib/autofix';
 import { reportedToday } from '@server/lib/autofix/chat';
 import { REPLACES_FILES } from '@server/lib/autofix/understand';
 import type { NowPlaying } from '@server/lib/nowPlaying';
@@ -244,7 +249,6 @@ class SiriReports {
     const tv = at.media.mediaType === MediaType.TV;
     // A season or episode they name wins over what was playing.
     const said = tv ? seasonEpisodeIn(words) : {};
-    const season = said.season ?? at.season;
     const episode =
       said.season !== undefined && said.season !== at.season
         ? said.episode
@@ -255,10 +259,22 @@ class SiriReports {
       : undefined;
     let fixKind = read?.kind;
     if (fixKind === 'replaceSeason' && !tv) fixKind = 'broken';
-    // Subtitles for all of a season: not just the episode playing.
+    // Subtitles for all of a season or series, not just the episode
+    // playing, only when their words name the season or the whole series.
+    const wholeSeries =
+      tv &&
+      !!read?.all &&
+      said.season === undefined &&
+      WHOLE_SERIES.test(words);
+    const season = wholeSeries ? undefined : (said.season ?? at.season);
     const wholeSeason =
       fixKind === 'replaceSeason' ||
-      (!!read?.all && tv && said.episode === undefined);
+      (!!read?.all &&
+        tv &&
+        said.episode === undefined &&
+        (wholeSeries ||
+          said.season !== undefined ||
+          asksForEveryEpisode(words)));
     const where = {
       title: at.title,
       season,
@@ -316,7 +332,7 @@ class SiriReports {
       });
     }
     return {
-      say: this.started(user, fixKind, where, read?.language, read?.all),
+      say: this.started(user, fixKind, where, read?.language, read?.all, tv),
       issueId: issue.id,
     };
   }
@@ -422,19 +438,27 @@ class SiriReports {
     kind: FixKind | undefined,
     where: { title: string; season?: number; episode?: number },
     language?: string,
-    all?: boolean
+    all?: boolean,
+    tv?: boolean
   ): string {
     const after = ' You’ll be told how it goes.';
-    if (all && where.season !== undefined && where.episode === undefined) {
+    const of =
+      where.season !== undefined ? `season ${where.season}` : where.title;
+    if (all && where.episode === undefined) {
       if (kind === 'subtitles') {
         return `Reported. The ${
           language ? `${languageName(language)} ` : ''
-        }subtitles of season ${where.season} are being replaced, one episode at a time.${after}`;
+        }subtitles of ${of} are being replaced, one episode at a time.${after}`;
       }
       if (kind === 'transcribe') {
-        return `Reported. Subtitles for season ${where.season} are being made from the audio, one episode at a time.${after}`;
+        return `Reported. Subtitles for ${of} are being made from the audio, one episode at a time.${after}`;
       }
     }
+    // A series with no episode named: only what is missing is looked for.
+    const howToAskAll =
+      kind === 'subtitles' && tv && where.episode === undefined
+        ? ` ${HOW_TO_ASK_ALL}`
+        : '';
     switch (kind) {
       case undefined:
         return autofix.enabledFor(user)
@@ -443,7 +467,7 @@ class SiriReports {
       case 'subtitles':
         return `Reported. I’m looking for ${
           language ? `${languageName(language)} ` : ''
-        }subtitles now.${after}`;
+        }subtitles now.${after}${howToAskAll}`;
       case 'transcribe':
         return `Reported. Subtitles are being made from the audio.${after}`;
       case 'missing':
@@ -488,6 +512,10 @@ class SiriReports {
     );
   }
 }
+
+/** All of a series, not one season of it. */
+const WHOLE_SERIES =
+  /\b(whole|entire|complete)\s+(series|show)\b|\b(all|every)\s+(of\s+)?(the\s+|its\s+)?(seasons|series|show)\b|\bevery\s+season\b/i;
 
 /** A title's name from TMDB, for one sent back without being offered. */
 const titleOf = async (media: Media): Promise<string> => {

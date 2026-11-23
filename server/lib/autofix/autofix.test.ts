@@ -2826,12 +2826,44 @@ describe('Auto-fix: subtitles for all of a series or season', () => {
   });
 
   it('reads all of it, and a redo, from a report', () => {
+    // Replacing alone is not all of it.
     assert.deepEqual(classify('replace the subtitles for season 2'), {
       kind: 'subtitles',
       language: undefined,
       replace: true,
-      all: true,
     });
+    assert.deepEqual(
+      classify('replace the subtitles of every episode of season 2'),
+      { kind: 'subtitles', language: undefined, replace: true, all: true }
+    );
+    for (const said of [
+      'the subtitles are all out of sync',
+      'all of a sudden the subtitles are off',
+      'the whole thing has bad subtitles',
+      'every time the subtitles are late',
+      'the existing subtitles are wrong',
+      'the subtitles are already out of sync',
+      'the subtitles went wrong again',
+      'subtitles are completely off, replace them',
+      'even if I restart, the subtitles are late',
+      'the transcription went missing again',
+    ]) {
+      assert.equal(classify(said)?.all, undefined, said);
+      assert.equal(classify(said)?.redo, undefined, said);
+    }
+    for (const said of [
+      'replace the subtitles of every episode',
+      'replace the subtitles of all episodes',
+      'the subtitles of the whole season are off',
+      'fix the subtitles of the entire series',
+      'subtitles of the whole show are wrong',
+      'replace all of season 2’s subtitles',
+      'all the subtitles are wrong',
+      'get new subtitles even where they exist',
+      'replace subtitles even for episodes that already have subtitles',
+    ]) {
+      assert.equal(classify(said)?.all, true, said);
+    }
     assert.equal(
       classify('fix the subtitles on all of Glasswing, even where they exist')
         ?.all,
@@ -2860,9 +2892,80 @@ describe('Auto-fix: subtitles for all of a series or season', () => {
       kind: 'transcribe',
       language: undefined,
     });
+    for (const said of ['redo the transcription', 're-transcribe season 2']) {
+      assert.deepEqual(
+        classify(said),
+        { kind: 'transcribe', language: undefined, all: true, redo: true },
+        said
+      );
+    }
   });
 
-  it('fixes the subtitles for all of a series from AI Search without asking for a season', async () => {
+  it('only searches for what is missing on an All Seasons issue that does not ask for every episode', async () => {
+    bazarrEpisodes = [bazarrEpisode(4801, 1, 1), bazarrEpisode(4802, 2, 1)];
+    episodes = [
+      episode(1, { id: 101 }),
+      episode(1, { id: 201, seasonNumber: 2 }),
+    ];
+    let searchedMissing = 0;
+    mock.method(BazarrAPI.prototype, 'searchMissingSeries', async () => {
+      searchedMissing++;
+      return 'finished';
+    });
+    mock.method(BazarrAPI.prototype, 'getProviders', async () => []);
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.SUBTITLES,
+      message: 'the subtitles are all out of sync',
+      mediaId: glasswing.id,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.match(comment, /every subtitle this series is missing/);
+    assert.match(
+      comment,
+      /Say “replace the subtitles of every episode” to replace existing ones too\.$/
+    );
+    await autofix.idle();
+    assert.equal(searchedMissing, 1);
+    assert.deepEqual(episodeDownloads, []);
+  });
+
+  it('replaces every episode’s subtitles from an All Seasons issue that asks for every episode', async () => {
+    bazarrEpisodes = [bazarrEpisode(4811, 1, 1), bazarrEpisode(4812, 2, 1)];
+    episodes = [
+      episode(1, { id: 101 }),
+      episode(1, { id: 201, seasonNumber: 2 }),
+    ];
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.SUBTITLES,
+      message: 'please replace the subtitles of every episode',
+      mediaId: glasswing.id,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.match(
+      comment,
+      /Replacing the subtitles of 2 episodes of the series/
+    );
+    await autofix.idle();
+    assert.deepEqual(episodeDownloads, ['4811:subdl-4811', '4812:subdl-4812']);
+  });
+
+  it('never widens the episode an issue names', async () => {
+    bazarrEpisodes = [bazarrEpisode(4821, 2, 1), bazarrEpisode(4822, 2, 2)];
+    episodes = [1, 2].map((n) => episode(n, { id: 220 + n, seasonNumber: 2 }));
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.SUBTITLES,
+      message: 'replace the subtitles of every episode',
+      mediaId: glasswing.id,
+      problemSeason: 2,
+      problemEpisode: 1,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.match(comment, /Downloaded en subtitles from subdl/);
+    await autofix.idle();
+    assert.deepEqual(episodeDownloads, ['4821:subdl-4821']);
+  });
+
+  it('offers the subtitles for all of a series from AI Search without asking for a season', async () => {
     bazarrEpisodes = [bazarrEpisode(4501, 1, 1), bazarrEpisode(4502, 2, 1)];
     episodes = [
       episode(1, { id: 101 }),
@@ -2902,10 +3005,20 @@ describe('Auto-fix: subtitles for all of a series or season', () => {
       ep: 2,
       all: true,
     });
-    const res = await call('POST', '/api/v1/ai/chat', {
+    const asked = await call('POST', '/api/v1/ai/chat', {
       message: 'fix the subtitles for all of Glasswing',
     });
-    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(asked.status, 200, JSON.stringify(asked.body));
+    // Their own words asked, but it is offered first all the same.
+    assert.match(
+      asked.body.reply,
+      /^This replaces the subtitles of all of Glasswing.*, even where there are some\. Confirm to go ahead\.$/
+    );
+    assert.equal(asked.body.fix, undefined);
+    assert.equal(asked.body.confirm.all, true);
+    assert.equal(asked.body.confirm.episodeNumber, undefined);
+    assert.deepEqual(episodeDownloads, []);
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
     assert.match(
       res.body.reply,
       /^Replacing the subtitles of 2 episodes of the series, one at a time\./
@@ -2915,7 +3028,76 @@ describe('Auto-fix: subtitles for all of a series or season', () => {
     assert.deepEqual(episodeDownloads, ['4501:subdl-4501', '4502:subdl-4502']);
   });
 
-  it('offers it for confirmation when the message did not ask, and keeps all of it', async () => {
+  it('drops all of it when only the model read it, and keeps the model’s episode', async () => {
+    bazarrEpisodes = [bazarrEpisode(4511, 2, 1), bazarrEpisode(4512, 2, 2)];
+    episodes = [1, 2].map((n) => episode(n, { id: 230 + n, seasonNumber: 2 }));
+    Object.defineProperty(TheMovieDb.prototype, 'searchTvShows', {
+      configurable: true,
+      set() {},
+      get: () => async () => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [
+          {
+            id: 91001,
+            name: 'Glasswing',
+            first_air_date: '2021-03-01',
+            media_type: 'tv',
+            genre_ids: [],
+            overview: '',
+            popularity: 1,
+            vote_average: 8,
+            vote_count: 1,
+            origin_country: ['GB'],
+            original_language: 'en',
+            original_name: 'Glasswing',
+          },
+        ],
+      }),
+    });
+    let searchedMissing = 0;
+    mock.method(BazarrAPI.prototype, 'searchMissingSeries', async () => {
+      searchedMissing++;
+      return 'finished';
+    });
+    mock.method(BazarrAPI.prototype, 'getProviders', async () => []);
+    modelAnswer = JSON.stringify({
+      r: 'Fixing the subtitles of Glasswing.',
+      titles: [{ t: 'Glasswing', y: 2021, k: 'tv' }],
+      do: 'fix',
+      fx: 'subtitles',
+      all: true,
+    });
+    const loose = await call('POST', '/api/v1/ai/chat', {
+      message: 'the subtitles of Glasswing are all out of sync',
+    });
+    assert.equal(loose.status, 200, JSON.stringify(loose.body));
+    assert.match(loose.body.reply, /every subtitle this series is missing/);
+    await autofix.idle();
+    assert.equal(searchedMissing, 1);
+    assert.deepEqual(episodeDownloads, []);
+
+    // Their words say even where there are some, but not every episode:
+    // the model's episode stays.
+    modelAnswer = JSON.stringify({
+      r: 'Replacing the subtitles of Glasswing.',
+      titles: [{ t: 'Glasswing', y: 2021, k: 'tv' }],
+      do: 'fix',
+      fx: 'subtitles',
+      se: 2,
+      ep: 1,
+      all: true,
+    });
+    const one = await call('POST', '/api/v1/ai/chat', {
+      message: 'new subtitles for Glasswing please, even where they exist',
+    });
+    assert.equal(one.status, 200, JSON.stringify(one.body));
+    assert.match(one.body.reply, /Downloaded en subtitles from subdl/);
+    assert.deepEqual(episodeDownloads, ['4511:subdl-4511']);
+  });
+
+  it('offers it for confirmation when the message did not name the title, and keeps all of it', async () => {
     bazarrEpisodes = [bazarrEpisode(4601, 1, 1)];
     episodes = [episode(1, { id: 101 })];
     modelAnswer = JSON.stringify({
@@ -2926,7 +3108,7 @@ describe('Auto-fix: subtitles for all of a series or season', () => {
       all: true,
     });
     const asked = await call('POST', '/api/v1/ai/chat', {
-      message: 'yes please, do that',
+      message: 'yes please, transcribe every episode',
     });
     assert.equal(asked.status, 200, JSON.stringify(asked.body));
     assert.match(

@@ -324,3 +324,101 @@ describe('what counts as imported when it leaves the queue', () => {
     assert.equal(leftImported(item('queued', 500)), false);
   });
 });
+
+describe('a download its client has finished', () => {
+  /** SABnzbd's history, as mode=history answers; the queue stays empty. */
+  let sabHistory: Record<string, unknown>[] = [];
+
+  beforeEach(() => {
+    sabHistory = [];
+    getSettings().downloadClients = [
+      {
+        id: 1,
+        name: 'SABnzbd',
+        type: 'sabnzbd',
+        hostname: 'sab',
+        port: 8080,
+        useSsl: false,
+        urlBase: '',
+        apiKey: 'x',
+        username: '',
+        password: '',
+      },
+    ];
+    mock.restoreAll();
+    mock.method(axios, 'create', (config: { baseURL?: string }) => ({
+      interceptors: {
+        request: { use: () => 0 },
+        response: { use: () => 0 },
+      },
+      get: async (url: string, options?: { params?: { mode?: string } }) => {
+        if (config.baseURL?.includes('//sab')) {
+          return {
+            data:
+              options?.params?.mode === 'history'
+                ? { history: { slots: sabHistory } }
+                : { queue: { slots: [] } },
+          };
+        }
+        return url === '/history/since'
+          ? { data: history }
+          : { data: { records: queue, totalRecords: queue.length } };
+      },
+      post: async () => ({ data: {} }),
+    }));
+  });
+
+  afterEach(() => {
+    getSettings().downloadClients = [];
+  });
+
+  it('stays importing when the client drops it before Sonarr’s queue catches up', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 3_000_000 });
+    // Sonarr last read it mid-download; SABnzbd has finished it.
+    queue = [record('glasswing', 1, 'downloading', 'downloading', 300)];
+    sabHistory = [{ nzo_id: 'glasswing', status: 'Completed', bytes: 500 }];
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker
+        .getSeriesProgress(0, 1286)
+        .map((i) => [i.stage, i.sizeLeft]),
+      [['importing', 0]]
+    );
+
+    // Sonarr imports it and the client removes the job; only the client is
+    // read again before the next queue read.
+    sabHistory = [];
+    await downloadTracker.updateLive();
+    assert.deepEqual(
+      downloadTracker
+        .getSeriesProgress(0, 1286)
+        .map((i) => [i.stage, i.sizeLeft]),
+      [['importing', 0]]
+    );
+
+    // The queue no longer has it: being added to the library.
+    queue = [];
+    mock.timers.tick(15_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker.getSeriesProgress(0, 1286).map((i) => i.stage),
+      ['imported']
+    );
+  });
+
+  it('still shows a failure Sonarr reports afterwards', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 4_000_000 });
+    queue = [record('static', 2, 'downloading', 'downloading', 300)];
+    sabHistory = [{ nzo_id: 'static', status: 'Completed', bytes: 500 }];
+    await downloadTracker.updateDownloads();
+
+    sabHistory = [];
+    queue = [record('static', 2, 'failed', 'failed', 0)];
+    mock.timers.tick(15_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker.getSeriesProgress(0, 1286).map((i) => i.stage),
+      ['failed']
+    );
+  });
+});

@@ -251,6 +251,37 @@ export const withLiveProgress = (
   };
 };
 
+/**
+ * Stages a download can only be in before its client has all of it. Once the
+ * client has reported it complete, these come only from a stale queue read.
+ */
+const BEFORE_DONE: DownloadStage[] = [
+  'downloading',
+  'queued',
+  'finishing',
+  'stalled',
+  'paused',
+];
+
+/**
+ * A download its client has already reported complete, kept as being
+ * imported. Radarr's and Sonarr's queue reports lag the client, and the
+ * client drops the download once it is imported and removed, so without this
+ * a finished download would briefly show its old progress again before
+ * showing as added to the library.
+ */
+export const keptDone = (item: DownloadingItem): DownloadingItem =>
+  BEFORE_DONE.includes(item.stage)
+    ? {
+        ...item,
+        stage: 'importing',
+        step: undefined,
+        sizeLeft: 0,
+        timeLeft: '',
+        estimatedCompletionTime: undefined,
+      }
+    : item;
+
 /** Queue read interval while someone watches, with download clients linked. */
 const QUEUE_REFRESH_WITH_CLIENTS_MS = 30_000;
 
@@ -420,10 +451,23 @@ class DownloadTracker {
     after: DownloadingItem[],
     now = Date.now()
   ) {
+    this.noteDone(
+      after.flatMap((item) =>
+        item.stage === 'importing' && item.downloadId
+          ? [item.downloadId.toLowerCase()]
+          : []
+      ),
+      now
+    );
     const still = new Set(after.map(itemKey));
     const imported: ImportedDownload[] = [];
     for (const item of before) {
-      if (still.has(itemKey(item)) || !leftImported(item)) continue;
+      if (
+        still.has(itemKey(item)) ||
+        !(leftImported(item) || (this.isDone(item) && item.stage !== 'failed'))
+      ) {
+        continue;
+      }
       for (const serverId of serverIds) {
         imported.push(this.hold(kind, serverId, item, now));
       }
@@ -666,6 +710,28 @@ class DownloadTracker {
   /** Latest download client state, by lower-cased download id. */
   private live = new Map<string, LiveDownload>();
 
+  /**
+   * Downloads a client or Radarr/Sonarr has reported complete, by lower-cased
+   * download id, with when that was first seen. Kept as long as an import is
+   * held (IMPORTED_HOLD_MS).
+   */
+  private done = new Map<string, number>();
+
+  /** Notes downloads now complete, and forgets old ones. */
+  private noteDone(ids: Iterable<string>, now = Date.now()) {
+    for (const id of ids) {
+      if (!this.done.has(id)) this.done.set(id, now);
+    }
+    for (const [id, at] of this.done) {
+      if (now - at > IMPORTED_HOLD_MS) this.done.delete(id);
+    }
+  }
+
+  private isDone(item: DownloadingItem): boolean {
+    const id = item.downloadId?.toLowerCase();
+    return !!id && this.done.has(id);
+  }
+
   /** Backfill's own downloads, as last reported. */
   private backfill: BackfillDownload[] = [];
 
@@ -724,8 +790,13 @@ class DownloadTracker {
       .map((d) => d.item);
   }
 
-  private withLive = (item: DownloadingItem) =>
-    withLiveProgress(item, this.live.get(item.downloadId?.toLowerCase()));
+  private withLive = (item: DownloadingItem) => {
+    const merged = withLiveProgress(
+      item,
+      this.live.get(item.downloadId?.toLowerCase())
+    );
+    return this.isDone(merged) ? keptDone(merged) : merged;
+  };
 
   public getMovieProgress(
     serverId: number,
@@ -807,6 +878,7 @@ class DownloadTracker {
     this.sonarrServers = {};
     this.lidarrServers = {};
     this.live = new Map();
+    this.done = new Map();
     this.backfill = [];
     this.songs = [];
     this.imported = new Map();
@@ -905,6 +977,11 @@ class DownloadTracker {
     );
 
     this.live = new Map(answers.flatMap((answer) => [...answer]));
+    this.noteDone(
+      [...this.live].flatMap(([id, live]) =>
+        live.stage === 'importing' ? [id] : []
+      )
+    );
   }
 
   /**

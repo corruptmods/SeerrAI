@@ -81,6 +81,7 @@ import {
   rankCandidates,
   selectEntries,
   unseeded,
+  whyNotApproveAnyway,
 } from '@server/lib/backfill/plan';
 import {
   PackedRelease,
@@ -2800,19 +2801,13 @@ class Backfill {
       where: { id: candidateId },
     });
     const override = !!options.override;
-    // A pack turned down only for what the profile turned down can still be
-    // approved anyway.
-    const waiting =
-      candidate.status === 'ready' ||
-      (override &&
-        candidate.status === 'rejected' &&
-        candidate.plan.some((e) => e.action === 'reject' && e.override));
-    if (!waiting) {
-      throw new Error(
-        override && candidate.status === 'rejected'
-          ? 'Nothing in this pack was turned down only by the quality profile, so it cannot be approved anyway.'
-          : 'This pack is not waiting for approval.'
-      );
+    // A pack the quality profile alone turned down can still be approved
+    // anyway; one turned down for anything else (its size included) can't.
+    if (override && candidate.status === 'rejected') {
+      const why = whyNotApproveAnyway(candidate);
+      if (why) throw new Error(why);
+    } else if (candidate.status !== 'ready') {
+      throw new Error('This pack is not waiting for approval.');
     }
     const client = this.clientFor(candidate.protocol);
     if (!client) {
@@ -2968,7 +2963,11 @@ class Backfill {
         })
       )
       .catch(async (e) => {
-        await candidates.update(candidate.id, { status: candidate.status });
+        // Back as it was, with the reason it waited.
+        await candidates.update(candidate.id, {
+          status: candidate.status,
+          reason: candidate.reason,
+        });
         throw e;
       });
     await this.linkReplacement(job);

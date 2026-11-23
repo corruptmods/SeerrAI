@@ -547,6 +547,29 @@ const overridable = (entries: PlanEntry[]): number =>
   entries.filter((e) => e.action === 'reject' && e.override).length;
 
 /**
+ * Why a turned-down pack can't be approved anyway, or undefined when it
+ * can: only a pack the quality profile alone turned down (nothing in it
+ * Backfill would take otherwise, and within the size limits) can be.
+ */
+export const whyNotApproveAnyway = (candidate: {
+  plan: PlanEntry[];
+  summary?: PlanSummary | null;
+}): string | undefined => {
+  if (!overridable(candidate.plan)) {
+    return 'Nothing in this pack was turned down only by the quality profile, so it cannot be approved anyway.';
+  }
+  if (candidate.summary?.outsideSize) {
+    return 'This pack is outside the size limits, so it cannot be approved anyway.';
+  }
+  if (
+    candidate.plan.some((e) => e.action === 'fill' || e.action === 'upgrade')
+  ) {
+    return 'This pack was turned down for more than the quality profile, so it cannot be approved anyway.';
+  }
+  return undefined;
+};
+
+/**
  * The entries an approval imports, by mode, optionally without AI matches.
  * With `override` (an admin's Approve anyway), also the files only the
  * quality profile turned down, as what they would otherwise be: fills, and

@@ -7,7 +7,7 @@ import { agentWorkingOn, workedKey } from '@server/lib/agent/working';
 import backfill, { isMissing } from '@server/lib/backfill/engine';
 import { filmOut } from '@server/lib/backfill/filmDates';
 import type { PlanEntry } from '@server/lib/backfill/plan';
-import { selectEntries } from '@server/lib/backfill/plan';
+import { selectEntries, whyNotApproveAnyway } from '@server/lib/backfill/plan';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -89,7 +89,11 @@ const candidateView = (c: BackfillCandidate, withPlan = false) => ({
   publishDate: c.publishDate,
   status: c.status,
   reason: c.reason,
-  summary: c.summary,
+  // Approve anyway is offered only for a pack the profile alone turned down.
+  summary:
+    c.status === 'rejected' && c.summary?.overridable && whyNotApproveAnyway(c)
+      ? { ...c.summary, overridable: undefined }
+      : c.summary,
   createdAt: c.createdAt,
   plan: withPlan ? c.plan.map(entryView) : undefined,
 });

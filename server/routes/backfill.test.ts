@@ -11,6 +11,7 @@ import backfill from '@server/lib/backfill/engine';
 import BackfillLidarr from '@server/lib/backfill/lidarr';
 import backfillNotices from '@server/lib/backfill/notices';
 import type { PlanEntry } from '@server/lib/backfill/plan';
+import { whyNotApproveAnyway } from '@server/lib/backfill/plan';
 import type { SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager, { Notification } from '@server/lib/notifications';
@@ -572,6 +573,103 @@ describe('Backfill routes', () => {
       [[101]]
     );
     assert.deepEqual(importQualities, ['Bluray-1080p Remux']);
+  });
+
+  it('approve anyway only a pack the quality profile alone turned down', async () => {
+    const { candidate } = await seed();
+    const remux = {
+      quality: { id: 20, name: 'Bluray-1080p Remux' },
+      revision: { version: 1, real: 0 },
+    };
+    const turnedDown: PlanEntry = {
+      ...PLAN[0],
+      quality: remux,
+      action: 'reject',
+      reason: 'Bluray-1080p Remux is not in the profile',
+      override: { action: 'fill', replaces: 0 },
+    };
+    const candidates = getRepository(BackfillCandidate);
+    const approve = () =>
+      call('POST', `/api/v1/backfill/candidates/${candidate.id}/approve`, {
+        mode: 'missing',
+        override: true,
+      });
+    // Whether the pack's view offers Approve anyway.
+    const offered = async () =>
+      whyNotApproveAnyway(
+        await candidates.findOneOrFail({ where: { id: candidate.id } })
+      ) === undefined;
+
+    // Turned down for its size: a pack within the limits was found.
+    await candidates.update(candidate.id, {
+      status: 'rejected',
+      reason: 'Over the size limit',
+      plan: [turnedDown, PLAN[2]],
+      summary: {
+        ...candidate.summary!,
+        fill: 0,
+        upgrade: 0,
+        reject: 1,
+        overridable: 1,
+        outsideSize: 1,
+        sizeNote: 'Over the size limit',
+      },
+    });
+    let res = await approve();
+    assert.equal(res.status, 400);
+    assert.equal(
+      res.body.message,
+      'This pack is outside the size limits, so it cannot be approved anyway.'
+    );
+    assert.equal(await offered(), false);
+
+    // Something in it Backfill would take otherwise: turned down for that.
+    await candidates.update(candidate.id, {
+      plan: [turnedDown, PLAN[1], PLAN[2]],
+      summary: {
+        ...candidate.summary!,
+        fill: 0,
+        upgrade: 1,
+        reject: 1,
+        overridable: 1,
+      },
+    });
+    res = await approve();
+    assert.equal(res.status, 400);
+    assert.match(
+      res.body.message,
+      /turned down for more than the quality profile/
+    );
+    assert.equal(await offered(), false);
+    assert.equal(await getRepository(BackfillJob).count(), 0);
+
+    // The profile alone: offered, and its reason kept if the download
+    // can't be saved.
+    await candidates.update(candidate.id, {
+      plan: [turnedDown, PLAN[2]],
+      summary: {
+        ...candidate.summary!,
+        fill: 0,
+        upgrade: 0,
+        reject: 1,
+        overridable: 1,
+      },
+    });
+    assert.equal(await offered(), true);
+    const saving = mock.method(getRepository(BackfillJob), 'save', async () => {
+      throw new Error('The database is busy');
+    });
+    res = await approve();
+    saving.mock.restore();
+    assert.equal(res.status, 400);
+    const back = await candidates.findOneOrFail({
+      where: { id: candidate.id },
+    });
+    assert.equal(back.status, 'rejected');
+    assert.equal(back.reason, 'Over the size limit');
+
+    res = await approve();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
   });
 
   it('approve, download only the chosen files, import, clean up and tell admins', async () => {

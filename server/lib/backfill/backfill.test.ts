@@ -680,6 +680,93 @@ describe('Backfill: what Sonarr would take', () => {
     );
   });
 
+  it('marks a file only the profile turned down with what it would be, for Approve anyway', () => {
+    const remux = q(20, 'Bluray-1080p Remux');
+    const plan = [
+      // Not in the profile, for a missing episode.
+      decide(entry(0, [1], remux), ANIME_1080P, episodes, files),
+      // Under the profile's minimum score, over SDTV on disk.
+      decide(entry(1, [2], q(2, 'DVD'), 50), ANIME_1080P, episodes, files),
+      // Quality unknown: never.
+      decide(entry(2, [1], q(0, 'Unknown')), ANIME_1080P, episodes, files),
+      // No episode: never.
+      decide(entry(3, []), ANIME_1080P, episodes, files),
+    ];
+    assert.deepEqual(
+      plan.map((p) => [p.action, p.override]),
+      [
+        ['reject', { action: 'fill', replaces: 0 }],
+        ['reject', { action: 'upgrade', replaces: 1 }],
+        ['reject', undefined],
+        ['reject', undefined],
+      ]
+    );
+    assert.match(plan[0].reason ?? '', /Remux is not in the profile/);
+    assert.match(plan[1].reason ?? '', /below the profile's minimum of 100/);
+    assert.equal(summarize(plan).overridable, 2);
+    assert.equal(summarize(plan).fill, 0);
+
+    assert.deepEqual(selectEntries(plan, 'all'), [], 'never without override');
+    const missing = selectEntries(plan, 'missing', true, true);
+    assert.deepEqual(
+      missing.map((p) => [p.index, p.action, p.replaces, p.overridden]),
+      [[0, 'fill', 0, true]]
+    );
+    assert.deepEqual(
+      selectEntries(plan, 'all', true, true).map((p) => [
+        p.index,
+        p.action,
+        p.replaces,
+      ]),
+      [
+        [0, 'fill', 0],
+        [1, 'upgrade', 1],
+      ]
+    );
+
+    // An episode not yet out is no more fillable for being overridden.
+    const fresh = new Map(episodes);
+    fresh.set(1, {
+      ...episodes.get(1)!,
+      airDateUtc: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    });
+    assert.equal(
+      decide(entry(0, [1], remux), ANIME_1080P, fresh, files).override,
+      undefined
+    );
+  });
+
+  it('keeps one file per episode open to Approve anyway, none where a usable file fills it', () => {
+    const remux = q(20, 'Bluray-1080p Remux');
+    const two = dedupe(
+      [
+        decide(entry(0, [1], remux, 100), ANIME_1080P, episodes, files),
+        decide(entry(1, [1], remux, 400), ANIME_1080P, episodes, files),
+      ],
+      ANIME_1080P
+    );
+    assert.deepEqual(
+      two.map((p) => !!p.override),
+      [false, true],
+      'the better one'
+    );
+    const beside = dedupe(
+      [
+        decide(entry(0, [1], remux), ANIME_1080P, episodes, files),
+        decide(entry(1, [1]), ANIME_1080P, episodes, files),
+      ],
+      ANIME_1080P
+    );
+    assert.deepEqual(
+      beside.map((p) => [p.action, !!p.override]),
+      [
+        ['reject', false],
+        ['fill', false],
+      ]
+    );
+    assert.equal(summarize(beside).overridable, undefined);
+  });
+
   it('leaves an episode that aired under 12 hours ago to Sonarr, and fills one aired before', () => {
     const hoursAgo = (h: number) =>
       new Date(Date.now() - h * 3_600_000).toISOString();

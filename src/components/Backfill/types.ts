@@ -78,6 +78,13 @@ export interface EntryView {
   /** `ai` when placed by the AI second opinion; `why` holds its reading. */
   matchedBy?: 'ai' | 'title';
   why?: string;
+  /**
+   * Turned down only by the quality profile: what it would otherwise be, for
+   * Approve anyway.
+   */
+  override?: { action: 'fill' | 'upgrade'; replaces: number };
+  /** Taken despite the quality profile, by Approve anyway. */
+  overridden?: boolean;
 }
 
 export interface CandidateView {

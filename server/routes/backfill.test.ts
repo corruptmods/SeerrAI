@@ -117,6 +117,8 @@ let sent: { type: Notification; payload: NotificationPayload }[] = [];
 let episodes: SonarrEpisode[] = [];
 let filePrio: { indexes: number[]; priority: number }[] = [];
 let imports: { path: string; episodeIds: number[] }[][] = [];
+/** The quality each imported file was sent to Sonarr with. */
+let importQualities: (string | undefined)[] = [];
 let deleted: string[] = [];
 let torrentDone = false;
 /** qBittorrent's torrent state, when not the default. */
@@ -156,6 +158,7 @@ beforeEach(async () => {
   clearAiCache();
   filePrio = [];
   imports = [];
+  importQualities = [];
   deleted = [];
   torrentDone = false;
   torrentState = undefined;
@@ -250,10 +253,17 @@ beforeEach(async () => {
   mock.method(
     BackfillSonarr.prototype,
     'manualImport',
-    async (files: { path: string; episodeIds: number[] }[]) => {
+    async (
+      files: {
+        path: string;
+        episodeIds: number[];
+        quality?: { quality: { name: string } };
+      }[]
+    ) => {
       imports.push(
         files.map((f) => ({ path: f.path, episodeIds: f.episodeIds }))
       );
+      importQualities.push(...files.map((f) => f.quality?.quality.name));
       return 77;
     }
   );
@@ -475,6 +485,93 @@ describe('Backfill routes', () => {
     assert.equal(job.approvedByName, `${admin.displayName} (API key)`);
     assert.equal(job.approvedById, admin.id);
     assert.match(job.log[0].message, /\(API key\) approved 1 files/);
+  });
+
+  it('approve anyway what only the quality profile turned down, for admins only', async () => {
+    const { candidate } = await seed();
+    const remux = {
+      quality: { id: 20, name: 'Bluray-1080p Remux' },
+      revision: { version: 1, real: 0 },
+    };
+    await getRepository(BackfillCandidate).update(candidate.id, {
+      status: 'rejected',
+      reason: 'Bluray-1080p Remux is not in the profile',
+      plan: [
+        {
+          ...PLAN[0],
+          quality: remux,
+          action: 'reject',
+          reason: 'Bluray-1080p Remux is not in the profile',
+          override: { action: 'fill', replaces: 0 },
+        },
+        {
+          ...PLAN[1],
+          quality: remux,
+          action: 'reject',
+          reason: 'Bluray-1080p Remux is not in the profile',
+          replaces: 0,
+          override: { action: 'upgrade', replaces: 1 },
+        },
+        PLAN[2],
+      ],
+      summary: {
+        ...candidate.summary!,
+        fill: 0,
+        upgrade: 0,
+        reject: 2,
+        replaces: 0,
+        overridable: 2,
+      },
+    });
+    const approve = (body: unknown) =>
+      call('POST', `/api/v1/backfill/candidates/${candidate.id}/approve`, body);
+
+    actingAs = member;
+    assert.equal(
+      (await approve({ mode: 'missing', override: true })).status,
+      403
+    );
+    actingAs = admin;
+
+    const plain = await approve({ mode: 'missing' });
+    assert.equal(plain.status, 400);
+    assert.match(plain.body.message, /not waiting for approval/);
+
+    const unconfirmed = await approve({ mode: 'all', override: true });
+    assert.equal(unconfirmed.status, 400);
+    assert.match(unconfirmed.body.message, /replaces 1 file on disk/);
+
+    const res = await approve({ mode: 'missing', override: true });
+    assert.equal(res.status, 200);
+    const jobs = getRepository(BackfillJob);
+    let job = await jobs.findOneOrFail({ where: { id: res.body.id } });
+    assert.deepEqual(
+      job.files.map((f) => [f.index, f.action, f.overridden]),
+      [[0, 'fill', true]]
+    );
+    assert.match(
+      job.log[0].message,
+      /approved 1 files \(missing only, 1 turned down by Sonarr's quality profile and approved anyway\)/
+    );
+    assert.equal(
+      (
+        await getRepository(BackfillCandidate).findOneOrFail({
+          where: { id: candidate.id },
+        })
+      ).status,
+      'approved'
+    );
+
+    // Imported through Sonarr's manual import with the file's own quality.
+    torrentDone = true;
+    await backfill.tick();
+    job = await jobs.findOneOrFail({ where: { id: job.id } });
+    assert.equal(job.status, 'importing');
+    assert.deepEqual(
+      imports[0].map((f) => f.episodeIds),
+      [[101]]
+    );
+    assert.deepEqual(importQualities, ['Bluray-1080p Remux']);
   });
 
   it('approve, download only the chosen files, import, clean up and tell admins', async () => {

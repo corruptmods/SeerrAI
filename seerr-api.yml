@@ -7714,7 +7714,7 @@ paths:
           type: number
     post:
       summary: 'Approve a pack'
-      description: 'Replacing files on disk needs the series'' name typed as confirm. A pack approved with the API key records the account it acts as followed by "(API key)" as its approver.'
+      description: 'Replacing files on disk needs the series'' name typed as confirm. A pack approved with the API key records the account it acts as followed by "(API key)" as its approver. With override, files Sonarr''s, Radarr''s or Lidarr''s quality profile turned down (their quality isn''t in it, or they score under its minimum) are imported anyway; a pack with nothing else usable can then be approved too.'
       tags:
         - backfill
       requestBody:
@@ -7731,6 +7731,9 @@ paths:
                   type: string
                 includeAi:
                   type: boolean
+                override:
+                  type: boolean
+                  description: Approve anyway. Also imports the files only the quality profile turned down, as fills (and, with mode all, upgrades). Admins only; never used by Backfill or the admin agent on their own.
       responses:
         '200':
           description: OK

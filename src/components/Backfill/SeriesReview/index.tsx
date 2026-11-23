@@ -118,6 +118,10 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   willDelete:
     '{count} existing {count, plural, one {file is} other {files are}} deleted for good when replacements import.',
   approve: 'Approve & download…',
+  approveAnyway: 'Approve anyway…',
+  overridableNote:
+    '{app}’s quality profile turned down {count, plural, one {# file} other {# files}} here. An admin can approve {count, plural, one {it} other {them}} anyway.',
+  profileTurnedDown: 'Approve anyway can take it',
   skipPack: 'Skip this pack',
   aiMatched:
     '{count, plural, one {# file was} other {# files were}} placed by the AI, not by name. Check under Show files before approving.',
@@ -166,6 +170,8 @@ const SeriesReview = () => {
   const [approving, setApproving] = useState(false);
   // Snapshot of the pack the Approve dialog opened for.
   const [approveTarget, setApproveTarget] = useState<CandidateView>();
+  // The dialog is Approve anyway: with what the quality profile turned down.
+  const [approveOverride, setApproveOverride] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [problem, setProblem] = useState<string>();
   const [asking, setAsking] = useState(false);
@@ -263,8 +269,18 @@ const SeriesReview = () => {
 
   // The dialog's pack in its latest state, while still approvable.
   const approveCandidate = data.candidates.find(
-    (c) => c.id === approveTarget?.id && c.status === 'ready'
+    (c) =>
+      c.id === approveTarget?.id &&
+      (c.status === 'ready' ||
+        (approveOverride &&
+          c.status === 'rejected' &&
+          !!c.summary?.overridable))
   );
+  const openApprove = (c: CandidateView, override: boolean) => {
+    setApproveTarget(c);
+    setApproveOverride(override);
+    setApproving(true);
+  };
 
   const fileCount = (c: CandidateView) =>
     (c.summary?.fill ?? 0) + (c.summary?.upgrade ?? 0);
@@ -468,6 +484,7 @@ const SeriesReview = () => {
           seriesTitle={series.title}
           candidate={approveCandidate ?? approveTarget}
           unavailable={!approveCandidate}
+          override={approveOverride}
           onClose={() => setApproving(false)}
           onApproved={(jobId) => router.push(`/backfill/jobs/${jobId}`)}
         />
@@ -690,18 +707,37 @@ const SeriesReview = () => {
                     })}
                   />
                 )}
+                {!!selected.summary.overridable && (
+                  <p className="text-sm text-gray-400">
+                    {intl.formatMessage(messages.overridableNote, {
+                      app,
+                      count: selected.summary.overridable,
+                    })}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button
                     buttonType="success"
-                    disabled={blocked || !data.readiness.ready}
-                    onClick={() => {
-                      setApproveTarget(selected);
-                      setApproving(true);
-                    }}
+                    disabled={
+                      blocked ||
+                      !data.readiness.ready ||
+                      !(selected.summary.fill || selected.summary.upgrade)
+                    }
+                    onClick={() => openApprove(selected, false)}
                   >
                     <CheckIcon />
                     <span>{intl.formatMessage(messages.approve)}</span>
                   </Button>
+                  {!!selected.summary.overridable && (
+                    <Button
+                      buttonType="warning"
+                      disabled={blocked || !data.readiness.ready}
+                      onClick={() => openApprove(selected, true)}
+                    >
+                      <CheckIcon />
+                      <span>{intl.formatMessage(messages.approveAnyway)}</span>
+                    </Button>
+                  )}
                   <Button
                     buttonType="ghost"
                     onClick={() =>
@@ -812,6 +848,18 @@ const SeriesReview = () => {
                             <ProtocolBadge protocol={c.protocol} />
                             <span>{c.indexer}</span>
                             {c.reason && <span>· {c.reason}</span>}
+                            {c.status === 'rejected' &&
+                              !!c.summary?.overridable && (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 text-yellow-300 hover:text-yellow-200 disabled:opacity-50 light:text-warning-text"
+                                  disabled={blocked || !data.readiness.ready}
+                                  onClick={() => openApprove(c, true)}
+                                >
+                                  <CheckIcon className="h-3 w-3" />
+                                  {intl.formatMessage(messages.approveAnyway)}
+                                </button>
+                              )}
                             {!!c.plan?.length && (
                               <button
                                 type="button"
@@ -941,6 +989,9 @@ const SeriesReview = () => {
                                   {entry.reason && (
                                     <span className="basis-full pl-[7.75rem] text-gray-500">
                                       {entry.reason}
+                                      {entry.action === 'reject' &&
+                                        entry.override &&
+                                        ` · ${intl.formatMessage(messages.profileTurnedDown)}`}
                                     </span>
                                   )}
                                 </li>

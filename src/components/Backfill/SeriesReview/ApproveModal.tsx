@@ -10,7 +10,11 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Backfill.ApproveModal', {
   title: 'Approve — {series}',
+  titleAnyway: 'Approve anyway — {series}',
   approve: 'Approve & start download',
+  approveAnyway: 'Approve anyway & start download',
+  overrideWarning:
+    '{app}’s quality profile turned down {count, plural, one {one of these files} other {# of these files}}: its quality isn’t in the profile, or it scores under the profile’s minimum. {count, plural, one {It is} other {They are}} imported anyway.',
   approving: 'Starting…',
   whatToImport: 'What to import',
   all: 'Missing and upgrades',
@@ -43,6 +47,7 @@ const ApproveModal = ({
   seriesTitle,
   candidate,
   unavailable = false,
+  override = false,
   onClose,
   onApproved,
 }: {
@@ -52,13 +57,28 @@ const ApproveModal = ({
   candidate: CandidateView;
   /** The pack can no longer be approved; disables OK. */
   unavailable?: boolean;
+  /**
+   * Approve anyway: also the files only the quality profile turned down.
+   */
+  override?: boolean;
   onClose: () => void;
   onApproved: (jobId: number) => void;
 }) => {
   const intl = useIntl();
   const plan = useMemo(() => candidate.plan ?? [], [candidate.plan]);
   const summary = candidate.summary;
-  const hasUpgrades = (summary?.upgrade ?? 0) > 0;
+  /** Turned down by the profile alone, and taken here as `action`. */
+  const overriding = (
+    e: (typeof plan)[number],
+    action: 'fill' | 'upgrade'
+  ): boolean =>
+    override && e.action === 'reject' && e.override?.action === action;
+  const fills =
+    (summary?.fill ?? 0) + plan.filter((e) => overriding(e, 'fill')).length;
+  const upgrades =
+    (summary?.upgrade ?? 0) +
+    plan.filter((e) => overriding(e, 'upgrade')).length;
+  const hasUpgrades = upgrades > 0;
   const [mode, setMode] = useState<'missing' | 'all'>(
     hasUpgrades ? 'all' : 'missing'
   );
@@ -77,21 +97,29 @@ const ApproveModal = ({
   }, [show, hasUpgrades, candidate.id]);
 
   const pick = useMemo(() => {
+    const taken = (e: (typeof plan)[number], m: 'missing' | 'all') =>
+      e.action === 'fill' ||
+      (m === 'all' && e.action === 'upgrade') ||
+      (override &&
+        e.action === 'reject' &&
+        !!e.override &&
+        (e.override.action === 'fill' || m === 'all'));
     const of = (m: 'missing' | 'all') =>
-      plan.filter(
-        (e) =>
-          (e.action === 'fill' || (m === 'all' && e.action === 'upgrade')) &&
-          (includeAi || e.matchedBy !== 'ai')
-      );
+      plan.filter((e) => taken(e, m) && (includeAi || e.matchedBy !== 'ai'));
     return { missing: of('missing'), all: of('all') };
-  }, [plan, includeAi]);
+  }, [plan, includeAi, override]);
   const chosen = pick[mode];
   const aiInMode = plan.filter(
     (e) =>
       e.matchedBy === 'ai' &&
       (e.action === 'fill' || (mode === 'all' && e.action === 'upgrade'))
   ).length;
-  const replaces = chosen.reduce((n, e) => n + e.replaces, 0);
+  const replaces = chosen.reduce(
+    (n, e) =>
+      n + (e.action === 'reject' ? (e.override?.replaces ?? 0) : e.replaces),
+    0
+  );
+  const turnedDown = chosen.filter((e) => e.action === 'reject').length;
   const confirmed =
     replaces === 0 ||
     confirm.trim().toLowerCase() === seriesTitle.trim().toLowerCase();
@@ -102,7 +130,7 @@ const ApproveModal = ({
     try {
       const { data } = await axios.post<{ id: number }>(
         `/api/v1/backfill/candidates/${candidate.id}/approve`,
-        { mode, confirm, includeAi }
+        { mode, confirm, includeAi, ...(override ? { override: true } : {}) }
       );
       onApproved(data.id);
     } catch (e) {
@@ -163,12 +191,19 @@ const ApproveModal = ({
       leaveTo="opacity-0"
     >
       <Modal
-        title={intl.formatMessage(messages.title, { series: seriesTitle })}
+        title={intl.formatMessage(
+          override ? messages.titleAnyway : messages.title,
+          { series: seriesTitle }
+        )}
         subTitle={candidate.title}
         onCancel={onClose}
         onOk={approve}
         okText={intl.formatMessage(
-          busy ? messages.approving : messages.approve
+          busy
+            ? messages.approving
+            : override
+              ? messages.approveAnyway
+              : messages.approve
         )}
         okButtonType="success"
         okDisabled={busy || unavailable || !confirmed || !chosen.length}
@@ -182,6 +217,15 @@ const ApproveModal = ({
             />
           )}
           {problem && <Alert type="error" title={problem} />}
+          {turnedDown > 0 && (
+            <Alert
+              type="warning"
+              title={intl.formatMessage(messages.overrideWarning, {
+                app: appName(kind),
+                count: turnedDown,
+              })}
+            />
+          )}
           <div className="text-label">
             {intl.formatMessage(messages.whatToImport)}
           </div>
@@ -193,12 +237,12 @@ const ApproveModal = ({
                 intl.formatMessage(messages.allDetail, {
                   files: pick.all.length,
                   size: bytes(pick.all),
-                  fill: summary?.fill ?? 0,
-                  upgrade: summary?.upgrade ?? 0,
+                  fill: fills,
+                  upgrade: upgrades,
                 }),
                 true
               )}
-            {(summary?.fill ?? 0) > 0 &&
+            {fills > 0 &&
               option(
                 'missing',
                 intl.formatMessage(

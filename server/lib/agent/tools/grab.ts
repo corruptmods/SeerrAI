@@ -106,7 +106,7 @@ const outsideProfile = (
         : null;
   if (why) {
     throw new Refused(
-      `Nothing was started: ${why}. Running on your own, you take only what the profile takes; leave this one for the admin and say so in your summary.`
+      `Nothing was started: ${why}. Running on your own, you take only what the profile takes; leave this one for the admin and say so in your summary. If Backfill found this release, the admin can take it with Approve anyway on the title's Backfill page.`
     );
   }
 };

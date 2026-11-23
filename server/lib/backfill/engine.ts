@@ -2788,14 +2788,31 @@ class Backfill {
       by?: string;
       /** The admin agent conversation taking it. */
       agentRunId?: number;
+      /**
+       * An admin's Approve anyway: also the files only the quality profile
+       * turned down. Never set by Backfill or the agent on their own.
+       */
+      override?: boolean;
     }
   ): Promise<BackfillJob> {
     const candidates = getRepository(BackfillCandidate);
     const candidate = await candidates.findOneOrFail({
       where: { id: candidateId },
     });
-    if (candidate.status !== 'ready') {
-      throw new Error('This pack is not waiting for approval.');
+    const override = !!options.override;
+    // A pack turned down only for what the profile turned down can still be
+    // approved anyway.
+    const waiting =
+      candidate.status === 'ready' ||
+      (override &&
+        candidate.status === 'rejected' &&
+        candidate.plan.some((e) => e.action === 'reject' && e.override));
+    if (!waiting) {
+      throw new Error(
+        override && candidate.status === 'rejected'
+          ? 'Nothing in this pack was turned down only by the quality profile, so it cannot be approved anyway.'
+          : 'This pack is not waiting for approval.'
+      );
     }
     const client = this.clientFor(candidate.protocol);
     if (!client) {
@@ -2804,7 +2821,20 @@ class Backfill {
       );
     }
     const includeAi = options.includeAi ?? true;
-    let selected = selectEntries(candidate.plan, options.mode, includeAi);
+    let selected = selectEntries(
+      candidate.plan,
+      options.mode,
+      includeAi,
+      override
+    );
+    if (
+      candidate.status === 'rejected' &&
+      !selected.some((e) => e.overridden)
+    ) {
+      throw new Error(
+        'Nothing in this pack was turned down only by the quality profile, so it cannot be approved anyway.'
+      );
+    }
     if (!selected.length) {
       throw new Error('Nothing in this pack would be imported.');
     }
@@ -2892,7 +2922,7 @@ class Backfill {
     // Claim only if still ready, so of two concurrent approvals (two
     // admins, or an admin and auto-approve) only one starts a download.
     const claimed = await candidates.update(
-      { id: candidate.id, status: 'ready' },
+      { id: candidate.id, status: candidate.status },
       // The reason it waited for an admin no longer applies.
       { status: 'approved', reason: null }
     );
@@ -2925,6 +2955,10 @@ class Backfill {
                 selected.some((e) => e.matchedBy === 'ai')
                   ? `, ${selected.filter((e) => e.matchedBy === 'ai').length} matched by AI`
                   : ''
+              }${
+                selected.some((e) => e.overridden)
+                  ? `, ${selected.filter((e) => e.overridden).length} turned down by ${appOf(row.kind)}'s quality profile and approved anyway`
+                  : ''
               }${leftOut})`,
             },
           ],
@@ -2934,7 +2968,7 @@ class Backfill {
         })
       )
       .catch(async (e) => {
-        await candidates.update(candidate.id, { status: 'ready' });
+        await candidates.update(candidate.id, { status: candidate.status });
         throw e;
       });
     await this.linkReplacement(job);

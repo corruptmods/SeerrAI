@@ -193,6 +193,14 @@ export interface PlanEntry {
    * downloaded; its one video is imported.
    */
   whole?: true;
+  /**
+   * Turned down only by the quality profile (its quality isn't in it, or it
+   * scores under its minimum): what it would otherwise be, so an admin can
+   * approve it anyway. Never set for any other rejection.
+   */
+  override?: { action: 'fill' | 'upgrade'; replaces: number };
+  /** Taken despite the quality profile, by an admin's Approve anyway. */
+  overridden?: true;
 }
 
 export interface PlanSummary {
@@ -231,6 +239,11 @@ export interface PlanSummary {
   outsideSize?: number;
   /** The size-limit problem in words. */
   sizeNote?: string;
+  /**
+   * Files the quality profile alone turned down, which an admin can approve
+   * anyway. Absent when none.
+   */
+  overridable?: number;
 }
 
 /** Index of the matching top-level quality, lowest first; groups count once. */
@@ -316,7 +329,8 @@ const judged = (
 /**
  * Decides one file's action. A file for a missing episode fills it; one for
  * an episode on disk upgrades only if Sonarr would take it over every file
- * it replaces.
+ * it replaces. A file the quality profile turns down is rejected, with what
+ * it would otherwise be, for an admin's Approve anyway.
  */
 export const decide = (
   entry: Omit<PlanEntry, 'action' | 'reason' | 'replaces'>,
@@ -329,20 +343,33 @@ export const decide = (
     return { ...base, action: 'reject', reason: 'No matching episode' };
   }
   const qualityId = entry.quality?.quality.id ?? 0;
-  if (!qualityId || !qualityAllowed(profile, qualityId)) {
-    return {
-      ...base,
-      action: 'reject',
-      reason: `${entry.quality?.quality.name ?? 'Unknown quality'} is not in the profile`,
-    };
-  }
-  if (entry.score < profile.minFormatScore) {
-    return {
-      ...base,
-      action: 'reject',
-      reason: `Scores ${entry.score}, below the profile's minimum of ${profile.minFormatScore}`,
-    };
-  }
+  const profileReason =
+    !qualityId || !qualityAllowed(profile, qualityId)
+      ? `${entry.quality?.quality.name ?? 'Unknown quality'} is not in the profile`
+      : entry.score < profile.minFormatScore
+        ? `Scores ${entry.score}, below the profile's minimum of ${profile.minFormatScore}`
+        : undefined;
+  const judged = againstDisk(base, profile, episodes, files);
+  if (!profileReason) return judged;
+  return {
+    ...base,
+    action: 'reject',
+    reason: profileReason,
+    // An unknown quality can't be imported as anything, so never.
+    ...(qualityId && (judged.action === 'fill' || judged.action === 'upgrade')
+      ? { override: { action: judged.action, replaces: judged.replaces } }
+      : {}),
+  };
+};
+
+/** A file's action by what is on disk, the profile's own limits aside. */
+const againstDisk = (
+  base: Omit<PlanEntry, 'action' | 'reason'>,
+  profile: SonarrQualityProfile,
+  episodes: Map<number, SonarrEpisode>,
+  files: Map<number, SonarrEpisodeFile>
+): PlanEntry => {
+  const entry = base;
   const existing = entry.episodeIds
     .map((id) => episodes.get(id))
     .filter((ep): ep is SonarrEpisode => !!ep && ep.hasFile);
@@ -408,30 +435,51 @@ const better = (
 
 /**
  * When a pack has two files for one episode (v1 and v2), keeps the better
- * and skips the other.
+ * and skips the other. Of the files only the profile turned down, one per
+ * episode stays open to Approve anyway, and none for an episode a usable
+ * file already covers.
  */
 export const dedupe = (
   entries: PlanEntry[],
   profile: SonarrQualityProfile
 ): PlanEntry[] => {
+  const keyOf = (entry: PlanEntry) => [...entry.episodeIds].sort().join(',');
   const best = new Map<string, PlanEntry>();
   for (const entry of entries) {
     if (entry.action !== 'fill' && entry.action !== 'upgrade') continue;
-    const key = [...entry.episodeIds].sort().join(',');
+    const key = keyOf(entry);
     const held = best.get(key);
     if (!held || better(profile, entry, held)) best.set(key, entry);
   }
   const keep = new Set(best.values());
-  return entries.map((entry) =>
-    (entry.action === 'fill' || entry.action === 'upgrade') && !keep.has(entry)
-      ? {
-          ...entry,
-          action: 'skip',
-          reason: 'Another file in the pack is better',
-          replaces: 0,
-        }
-      : entry
-  );
+  const covered = new Set([...keep].flatMap((e) => e.episodeIds));
+  const bestOverride = new Map<string, PlanEntry>();
+  for (const entry of entries) {
+    if (!entry.override || entry.episodeIds.some((id) => covered.has(id))) {
+      continue;
+    }
+    const key = keyOf(entry);
+    const held = bestOverride.get(key);
+    if (!held || better(profile, entry, held)) bestOverride.set(key, entry);
+  }
+  const keepOverride = new Set(bestOverride.values());
+  return entries.map((entry) => {
+    if (
+      (entry.action === 'fill' || entry.action === 'upgrade') &&
+      !keep.has(entry)
+    ) {
+      return {
+        ...entry,
+        action: 'skip',
+        reason: 'Another file in the pack is better',
+        replaces: 0,
+      };
+    }
+    if (entry.override && !keepOverride.has(entry)) {
+      return { ...entry, override: undefined };
+    }
+    return entry;
+  });
 };
 
 export const summarize = (entries: PlanEntry[]): PlanSummary => {
@@ -463,20 +511,48 @@ export const summarize = (entries: PlanEntry[]): PlanSummary => {
     score: scores.length ? scores[Math.floor(scores.length / 2)] : 0,
     aiMatched: used.filter((e) => e.matchedBy === 'ai').length,
     multi: used.filter((e) => e.episodeIds.length > 1).length,
+    ...(overridable(entries) ? { overridable: overridable(entries) } : {}),
   };
 };
 
-/** The entries an approval imports, by mode, optionally without AI matches. */
+/** Files only the quality profile turned down, open to Approve anyway. */
+const overridable = (entries: PlanEntry[]): number =>
+  entries.filter((e) => e.action === 'reject' && e.override).length;
+
+/**
+ * The entries an approval imports, by mode, optionally without AI matches.
+ * With `override` (an admin's Approve anyway), also the files only the
+ * quality profile turned down, as what they would otherwise be: fills, and
+ * in mode 'all' upgrades too.
+ */
 export const selectEntries = (
   entries: PlanEntry[],
   mode: 'missing' | 'all',
-  includeAi = true
+  includeAi = true,
+  override = false
 ): PlanEntry[] =>
-  entries.filter(
-    (e) =>
-      (e.action === 'fill' || (mode === 'all' && e.action === 'upgrade')) &&
-      (includeAi || e.matchedBy !== 'ai')
-  );
+  entries.flatMap((e): PlanEntry[] => {
+    if (!includeAi && e.matchedBy === 'ai') return [];
+    if (e.action === 'fill' || (mode === 'all' && e.action === 'upgrade')) {
+      return [e];
+    }
+    if (
+      override &&
+      e.action === 'reject' &&
+      e.override &&
+      (e.override.action === 'fill' || mode === 'all')
+    ) {
+      return [
+        {
+          ...e,
+          action: e.override.action,
+          replaces: e.override.replaces,
+          overridden: true,
+        },
+      ];
+    }
+    return [];
+  });
 
 /**
  * Whether a multi-episode pack must wait because another pack fills

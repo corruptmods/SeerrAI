@@ -8,6 +8,7 @@ import backfill, { isMissing } from '@server/lib/backfill/engine';
 import { filmOut } from '@server/lib/backfill/filmDates';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import { selectEntries } from '@server/lib/backfill/plan';
+import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import downloadCheckRoutes from '@server/routes/downloadCheck';
@@ -71,6 +72,9 @@ const entryView = (entry: PlanEntry) => ({
   replaces: entry.replaces,
   matchedBy: entry.matchedBy,
   why: entry.why,
+  /** Only the quality profile turned it down: open to Approve anyway. */
+  override: entry.override,
+  overridden: entry.overridden,
 });
 
 /** Candidate without its Prowlarr links, which carry Prowlarr's API key. */
@@ -803,12 +807,26 @@ const approveBody = z.object({
   confirm: z.string().optional(),
   /** Exclude files placed only by the AI second opinion. */
   includeAi: z.boolean().optional(),
+  /**
+   * Approve anyway: also import the files only the quality profile turned
+   * down. Admins only.
+   */
+  override: z.boolean().optional(),
 });
 
 backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
   if (!requireReady(res, next)) return;
   const parsed = approveBody.safeParse(req.body);
   if (!parsed.success) return next({ status: 400, message: 'Bad request.' });
+  // The router is admin only already; Approve anyway stays so even if it
+  // is ever opened wider.
+  if (parsed.data.override && !req.user?.hasPermission(Permission.ADMIN)) {
+    return next({
+      status: 403,
+      message:
+        'Only an admin can approve files the quality profile turned down.',
+    });
+  }
   try {
     const id = idParam(req);
     const candidate = await getRepository(BackfillCandidate).findOneOrFail({
@@ -822,7 +840,8 @@ backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
     const replaces = selectEntries(
       candidate.plan,
       parsed.data.mode,
-      parsed.data.includeAi ?? true
+      parsed.data.includeAi ?? true,
+      parsed.data.override ?? false
     ).reduce((n, e) => n + e.replaces, 0);
     if (
       replaces > 0 &&
@@ -845,6 +864,7 @@ backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
       mode: parsed.data.mode,
       user: req.user,
       includeAi: parsed.data.includeAi,
+      override: parsed.data.override,
       by: viaApiKey ? `${req.user?.displayName} (API key)` : undefined,
     });
     return res.status(200).json(jobView(job));

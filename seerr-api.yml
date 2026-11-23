@@ -339,6 +339,142 @@ components:
     BackfillAnswer:
       type: object
       additionalProperties: true
+    BackfillPlanEntry:
+      type: object
+      description: One file of a pack, and what Backfill would do with it.
+      additionalProperties: true
+      properties:
+        index:
+          type: number
+        name:
+          type: string
+        size:
+          type: number
+        episodeIds:
+          type: array
+          items:
+            type: number
+        action:
+          type: string
+          enum: [fill, upgrade, skip, reject]
+        reason:
+          type: string
+        replaces:
+          type: number
+        matchedBy:
+          type: string
+        override:
+          type: object
+          description: Present only when the quality profile alone turned the file down (its quality isn't in it, or it scores under its minimum). What the file would otherwise be, for Approve anyway.
+          properties:
+            action:
+              type: string
+              enum: [fill, upgrade]
+            replaces:
+              type: number
+        overridden:
+          type: boolean
+          enum: [true]
+          description: Taken despite the quality profile, by an admin's Approve anyway. Present only then.
+    BackfillPlanSummary:
+      type: object
+      description: What a pack would do, counted.
+      additionalProperties: true
+      properties:
+        fill:
+          type: number
+        upgrade:
+          type: number
+        skip:
+          type: number
+        reject:
+          type: number
+        covered:
+          type: number
+        bytes:
+          type: number
+        fillBytes:
+          type: number
+        replaces:
+          type: number
+        quality:
+          type: string
+        score:
+          type: number
+        outsideSize:
+          type: number
+          description: Files to take outside Sonarr's or Radarr's size limits.
+        sizeNote:
+          type: string
+        overridable:
+          type: number
+          description: Files only the quality profile turned down, which an admin can approve anyway. Absent when none, and for a turned-down pack that can't be approved anyway (turned down for anything else too, its size included).
+    BackfillCandidate:
+      type: object
+      description: A pack found for a title, without its Prowlarr links.
+      additionalProperties: true
+      properties:
+        id:
+          type: number
+        seriesId:
+          type: number
+        title:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        summary:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/BackfillPlanSummary'
+        plan:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackfillPlanEntry'
+    BackfillMovieOnDisk:
+      type: object
+      description: A movie's file in Radarr, and whether Backfill counts it as out.
+      additionalProperties: true
+      properties:
+        title:
+          type: string
+        year:
+          type: number
+        profile:
+          type: string
+        minFormatScore:
+          type: number
+        names:
+          type: array
+          items:
+            type: string
+        available:
+          type: boolean
+          description: Radarr counts it as available.
+        out:
+          type: boolean
+          description: Backfill counts it as out long enough to fetch, by Radarr's date, or by TMDB's when Radarr has none, after the new-release wait.
+        tmdbRelease:
+          type: object
+          description: TMDB's release date, when Radarr has none and Backfill goes by it. Its earliest TV, digital or physical release; else its primary release date, only for a film TMDB calls released that is made for TV or has no typed release dates.
+          properties:
+            date:
+              type: string
+            kind:
+              type: string
+              enum: [tv, digital, physical, primary]
+        file:
+          type: object
+          properties:
+            quality:
+              type: string
+            score:
+              type: number
+            belowCutoff:
+              type: boolean
     SiriShortcut:
       type: object
       properties:
@@ -7708,7 +7844,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BackfillAnswer'
+                type: object
+                additionalProperties: true
+                properties:
+                  movie:
+                    $ref: '#/components/schemas/BackfillMovieOnDisk'
+                  candidates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BackfillCandidate'
     put:
       summary: "Change a series' search names, or ignore it"
       tags:

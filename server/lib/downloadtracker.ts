@@ -462,10 +462,21 @@ class DownloadTracker {
     const still = new Set(after.map(itemKey));
     const imported: ImportedDownload[] = [];
     for (const item of before) {
+      if (still.has(itemKey(item))) continue;
       if (
-        still.has(itemKey(item)) ||
-        !(leftImported(item) || (this.isDone(item) && item.stage !== 'failed'))
+        !leftImported(item) &&
+        !(
+          this.isDone(item) &&
+          item.stage !== 'failed' &&
+          item.stage !== 'needsAttention'
+        )
       ) {
+        // Left without being imported (removed, failed, blocked): a re-grab of
+        // the same release starts afresh.
+        const id = item.downloadId?.toLowerCase();
+        if (id && !after.some((a) => a.downloadId?.toLowerCase() === id)) {
+          this.done.delete(id);
+        }
         continue;
       }
       for (const serverId of serverIds) {

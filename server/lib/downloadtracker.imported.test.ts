@@ -421,4 +421,50 @@ describe('a download its client has finished', () => {
       ['failed']
     );
   });
+
+  it('is not shown as imported when it was blocked and then removed', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 5_000_000 });
+    let scans = 0;
+    downloadTracker.whenImported(() => {
+      scans++;
+    });
+    queue = [record('lantern', 3, 'completed', 'importBlocked', 0)];
+    sabHistory = [{ nzo_id: 'lantern', status: 'Completed', bytes: 500 }];
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker.getSeriesProgress(0, 1286).map((i) => i.stage),
+      ['needsAttention']
+    );
+
+    // Removed by hand instead of imported.
+    queue = [];
+    sabHistory = [];
+    mock.timers.tick(15_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(downloadTracker.getSeriesProgress(0, 1286), []);
+    mock.timers.tick(IMPORTED_SCAN_DELAY_MS);
+    assert.equal(scans, 0);
+  });
+
+  it('shows a re-grab of the same release downloading again', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 6_000_000 });
+    queue = [record('harbour', 4, 'completed', 'importBlocked', 0)];
+    sabHistory = [{ nzo_id: 'harbour', status: 'Completed', bytes: 500 }];
+    await downloadTracker.updateDownloads();
+
+    queue = [];
+    sabHistory = [];
+    mock.timers.tick(15_000);
+    await downloadTracker.updateDownloads();
+
+    queue = [record('harbour', 4, 'downloading', 'downloading', 300)];
+    mock.timers.tick(15_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker
+        .getSeriesProgress(0, 1286)
+        .map((i) => [i.stage, i.sizeLeft]),
+      [['downloading', 300]]
+    );
+  });
 });

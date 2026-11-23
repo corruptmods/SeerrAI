@@ -101,11 +101,13 @@ If there's no default server, Retry says so: add one in **Settings → Services*
 
 Seerr AI decides what counts as anime the same way everywhere (requests, scans, title pages, the Anime page and the Anime Check): anything TMDB tags as anime, from any country, and animation in Japanese.
 
+**Anime handling** (**Settings → Services → Anime**) is **Auto**, **On** or **Off**. On Auto, the default, it is on only while a Sonarr or Radarr server has an anime root folder, anime quality profile or anime tags of its own; the page says which it is now and why. Off, every request goes with the standard folder, profile, tags and series type, and **Request as anime**, the title's **Anime** setting and the Anime Check are hidden. Everything below applies while it's on.
+
 - **Leave out anime made in** (**Settings → Services → Anime**): countries whose anime-styled titles don't count unless in Japanese. List the United States to keep Avatar: The Last Airbender and Gravespire with your regular series; leave it empty to count anime from everywhere. Servers from before this setting start with the United States listed.
 - **When requesting:** **Request as anime** is ticked for anime, from Japan or anywhere else. Untick it when it's wrong, and the request goes to the regular folder, profile and tags.
 - **On a title:** admins set **Anime** in the Manage panel to Automatic, Anime or Not anime. **Save and Move** sets the matching root folder (the files move), quality profile and, for a series, series type.
 - **Movies:** each Radarr can have its own anime root folder, quality profile and tags (Settings → Services).
-- **Anime Check** (nightly, 04:15): a report on Settings → Services of series in the wrong root folder or with the wrong series type, and movies in the wrong root folder or quality profile. It changes nothing; **Run Check** runs it now.
+- **Anime Check** (nightly, 04:15): a report on Settings → Services of series in the wrong root folder or with the wrong series type, and movies in the wrong root folder or quality profile. It changes nothing; **Run Check** runs it now. It has its own switch (on to start), and never runs while anime handling is off.
 
 ## Override rules
 

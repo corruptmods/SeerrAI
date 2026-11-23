@@ -11,10 +11,15 @@ AI in Seerr AI suggests and explains. **It never acts on its own**: when AI Sear
 - **Provider:** Claude (Anthropic), or OpenAI or any OpenAI-compatible server, including one at home (Ollama, LM Studio: enter its address, such as `http://your-server:11434/v1`; the key is then optional). A model at home keeps everything on your network.
 - **API key:** never shown again once saved, and only ever sent to the provider and address it was saved for.
 - **Model:** used by every feature. Under **Advanced**, a cheaper or stronger model can be chosen per feature.
+- **Effort:** how hard the model thinks before answering. **Lowest**, the default, asks for the least each model accepts: the cheapest and fastest. **Low**, **Medium** and **High** give better answers, often letting a cheaper model do as well as a dearer one, but cost more and take longer. Under **Advanced**, each feature can have its own effort beside its model, or keep **Same as default**. Models without an effort setting ignore it.
 - **Daily Limit per Person:** answers each person gets a day (default 20; 0 is no limit). Admins aren't limited. Answers from memory, and failed or empty ones, don't count.
 - **Test** checks the model answers.
 
 Each feature sends only what it needs, and keeps the answer short. Titles go as "Name (year)", never account names or emails. What people watched is sent for AI Search, suggestions and picks; issue comments are sent as written. Answers are remembered for a while (an hour for searches, up to 30 days for recaps), and a repeat costs nothing and doesn't count towards the limit.
+
+### Choosing a model
+
+The cheapest models, at the lowest effort, can give weak suggestions in AI Search: titles that don't fit what was asked, or the wrong film of the same name. If that happens, first raise **Effort** for AI Search to Medium under **Advanced**; if it's still poor, choose a mid-range model for AI Search (such as Claude Sonnet or Haiku, or a mid-range OpenAI model) and keep the cheap one for the smaller features. Recaps, reasons and log explanations do well on cheap models at the lowest effort.
 
 ### What it costs
 
@@ -31,7 +36,7 @@ Each can be turned off in **Settings → Features** (for everyone) or in your ow
 
 | Feature | Where | Who | What it does |
 |---|---|---|---|
-| **AI Search** (`aiChat`) | The sparkle button beside search | Everyone | Describe a title, ask about what you watched, or send a photo. With music on, it finds albums and artists too, each requested from its own tile. Finds up to 6 titles (20 for a list), and reads a whole franchise, studio, director's or actor's work from TMDB. Results can be opened, put on a list, or requested together after you confirm. Problems you mention can be passed to [Auto-fix](./subtitles-and-autofix.md#auto-fix), including a whole season to replace, or an album's missing songs. Admins can also ask for a file to be replaced, a release group blocked and so on; that goes to the [admin agent](./backfill-and-agent.md#changes-you-approve), which waits for their approval. |
+| **AI Search** (`aiChat`) | The sparkle button beside search | Everyone | Describe a title, ask about what you watched, or send a photo. With music on, it finds albums and artists too, each requested from its own tile. Finds up to 6 titles (20 for a list), and reads a whole franchise, studio, director's or actor's work from TMDB. Results can be opened, put on a list, or requested together after you confirm. Ask for a genre or kind of film (slasher films, anime) and every title shown is of that genre on TMDB; others are left out. Series are only checked against the genres TMDB has for series, so asking for horror doesn't hide series. Problems you mention can be passed to [Auto-fix](./subtitles-and-autofix.md#auto-fix), including a whole season to replace, or an album's missing songs. Admins can also ask for a file to be replaced, a release group blocked and so on; that goes to the [admin agent](./backfill-and-agent.md#changes-you-approve), which waits for their approval. |
 | **Why These Suggestions** (`aiReasons`) | Suggested for You page | Everyone | Explains why each title was suggested. |
 | **Pick for the Room** (`aiPicker`) | A tab in AI Search | Everyone | Choose who is watching (up to 6), movie or series, and a mood; it picks three titles from what each person has been watching, by default only ones ready to watch. You can include people you share a watch list with, if they haven't turned this off; admins can include anyone. |
 | **Catch Me Up** (`aiRecap`) | Series pages | Everyone | A spoiler-free recap up to where you are (from your watch history on any connected server, or an episode you pick), built from TMDB's episode synopses; only those up to there are sent. |

@@ -373,6 +373,13 @@ const openAiPlan = (
   return { efforts: known !== undefined ? [known] : [effort, null], key };
 };
 
+/**
+ * Claude's room for thinking: by effort when one is sent; the least when
+ * the model takes no effort.
+ */
+const claudeRoom = (effort: AiEffort, level: string | null) =>
+  THINKING_ROOM[level ? effort : 'lowest'];
+
 const completeAnthropic = async (
   ai: AiSettings,
   req: CompletionRequest
@@ -387,7 +394,7 @@ const completeAnthropic = async (
       `${ANTHROPIC_URL}/messages`,
       {
         model: req.model,
-        max_tokens: req.maxTokens + THINKING_ROOM[effort],
+        max_tokens: req.maxTokens + claudeRoom(effort, level),
         system: req.system,
         messages: [
           {
@@ -690,7 +697,7 @@ const converseAnthropic = async (
       `${ANTHROPIC_URL}/messages`,
       {
         model: req.model,
-        max_tokens: req.maxTokens + THINKING_ROOM[effort],
+        max_tokens: req.maxTokens + claudeRoom(effort, level),
         system: req.system,
         messages: anthropicMessages(req.messages),
         tools: req.tools.map((tool) => ({

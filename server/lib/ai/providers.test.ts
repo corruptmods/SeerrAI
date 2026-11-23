@@ -671,6 +671,28 @@ describe('effort', () => {
     );
   });
 
+  it('gives a Claude model that takes no effort only the least room to think', async () => {
+    const sent = capture([
+      httpError(400, {
+        error: {
+          message: 'output_config.effort: Extra inputs are not permitted',
+        },
+      }),
+      claudeReply,
+      claudeReply,
+    ]);
+    await complete(settings(), { ...request, effort: 'high' });
+    await complete(settings(), { ...request, effort: 'high' });
+    assert.deepEqual(
+      sent.map((s) => [s.body.output_config, s.body.max_tokens]),
+      [
+        [{ effort: 'high' }, 100 + 16384],
+        [undefined, 100 + 2048],
+        [undefined, 100 + 2048],
+      ]
+    );
+  });
+
   it('asks an OpenAI reasoning model for the level set, then lower ones it accepts', async () => {
     const sent = capture([
       effortRefused('high'),

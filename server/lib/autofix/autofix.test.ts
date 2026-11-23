@@ -1306,6 +1306,79 @@ describe('Auto-fix: re-numbering a season', () => {
   });
 });
 
+describe('Auto-fix: re-numbering checks', () => {
+  const report = async (episodeNumber: number) => {
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'This is the wrong episode',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: episodeNumber,
+    });
+    return commentOn(res.body.id);
+  };
+
+  it('moves nothing when the episode has another file than the one checked', async () => {
+    origins = { 103: 'Static Garden S01E04' };
+    episodes[3] = { ...episodes[3], hasFile: false, episodeFileId: 0 };
+    fakeImports();
+    // A new file arrived for S01E03 after the check.
+    mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+      episodes.map((ep) =>
+        ep.id === 103 ? { ...ep, episodeFileId: 777 } : { ...ep }
+      )
+    );
+    mock.method(BackfillSonarr.prototype, 'getEpisodeFiles', async () => [
+      {
+        id: 777,
+        relativePath: 'Season 01/Glasswing - S01E03 - new.mkv',
+        seasonNumber: 1,
+        size: 1,
+        quality: { quality: { id: 3, name: 'WEBDL-1080p' } },
+      },
+    ]);
+    const comment = await report(3);
+    assert.equal(
+      comment,
+      'Automatic fix: Nothing in season 1 was re-numbered. Moving S01E03 to S01E04 failed: S01E03 has another file now than the one checked, so it was not moved. Stopped there, so S01E03 keeps its old number, and nothing else was changed.'
+    );
+    assert.deepEqual(imported, []);
+    assert.deepEqual(deleted, []);
+  });
+
+  it('leaves a file from another season for an admin, unless an admin reported it', async () => {
+    // S01E04's file came from the release of S02E01, which has none.
+    episodes.push(
+      episode(1, {
+        id: 201,
+        seasonNumber: 2,
+        absoluteEpisodeNumber: 15,
+        hasFile: false,
+        episodeFileId: 0,
+      })
+    );
+    origins = { 104: 'Lantern Song S02E01 (15)' };
+    fakeImports();
+    const comment = await report(4);
+    assert.equal(
+      comment,
+      'Automatic fix: Left S01E04 as it is: its file came from a release of another season, and only an admin can have files moved between seasons.'
+    );
+    assert.deepEqual(imported, []);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
+
+    actingAs = admin;
+    autofix.reset();
+    const byAdmin = await report(4);
+    assert.match(
+      byAdmin,
+      /^Automatic fix: Re-numbered 1 file of season 1 to match Sonarr: S01E04 is now S02E01\./
+    );
+    assert.deepEqual(imported, ['4>1']);
+  });
+});
+
 describe('Auto-fix: from AI Search', () => {
   it('fetches subtitles at once when asked in plain words', async () => {
     modelAnswer = JSON.stringify({

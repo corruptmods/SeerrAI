@@ -630,12 +630,20 @@ interface Finding {
   episode: ArrEpisode;
   why: string;
   to?: ArrEpisode;
+  /** The checked file's path in the series folder. */
+  relativePath?: string;
 }
 
-/** A file to move from the episode it is linked to onto the one it is. */
+/**
+ * A file to move from the episode it is linked to onto the one it is: the
+ * file checked, by its id and path, so another found there at move time is
+ * left alone.
+ */
 interface Move {
   from: ArrEpisode;
   to: ArrEpisode;
+  fileId: number;
+  relativePath?: string;
 }
 
 const nameOf = (ep: ArrEpisode) => label(ep.seasonNumber, ep.episodeNumber);
@@ -1975,6 +1983,7 @@ class AutoFix {
           why: `came from “${origin}”, which is ${label(to.seasonNumber, to.episodeNumber)}`,
           // One episode's file, named for one other episode: re-numbered.
           to: mappedTo.length === 1 && !shared(episode) ? to : undefined,
+          relativePath: file?.relativePath,
         });
         continue;
       }
@@ -1992,11 +2001,32 @@ class AutoFix {
       }
     }
 
-    const moves = findings
+    const moves: Move[] = findings
       .filter((f): f is Finding & { to: ArrEpisode } => !!f.to)
-      .map((f) => ({ from: f.episode, to: f.to }));
-    const plan = planMoves(moves, all);
+      .map((f) => ({
+        from: f.episode,
+        to: f.to,
+        fileId: f.episode.episodeFileId,
+        relativePath: f.relativePath,
+      }));
+    // Into another season only for an admin's confirmed report.
+    const acrossSeasons =
+      !isAdmin(req.user) || req.unconfirmed
+        ? moves.filter((m) => m.to.seasonNumber !== req.seasonNumber)
+        : [];
+    const plan = planMoves(
+      moves.filter((m) => !acrossSeasons.includes(m)),
+      all
+    );
     const parts: string[] = [];
+    if (acrossSeasons.length) {
+      parts.push(
+        leftAlone(
+          acrossSeasons,
+          `${acrossSeasons.length === 1 ? 'its file came' : 'their files came'} from a release of another season, and only an admin can have files moved between seasons.`
+        )
+      );
+    }
     let moved = false;
     if (plan.ready.length) {
       const remap = await this.renumber(req, sonarr, plan.ready);
@@ -2090,7 +2120,8 @@ class AutoFix {
               api,
               sonarr.id,
               move.from.id,
-              move.to.id
+              move.to.id,
+              { episodeFileId: move.fileId, relativePath: move.relativePath }
             );
             changed.push(`${nameOf(move.from)} is now ${nameOf(move.to)}`);
             if (!result.renamed) notRenamed++;

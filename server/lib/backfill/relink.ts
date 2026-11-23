@@ -171,7 +171,8 @@ export const relinkEpisodeFile = async (
 /**
  * Moves a file that holds one episode onto the episode it really is, in
  * place, then renames it. The target must have no file, or Sonarr would
- * replace it. Verified afterwards: the file is linked to the target alone,
+ * replace it, and the source must still have the file that was checked
+ * (`planned`). Verified afterwards: the file is linked to the target alone,
  * and the episode it left has no file.
  */
 export const moveEpisodeFile = async (
@@ -179,6 +180,7 @@ export const moveEpisodeFile = async (
   seriesId: number,
   fromEpisodeId: number,
   toEpisodeId: number,
+  planned: { episodeFileId: number; relativePath?: string },
   sleep: (ms: number) => Promise<void> = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms))
 ): Promise<RelinkResult> => {
@@ -197,6 +199,10 @@ export const moveEpisodeFile = async (
   if (!source.episodeFileId) {
     throw new RelinkError(`${fromName} no longer has a file.`);
   }
+  const changed = `${fromName} has another file now than the one checked, so it was not moved.`;
+  if (source.episodeFileId !== planned.episodeFileId) {
+    throw new RelinkError(changed);
+  }
   if (target.episodeFileId) {
     throw new RelinkError(
       `${to} has a file of its own, and files are never replaced here.`
@@ -212,6 +218,9 @@ export const moveEpisodeFile = async (
   const file = files.find((f) => f.id === source.episodeFileId);
   if (!file?.relativePath) {
     throw new RelinkError(`Sonarr has no record of the file for ${fromName}.`);
+  }
+  if (planned.relativePath && file.relativePath !== planned.relativePath) {
+    throw new RelinkError(changed);
   }
   const from = file.relativePath;
   const path =

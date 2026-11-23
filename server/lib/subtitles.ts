@@ -679,15 +679,19 @@ export const choiceOf = (result: BazarrSearchResult) => ({
   originalFormat: result.original_format,
 });
 
-/** Episodes in a scope, minus any already transcribed. */
+/**
+ * Episodes in a scope, minus any already transcribed unless `redo` (asked
+ * for in so many words: transcribe them again).
+ */
 export const episodesToTranscribe = (
   episodes: EpisodeSubtitles[],
   scope: TranscribeScope,
   seasonNumber?: number,
-  episodeNumber?: number
+  episodeNumber?: number,
+  { redo = false }: { redo?: boolean } = {}
 ): EpisodeSubtitles[] =>
   episodes.filter((episode) => {
-    if (episode.tracks.some((track) => track.ai)) {
+    if (!redo && episode.tracks.some((track) => track.ai)) {
       return false;
     }
     switch (scope) {
@@ -774,14 +778,30 @@ const episodeTask = (
   };
 };
 
-/** Queues a scope's episodes one at a time; returns how many. */
-export const queueSeriesTranscription = async (
+/**
+ * Queues episodes' transcriptions, requested (not because a search found
+ * nothing), in the order given; returns how many were added.
+ */
+export const queueEpisodesTranscription = (
   owner: string,
+  seriesId: number,
+  episodes: BazarrEpisode[]
+): number =>
+  transcriber.enqueue(
+    episodes.map((episode) => episodeTask(owner, seriesId, episode))
+  );
+
+/**
+ * Bazarr's episodes in a transcription scope, in order. With `redo`,
+ * episodes transcribed before count too.
+ */
+export const transcriptionScope = async (
   seriesId: number,
   scope: TranscribeScope,
   seasonNumber?: number,
-  episodeNumber?: number
-): Promise<number> => {
+  episodeNumber?: number,
+  options: { redo?: boolean } = {}
+): Promise<BazarrEpisode[]> => {
   const [subtitles, episodes] = await Promise.all([
     seriesSubtitles(seriesId),
     bazarr().getEpisodes(seriesId),
@@ -789,19 +809,43 @@ export const queueSeriesTranscription = async (
   const byNumber = new Map(
     episodes.map((e) => [`${e.season}x${e.episode}`, e])
   );
-  const tasks = episodesToTranscribe(
+  return episodesToTranscribe(
     subtitles?.episodes ?? [],
     scope,
     seasonNumber,
-    episodeNumber
-  ).flatMap((episode): TranscriptionTask[] => {
+    episodeNumber,
+    options
+  ).flatMap((episode): BazarrEpisode[] => {
     const found = byNumber.get(
       `${episode.seasonNumber}x${episode.episodeNumber}`
     );
-    return found ? [episodeTask(owner, seriesId, found)] : [];
+    return found ? [found] : [];
   });
-  return transcriber.enqueue(tasks);
 };
+
+/**
+ * Queues a scope's episodes one at a time; returns how many. With `redo`,
+ * episodes transcribed before are transcribed again.
+ */
+export const queueSeriesTranscription = async (
+  owner: string,
+  seriesId: number,
+  scope: TranscribeScope,
+  seasonNumber?: number,
+  episodeNumber?: number,
+  options: { redo?: boolean } = {}
+): Promise<number> =>
+  queueEpisodesTranscription(
+    owner,
+    seriesId,
+    await transcriptionScope(
+      seriesId,
+      scope,
+      seasonNumber,
+      episodeNumber,
+      options
+    )
+  );
 
 // ---- When a search finds nothing -------------------------------------------
 

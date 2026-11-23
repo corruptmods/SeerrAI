@@ -43,6 +43,8 @@ import {
   titleMatches,
 } from '@server/lib/agent/tools';
 import { ANTHROPIC_URL } from '@server/lib/ai/providers';
+import type { FixRequest, FixResult } from '@server/lib/autofix';
+import autofix from '@server/lib/autofix';
 import type {
   ArrCustomFormat,
   ArrExtras,
@@ -5482,5 +5484,138 @@ describe('the admin agent where Backfill doesn’t search Prowlarr', () => {
     assert.match(prowlarrUnavailable() ?? '', /Prowlarr is not set up/);
     const releases = TOOLS.find((t) => t.name === 'search_releases')!;
     assert.equal(offered(releases, run), true);
+  });
+});
+
+describe('subtitles through the admin agent', () => {
+  let asked: FixRequest[] = [];
+  let answer: FixResult;
+  let staticGarden: Media;
+  let bazarrBefore: ReturnType<typeof getSettings>['bazarr'];
+
+  const stateWith = async (trigger: 'ask' | 'report') =>
+    ({
+      run: { trigger, steps: [], actions: [], arrId: null },
+      user: await admin(),
+      releases: new Map(),
+      bind: () => undefined,
+      act: () => assert.fail('nothing to record as a change'),
+      propose: () => assert.fail('nothing to approve'),
+    }) as unknown as AgentState;
+
+  beforeEach(async () => {
+    asked = [];
+    answer = {
+      kind: 'subtitles',
+      ok: true,
+      message:
+        'Replacing the English subtitles of 24 episodes of season 2, one at a time.',
+    };
+    bazarrBefore = getSettings().bazarr;
+    getSettings().bazarr = {
+      hostname: 'bazarr',
+      port: 6767,
+      useSsl: false,
+      urlBase: '',
+      apiKey: 'b',
+    };
+    staticGarden = await getRepository(Media).save(
+      new Media({
+        tmdbId: 93001,
+        tvdbId: 93002,
+        mediaType: MediaType.TV,
+        status: MediaStatus.AVAILABLE,
+        serviceId: 0,
+        externalServiceId: SERIES_ID,
+      })
+    );
+    mock.method(autofix, 'run', async (req: FixRequest) => {
+      asked.push(req);
+      return answer;
+    });
+  });
+
+  afterEach(() => {
+    getSettings().bazarr = bazarrBefore;
+  });
+
+  it('replaces the subtitles of a season through Auto-fix, as the admin, with nothing to approve', async () => {
+    const result = await runTool(await stateWith('ask'), 'fix_subtitles', {
+      title: `series:0:${SERIES_ID}`,
+      season: 2,
+      language: 'EN',
+      replace: true,
+    });
+    assert.equal(result.isError, false, result.text);
+    assert.match(result.text, /^Replacing the English subtitles of 24/);
+    assert.equal(asked.length, 1);
+    const [req] = asked;
+    assert.equal(req.kind, 'subtitles');
+    assert.equal(req.media.id, staticGarden.id);
+    assert.equal(req.seasonNumber, 2);
+    assert.equal(req.episodeNumber, undefined);
+    assert.equal(req.language, 'en');
+    assert.equal(req.all, true);
+    assert.equal(req.user.id, (await admin()).id);
+  });
+
+  it('transcribes a whole series again when asked to redo it, and fills only what is missing otherwise', async () => {
+    const state = await stateWith('ask');
+    await runTool(state, 'fix_subtitles', {
+      title: `series:0:${SERIES_ID}`,
+      transcribe: true,
+      redo: true,
+    });
+    await runTool(state, 'fix_subtitles', { title: `series:0:${SERIES_ID}` });
+    assert.deepEqual(
+      asked.map((req) => ({
+        kind: req.kind,
+        season: req.seasonNumber,
+        all: req.all,
+        redo: req.redo,
+      })),
+      [
+        { kind: 'transcribe', season: undefined, all: true, redo: true },
+        {
+          kind: 'subtitles',
+          season: undefined,
+          all: false,
+          redo: undefined,
+        },
+      ]
+    );
+  });
+
+  it('says why when Auto-fix could not do it', async () => {
+    answer = {
+      kind: 'subtitles',
+      ok: false,
+      message: 'Subtitles for this were looked for in the last hour.',
+    };
+    const result = await runTool(await stateWith('ask'), 'fix_subtitles', {
+      title: `series:0:${SERIES_ID}`,
+      season: 1,
+      episode: 2,
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.text, /looked for in the last hour/);
+  });
+
+  it('is only for an admin in the conversation, and only with Bazarr', async () => {
+    const tool = TOOLS.find((t) => t.name === 'fix_subtitles')!;
+    const alone = await stateWith('report');
+    assert.equal(offered(tool, alone.run), false);
+    const refused = await runTool(alone, 'fix_subtitles', {
+      title: `series:0:${SERIES_ID}`,
+    });
+    assert.match(refused.text, /There is no tool called fix_subtitles/);
+
+    getSettings().bazarr = { ...getSettings().bazarr, hostname: '' };
+    const none = await runTool(await stateWith('ask'), 'fix_subtitles', {
+      title: `series:0:${SERIES_ID}`,
+    });
+    assert.equal(none.isError, true);
+    assert.match(none.text, /Bazarr is not set up/);
+    assert.deepEqual(asked, []);
   });
 });

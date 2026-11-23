@@ -21,6 +21,7 @@ export const TOOL_WORDS = [
   'search_upgrade',
   'propose_change',
   'replace_season',
+  'fix_subtitles',
 ] as const;
 
 export type ToolWords = (typeof TOOL_WORDS)[number] | 'other';

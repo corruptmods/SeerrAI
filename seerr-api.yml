@@ -11482,6 +11482,12 @@ paths:
                 language:
                   type: string
                   pattern: '^[a-z]{2}$'
+                all:
+                  type: boolean
+                  description: Subtitles or transcription for everything in scope, even where subtitles exist (a whole series or season has each episode's subtitles replaced).
+                redo:
+                  type: boolean
+                  description: Transcription only; episodes transcribed before are transcribed again.
                 message:
                   type: string
                   maxLength: 500

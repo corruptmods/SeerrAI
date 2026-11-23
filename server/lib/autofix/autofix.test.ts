@@ -1,3 +1,4 @@
+import type { BazarrEpisode } from '@server/api/bazarr';
 import BazarrAPI from '@server/api/bazarr';
 import { MusicBrainz } from '@server/api/musicbrainz';
 import LidarrAPI from '@server/api/servarr/lidarr';
@@ -2556,5 +2557,386 @@ describe('Auto-fix: music from AI Search', () => {
     );
     assert.deepEqual(asked, []);
     assert.deepEqual(deleted, []);
+  });
+});
+
+describe('Auto-fix: subtitles for all of a series or season', () => {
+  /** Bazarr's episodes of Glasswing. */
+  let bazarrEpisodes: BazarrEpisode[] = [];
+  /** Episodes whose search offers only Whisper. */
+  let onlyWhisper = new Set<number>();
+  /** Episodes whose current subtitle Whisper made. */
+  let transcribed = new Set<number>();
+  /** Episode downloads, as "id:subtitle". */
+  let episodeDownloads: string[] = [];
+  /** Transcriptions queued, as "SxE". */
+  let queued: string[] = [];
+  let glasswing: Media;
+
+  /** An episode with English subtitles from OpenSubtitles, or none. */
+  const bazarrEpisode = (
+    id: number,
+    season: number,
+    number: number,
+    subtitles = true
+  ): BazarrEpisode => ({
+    sonarrSeriesId: 77,
+    sonarrEpisodeId: id,
+    season,
+    episode: number,
+    title: `Episode ${number}`,
+    subtitles: subtitles
+      ? [
+          {
+            name: 'English',
+            code2: 'en',
+            path: `/tv/glasswing/${id}.en.srt`,
+            forced: false,
+            hi: false,
+          },
+        ]
+      : [],
+    missing_subtitles: subtitles
+      ? []
+      : [{ name: 'English', code2: 'en', forced: false, hi: false }],
+  });
+
+  const result = (provider: string, subtitle: string, score: number) => ({
+    provider,
+    subtitle,
+    language: 'en',
+    score,
+    hearing_impaired: 'False',
+    forced: 'False',
+    original_format: 'False',
+    release_info: [],
+    matches: [],
+    dont_matches: [],
+  });
+
+  beforeEach(async () => {
+    onlyWhisper = new Set();
+    transcribed = new Set();
+    episodeDownloads = [];
+    queued = [];
+    glasswing = await getRepository(Media).save(
+      new Media({
+        tmdbId: 91001,
+        tvdbId: 91002,
+        mediaType: MediaType.TV,
+        status: MediaStatus.AVAILABLE,
+        serviceId: 0,
+        externalServiceId: 77,
+      })
+    );
+    mock.method(BazarrAPI.prototype, 'getSeries', async () => ({
+      sonarrSeriesId: 77,
+      title: 'Glasswing',
+      profileId: 1,
+    }));
+    mock.method(BazarrAPI.prototype, 'getLanguageProfiles', async () => []);
+    mock.method(BazarrAPI.prototype, 'getEpisodes', async () => bazarrEpisodes);
+    mock.method(
+      BazarrAPI.prototype,
+      'getEpisodeHistory',
+      async (id: number) => [
+        {
+          action: 1,
+          provider: transcribed.has(id) ? 'whisperai' : 'opensubtitles',
+          subtitles_path: `/tv/glasswing/${id}.en.srt`,
+        },
+      ]
+    );
+    mock.method(BazarrAPI.prototype, 'searchEpisode', async (id: number) =>
+      onlyWhisper.has(id)
+        ? [result('whisperai', `w-${id}`, 50)]
+        : [
+            result('opensubtitles', `os-${id}`, 97),
+            result('subdl', `subdl-${id}`, 90),
+            result('whisperai', `w-${id}`, 50),
+          ]
+    );
+    mock.method(
+      BazarrAPI.prototype,
+      'downloadEpisode',
+      async (_series: number, id: number, choice: { subtitle: string }) => {
+        episodeDownloads.push(`${id}:${choice.subtitle}`);
+        return 'finished';
+      }
+    );
+    // Transcriptions are only queued here, never run.
+    mock.method(
+      transcriber,
+      'enqueue',
+      (tasks: { seasonNumber?: number; episodeNumber?: number }[]) => {
+        queued.push(
+          ...tasks.map((t) => `${t.seasonNumber}x${t.episodeNumber}`)
+        );
+        return tasks.length;
+      }
+    );
+  });
+
+  it('replaces the subtitles of a whole season one episode at a time, those there included', async () => {
+    bazarrEpisodes = [
+      bazarrEpisode(4101, 1, 1),
+      bazarrEpisode(4201, 2, 1),
+      bazarrEpisode(4202, 2, 2),
+      bazarrEpisode(4203, 2, 3),
+      bazarrEpisode(4204, 2, 4),
+    ];
+    onlyWhisper = new Set([4203]);
+    // S02E04 has no file in Sonarr.
+    episodes = [
+      episode(1, { id: 101 }),
+      ...[1, 2, 3, 4].map((n) =>
+        episode(n, { id: 200 + n, seasonNumber: 2, hasFile: n !== 4 })
+      ),
+    ];
+    const asked = {
+      kind: 'subtitles' as const,
+      media: glasswing,
+      seasonNumber: 2,
+      language: 'en',
+      all: true,
+      user: member,
+    };
+    const first = await autofix.run(asked);
+    assert.equal(first.ok, true, first.message);
+    assert.match(
+      first.message,
+      /^Replacing the English subtitles of 3 episodes of season 2, one at a time\./
+    );
+    await autofix.idle();
+    // Each episode's subtitles from another provider than the last one.
+    assert.deepEqual(episodeDownloads, ['4201:subdl-4201', '4202:subdl-4202']);
+    // Nothing from the providers: transcribed.
+    assert.deepEqual(queued, ['2x3']);
+
+    const again = await autofix.run(asked);
+    assert.equal(again.ok, false);
+    assert.match(again.message, /already set to be replaced today/);
+    await autofix.idle();
+    assert.equal(episodeDownloads.length, 2, 'not started twice');
+  });
+
+  it('counts one request once against the daily limit', async () => {
+    bazarrEpisodes = Array.from({ length: 5 }, (_, i) =>
+      bazarrEpisode(4700 + i, 1, i + 1)
+    );
+    episodes = Array.from({ length: 5 }, (_, i) => episode(i + 1));
+    // 29 fixes used: one request for five episodes is the 30th.
+    await getRepository(AutoFixMark).save({
+      key: `use:fix:${member.id}:${new Date().toISOString().slice(0, 10)}`,
+      count: 29,
+      at: new Date(),
+    });
+    autofix.reset();
+    const result = await autofix.run({
+      kind: 'subtitles',
+      media: glasswing,
+      all: true,
+      user: member,
+    });
+    assert.equal(result.ok, true, result.message);
+    await autofix.idle();
+    assert.equal(episodeDownloads.length, 5);
+    const over = await autofix.run({
+      kind: 'transcribe',
+      media: glasswing,
+      all: true,
+      user: member,
+    });
+    assert.match(over.message, /as many fixes today as allowed/);
+  });
+
+  it('caps how many episodes one request covers, and says so', async () => {
+    bazarrEpisodes = Array.from({ length: 64 }, (_, i) =>
+      bazarrEpisode(5000 + i, 1, i + 1)
+    );
+    episodes = Array.from({ length: 64 }, (_, i) => episode(i + 1));
+    const result = await autofix.run({
+      kind: 'subtitles',
+      media: glasswing,
+      all: true,
+      user: admin,
+    });
+    assert.match(result.message, /of 60 episodes of the series/);
+    assert.match(result.message, /the other 4 are left out/);
+    await autofix.idle();
+    assert.equal(episodeDownloads.length, 60);
+  });
+
+  it('still only searches for what is missing when not asked for all of it', async () => {
+    bazarrEpisodes = [bazarrEpisode(4301, 1, 1)];
+    let searchedMissing = 0;
+    mock.method(BazarrAPI.prototype, 'searchMissingSeries', async () => {
+      searchedMissing++;
+      return 'finished';
+    });
+    mock.method(BazarrAPI.prototype, 'getProviders', async () => []);
+    const result = await autofix.run({
+      kind: 'subtitles',
+      media: glasswing,
+      user: admin,
+    });
+    assert.match(result.message, /every subtitle this series is missing/);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(searchedMissing, 1);
+    assert.deepEqual(episodeDownloads, []);
+  });
+
+  it('transcribes a whole series with subtitles or without, and redoes transcriptions only when asked', async () => {
+    bazarrEpisodes = [
+      bazarrEpisode(4401, 0, 1, false),
+      bazarrEpisode(4411, 1, 1),
+      bazarrEpisode(4412, 1, 2, false),
+      bazarrEpisode(4413, 1, 3),
+    ];
+    transcribed = new Set([4413]);
+
+    // As before: only what is missing subtitles.
+    const missing = await autofix.run({
+      kind: 'transcribe',
+      media: glasswing,
+      user: admin,
+    });
+    assert.equal(missing.ok, true, missing.message);
+    assert.deepEqual(queued, ['0x1', '1x2']);
+
+    queued = [];
+    const all = await autofix.run({
+      kind: 'transcribe',
+      media: glasswing,
+      all: true,
+      user: admin,
+    });
+    assert.match(all.message, /Transcribing 2 episodes with Whisper/);
+    assert.deepEqual(queued, ['1x1', '1x2'], 'specials and Whisper’s own left');
+
+    queued = [];
+    const redo = await autofix.run({
+      kind: 'transcribe',
+      media: glasswing,
+      redo: true,
+      user: admin,
+    });
+    assert.equal(redo.ok, true, redo.message);
+    assert.deepEqual(queued, ['1x1', '1x2', '1x3']);
+  });
+
+  it('reads all of it, and a redo, from a report', () => {
+    assert.deepEqual(classify('replace the subtitles for season 2'), {
+      kind: 'subtitles',
+      language: undefined,
+      replace: true,
+      all: true,
+    });
+    assert.equal(
+      classify('fix the subtitles on all of Glasswing, even where they exist')
+        ?.all,
+      true
+    );
+    assert.equal(classify('missing subtitles on S02E03')?.all, undefined);
+    assert.equal(
+      classify('missing subtitles for all the episodes')?.all,
+      undefined
+    );
+    assert.equal(
+      classify('there are no subtitles at all for season 2')?.all,
+      undefined
+    );
+    assert.equal(
+      classify('the subtitles of season 2 went missing again')?.all,
+      undefined
+    );
+    assert.deepEqual(classify('transcribe season 2 again'), {
+      kind: 'transcribe',
+      language: undefined,
+      all: true,
+      redo: true,
+    });
+    assert.deepEqual(classify('please transcribe the subtitles with whisper'), {
+      kind: 'transcribe',
+      language: undefined,
+    });
+  });
+
+  it('fixes the subtitles for all of a series from AI Search without asking for a season', async () => {
+    bazarrEpisodes = [bazarrEpisode(4501, 1, 1), bazarrEpisode(4502, 2, 1)];
+    episodes = [
+      episode(1, { id: 101 }),
+      episode(1, { id: 201, seasonNumber: 2 }),
+    ];
+    Object.defineProperty(TheMovieDb.prototype, 'searchTvShows', {
+      configurable: true,
+      set() {},
+      get: () => async () => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [
+          {
+            id: 91001,
+            name: 'Glasswing',
+            first_air_date: '2021-03-01',
+            media_type: 'tv',
+            genre_ids: [],
+            overview: '',
+            popularity: 1,
+            vote_average: 8,
+            vote_count: 1,
+            origin_country: ['GB'],
+            original_language: 'en',
+            original_name: 'Glasswing',
+          },
+        ],
+      }),
+    });
+    // The model takes the episode count for an episode.
+    modelAnswer = JSON.stringify({
+      r: 'Replacing the subtitles of Glasswing.',
+      titles: [{ t: 'Glasswing', y: 2021, k: 'tv' }],
+      do: 'fix',
+      fx: 'subtitles',
+      ep: 2,
+      all: true,
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'fix the subtitles for all of Glasswing',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(
+      res.body.reply,
+      /^Replacing the subtitles of 2 episodes of the series, one at a time\./
+    );
+    assert.equal(res.body.fix.ok, true);
+    await autofix.idle();
+    assert.deepEqual(episodeDownloads, ['4501:subdl-4501', '4502:subdl-4502']);
+  });
+
+  it('offers it for confirmation when the message did not ask, and keeps all of it', async () => {
+    bazarrEpisodes = [bazarrEpisode(4601, 1, 1)];
+    episodes = [episode(1, { id: 101 })];
+    modelAnswer = JSON.stringify({
+      r: 'Transcribing Quiet Ravens.',
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'transcribe',
+      all: true,
+    });
+    const asked = await call('POST', '/api/v1/ai/chat', {
+      message: 'yes please, do that',
+    });
+    assert.equal(asked.status, 200, JSON.stringify(asked.body));
+    assert.match(
+      asked.body.reply,
+      /^This makes subtitles from the audio of all of .*Quiet Ravens.*, even where it has subtitles\. Confirm to go ahead\.$/
+    );
+    assert.equal(asked.body.confirm.all, true);
+    const done = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
+    assert.equal(done.status, 200, JSON.stringify(done.body));
+    assert.match(done.body.reply, /Transcribing 1 episode with Whisper/);
+    assert.deepEqual(queued, ['1x1']);
   });
 });

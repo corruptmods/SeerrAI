@@ -173,6 +173,12 @@ const chatReply = z
       .regex(/^[a-z]{2}$/i)
       .nullish()
       .catch(null),
+    /**
+     * Subtitles or transcription for everything asked about, even where
+     * subtitles exist; redo: transcribe again what was transcribed before.
+     */
+    all: z.boolean().nullish().catch(null),
+    redo: z.boolean().nullish().catch(null),
     /** The list's name, for "list". */
     n: text(80).nullish().catch(null),
     /** Films, series, or both, for a set. */
@@ -184,7 +190,22 @@ const chatReply = z
   })
   .passthrough()
   .transform(
-    ({ r, titles, music, do: action, n, m, g, fx, se, ep, lang, ...rest }) => ({
+    ({
+      r,
+      titles,
+      music,
+      do: action,
+      n,
+      m,
+      g,
+      fx,
+      se,
+      ep,
+      lang,
+      all,
+      redo,
+      ...rest
+    }) => ({
       r,
       titles,
       music,
@@ -196,6 +217,8 @@ const chatReply = z
       se,
       ep,
       lang: lang?.toLowerCase(),
+      all: all ?? undefined,
+      redo: redo ?? undefined,
       /** A whole set of titles to read from TMDB instead of naming them. */
       src: readSet(rest),
     })
@@ -416,7 +439,7 @@ export const chat = async (
       'If they want titles put on a list (a new one to make, or one of theirs they name), add "do":"list" and the list\'s name in "n" (for a new list, a short name that fits). If they want titles requested or downloaded, add "do":"request". When that is about titles already offered ("those", "all of them"), leave "titles" empty; if they pick only some, list just those. You only set this up: they confirm it themselves. ' +
       'For a whole set, do not list titles: name the set and every title is read from TMDB. Use "set": "series" for a film series (Harry Potter, John Wick), "universe" for a shared universe or theme (Marvel Cinematic Universe), "studio" for a studio\'s films (Pixar, A24), "director" or "actor" for someone\'s films; "of": the name to search for; "m": "movie", "tv" or "any". For example, "request all of Nolan\'s films" is {"r":"Christopher Nolan\'s films as director.","titles":[],"do":"request","set":"director","of":"Christopher Nolan","m":"movie"}. ' +
       (admin ? ADMIN_NOTE : '') +
-      'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality), "wrongEpisode" (an episode is the wrong one, or episodes are mixed up) or "replaceSeason" (a whole season is bad, messed up or wrong, or they want all of it replaced or downloaded again); the one title in "titles"; "se" and "ep" as numbers for the season and episode when given, also when said earlier in the conversation; "lang" as a two-letter code for a subtitle language. "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
+      'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality), "wrongEpisode" (an episode is the wrong one, or episodes are mixed up) or "replaceSeason" (a whole season is bad, messed up or wrong, or they want all of it replaced or downloaded again); the one title in "titles"; "se" and "ep" as numbers for the season and episode when given, also when said earlier in the conversation; "lang" as a two-letter code for a subtitle language; for "subtitles" or "transcribe", "all":true when they want it done for everything they name even where subtitles already exist (fix, replace or redo the subtitles of a whole series, a season or a movie; transcribe it regardless), and "redo":true when they ask for a transcription made again. A whole series ("all of Glasswing") has no "se" or "ep". "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
       `Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of", "m" and "g"${
         music ? ' and "music"' : ''
       } when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.`,
@@ -468,6 +491,8 @@ export const chat = async (
         seasonNumber: answer.se ?? undefined,
         episodeNumber: answer.ep ?? undefined,
         language: answer.lang,
+        all: answer.all,
+        redo: answer.redo,
       },
       before ? `${before.ask}\n${before.reply ?? ''}` : undefined
     );

@@ -185,6 +185,8 @@ const fixBody = z.object({
     .string()
     .regex(/^[a-z]{2}$/)
     .optional(),
+  all: z.boolean().optional(),
+  redo: z.boolean().optional(),
   message: z.string().max(500).default(''),
 });
 

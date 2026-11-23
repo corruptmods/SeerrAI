@@ -28,6 +28,7 @@ import {
   searchIndexers,
   searchReleases,
 } from '@server/lib/agent/tools/search';
+import { fixSubtitles } from '@server/lib/agent/tools/subtitles';
 import { findTitle, nameOf, titleStatus } from '@server/lib/agent/tools/titles';
 import { z } from 'zod';
 
@@ -67,7 +68,7 @@ export { lookups } from '@server/lib/agent/tools/titles';
  * list a release's files, and download exactly the chosen files mapped to
  * episodes (Backfill matches an album's files to tracks). Backfill waits for
  * disk space, fetches only those files and has the *arr import each as
- * mapped.
+ * mapped. Subtitles are fixed or transcribed through Auto-fix and Bazarr.
  *
  * Releases and titles are named by short references ("r3",
  * "series:1:1283"); server links, keys and paths never reach the model.
@@ -88,6 +89,7 @@ export const TOOLS: AgentTool[] = [
   searchUpgrade,
   replaceSeason,
   proposeChange,
+  fixSubtitles,
 ];
 
 /**

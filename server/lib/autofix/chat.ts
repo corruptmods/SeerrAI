@@ -41,6 +41,10 @@ interface ChatFix {
   seasonNumber?: number;
   episodeNumber?: number;
   language?: string;
+  /** Subtitles or transcription for all of it, even where they exist. */
+  all?: boolean;
+  /** Transcription made again where it was made before. */
+  redo?: boolean;
 }
 
 const ISSUE_TYPE: Partial<Record<FixKind, IssueType>> = {
@@ -61,6 +65,10 @@ export interface FixToConfirm {
   seasonNumber?: number;
   episodeNumber?: number;
   language?: string;
+  /** Subtitles or transcription for all of it, even where they exist. */
+  all?: boolean;
+  /** Transcription made again where it was made before. */
+  redo?: boolean;
   /** The user's text, used as the issue's first comment. */
   message: string;
 }
@@ -300,8 +308,35 @@ export const readFix = (
         (said.season === undefined || said.season === fix.seasonNumber
           ? fix.episodeNumber
           : undefined));
-  return { ...fix, kind, seasonNumber, episodeNumber };
+  // Subtitles or a transcription for all of it: their words or the model's.
+  const words = classify(message);
+  const ownWords = words?.kind === kind ? words : undefined;
+  const all =
+    (kind === 'subtitles' || kind === 'transcribe') &&
+    !!(fix.all || fix.redo || ownWords?.all);
+  const redo = kind === 'transcribe' && !!(fix.redo || ownWords?.redo);
+  // The whole series: no season from earlier, and no episode the model
+  // read from a count ("all 10 episodes").
+  const wholeSeries =
+    all && said.season === undefined && WHOLE_SERIES.test(message);
+  return {
+    ...fix,
+    kind,
+    seasonNumber: wholeSeries ? undefined : seasonNumber,
+    episodeNumber:
+      all &&
+      said.episode === undefined &&
+      (wholeSeries || seasonNumber === undefined)
+        ? undefined
+        : episodeNumber,
+    ...(all && { all: true }),
+    ...(redo && { redo: true }),
+  };
 };
+
+/** All of a series, not one season of it. */
+const WHOLE_SERIES =
+  /\b(whole|entire|complete)\s+(series|show)\b|\b(all|every)\s+(of\s+)?(the\s+)?(seasons|series|show)\b|\bevery\s+(season|episode)\b|\ball\s+(of\s+)?(the\s+|its\s+)?episodes\b/i;
 
 /** A message asking for a title to be fixed, without saying how. */
 const FIX_WORDS = /\b(fix\w*|repair\w*|sort (it )?out|look (at|into))\b/i;
@@ -339,14 +374,30 @@ const askedInTheirWords = (
 };
 
 /** What a fix that replaces nothing does, offered for confirmation. */
-const offerText = (kind: FixKind, what: string) =>
+const offerText = (
+  kind: FixKind,
+  what: string,
+  how: { all?: boolean; redo?: boolean } = {}
+) =>
   `${
     kind === 'subtitles'
-      ? 'This gets subtitles for'
+      ? how.all
+        ? 'This replaces the subtitles of'
+        : 'This gets subtitles for'
       : kind === 'transcribe'
-        ? 'This makes subtitles from the audio of'
+        ? how.redo
+          ? 'This makes subtitles from the audio again for'
+          : 'This makes subtitles from the audio of'
         : 'This searches again for what is missing of'
-  } ${what}. Confirm to go ahead.`;
+  } ${what}${
+    how.all && !how.redo
+      ? kind === 'subtitles'
+        ? ', even where there are some'
+        : kind === 'transcribe'
+          ? ', even where it has subtitles'
+          : ''
+      : ''
+  }. Confirm to go ahead.`;
 
 const MUSIC_FIXES =
   'For music, I can search again for an album’s missing tracks or an artist’s missing albums. For anything else, ask an admin.';
@@ -479,7 +530,13 @@ export const fixFromChat = async (
     const name = 'title' in result ? result.title : result.name;
     if (!askedInTheirWords(fix.kind, [name, fix.title?.t], message, earlier)) {
       return {
-        reply: offerText(fix.kind, `${label(result)}${episode}`),
+        reply: offerText(
+          fix.kind,
+          `${
+            fix.all && mediaType === MediaType.TV && !episode ? 'all of ' : ''
+          }${label(result)}${episode}`,
+          fix
+        ),
         results,
         confirm: {
           kind: fix.kind,
@@ -489,6 +546,8 @@ export const fixFromChat = async (
           episodeNumber:
             mediaType === MediaType.TV ? fix.episodeNumber : undefined,
           language: fix.language,
+          ...(fix.all && { all: true }),
+          ...(fix.redo && { redo: true }),
           message,
         },
       };
@@ -499,6 +558,8 @@ export const fixFromChat = async (
       seasonNumber: fix.seasonNumber,
       episodeNumber: fix.episodeNumber,
       language: fix.language,
+      all: fix.all,
+      redo: fix.redo,
       user,
     });
     return {
@@ -588,6 +649,8 @@ export const confirmFix = async (
       seasonNumber: fix.seasonNumber,
       episodeNumber: fix.episodeNumber,
       language: fix.language,
+      all: fix.all,
+      redo: fix.redo,
       user,
     });
     return {

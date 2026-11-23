@@ -19,5 +19,6 @@ export const toolMessages: Record<ToolWords, MessageDescriptor> =
     search_upgrade: 'looked for a better release',
     propose_change: 'asked to make a change',
     replace_season: 'asked to replace a season',
+    fix_subtitles: 'fixed subtitles',
     other: 'did something else',
   });

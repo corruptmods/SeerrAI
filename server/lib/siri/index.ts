@@ -255,10 +255,14 @@ class SiriReports {
       : undefined;
     let fixKind = read?.kind;
     if (fixKind === 'replaceSeason' && !tv) fixKind = 'broken';
+    // Subtitles for all of a season: not just the episode playing.
+    const wholeSeason =
+      fixKind === 'replaceSeason' ||
+      (!!read?.all && tv && said.episode === undefined);
     const where = {
       title: at.title,
       season,
-      episode: fixKind === 'replaceSeason' ? undefined : episode,
+      episode: wholeSeason ? undefined : episode,
     };
 
     const open = await reportedToday(
@@ -306,11 +310,13 @@ class SiriReports {
           kind: fixKind,
           language: read.language,
           replace: read.replace,
+          all: read.all,
+          redo: read.redo,
         },
       });
     }
     return {
-      say: this.started(user, fixKind, where, read?.language),
+      say: this.started(user, fixKind, where, read?.language, read?.all),
       issueId: issue.id,
     };
   }
@@ -415,9 +421,20 @@ class SiriReports {
     user: User,
     kind: FixKind | undefined,
     where: { title: string; season?: number; episode?: number },
-    language?: string
+    language?: string,
+    all?: boolean
   ): string {
     const after = ' You’ll be told how it goes.';
+    if (all && where.season !== undefined && where.episode === undefined) {
+      if (kind === 'subtitles') {
+        return `Reported. The ${
+          language ? `${languageName(language)} ` : ''
+        }subtitles of season ${where.season} are being replaced, one episode at a time.${after}`;
+      }
+      if (kind === 'transcribe') {
+        return `Reported. Subtitles for season ${where.season} are being made from the audio, one episode at a time.${after}`;
+      }
+    }
     switch (kind) {
       case undefined:
         return autofix.enabledFor(user)

@@ -30,12 +30,17 @@ const reply = z.object({
     .nullish()
     .catch(null),
   wrongSubtitles: z.boolean().nullish().catch(null),
+  allOfIt: z.boolean().nullish().catch(null),
 });
 
 export interface ReadReport {
   kind: FixKind;
   language?: string;
   replace?: boolean;
+  /** Subtitles or transcription for all of it, even where they exist. */
+  all?: boolean;
+  /** Transcription made again where it was made before. */
+  redo?: boolean;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -51,7 +56,7 @@ const SYSTEM =
   'wrongEpisode: the file is a different episode or film than it should be. ' +
   'replaceSeason: a whole season is bad. ' +
   'unclear: anything else, or not a problem with the file. ' +
-  'Reply with JSON only: {"kind": one of those, "language": the two-letter code of a subtitle language they name, or null, "wrongSubtitles": true when the subtitles there are wrong rather than missing}.';
+  'Reply with JSON only: {"kind": one of those, "language": the two-letter code of a subtitle language they name, or null, "wrongSubtitles": true when the subtitles there are wrong rather than missing, "allOfIt": true when they want subtitles or a transcription for every episode, or even where subtitles exist}.';
 
 /**
  * The AI's fix kind for a report, when "Understand Reports" is on. Undefined
@@ -70,7 +75,7 @@ export const askAboutReport = async (
       user,
       system: SYSTEM,
       prompt,
-      maxTokens: 60,
+      maxTokens: 80,
       cache: { key: cacheKey(user.id, prompt), ms: DAY },
     });
     if (answer.kind === 'unclear') return undefined;
@@ -81,6 +86,8 @@ export const askAboutReport = async (
       kind,
       language: answer.language ?? undefined,
       replace: kind === 'subtitles' && answer.wrongSubtitles ? true : undefined,
+      ...((kind === 'subtitles' || kind === 'transcribe') &&
+        answer.allOfIt && { all: true }),
     };
   } catch (e) {
     logger.debug('Could not ask the AI model about a report', {

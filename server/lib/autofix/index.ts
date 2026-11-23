@@ -1,7 +1,7 @@
 import type {
+  BazarrEpisode,
   BazarrJobEnd,
   BazarrSearchResult,
-  BazarrSubtitle,
 } from '@server/api/bazarr';
 import { WHISPER_PROVIDER } from '@server/api/bazarr';
 import { IssueType } from '@server/constants/issue';
@@ -45,11 +45,14 @@ import {
   choiceOf,
   findEpisode,
   forgetEpisodeHistory,
+  queueEpisodesTranscription,
   queueMovieTranscription,
   queueSeriesTranscription,
   searchMissingSeriesOrTranscribe,
   subtitlesReady,
+  transcriptionScope,
 } from '@server/lib/subtitles';
+import transcriber from '@server/lib/transcriber';
 import logger from '@server/logger';
 import { LessThan } from 'typeorm';
 
@@ -112,6 +115,14 @@ export interface FixRequest {
   language?: string;
   /** Subtitles present are wrong, not just missing. */
   replace?: boolean;
+  /**
+   * Subtitles or transcription for everything in scope, even where subtitles
+   * exist: a whole series or season has each episode's subtitles replaced
+   * (or transcribed) rather than only what is missing.
+   */
+  all?: boolean;
+  /** Transcription: episodes transcribed before are transcribed again. */
+  redo?: boolean;
   /** Requester: their limits and visibility apply. */
   user: User;
   /** Issue to reply on. */
@@ -278,6 +289,17 @@ const SUBTITLE_WRONG =
 const BROKEN =
   /\b(broken|corrupt\w*|won'?t (play|load|start)|doesn'?t (play|load|work)|can'?t (play|watch)|no (sound|audio|picture|video)|black screen|green screen|stutter\w*|freez\w*|glitch\w*|pixelat\w*|artifact\w*|cuts? (out|off)|audio (is )?(out of sync|missing|wrong)|bad (quality|file|copy|encode))\b/i;
 
+/** Asking for subtitles again, or a transcription made again. */
+const REDO = /\b(re-?do(ne|ing)?|again|re-?transcrib\w*|from scratch)\b/i;
+/** Even where subtitles are there already. */
+const EVEN_IF =
+  /\beven (if|where|when|though|for)\b|\b(existing|regardless|already (there|have|has))\b/i;
+/** All of the title or season. */
+const ALL_OF = /(?<!\bat\s)\ball\b|\b(every|whole|entire|complete)\b/i;
+
+/** What a report asks for. */
+type Reading = ReadReport;
+
 /**
  * The fix a report asks for, from its text and issue type. Subtitle issues
  * are always subtitles; video/audio issues are the file unless they name the
@@ -286,23 +308,41 @@ const BROKEN =
 export const classify = (
   text: string,
   issueType?: IssueType
-): { kind: FixKind; language?: string; replace?: boolean } | undefined => {
+): Reading | undefined => {
   const language = languageIn(text);
-  const subtitles = (): {
-    kind: FixKind;
-    language?: string;
-    replace?: boolean;
-  } =>
-    TRANSCRIBE.test(text)
-      ? { kind: 'transcribe', language }
+  const subtitles = (): Reading => {
+    const transcribe = TRANSCRIBE.test(text);
+    // "Again" asks for a transcription made again; for subtitles it may
+    // only mean they went missing again.
+    const redo = transcribe ? REDO.test(text) : /\bre-?do\w*\b/i.test(text);
+    // Everything in scope, existing subtitles too: "all of it", "redo",
+    // "even if they exist", or replacing a whole season or series.
+    const all =
+      EVEN_IF.test(text) ||
+      (transcribe && redo) ||
+      (seasonEpisodeIn(text).episode === undefined &&
+        !/\bmissing\b/i.test(text) &&
+        (redo || REPLACE_WORDS.test(text) || ALL_OF.test(text)));
+    return transcribe
+      ? {
+          kind: 'transcribe',
+          language,
+          ...(all && { all: true }),
+          ...(redo && { redo: true }),
+        }
       : {
           kind: 'subtitles',
           language,
           replace:
-            issueType === IssueType.SUBTITLES || SUBTITLE_WRONG.test(text)
+            issueType === IssueType.SUBTITLES ||
+            SUBTITLE_WRONG.test(text) ||
+            REPLACE_WORDS.test(text) ||
+            redo
               ? true
               : undefined,
+          ...(all && { all: true }),
         };
+  };
   if (issueType === IssueType.SUBTITLES) return subtitles();
   if (wholeSeason(text) && !SUBTITLE.test(text)) {
     return { kind: 'replaceSeason' };
@@ -414,6 +454,91 @@ const needsSeason = (req: FixRequest) =>
   req.media.mediaType === MediaType.TV &&
   req.episodeNumber !== undefined &&
   req.seasonNumber === undefined;
+
+/**
+ * Subtitles or transcription asked for all of a series: an episode number
+ * with no season (often a count, "all 10 episodes") is dropped rather than
+ * asked about.
+ */
+const wholeScope = (req: FixRequest): FixRequest =>
+  (req.all || req.redo) && needsSeason(req)
+    ? { ...req, episodeNumber: undefined }
+    : req;
+
+/** Most episodes one subtitle or transcription request covers. */
+const MAX_SUBTITLE_EPISODES = 60;
+
+const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' });
+const languageName = (code: string) => {
+  try {
+    return LANGUAGE_NAMES.of(code) ?? code;
+  } catch {
+    return code;
+  }
+};
+
+const isTrue = (v: unknown) => String(v).toLowerCase() === 'true';
+
+/**
+ * Languages to get: the one asked for; when replacing, those present;
+ * otherwise those missing, those present, or English.
+ */
+const wantedLanguages = (
+  item: Pick<BazarrEpisode, 'subtitles' | 'missing_subtitles'>,
+  language: string | undefined,
+  replace: boolean
+): string[] => {
+  const present = [
+    ...new Set(
+      (item.subtitles ?? []).filter((s) => !s.forced).map((s) => s.code2)
+    ),
+  ];
+  const missing = (item.missing_subtitles ?? []).map((m) => m.code2);
+  return language
+    ? [language]
+    : replace && present.length
+      ? present
+      : missing.length
+        ? missing
+        : present.length
+          ? present
+          : ['en'];
+};
+
+/**
+ * The best provider result in the wanted languages: when replacing, from
+ * another provider than the last one first; then not SDH; then by score.
+ */
+const bestSubtitle = (
+  results: BazarrSearchResult[],
+  wanted: string[],
+  replace: boolean,
+  lastProvider: string | null | undefined
+): BazarrSearchResult | undefined =>
+  results
+    .filter(
+      (r) =>
+        r.provider !== WHISPER_PROVIDER &&
+        !isTrue(r.forced) &&
+        wanted.some((code) => r.language?.toLowerCase().startsWith(code))
+    )
+    .sort(
+      (a, b) =>
+        Number(replace && a.provider === lastProvider) -
+          Number(replace && b.provider === lastProvider) ||
+        Number(isTrue(a.hearing_impaired)) -
+          Number(isTrue(b.hearing_impaired)) ||
+        Number(b.score) - Number(a.score)
+    )[0];
+
+/** "1 episode", "24 episodes". */
+const episodeCount = (n: number) => `${n} episode${n === 1 ? '' : 's'}`;
+
+/** Tally of a whole-title subtitle replacement. */
+type Replaced = Record<
+  'downloaded' | 'transcribing' | 'none' | 'failed',
+  number
+>;
 
 /** Swapping one file for another release via Sonarr or Radarr. */
 interface Swap {
@@ -574,7 +699,7 @@ interface IssueFixOptions {
    */
   actor?: User;
   /** AI Search's reading, used instead of re-reading the report. */
-  asked?: Pick<FixRequest, 'kind' | 'language' | 'replace'>;
+  asked?: Pick<FixRequest, 'kind' | 'language' | 'replace' | 'all' | 'redo'>;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -712,7 +837,7 @@ class AutoFix {
   }
 
   /** Running issue fixes. */
-  private pending = new Set<Promise<FixResult | undefined>>();
+  private pending = new Set<Promise<unknown>>();
 
   public enabledFor(user?: User | null): boolean {
     return featureEnabled('autoFix', user);
@@ -800,14 +925,202 @@ class AutoFix {
     // Bazarr follows one Radarr and one Sonarr; other servers' ids don't apply.
     const arrId = bazarrIdOf(req.media);
     if (!arrId) return NOT_IN_BAZARR;
+    req = wholeScope(req);
     if (needsSeason(req)) return ASK_SEASON;
     const isMovie = req.media.mediaType === MediaType.MOVIE;
+    const key = `subs:${req.media.id}:${req.seasonNumber ?? ''}:${req.episodeNumber ?? ''}:${req.language ?? ''}`;
+    if (!isMovie && req.episodeNumber === undefined && req.all) {
+      // Every episode's subtitles, one at a time: held for a day.
+      const whole = req;
+      return this.holding(
+        `${key}:all`,
+        DAY,
+        'The subtitles of these episodes were already set to be replaced today.',
+        () => this.replaceAllSubtitles(whole, arrId)
+      );
+    }
+    const asked = req.all ? { ...req, replace: true } : req;
     return this.holding(
-      `subs:${req.media.id}:${req.seasonNumber ?? ''}:${req.episodeNumber ?? ''}:${req.language ?? ''}`,
+      key,
       HOUR,
       'Subtitles for this were looked for in the last hour.',
-      () => this.findSubtitles(req, arrId, isMovie)
+      () => this.findSubtitles(asked, arrId, isMovie)
     );
+  }
+
+  /** Bulk subtitle work, one episode at a time across requests. */
+  private subtitleWork: Promise<void> = Promise.resolve();
+
+  /**
+   * Episodes of a series with a file in Sonarr, as "SxE"; undefined when
+   * Sonarr can't say.
+   */
+  private async withFiles(media: Media): Promise<Set<string> | undefined> {
+    const sonarr = sonarrFor(media);
+    if (!sonarr) return undefined;
+    try {
+      return new Set(
+        (await sonarr.api.episodes(sonarr.id))
+          .filter((e) => e.hasFile)
+          .map((e) => `${e.seasonNumber}x${e.episodeNumber}`)
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Replaces the subtitles of every episode in scope (a season, or the whole
+   * series but its specials), even where they exist: each is searched for
+   * with the providers and the best result downloaded, from another
+   * provider than last time first. One with nothing found is transcribed
+   * when Bazarr has Whisper. Runs in the background, one episode at a time.
+   */
+  private async replaceAllSubtitles(
+    req: FixRequest,
+    arrId: number
+  ): Promise<Outcome> {
+    const [all, files] = await Promise.all([
+      bazarr().getEpisodes(arrId),
+      this.withFiles(req.media),
+    ]);
+    const where =
+      req.seasonNumber === undefined
+        ? 'the series'
+        : `season ${req.seasonNumber}`;
+    const inScope = all
+      .filter(
+        (e) =>
+          (req.seasonNumber === undefined
+            ? e.season > 0
+            : e.season === req.seasonNumber) &&
+          (!files || files.has(`${e.season}x${e.episode}`))
+      )
+      .sort((a, b) => a.season - b.season || a.episode - b.episode);
+    if (!inScope.length) {
+      return {
+        ok: false,
+        message: `No episode of ${where} has a file, so there are no subtitles to replace.`,
+      };
+    }
+    const chosen = inScope.slice(0, MAX_SUBTITLE_EPISODES);
+    const titleKey = `tv:${req.media.tmdbId}`;
+    const work = this.subtitleWork.then(() =>
+      transcriber.searching(titleKey, async () => {
+        const tally: Replaced = {
+          downloaded: 0,
+          transcribing: 0,
+          none: 0,
+          failed: 0,
+        };
+        for (const episode of chosen) {
+          const done = await this.replaceEpisodeSubtitles(
+            req,
+            arrId,
+            titleKey,
+            episode
+          ).catch((e): keyof Replaced => {
+            logger.warn('Could not replace an episode’s subtitles', {
+              label: LABEL,
+              mediaId: req.media.id,
+              episode: label(episode.season, episode.episode),
+              errorMessage: message(e),
+            });
+            return 'failed';
+          });
+          tally[done]++;
+        }
+        logger.info('Replaced the subtitles of a series', {
+          label: LABEL,
+          mediaId: req.media.id,
+          ...tally,
+        });
+        if (req.issueId) await this.replacedOnIssue(req.issueId, tally);
+      })
+    );
+    this.subtitleWork = work.catch(() => undefined);
+    this.pending.add(work);
+    void work.catch(() => undefined).finally(() => this.pending.delete(work));
+    const language = req.language ? `${languageName(req.language)} ` : '';
+    return {
+      ok: true,
+      message:
+        `Replacing the ${language}subtitles of ${episodeCount(chosen.length)} of ${where}, one at a time. Each shows on the title's page once it is in, and an episode no provider has subtitles for is transcribed from the audio when Bazarr has Whisper.` +
+        (inScope.length > chosen.length
+          ? ` One request covers at most ${MAX_SUBTITLE_EPISODES} episodes, so the other ${inScope.length - chosen.length} are left out: ask for them a season at a time.`
+          : ''),
+      link: `/tv/${req.media.tmdbId}`,
+    };
+  }
+
+  /** One episode of a whole-title replacement; what came of it. */
+  private async replaceEpisodeSubtitles(
+    req: FixRequest,
+    arrId: number,
+    titleKey: string,
+    episode: BazarrEpisode
+  ): Promise<keyof Replaced> {
+    const api = bazarr();
+    const id = episode.sonarrEpisodeId;
+    const lastProvider = (await api.getEpisodeHistory(id))[0]?.provider;
+    const results = await api.searchEpisode(id);
+    const best = bestSubtitle(
+      results,
+      wantedLanguages(episode, req.language, true),
+      true,
+      lastProvider
+    );
+    if (best) {
+      try {
+        const end = await api.downloadEpisode(arrId, id, choiceOf(best));
+        return end === 'failed' || end === 'gone' ? 'failed' : 'downloaded';
+      } finally {
+        forgetEpisodeHistory(id);
+      }
+    }
+    if (results.some((r) => r.provider === WHISPER_PROVIDER)) {
+      queueEpisodesTranscription(titleKey, arrId, [episode]);
+      return 'transcribing';
+    }
+    return 'none';
+  }
+
+  /** Says on the issue how a whole-title replacement went. */
+  private async replacedOnIssue(
+    issueId: number,
+    tally: Replaced
+  ): Promise<void> {
+    const parts = [
+      tally.downloaded && `${episodeCount(tally.downloaded)} got new subtitles`,
+      tally.transcribing &&
+        `${episodeCount(tally.transcribing)} had none from the providers and ${tally.transcribing === 1 ? 'is' : 'are'} being transcribed`,
+      tally.none &&
+        `${episodeCount(tally.none)} had none from the providers, and Bazarr has no Whisper to transcribe them`,
+      tally.failed &&
+        `${episodeCount(tally.failed)} could not be done, which an admin can see in the logs`,
+    ].filter((part): part is string => !!part);
+    if (!parts.length) return;
+    try {
+      const issue = await getRepository(Issue).findOne({
+        where: { id: issueId },
+        relations: { createdBy: true },
+      });
+      if (!issue) return;
+      const text = parts.join('; ');
+      await getRepository(IssueComment).save(
+        new IssueComment({
+          issue,
+          user: (await owner()) ?? issue.createdBy,
+          message: `Automatic fix: the subtitles are done. ${text.charAt(0).toUpperCase()}${text.slice(1)}.`,
+        })
+      );
+    } catch (e) {
+      logger.warn('Could not say on an issue how its subtitles went', {
+        label: LABEL,
+        issueId,
+        errorMessage: message(e),
+      });
+    }
   }
 
   private async findSubtitles(
@@ -834,10 +1147,7 @@ class AutoFix {
       };
     }
 
-    let item: {
-      subtitles: BazarrSubtitle[] | null;
-      missing_subtitles: { code2: string }[] | null;
-    };
+    let item: Pick<BazarrEpisode, 'subtitles' | 'missing_subtitles'>;
     let lastProvider: string | null | undefined;
     let results: BazarrSearchResult[];
     let download: (r: BazarrSearchResult) => Promise<BazarrJobEnd>;
@@ -879,40 +1189,8 @@ class AutoFix {
 
     // Replace: the present languages; otherwise the missing ones; default
     // English.
-    const present = [
-      ...new Set(
-        (item.subtitles ?? []).filter((s) => !s.forced).map((s) => s.code2)
-      ),
-    ];
-    const missing = (item.missing_subtitles ?? []).map((m) => m.code2);
-    const wanted = req.language
-      ? [req.language]
-      : req.replace && present.length
-        ? present
-        : missing.length
-          ? missing
-          : present.length
-            ? present
-            : ['en'];
-
-    const isTrue = (v: unknown) => String(v).toLowerCase() === 'true';
-    const found = results
-      .filter(
-        (r) =>
-          r.provider !== WHISPER_PROVIDER &&
-          !isTrue(r.forced) &&
-          wanted.some((code) => r.language?.toLowerCase().startsWith(code))
-      )
-      .sort(
-        (a, b) =>
-          // When replacing, prefer a different provider.
-          Number(req.replace && a.provider === lastProvider) -
-            Number(req.replace && b.provider === lastProvider) ||
-          Number(isTrue(a.hearing_impaired)) -
-            Number(isTrue(b.hearing_impaired)) ||
-          Number(b.score) - Number(a.score)
-      );
-    const best = found[0];
+    const wanted = wantedLanguages(item, req.language, !!req.replace);
+    const best = bestSubtitle(results, wanted, !!req.replace, lastProvider);
     if (best) {
       const end = await download(best);
       if (end === 'failed' || end === 'gone') {
@@ -951,12 +1229,13 @@ class AutoFix {
     if (!req.media.externalServiceId) return NOT_ON_SERVER;
     const arrId = bazarrIdOf(req.media);
     if (!arrId) return NOT_IN_BAZARR;
-    if (needsSeason(req)) return ASK_SEASON;
+    const asked = wholeScope(req);
+    if (needsSeason(asked)) return ASK_SEASON;
     return this.holding(
-      `transcribe:${req.media.id}:${req.seasonNumber ?? ''}:${req.episodeNumber ?? ''}`,
+      `transcribe:${asked.media.id}:${asked.seasonNumber ?? ''}:${asked.episodeNumber ?? ''}${asked.redo ? ':redo' : asked.all ? ':all' : ''}`,
       HOUR,
       'This was queued for transcription in the last hour.',
-      () => this.queueTranscription(req, arrId)
+      () => this.queueTranscription(asked, arrId)
     );
   }
 
@@ -974,6 +1253,7 @@ class AutoFix {
         link: `/movie/${req.media.tmdbId}`,
       };
     }
+    if (req.all || req.redo) return this.transcribeAll(req, arrId);
     const scope =
       req.episodeNumber !== undefined
         ? 'episode'
@@ -992,8 +1272,54 @@ class AutoFix {
       message: added
         ? `Transcribing ${added} episode${added === 1 ? '' : 's'} with Whisper, one at a time.`
         : scope === 'missing'
-          ? 'No episode is missing subtitles that has not been transcribed already.'
+          ? 'No episode is missing subtitles that has not been transcribed already. To have episodes with subtitles transcribed too, ask to transcribe all of it.'
           : 'Those episodes are already transcribed or queued.',
+      link: `/tv/${req.media.tmdbId}`,
+    };
+  }
+
+  /**
+   * Transcribes what was asked for (an episode, a season, or the whole
+   * series but its specials) even where subtitles exist; with `redo`, also
+   * episodes transcribed before.
+   */
+  private async transcribeAll(
+    req: FixRequest,
+    arrId: number
+  ): Promise<Outcome> {
+    const scope =
+      req.episodeNumber !== undefined
+        ? 'episode'
+        : req.seasonNumber !== undefined
+          ? 'season'
+          : 'notTranscribed';
+    const inScope = (
+      await transcriptionScope(
+        arrId,
+        scope,
+        req.seasonNumber,
+        req.episodeNumber,
+        { redo: req.redo }
+      )
+    )
+      .filter((e) => scope !== 'notTranscribed' || e.season > 0)
+      .sort((a, b) => a.season - b.season || a.episode - b.episode);
+    const chosen = inScope.slice(0, MAX_SUBTITLE_EPISODES);
+    const added = queueEpisodesTranscription(
+      `tv:${req.media.tmdbId}`,
+      arrId,
+      chosen
+    );
+    return {
+      ok: added > 0,
+      message: added
+        ? `Transcribing ${episodeCount(added)} with Whisper, one at a time, whether or not they have subtitles.` +
+          (inScope.length > chosen.length
+            ? ` One request covers at most ${MAX_SUBTITLE_EPISODES} episodes, so the other ${inScope.length - chosen.length} are left out: ask for them a season at a time.`
+            : '')
+        : req.redo
+          ? 'Those episodes are already queued for transcription.'
+          : 'Those episodes are already transcribed or queued. To have them transcribed again, ask to redo the transcription.',
       link: `/tv/${req.media.tmdbId}`,
     };
   }
@@ -1795,7 +2121,10 @@ class AutoFix {
         .map((c) => c.message)
         .join('\n');
       let asked:
-        | Pick<FixRequest, 'kind' | 'language' | 'replace' | 'unconfirmed'>
+        | Pick<
+            FixRequest,
+            'kind' | 'language' | 'replace' | 'all' | 'redo' | 'unconfirmed'
+          >
         | undefined = options.asked ?? classify(text, issue.issueType);
       if (!asked) {
         // Rules unclear: ask the model. Nobody confirmed its reading, so

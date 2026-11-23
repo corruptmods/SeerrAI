@@ -246,6 +246,7 @@
   "components.Backfill.Agent.tools.ask_admin": "asked you",
   "components.Backfill.Agent.tools.check_language": "checked the language",
   "components.Backfill.Agent.tools.find_title": "found the title",
+  "components.Backfill.Agent.tools.fix_subtitles": "fixed subtitles",
   "components.Backfill.Agent.tools.grab": "started a download",
   "components.Backfill.Agent.tools.other": "did something else",
   "components.Backfill.Agent.tools.propose_change": "asked to make a change",

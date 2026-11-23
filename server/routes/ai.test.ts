@@ -936,6 +936,152 @@ describe('the AI chat', () => {
     assert.equal(body.action, undefined);
   });
 
+  describe('a genre asked for', () => {
+    const film = (id: number, title: string, genres: number[]) => ({
+      id,
+      title,
+      release_date: '1990-01-01',
+      media_type: 'movie',
+      genre_ids: genres,
+      overview: '',
+      popularity: 1,
+      vote_average: 7,
+      vote_count: 1,
+      adult: false,
+      original_language: 'en',
+      original_title: title,
+      video: false,
+    });
+    const FILMS: Record<string, ReturnType<typeof film>> = {
+      // Horror.
+      Glasswing: film(601, 'Glasswing', [27]),
+      'Static Garden': film(602, 'Static Garden', [27, 53]),
+      // Animation and fantasy, no horror.
+      'Lantern Song': film(603, 'Lantern Song', [16, 14]),
+    };
+    const searches = ['searchMovies', 'searchTvShows'] as const;
+    const before_ = searches.map((name) =>
+      Object.getOwnPropertyDescriptor(TheMovieDb.prototype, name)
+    );
+
+    beforeEach(() => {
+      stub('searchMovies', async ({ query }: { query: string }) => ({
+        page: 1,
+        total_pages: 1,
+        total_results: FILMS[query] ? 1 : 0,
+        results: FILMS[query] ? [FILMS[query]] : [],
+      }));
+      stub('searchTvShows', async ({ query }: { query: string }) => ({
+        page: 1,
+        total_pages: 1,
+        total_results: query === 'Harbour Lights' ? 1 : 0,
+        results:
+          query === 'Harbour Lights'
+            ? [
+                {
+                  id: 701,
+                  name: 'Harbour Lights',
+                  first_air_date: '1999-01-01',
+                  media_type: 'tv',
+                  // Drama and mystery: series have no Horror genre.
+                  genre_ids: [18, 9648],
+                  origin_country: ['GB'],
+                  original_language: 'en',
+                  original_name: 'Harbour Lights',
+                  overview: '',
+                  popularity: 1,
+                  vote_average: 7,
+                  vote_count: 1,
+                },
+              ]
+            : [],
+      }));
+    });
+
+    after(() => {
+      searches.forEach((name, i) => {
+        const descriptor = before_[i];
+        if (descriptor) {
+          Object.defineProperty(TheMovieDb.prototype, name, descriptor);
+        }
+      });
+    });
+
+    const ask = (answer: string) => {
+      answers = [answer];
+      return call<{
+        reply: string;
+        results: { id: number }[];
+        action?: unknown;
+      }>('POST', '/api/v1/ai/chat', {
+        message: 'your top slasher films, one from each decade',
+      });
+    };
+
+    it('asks the model to name the genre every title must have', async () => {
+      await ask('{"r":"","titles":[]}');
+      assert.match(calls[0].system, /"g"/);
+      assert.match(calls[0].system, /must fit the genres/);
+    });
+
+    it('drops a title not of that genre, and does not judge series by a genre they lack', async () => {
+      const { status, body } = await ask(
+        '{"r":"Slashers by decade.","g":["Horror"],"titles":[{"t":"Glasswing","k":"movie"},{"t":"Lantern Song","k":"movie"},{"t":"Static Garden","k":"movie"},{"t":"Harbour Lights","k":"tv"}]}'
+      );
+      assert.equal(status, 200);
+      assert.equal(body.reply, 'Slashers by decade.');
+      assert.deepEqual(
+        body.results.map((r) => r.id),
+        [601, 602, 701]
+      );
+    });
+
+    it('says so plainly when none of the titles found were that genre', async () => {
+      const { body } = await ask(
+        '{"r":"Here you go.","g":["Horror"],"titles":[{"t":"Lantern Song","k":"movie"}],"do":"list","n":"Slashers"}'
+      );
+      assert.deepEqual(body.results, []);
+      assert.equal(
+        body.reply,
+        'None of the titles found were Horror. Try asking again.'
+      );
+      assert.equal(body.action, undefined);
+    });
+
+    it('reads a genre given as a name, and ignores one it cannot read', async () => {
+      const named = await ask(
+        '{"r":"","g":"horror","titles":[{"t":"Glasswing","k":"movie"},{"t":"Lantern Song","k":"movie"}]}'
+      );
+      assert.deepEqual(
+        named.body.results.map((r) => r.id),
+        [601]
+      );
+      answers = [
+        '{"r":"","g":{"name":"Horror"},"titles":[{"t":"Lantern Song","k":"movie"}]}',
+      ];
+      const unread = await call<{ results: { id: number }[] }>(
+        'POST',
+        '/api/v1/ai/chat',
+        { message: 'something else' }
+      );
+      assert.equal(unread.status, 200);
+      assert.deepEqual(
+        unread.body.results.map((r) => r.id),
+        [603]
+      );
+    });
+
+    it('keeps every title when no genre is named, as older answers did', async () => {
+      const { body } = await ask(
+        '{"r":"","titles":[{"t":"Glasswing","k":"movie"},{"t":"Lantern Song","k":"movie"}]}'
+      );
+      assert.deepEqual(
+        body.results.map((r) => r.id),
+        [601, 603]
+      );
+    });
+  });
+
   describe('a whole set, read from TMDB', () => {
     const movie = (id: number, date: string, popularity = 1) => ({
       id,

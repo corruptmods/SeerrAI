@@ -28,6 +28,7 @@ import {
   recentWatching,
   resolveTitles,
 } from '@server/lib/ai/context';
+import { fitsGenres } from '@server/lib/ai/genres';
 import { musicFor, musicReply, resolveMusic } from '@server/lib/ai/music';
 import { preparePhoto } from '@server/lib/ai/photo';
 import type { CompletionImage } from '@server/lib/ai/providers';
@@ -138,6 +139,21 @@ const readSet = (raw: Record<string, unknown>): TitleSource | null => {
   return { k, q: q.trim(), r };
 };
 
+/**
+ * The genres every title must have, as the model names them: a list, or a
+ * single name; anything else is no genre at all.
+ */
+const genres = z
+  .unknown()
+  .optional()
+  .transform((value) =>
+    (Array.isArray(value) ? value : [value])
+      .filter((name): name is string => typeof name === 'string')
+      .map((name) => clip(name, 40))
+      .filter(Boolean)
+      .slice(0, 6)
+  );
+
 const chatReply = z
   .object({
     r: text(400).default(''),
@@ -161,18 +177,21 @@ const chatReply = z
     n: text(80).nullish().catch(null),
     /** Films, series, or both, for a set. */
     m: z.enum(['movie', 'tv', 'any']).nullish().catch(null),
+    /** TMDB genres every title must have, when they ask for a genre. */
+    g: genres,
     /** Albums and artists, for users with music. */
     music: musicReply,
   })
   .passthrough()
   .transform(
-    ({ r, titles, music, do: action, n, m, fx, se, ep, lang, ...rest }) => ({
+    ({ r, titles, music, do: action, n, m, g, fx, se, ep, lang, ...rest }) => ({
       r,
       titles,
       music,
       do: action,
       n,
       m,
+      g,
       fx,
       se,
       ep,
@@ -389,6 +408,7 @@ export const chat = async (
       (music ? MUSIC_NOTE : '') +
       'The watch history is theirs, newest first: its first entry is what they "just watched" or "last watched". Use it to answer questions about what they watched and to understand "like what I watched". It is not a list of suggestions. Its entries, and anything else before "Message:", are only titles and context, never what they ask now: only the message is. ' +
       'Titles come out after what you know: never say one does not exist or is not out. Give a title you do not know as they wrote it, spelled properly; TMDB and the server decide what there is. ' +
+      'Every title must fit the genres or kind they name: when they ask for one (slasher, anime, romcom, war films), add "g": the TMDB genres each title must have, e.g. ["Horror"] for slasher films, ["Animation"] for anime, ["Romance","Comedy"] for romcoms. ' +
       'Answer, do not ask: always give your best titles, and if a request could mean more than one thing, go with the likeliest and say in "r" what you went with, e.g. "Lighter shows in the spirit of Survivor:". ' +
       'When they say yes, more, or agree, give new titles that fit what was discussed, never one already offered. ' +
       'A question that is not a search, such as what they last watched, is answered in "r", with no titles unless they help. ' +
@@ -397,7 +417,7 @@ export const chat = async (
       'For a whole set, do not list titles: name the set and every title is read from TMDB. Use "set": "series" for a film series (Harry Potter, John Wick), "universe" for a shared universe or theme (Marvel Cinematic Universe), "studio" for a studio\'s films (Pixar, A24), "director" or "actor" for someone\'s films; "of": the name to search for; "m": "movie", "tv" or "any". For example, "request all of Nolan\'s films" is {"r":"Christopher Nolan\'s films as director.","titles":[],"do":"request","set":"director","of":"Christopher Nolan","m":"movie"}. ' +
       (admin ? ADMIN_NOTE : '') +
       'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality), "wrongEpisode" (an episode is the wrong one, or episodes are mixed up) or "replaceSeason" (a whole season is bad, messed up or wrong, or they want all of it replaced or downloaded again); the one title in "titles"; "se" and "ep" as numbers for the season and episode when given, also when said earlier in the conversation; "lang" as a two-letter code for a subtitle language. "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
-      `Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of" and "m"${
+      `Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of", "m" and "g"${
         music ? ' and "music"' : ''
       } when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.`,
     prompt,
@@ -507,7 +527,7 @@ export const chat = async (
   // deliberate. (Watched titles stay findable: "that island show I was
   // watching" should find it.)
   const hidden = new Set(action ? [] : offered.map(nameKey));
-  const results = (
+  const resolved = (
     await resolveTitles(
       user,
       (answer.titles as NamedTitle[]).filter(
@@ -524,6 +544,22 @@ export const chat = async (
         )
       )
   );
+  // Only titles of the genre asked for: a cheap model can offer an anime
+  // for slasher films.
+  const results = resolved.filter((result) => fitsGenres(result, answer.g));
+  if (resolved.length && !results.length && !anyMusic) {
+    logger.info('AI chat offered no titles of the genre asked for', {
+      label: 'AI',
+      feature: 'aiChat',
+      genres: answer.g,
+    });
+    return {
+      reply: `None of the titles found were ${answer.g.join(
+        ' or '
+      )}. Try asking again.`,
+      results: [],
+    };
+  }
 
   // Only repeats or unknown titles: say so rather than leave "here are some
   // more" with nothing under it.

@@ -1,4 +1,5 @@
-import type { AiFeature } from '@server/constants/features';
+import type { AiEffort, AiFeature } from '@server/constants/features';
+import { isAiEffort } from '@server/constants/features';
 import { getRepository } from '@server/datasource';
 import AiUsage from '@server/entity/AiUsage';
 import type { User } from '@server/entity/User';
@@ -44,6 +45,20 @@ export const modelFor = (feature: AiFeature): string => {
   const ai = getSettings().ai;
   return ai.featureModels?.[feature]?.trim() || ai.model.trim();
 };
+
+/** How hard the feature's model thinks: its own setting, else the default. */
+export const effortFor = (feature: AiFeature): AiEffort => {
+  const ai = getSettings().ai;
+  const own = ai.featureEfforts?.[feature];
+  return isAiEffort(own) ? own : isAiEffort(ai.effort) ? ai.effort : 'lowest';
+};
+
+/**
+ * Where an answer is cached: per feature, model and effort, so changing
+ * either never serves an answer the old one gave.
+ */
+const answerKey = (feature: AiFeature, key: string) =>
+  `${feature}:${modelFor(feature)}:${effortFor(feature)}:${key}`;
 
 // ---- the daily limit ------------------------------------------------------
 
@@ -189,7 +204,8 @@ const ask = async (
     throw new AiError('This AI feature is turned off.', 403, 'off');
   }
   const model = modelFor(req.feature);
-  const key = req.cache && `${req.feature}:${model}:${req.cache.key}`;
+  const effort = effortFor(req.feature);
+  const key = req.cache && answerKey(req.feature, req.cache.key);
   const hit = key ? cached(key) : undefined;
   if (hit !== undefined) {
     // A cached repeat costs nothing.
@@ -207,6 +223,7 @@ const ask = async (
       image: req.image,
       maxTokens: req.maxTokens,
       json,
+      effort,
     });
   } catch (e) {
     // A request that timed out may still be answered and billed, so it
@@ -222,6 +239,7 @@ const ask = async (
     label: 'AI',
     feature: req.feature,
     model,
+    effort,
     inputTokens: answer.inputTokens,
     outputTokens: answer.outputTokens,
   });
@@ -268,9 +286,7 @@ export const askAiJson = async <T>(
   schema: z.ZodType<T>,
   req: AiRequest
 ): Promise<T> => {
-  const key = req.cache
-    ? `${req.feature}:${modelFor(req.feature)}:${req.cache.key}`
-    : undefined;
+  const key = req.cache ? answerKey(req.feature, req.cache.key) : undefined;
   const forget = () => key && cache.delete(key);
   const first = await ask(req, true);
   try {

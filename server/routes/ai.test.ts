@@ -45,7 +45,12 @@ setupTestDb();
 // ---- a fake model -----------------------------------------------------------
 
 /** What each call sent, and the model's next answers. */
-let calls: { system: string; prompt: string; image?: unknown }[] = [];
+let calls: {
+  system: string;
+  prompt: string;
+  image?: unknown;
+  effort?: string;
+}[] = [];
 let answers: (string | Error)[] = [];
 
 const modelReply = (text: string) => ({
@@ -65,6 +70,7 @@ mock.method(
       messages: {
         content: string | { type: string; text?: string; source?: unknown }[];
       }[];
+      output_config?: { effort?: string };
     }
   ) => {
     const content = body.messages[0].content;
@@ -78,6 +84,7 @@ mock.method(
         typeof content === 'string'
           ? undefined
           : content.find((part) => part.type === 'image')?.source,
+      effort: body.output_config?.effort,
     });
     const next = answers.shift() ?? '{}';
     if (next instanceof Error) {
@@ -337,6 +344,49 @@ describe('AI settings', () => {
     assert.equal(calls.length, 1, 'one tiny test request');
     assert.equal(getSettings().ai.model, 'claude-other');
   });
+
+  it('saves an effort for all features and for each, kept when a form leaves them out', async () => {
+    actingAs = admin;
+    assert.equal(
+      (await call<{ effort: string }>('GET', '/api/v1/settings/ai')).body
+        .effort,
+      'lowest',
+      'the default for settings saved before there was one'
+    );
+    const saved = await call<{
+      effort: string;
+      featureEfforts: Record<string, string>;
+    }>('POST', '/api/v1/settings/ai', {
+      ...form,
+      effort: 'medium',
+      featureEfforts: { aiAgent: 'high', notAFeature: 'low' },
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.effort, 'medium');
+    assert.deepEqual(saved.body.featureEfforts, { aiAgent: 'high' });
+    assert.equal(getSettings().ai.effort, 'medium');
+
+    // An older page knows nothing of effort: what is saved stays.
+    const older = await call('POST', '/api/v1/settings/ai', form);
+    assert.equal(older.status, 200);
+    assert.equal(getSettings().ai.effort, 'medium');
+    assert.deepEqual(getSettings().ai.featureEfforts, { aiAgent: 'high' });
+  });
+
+  it('refuses an effort it does not know', async () => {
+    actingAs = admin;
+    for (const bad of [
+      { effort: 'extreme' },
+      { featureEfforts: { aiChat: 'max' } },
+    ]) {
+      const { status } = await call('POST', '/api/v1/settings/ai', {
+        ...form,
+        ...bad,
+      });
+      assert.equal(status, 400);
+    }
+    assert.equal(getSettings().ai.effort, undefined);
+  });
 });
 
 describe('the saved key', () => {
@@ -545,6 +595,25 @@ describe('the AI chat', () => {
     assert.equal(first.status, 200);
     assert.equal(again.status, 200);
     assert.equal(calls.length, 1);
+  });
+
+  it('asks again at a new effort rather than answer from memory', async () => {
+    answers = [
+      '{"r":"","titles":[{"t":"Hedgehog Morning","k":"movie"}]}',
+      '{"r":"","titles":[{"t":"Hedgehog Morning","k":"movie"}]}',
+      '{"r":"","titles":[{"t":"Hedgehog Morning","k":"movie"}]}',
+    ];
+    await call('POST', '/api/v1/ai/chat', { message: 'same day' });
+    getSettings().ai.effort = 'high';
+    await call('POST', '/api/v1/ai/chat', { message: 'same day' });
+    // A feature's own effort wins over the default.
+    getSettings().ai.featureEfforts = { aiChat: 'medium' };
+    await call('POST', '/api/v1/ai/chat', { message: 'same day' });
+    await call('POST', '/api/v1/ai/chat', { message: 'same day' });
+    assert.deepEqual(
+      calls.map((c) => c.effort),
+      ['low', 'high', 'medium']
+    );
   });
 
   it('asks once more when the answer is not readable, then gives up', async () => {

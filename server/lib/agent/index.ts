@@ -44,7 +44,7 @@ import {
   startApprovedGrab,
   titleRef,
 } from '@server/lib/agent/tools';
-import { aiFeatureOn, modelFor } from '@server/lib/ai';
+import { aiFeatureOn, effortFor, modelFor } from '@server/lib/ai';
 import { countAnswer, noteFailure } from '@server/lib/ai/credit';
 import type {
   ConverseMessage,
@@ -1674,6 +1674,7 @@ class Agent {
 
       const ai = settings.ai;
       const model = modelFor('aiAgent');
+      const effort = effortFor('aiAgent');
       // Recomputed each turn: an admin who replies mid-run is present from
       // then on.
       const toolsNow = () =>
@@ -1796,6 +1797,7 @@ class Agent {
             messages,
             tools: toolsNow(),
             maxTokens: TURN_TOKENS,
+            effort,
           },
           async (text) => {
             step('error', text);

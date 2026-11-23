@@ -1,5 +1,5 @@
-import type { AiFeature } from '@server/constants/features';
-import { AI_FEATURES } from '@server/constants/features';
+import type { AiEffort, AiFeature } from '@server/constants/features';
+import { AI_EFFORTS, AI_FEATURES } from '@server/constants/features';
 import { clearAiCache } from '@server/lib/ai';
 import {
   clearOutOfCredit,
@@ -19,6 +19,10 @@ import { z } from 'zod';
  * an empty field keeps the saved one.
  */
 const aiSettingsRoutes = Router();
+
+const effortValue = z.enum(AI_EFFORTS, {
+  error: 'The effort must be lowest, low, medium or high.',
+});
 
 const body = z.object({
   enabled: z.boolean(),
@@ -44,12 +48,29 @@ const body = z.object({
         )
       )
     ),
+  /** Optional, so an older page saving the form keeps working. */
+  effort: effortValue.optional(),
+  /** Per feature; a feature left out uses the default effort. */
+  featureEfforts: z
+    .record(z.string(), effortValue)
+    .optional()
+    .transform((efforts) =>
+      efforts
+        ? (Object.fromEntries(
+            Object.entries(efforts).filter(([feature]) =>
+              (AI_FEATURES as readonly string[]).includes(feature)
+            )
+          ) as Partial<Record<AiFeature, AiEffort>>)
+        : undefined
+    ),
   dailyLimit: z.number().int().min(0).max(10_000),
 });
 
 /** Settings as the browser sees them: all but the key. */
 const visible = (ai: AiSettings) => ({
   ...ai,
+  effort: ai.effort ?? 'lowest',
+  featureEfforts: ai.featureEfforts ?? {},
   apiKey: '',
   hasApiKey: !!ai.apiKey,
 });
@@ -72,6 +93,9 @@ const candidate = (input: z.infer<typeof body>): AiSettings => {
     baseUrl,
     model: input.model,
     featureModels: input.featureModels,
+    // Left out by an older page: keep what is saved.
+    effort: input.effort ?? saved.effort ?? 'lowest',
+    featureEfforts: input.featureEfforts ?? saved.featureEfforts ?? {},
     dailyLimit: input.dailyLimit,
   };
 };

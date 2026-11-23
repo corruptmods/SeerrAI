@@ -1,5 +1,5 @@
 import type { PersonalApiKeyAccess } from '@server/constants/apiKeys';
-import type { AiFeature } from '@server/constants/features';
+import type { AiEffort, AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import type { OidcClaimRule } from '@server/constants/oidc';
 import { oidcApplicationUrl, requiredClaimsFrom } from '@server/constants/oidc';
@@ -667,6 +667,10 @@ export interface AiSettings {
   model: string;
   /** Per-feature model overrides. */
   featureModels: Partial<Record<AiFeature, string>>;
+  /** How hard models think by default; "lowest" if unset. */
+  effort?: AiEffort;
+  /** Per-feature effort overrides. */
+  featureEfforts?: Partial<Record<AiFeature, AiEffort>>;
   /** Daily AI uses per user; 0 unlimited. Admins are exempt. */
   dailyLimit: number;
 }
@@ -1272,6 +1276,8 @@ class Settings {
         baseUrl: '',
         model: '',
         featureModels: {},
+        effort: 'lowest',
+        featureEfforts: {},
         dailyLimit: 20,
       },
       aiCredit: {

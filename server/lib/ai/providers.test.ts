@@ -622,3 +622,137 @@ describe('a conversation with tools', () => {
     assert.deepEqual(turn.calls[0].input, {});
   });
 });
+
+describe('effort', () => {
+  const claudeReply = { content: [{ type: 'text', text: 'ok' }] };
+  const openAiReply = {
+    choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+  };
+  const openai = (over: Partial<AiSettings> = {}) =>
+    settings({ provider: 'openai', ...over });
+  const effortRefused = (value: string) =>
+    httpError(400, {
+      error: {
+        message: `Unsupported value: 'reasoning_effort' does not support '${value}' with this model.`,
+      },
+    });
+
+  it('asks Claude for each level, with more room to think the higher it is', async () => {
+    const sent = capture([claudeReply, claudeReply, claudeReply, claudeReply]);
+    for (const effort of ['lowest', 'low', 'medium', 'high'] as const) {
+      await complete(settings(), { ...request, effort });
+    }
+    assert.deepEqual(
+      sent.map((s) => (s.body.output_config as { effort: string }).effort),
+      ['low', 'low', 'medium', 'high']
+    );
+    assert.deepEqual(
+      sent.map((s) => s.body.max_tokens),
+      [100 + 2048, 100 + 2048, 100 + 8192, 100 + 16384]
+    );
+  });
+
+  it('remembers a Claude model without effort per level asked', async () => {
+    const sent = capture([
+      httpError(400, {
+        error: {
+          message: 'output_config.effort: Extra inputs are not permitted',
+        },
+      }),
+      claudeReply,
+      claudeReply,
+    ]);
+    await complete(settings(), request);
+    // "high" was never refused, so it is asked for.
+    await complete(settings(), { ...request, effort: 'high' });
+    assert.deepEqual(
+      sent.map((s) => s.body.output_config),
+      [{ effort: 'low' }, undefined, { effort: 'high' }]
+    );
+  });
+
+  it('asks an OpenAI reasoning model for the level set, then lower ones it accepts', async () => {
+    const sent = capture([
+      effortRefused('high'),
+      openAiReply,
+      openAiReply,
+      openAiReply,
+    ]);
+    const luna = { ...request, model: 'gpt-6-luna' };
+    await complete(openai(), { ...luna, effort: 'high' });
+    await complete(openai(), { ...luna, effort: 'high' });
+    // Another level is not answered from what "high" learned.
+    await complete(openai(), { ...luna, effort: 'low' });
+    assert.deepEqual(
+      sent.map((s) => s.body.reasoning_effort),
+      ['high', 'medium', 'medium', 'low']
+    );
+    assert.equal(sent[0].body.max_completion_tokens, 100 + 16384);
+    assert.equal(sent[3].body.max_completion_tokens, 100 + 2048);
+  });
+
+  it('keeps the cheapest-first order for "lowest", the default', async () => {
+    const sent = capture([effortRefused('none'), openAiReply, openAiReply]);
+    await complete(openai(), {
+      ...request,
+      model: 'gpt-6-luna',
+      effort: 'lowest',
+    });
+    // No effort given is the same setting, so it is remembered for it.
+    await complete(openai(), { ...request, model: 'gpt-6-luna' });
+    assert.deepEqual(
+      sent.map((s) => s.body.reasoning_effort),
+      ['none', 'minimal', 'minimal']
+    );
+  });
+
+  it('sends no effort to OpenAI models that do not reason', async () => {
+    const sent = capture([openAiReply]);
+    await complete(openai(), { ...request, model: 'gpt-4o', effort: 'high' });
+    assert.equal(sent[0].body.reasoning_effort, undefined);
+    assert.equal(sent[0].body.max_completion_tokens, 100);
+  });
+
+  it('sends other servers an effort only when one is chosen, dropping it if refused', async () => {
+    const local = openai({ baseUrl: 'http://nas.local:11434/v1', apiKey: '' });
+    const sent = capture([
+      openAiReply,
+      httpError(400, { error: { message: 'unknown field reasoning_effort' } }),
+      openAiReply,
+      openAiReply,
+    ]);
+    await complete(local, { ...request, effort: 'lowest' });
+    await complete(local, { ...request, effort: 'medium' });
+    await complete(local, { ...request, effort: 'medium' });
+    assert.deepEqual(
+      sent.map((s) => s.body.reasoning_effort),
+      [undefined, 'medium', undefined, undefined]
+    );
+    assert.equal(sent[0].body.max_tokens, 100);
+    assert.equal(sent[1].body.max_tokens, 100 + 8192);
+    assert.equal(sent[3].body.max_tokens, 100, 'remembered as refused');
+  });
+
+  it('applies to a conversation with tools too', async () => {
+    const sent = capture([
+      { content: [{ type: 'text', text: 'done' }] },
+      effortRefused('medium'),
+      openAiReply,
+    ]);
+    const req = {
+      system: 'sys',
+      messages: [{ role: 'user' as const, text: 'hi' }],
+      tools: [],
+      maxTokens: 800,
+      effort: 'medium' as const,
+    };
+    await converse(settings(), { ...req, model: 'claude-test' });
+    await converse(openai(), { ...req, model: 'gpt-6-luna' });
+    assert.deepEqual(sent[0].body.output_config, { effort: 'medium' });
+    assert.equal(sent[0].body.max_tokens, 800 + 8192);
+    assert.deepEqual(
+      sent.slice(1).map((s) => s.body.reasoning_effort),
+      ['medium', 'low']
+    );
+  });
+});

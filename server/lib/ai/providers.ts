@@ -1,3 +1,4 @@
+import type { AiEffort } from '@server/constants/features';
 import type { AiSettings } from '@server/lib/settings';
 import axios, { isAxiosError } from 'axios';
 
@@ -7,24 +8,40 @@ import axios, { isAxiosError } from 'axios';
  * No temperature or sampling settings, which newer models reject.
  *
  * Newer models on both APIs think before answering; thinking is billed and
- * counts against the cap. Each request asks for the lowest effort accepted
- * and leaves room for it. A model's accepted level is learned from its
- * first refusal and remembered: at most one retry per model per restart.
+ * counts against the cap. Each request asks for the effort set for its
+ * feature ("lowest" by default: the least the model accepts) and leaves
+ * room for it. A model's accepted level is learned from its first refusal
+ * and remembered per requested effort: a few retries at most per model and
+ * effort per restart.
  */
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1';
 export const OPENAI_URL = 'https://api.openai.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 
-/** Long enough for a slow model writing a few hundred words. */
-const COMPLETION_TIMEOUT_MS = 90_000;
+/**
+ * Long enough for a slow model writing a few hundred words; more for the
+ * higher efforts, which think for longer first.
+ */
+const COMPLETION_TIMEOUT_MS: Record<AiEffort, number> = {
+  lowest: 90_000,
+  low: 90_000,
+  medium: 120_000,
+  high: 180_000,
+};
 const LIST_TIMEOUT_MS = 15_000;
 
 /**
- * Room for thinking on top of the answer's cap. Only what is used is
- * billed; without it a thinking model can spend the cap and say nothing.
+ * Room for thinking on top of the answer's cap, by effort. Only what is
+ * used is billed; without it a thinking model can spend the cap and say
+ * nothing.
  */
-const THINKING_ROOM = 2048;
+const THINKING_ROOM: Record<AiEffort, number> = {
+  lowest: 2048,
+  low: 2048,
+  medium: 8192,
+  high: 16384,
+};
 
 /** Image types both APIs accept. */
 export const IMAGE_TYPES = [
@@ -51,6 +68,8 @@ export interface CompletionRequest {
   maxTokens: number;
   /** Ask for a JSON object where the API can enforce it. */
   json?: boolean;
+  /** How hard the model thinks; "lowest" if unset. */
+  effort?: AiEffort;
 }
 
 export interface Completion {
@@ -100,21 +119,40 @@ export const billedBy = (ai: AiSettings): 'anthropic' | 'openai' | null =>
 
 /**
  * Whether an OpenAI model reasons: all but GPT-4, GPT-3.5 and chatgpt-*.
- * Reasoning models get the least effort they accept.
+ * Reasoning models get the effort set for the feature.
  */
 export const isReasoningModel = (model: string) =>
   !/^(gpt-4|gpt-3\.5|chatgpt-)/i.test(model.trim());
 
-/** Cheapest first; a model that refuses one is retried with the next. */
-const OPENAI_EFFORTS = ['none', 'minimal', 'low'] as const;
-const CLAUDE_EFFORT = 'low';
+/** OpenAI's efforts, lowest first. */
+const OPENAI_LEVELS = ['none', 'minimal', 'low', 'medium', 'high'];
 
 /**
- * What each model accepted, for the process lifetime: an OpenAI effort (null
- * to send none), and whether Claude takes an effort at all.
+ * The OpenAI efforts to try for a setting, in order; a model that refuses
+ * one is retried with the next, and null sends none. "lowest" is cheapest
+ * first; any other setting is that level, then the levels below it.
+ */
+const openAiLadder = (effort: AiEffort): (string | null)[] =>
+  effort === 'lowest'
+    ? ['none', 'minimal', 'low', null]
+    : [
+        ...OPENAI_LEVELS.slice(0, OPENAI_LEVELS.indexOf(effort) + 1).reverse(),
+        null,
+      ];
+
+/** Claude's effort for a setting: it has no level below "low". */
+const claudeLevel = (effort: AiEffort) =>
+  effort === 'medium' || effort === 'high' ? effort : 'low';
+
+/**
+ * What each model accepted for each requested effort, for the process
+ * lifetime: an OpenAI effort (null to send none), and whether Claude takes
+ * an effort at all. Keyed by model and effort, so asking for another effort
+ * is tried afresh.
  */
 const openAiEffort = new Map<string, string | null>();
 const claudeEffort = new Map<string, boolean>();
+const memoKey = (...parts: string[]) => parts.join('|');
 
 export const resetProviderMemoryForTests = () => {
   openAiEffort.clear();
@@ -280,11 +318,67 @@ const openAiHeaders = (ai: AiSettings) => ({
 const RAN_OUT =
   'used up its answer length thinking before it replied. Try again, or choose a model that thinks less.';
 
+/**
+ * Sends a Claude request with an effort, or without one for older models
+ * that have no effort setting and say so.
+ */
+const withClaudeEffort = async <T>(
+  model: string,
+  effort: AiEffort,
+  send: (level: string | null) => Promise<T>
+): Promise<T> => {
+  const level = claudeLevel(effort);
+  const key = memoKey(model, level);
+  const known = claudeEffort.get(key);
+  try {
+    const response = await send(known !== false ? level : null);
+    claudeEffort.set(key, known !== false);
+    return response;
+  } catch (e) {
+    if (known === undefined && refused(e, 'effort', 'output_config')) {
+      claudeEffort.set(key, false);
+      return send(null);
+    }
+    throw e;
+  }
+};
+
+/**
+ * The OpenAI efforts to try for a request, and where to remember the one
+ * accepted (none when there is nothing to remember).
+ */
+const openAiPlan = (
+  ai: AiSettings,
+  model: string,
+  effort: AiEffort
+): { efforts: (string | null)[]; key?: string } => {
+  if (isOfficialOpenAi(ai)) {
+    if (!isReasoningModel(model)) {
+      return { efforts: [null] };
+    }
+    const key = memoKey(model, effort);
+    const known = openAiEffort.get(key);
+    return {
+      efforts: known !== undefined ? [known] : openAiLadder(effort),
+      key,
+    };
+  }
+  // Another server gets an effort only when one was chosen, dropped if it
+  // refuses it.
+  if (effort === 'lowest') {
+    return { efforts: [null] };
+  }
+  const key = memoKey(openAiBase(ai), model, effort);
+  const known = openAiEffort.get(key);
+  return { efforts: known !== undefined ? [known] : [effort, null], key };
+};
+
 const completeAnthropic = async (
   ai: AiSettings,
   req: CompletionRequest
 ): Promise<Completion> => {
-  const send = (withEffort: boolean) =>
+  const effort = req.effort ?? 'lowest';
+  const send = (level: string | null) =>
     axios.post<{
       content: { type: string; text?: string }[];
       stop_reason?: string;
@@ -293,7 +387,7 @@ const completeAnthropic = async (
       `${ANTHROPIC_URL}/messages`,
       {
         model: req.model,
-        max_tokens: req.maxTokens + THINKING_ROOM,
+        max_tokens: req.maxTokens + THINKING_ROOM[effort],
         system: req.system,
         messages: [
           {
@@ -313,26 +407,14 @@ const completeAnthropic = async (
               : req.prompt,
           },
         ],
-        ...(withEffort ? { output_config: { effort: CLAUDE_EFFORT } } : {}),
+        ...(level ? { output_config: { effort: level } } : {}),
       },
-      { headers: anthropicHeaders(ai), timeout: COMPLETION_TIMEOUT_MS }
+      { headers: anthropicHeaders(ai), timeout: COMPLETION_TIMEOUT_MS[effort] }
     );
 
   let response;
   try {
-    const known = claudeEffort.get(req.model);
-    try {
-      response = await send(known !== false);
-      claudeEffort.set(req.model, known !== false);
-    } catch (e) {
-      // Older models have no effort setting and say so.
-      if (known === undefined && refused(e, 'effort', 'output_config')) {
-        claudeEffort.set(req.model, false);
-        response = await send(false);
-      } else {
-        throw e;
-      }
-    }
+    response = await withClaudeEffort(req.model, effort, send);
   } catch (e) {
     throw explain(e, 'Claude', ai.apiKey, !!req.image);
   }
@@ -368,6 +450,8 @@ const completeOpenAi = async (
   const official = isOfficialOpenAi(ai);
   const reasoning = official && isReasoningModel(req.model);
   const name = official ? 'OpenAI' : 'The AI server';
+  const effortSetting = req.effort ?? 'lowest';
+  const room = THINKING_ROOM[effortSetting];
 
   // An image goes as a data URL beside the text, which OpenAI and its
   // imitators (Ollama, LM Studio, vLLM) all accept.
@@ -382,8 +466,9 @@ const completeOpenAi = async (
     : req.prompt;
 
   // OpenAI itself gets its current names for the cap and system role,
-  // enforced JSON and the least reasoning. Other servers get the older form
-  // every OpenAI-compatible server understands.
+  // enforced JSON and the effort set. Other servers get the older form
+  // every OpenAI-compatible server understands, with an effort only when
+  // one was chosen.
   const body = (effort: string | null, json: boolean) =>
     official
       ? {
@@ -393,7 +478,7 @@ const completeOpenAi = async (
             { role: 'user', content: user },
           ],
           max_completion_tokens: reasoning
-            ? req.maxTokens + THINKING_ROOM
+            ? req.maxTokens + room
             : req.maxTokens,
           ...(effort ? { reasoning_effort: effort } : {}),
           ...(json ? { response_format: { type: 'json_object' } } : {}),
@@ -404,23 +489,22 @@ const completeOpenAi = async (
             { role: 'system', content: req.system },
             { role: 'user', content: user },
           ],
-          max_tokens: req.maxTokens,
+          max_tokens: effort ? req.maxTokens + room : req.maxTokens,
+          ...(effort ? { reasoning_effort: effort } : {}),
         };
 
   const send = (effort: string | null, json: boolean) =>
     axios.post<OpenAiResponse>(
       `${openAiBase(ai)}/chat/completions`,
       body(effort, json),
-      { headers: openAiHeaders(ai), timeout: COMPLETION_TIMEOUT_MS }
+      {
+        headers: openAiHeaders(ai),
+        timeout: COMPLETION_TIMEOUT_MS[effortSetting],
+      }
     );
 
-  // The efforts still to try for this model, cheapest first.
-  const known = openAiEffort.get(req.model);
-  const efforts: (string | null)[] = !reasoning
-    ? [null]
-    : known !== undefined
-      ? [known]
-      : [...OPENAI_EFFORTS, null];
+  // The efforts still to try for this model, in order.
+  const { efforts, key } = openAiPlan(ai, req.model, effortSetting);
   let json = !!req.json;
 
   let data: OpenAiResponse | undefined;
@@ -428,8 +512,8 @@ const completeOpenAi = async (
   for (let i = 0; i < efforts.length && !data; ) {
     try {
       data = (await send(efforts[i], json)).data;
-      if (reasoning) {
-        openAiEffort.set(req.model, efforts[i]);
+      if (key) {
+        openAiEffort.set(key, efforts[i]);
       }
     } catch (e) {
       lastError = e;
@@ -556,6 +640,8 @@ export interface ConverseRequest {
   messages: ConverseMessage[];
   tools: ConverseTool[];
   maxTokens: number;
+  /** How hard the model thinks; "lowest" if unset. */
+  effort?: AiEffort;
 }
 
 export interface ConverseTurn extends Completion {
@@ -588,7 +674,8 @@ const converseAnthropic = async (
   ai: AiSettings,
   req: ConverseRequest
 ): Promise<ConverseTurn> => {
-  const send = (withEffort: boolean) =>
+  const effort = req.effort ?? 'lowest';
+  const send = (level: string | null) =>
     axios.post<{
       content: {
         type: string;
@@ -603,7 +690,7 @@ const converseAnthropic = async (
       `${ANTHROPIC_URL}/messages`,
       {
         model: req.model,
-        max_tokens: req.maxTokens + THINKING_ROOM,
+        max_tokens: req.maxTokens + THINKING_ROOM[effort],
         system: req.system,
         messages: anthropicMessages(req.messages),
         tools: req.tools.map((tool) => ({
@@ -611,25 +698,14 @@ const converseAnthropic = async (
           description: tool.description,
           input_schema: tool.parameters,
         })),
-        ...(withEffort ? { output_config: { effort: CLAUDE_EFFORT } } : {}),
+        ...(level ? { output_config: { effort: level } } : {}),
       },
-      { headers: anthropicHeaders(ai), timeout: COMPLETION_TIMEOUT_MS }
+      { headers: anthropicHeaders(ai), timeout: COMPLETION_TIMEOUT_MS[effort] }
     );
 
   let response;
   try {
-    const known = claudeEffort.get(req.model);
-    try {
-      response = await send(known !== false);
-      claudeEffort.set(req.model, known !== false);
-    } catch (e) {
-      if (known === undefined && refused(e, 'effort', 'output_config')) {
-        claudeEffort.set(req.model, false);
-        response = await send(false);
-      } else {
-        throw e;
-      }
-    }
+    response = await withClaudeEffort(req.model, effort, send);
   } catch (e) {
     throw explain(e, 'Claude', ai.apiKey);
   }
@@ -715,6 +791,8 @@ const converseOpenAi = async (
     },
   }));
   const messages = openAiMessages(req.system, official, req.messages);
+  const effortSetting = req.effort ?? 'lowest';
+  const room = THINKING_ROOM[effortSetting];
 
   const send = (effort: string | null) =>
     axios.post<{
@@ -735,29 +813,33 @@ const converseOpenAi = async (
             messages,
             tools,
             max_completion_tokens: reasoning
-              ? req.maxTokens + THINKING_ROOM
+              ? req.maxTokens + room
               : req.maxTokens,
             ...(effort ? { reasoning_effort: effort } : {}),
           }
-        : { model: req.model, messages, tools, max_tokens: req.maxTokens },
-      { headers: openAiHeaders(ai), timeout: COMPLETION_TIMEOUT_MS }
+        : {
+            model: req.model,
+            messages,
+            tools,
+            max_tokens: effort ? req.maxTokens + room : req.maxTokens,
+            ...(effort ? { reasoning_effort: effort } : {}),
+          },
+      {
+        headers: openAiHeaders(ai),
+        timeout: COMPLETION_TIMEOUT_MS[effortSetting],
+      }
     );
 
   // With tools, some models refuse the lowest efforts, so "none" and
   // "minimal" may each be refused once before "low" is remembered.
-  const known = openAiEffort.get(req.model);
-  const efforts: (string | null)[] = !reasoning
-    ? [null]
-    : known !== undefined
-      ? [known]
-      : [...OPENAI_EFFORTS, null];
+  const { efforts, key } = openAiPlan(ai, req.model, effortSetting);
   let data;
   let lastError: unknown;
   for (let i = 0; i < efforts.length && !data; ) {
     try {
       data = (await send(efforts[i])).data;
-      if (reasoning) {
-        openAiEffort.set(req.model, efforts[i]);
+      if (key) {
+        openAiEffort.set(key, efforts[i]);
       }
     } catch (e) {
       lastError = e;

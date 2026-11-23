@@ -20,8 +20,8 @@ import {
   CheckCircleIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import type { AiFeature } from '@server/constants/features';
-import { AI_FEATURES } from '@server/constants/features';
+import type { AiEffort, AiFeature } from '@server/constants/features';
+import { AI_EFFORTS, AI_FEATURES } from '@server/constants/features';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -60,8 +60,17 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   modelsFailed: 'The model list could not be loaded: {reason}',
   featureModels: 'Model for Each Feature',
   featureModelsTip:
-    'Optional: a cheaper or stronger model per feature. Empty uses the model above.',
+    'Optional: a cheaper or stronger model, and its effort, per feature. Empty uses the settings above.',
   sameAsAbove: 'Same as above',
+  effort: 'Effort',
+  effortTip:
+    'How hard the model thinks before answering. Higher effort gives better answers, even from cheaper models, but costs more and is slower.',
+  effortLowest: 'Lowest',
+  effortLow: 'Low',
+  effortMedium: 'Medium',
+  effortHigh: 'High',
+  sameAsDefault: 'Same as default',
+  featureEffort: 'Effort for {feature}',
   dailyLimit: 'Daily Limit per Person',
   dailyLimitTip:
     'AI answers per person per day; 0 for no limit. Admins aren’t limited.',
@@ -92,8 +101,17 @@ interface AiSettingsForm {
   baseUrl: string;
   model: string;
   featureModels: Partial<Record<AiFeature, string>>;
+  effort?: AiEffort;
+  featureEfforts?: Partial<Record<AiFeature, AiEffort>>;
   dailyLimit: number;
 }
+
+const EFFORT_NAMES = {
+  lowest: 'effortLowest',
+  low: 'effortLow',
+  medium: 'effortMedium',
+  high: 'effortHigh',
+} as const satisfies Record<AiEffort, keyof typeof messages>;
 
 const SettingsAi = () => {
   const intl = useIntl();
@@ -215,6 +233,8 @@ const SettingsAi = () => {
     baseUrl: form.provider === 'openai' ? form.baseUrl : '',
     model: form.model,
     featureModels: form.featureModels,
+    effort: form.effort ?? 'lowest',
+    featureEfforts: form.featureEfforts ?? {},
     dailyLimit: form.dailyLimit,
   });
 
@@ -499,6 +519,29 @@ const SettingsAi = () => {
             </div>
           </div>
           <div className="form-row">
+            <label htmlFor="aiEffort" className="text-label">
+              {intl.formatMessage(messages.effort)}
+              <span className="label-tip">
+                {intl.formatMessage(messages.effortTip)}
+              </span>
+            </label>
+            <div className="form-input-area">
+              <div className="form-input-field">
+                <select
+                  id="aiEffort"
+                  value={form.effort ?? 'lowest'}
+                  onChange={(e) => set('effort', e.target.value as AiEffort)}
+                >
+                  {AI_EFFORTS.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="form-row">
             <label htmlFor="aiDailyLimit" className="text-label">
               {intl.formatMessage(messages.dailyLimit)}
               <span className="label-tip">
@@ -560,6 +603,37 @@ const SettingsAi = () => {
                       loading={listing}
                       emptyLabel={intl.formatMessage(messages.sameAsAbove)}
                     />
+                    <select
+                      id={`aiEffort-${feature}`}
+                      className="sm:w-44 sm:flex-none"
+                      aria-label={intl.formatMessage(messages.featureEffort, {
+                        feature: intl.formatMessage(messages[feature]),
+                      })}
+                      value={form.featureEfforts?.[feature] ?? ''}
+                      onChange={(e) => {
+                        const { [feature]: _old, ...others } =
+                          form.featureEfforts ?? {};
+                        void _old;
+                        set(
+                          'featureEfforts',
+                          e.target.value
+                            ? {
+                                ...others,
+                                [feature]: e.target.value as AiEffort,
+                              }
+                            : others
+                        );
+                      }}
+                    >
+                      <option value="">
+                        {intl.formatMessage(messages.sameAsDefault)}
+                      </option>
+                      {AI_EFFORTS.map((effort) => (
+                        <option key={effort} value={effort}>
+                          {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ))}
               </div>

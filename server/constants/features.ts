@@ -58,3 +58,14 @@ export const featureOn = (
   userOff: readonly string[] | undefined
 ): boolean =>
   !(globallyOff ?? []).includes(feature) && !(userOff ?? []).includes(feature);
+
+/**
+ * How hard the model thinks before answering. "lowest" is the least each
+ * model accepts; higher costs more and is slower, but answers better.
+ */
+export const AI_EFFORTS = ['lowest', 'low', 'medium', 'high'] as const;
+
+export type AiEffort = (typeof AI_EFFORTS)[number];
+
+export const isAiEffort = (value: unknown): value is AiEffort =>
+  AI_EFFORTS.includes(value as AiEffort);

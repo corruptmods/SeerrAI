@@ -2,7 +2,7 @@ import { radarrRouting } from '@server/lib/radarrRouting';
 import type { RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 /* Where a movie goes in Radarr, before a request's own folder or profile. */
 
@@ -31,6 +31,18 @@ const westernAnimation = {
   genres: [{ id: 16 }],
   original_language: 'en',
 };
+
+// With anime on (Settings → Services → Anime); the switch has its own tests.
+beforeEach(() => {
+  getSettings().main.anime = 'on';
+  getSettings().sonarr = [];
+  getSettings().radarr = [];
+});
+
+afterEach(() => {
+  getSettings().main.anime = 'auto';
+  getSettings().radarr = [];
+});
 
 describe('radarrRouting', () => {
   it('sends detected anime to the anime folder, profile and tags', () => {
@@ -145,5 +157,45 @@ describe('radarrRouting', () => {
     const routing = radarrRouting(westernAnimation, settings);
     routing.tags.push(99);
     assert.deepEqual(settings.tags, [1]);
+  });
+});
+
+describe('radarrRouting with the anime switch', () => {
+  const usual = {
+    anime: false,
+    decidedBy: 'off',
+    rootFolder: '/movies',
+    qualityProfile: 6,
+    tags: [1],
+  };
+
+  it('sends every movie with the usual settings while anime is off, ticked as anime or not', () => {
+    getSettings().main.anime = 'off';
+    assert.deepEqual(radarrRouting(animeKeyworded, settings), usual);
+    assert.deepEqual(
+      radarrRouting(westernAnimation, settings, 'anime', true),
+      usual
+    );
+  });
+
+  it('follows the servers in auto', () => {
+    getSettings().main.anime = 'auto';
+    assert.deepEqual(radarrRouting(animeKeyworded, settings), usual);
+
+    // An anime profile of its own on any Radarr is an anime library.
+    getSettings().radarr = [
+      {
+        ...settings,
+        activeAnimeDirectory: undefined,
+        animeTags: undefined,
+      } as unknown as RadarrSettings,
+    ];
+    assert.deepEqual(radarrRouting(animeKeyworded, settings), {
+      anime: true,
+      decidedBy: 'detection',
+      rootFolder: '/anime-movies',
+      qualityProfile: 9,
+      tags: [4],
+    });
   });
 });

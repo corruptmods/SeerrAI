@@ -18,6 +18,7 @@ const messages = defineMessages('components.Settings.AnimeCheck', {
   run: 'Run Check',
   running: 'Checking…',
   runFailed: 'The check could not be started.',
+  off: 'Anime Check is off. Turn it on above to run it.',
   neverRun: 'Not run yet. It runs daily, or now with Run Check.',
   checkedAt: 'Checked {when}.',
   summary:
@@ -177,11 +178,16 @@ const AnimeCheck = () => {
       </div>
       <div className="section max-w-6xl space-y-4">
         {problem && <Alert title={problem} type="error" />}
+        {report?.enabled === false && (
+          <p className="text-sm text-gray-400">
+            {intl.formatMessage(messages.off)}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Button
             buttonType="primary"
             buttonSize="sm"
-            disabled={!report || report.running}
+            disabled={!report || report.running || report.enabled === false}
             onClick={run}
           >
             <PlayIcon />

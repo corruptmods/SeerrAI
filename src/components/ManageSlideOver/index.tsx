@@ -688,6 +688,7 @@ const ManageSlideOver = ({
             </div>
           )}
         {hasPermission(Permission.ADMIN) &&
+          settings.currentSettings.animeEnabled &&
           data?.mediaInfo &&
           data.mediaInfo.status !== MediaStatus.BLOCKLISTED && (
             <AnimeSetting

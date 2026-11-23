@@ -106,6 +106,8 @@ afterEach(async () => {
   scheduledJobs.length = 0;
   process.off('unhandledRejection', onUnhandled);
   getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+  getSettings().main.anime = 'auto';
+  getSettings().main.animeCheck = true;
   for (const kind of MEDIA_SERVER_KINDS) getSettings()[kind].connected = false;
   mock.restoreAll();
 });
@@ -128,6 +130,8 @@ describe('scheduled jobs', () => {
   ] as const) {
     it(`logs a failed job and keeps the server up (${MediaServerType[serverType]})`, async () => {
       getSettings().main.mediaServerType = serverType;
+      // Anime on, so Anime Check runs too.
+      getSettings().main.anime = 'on';
       stubEveryJob();
       const errors = mock.method(logger, 'error');
 
@@ -151,6 +155,34 @@ describe('scheduled jobs', () => {
       }
     });
   }
+
+  it('lists Anime Check as off and skips it while anime or the check is off', async () => {
+    const run = mock.method(animeCheck, 'run', async () => undefined);
+    startJobs();
+    const job = scheduledJobs.find((j) => j.id === 'anime-check');
+    assert.ok(job, 'still listed, so its schedule can be edited');
+
+    // Auto, with no anime library on any server.
+    getSettings().sonarr = [];
+    getSettings().radarr = [];
+    assert.equal(job.off?.(), true);
+    job.job.invoke();
+    await settle();
+    assert.equal(run.mock.callCount(), 0);
+
+    getSettings().main.anime = 'on';
+    getSettings().main.animeCheck = false;
+    assert.equal(job.off?.(), true);
+    job.job.invoke();
+    await settle();
+    assert.equal(run.mock.callCount(), 0);
+
+    getSettings().main.animeCheck = true;
+    assert.equal(job.off?.(), false);
+    job.job.invoke();
+    await settle();
+    assert.equal(run.mock.callCount(), 1);
+  });
 
   it('replaces its jobs when started again, rather than scheduling them twice', () => {
     connect('plex');

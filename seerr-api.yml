@@ -375,8 +375,25 @@ components:
         - disabled
     AnimeSettings:
       type: object
-      description: What counts as anime.
+      description: Whether anime handling is on, whether Anime Check runs, and what counts as anime. A POST changes only the fields it sends; mode, check and excludedCountries are the ones it takes.
       properties:
+        mode:
+          type: string
+          enum: [auto, 'on', 'off']
+          description: auto (the default, also for settings saved before this existed) is on while some Sonarr or Radarr server has an anime root folder, an anime quality profile other than its standard one, or anime tags. Off sends every request with the standard settings, ignores anime choices sent with requests, and stops Anime Check.
+          example: auto
+        enabled:
+          type: boolean
+          readOnly: true
+          description: Whether anime handling is on now. Also in public settings as animeEnabled.
+        librarySetUp:
+          type: boolean
+          readOnly: true
+          description: Whether some Sonarr or Radarr server has an anime library, which auto follows.
+        check:
+          type: boolean
+          description: Whether Anime Check runs. On by default; it never runs while anime is off.
+          example: true
         excludedCountries:
           type: array
           description: Countries (ISO 3166-1) whose anime does not count as anime unless it is in Japanese. Empty counts anime from everywhere.
@@ -384,8 +401,6 @@ components:
             type: string
             pattern: '^[A-Za-z]{2}$'
           example: [US]
-      required:
-        - excludedCountries
     ThemeDefaults:
       type: object
       description: The server's default look, for everyone who has not chosen their own and the sign-in page.
@@ -1040,6 +1055,13 @@ components:
     MainSettings:
       type: object
       properties:
+        anime:
+          type: string
+          enum: [auto, 'on', 'off']
+          description: Anime handling; see AnimeSettings.mode. auto unless set.
+        animeCheck:
+          type: boolean
+          description: Whether Anime Check runs while anime is on. On unless turned off.
         personalApiKeys:
           type: string
           enum: ['off', 'managers', 'everyone']
@@ -2165,6 +2187,9 @@ components:
           description: Countries whose anime does not count as anime unless it is in Japanese. Set through /settings/anime.
           items:
             type: string
+        animeEnabled:
+          type: boolean
+          description: Whether anime handling is on (anime request choices, anime routing, Anime Check). Set through /settings/anime.
         personalApiKeys:
           type: string
           enum: ['off', 'managers', 'everyone']
@@ -3571,7 +3596,7 @@ components:
           type: boolean
         decidedBy:
           type: string
-          enum: [title, request, detection]
+          enum: [title, request, detection, 'off']
         automatic:
           type: boolean
         servers:
@@ -3592,7 +3617,7 @@ components:
                 type: boolean
               decidedBy:
                 type: string
-                enum: [title, request, detection]
+                enum: [title, request, detection, 'off']
               automatic:
                 type: boolean
               path:
@@ -4050,6 +4075,10 @@ components:
           example: '2020-09-02T05:02:23.000Z'
         running:
           type: boolean
+          example: false
+        off:
+          type: boolean
+          description: Switched off in its settings, so it does not run (Anime Check while anime or the check is off).
           example: false
     PersonDetails:
       type: object
@@ -4707,7 +4736,7 @@ paths:
                 $ref: '#/components/schemas/MainSettings'
   /settings/anime:
     get:
-      summary: What counts as anime
+      summary: Anime handling and what counts as anime
       tags:
         - settings
       responses:
@@ -4718,8 +4747,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/AnimeSettings'
     post:
-      summary: Set what counts as anime
-      description: Replaces the whole list of countries whose anime is left out.
+      summary: Set anime handling and what counts as anime
+      description: Changes the fields sent. excludedCountries replaces the whole list of countries whose anime is left out.
       tags:
         - settings
       requestBody:
@@ -4736,7 +4765,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AnimeSettings'
         '400':
-          description: Not a list of country codes
+          description: No field to change, a mode other than auto, on or off, check not true or false, or not a list of country codes
   /settings/appearance:
     get:
       summary: The server's default look
@@ -9747,6 +9776,9 @@ paths:
                     nullable: true
                   running:
                     type: boolean
+                  enabled:
+                    type: boolean
+                    description: Whether Anime Check runs (anime and the check both on).
                   servers:
                     type: array
                     items:
@@ -9788,7 +9820,7 @@ paths:
                                 type: boolean
                               decidedBy:
                                 type: string
-                                enum: [title, request, detection]
+                                enum: [title, request, detection, 'off']
                               wrongType:
                                 type: boolean
                               wrongFolder:
@@ -9837,7 +9869,7 @@ paths:
                                 type: boolean
                               decidedBy:
                                 type: string
-                                enum: [title, request, detection]
+                                enum: [title, request, detection, 'off']
                               wrongFolder:
                                 type: boolean
                               expectedFolder:
@@ -9867,6 +9899,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
+        '409':
+          description: The job is switched off
   /settings/jobs/{jobId}/cancel:
     post:
       summary: Cancel a specific job
@@ -18169,6 +18203,8 @@ paths:
                               type: string
         '404':
           description: No such media
+        '409':
+          description: Anime is off, so titles have no anime setting
   /media/{mediaId}/watched-by:
     get:
       summary: Who has watched a title, from Tautulli

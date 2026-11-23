@@ -2,6 +2,7 @@
 import CachedImage from '@app/components/Common/CachedImage';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -138,14 +139,17 @@ const AdvancedRequester = ({
     defaultOverrides?.ignoreQuota ?? false
   );
   // Same precedence as AnimeChoice: tick, edited request's type, title
-  // setting, matching rule, detection.
+  // setting, matching rule, detection. Never anime while anime is off.
+  const { currentSettings } = useSettings();
+  const animeEnabled = currentSettings.animeEnabled;
   const [ruleSeriesType, setRuleSeriesType] = useState<SeriesType | null>(null);
   const anime =
-    animeChoice ??
-    (requestSeriesType
-      ? requestSeriesType === 'anime'
-      : (animeSetting ??
-        (ruleSeriesType ? ruleSeriesType === 'anime' : isAnime)));
+    animeEnabled &&
+    (animeChoice ??
+      (requestSeriesType
+        ? requestSeriesType === 'anime'
+        : (animeSetting ??
+          (ruleSeriesType ? ruleSeriesType === 'anime' : isAnime))));
   // Movies fall back to standard tags when there are no anime ones, matching
   // lib/radarrRouting.
   const kindTags = (server: ServiceCommonServer, value: boolean) =>
@@ -479,8 +483,11 @@ const AdvancedRequester = ({
               serviceId: selectedServer ?? undefined,
               requestId: requestId ?? undefined,
               // Match rules against the series type as it will be sent.
-              seriesType:
-                animeChoice === null
+              seriesType: !animeEnabled
+                ? requestSeriesType === 'daily'
+                  ? 'daily'
+                  : undefined
+                : animeChoice === null
                   ? (requestSeriesType ?? undefined)
                   : animeChoice
                     ? 'anime'
@@ -495,6 +502,7 @@ const AdvancedRequester = ({
           setRuleSeriesType(override.seriesType ?? null);
           onRuleSeriesType?.(override.seriesType ?? null);
           if (
+            animeEnabled &&
             override.seriesType &&
             animeChoice === null &&
             animeSetting === null &&

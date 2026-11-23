@@ -1,5 +1,5 @@
 import blocklistedTagsProcessor from '@server/job/blocklistedTagsProcessor';
-import animeCheck from '@server/lib/animeCheck';
+import animeCheck, { animeCheckEnabled } from '@server/lib/animeCheck';
 import availabilitySync from '@server/lib/availabilitySync';
 import backfill from '@server/lib/backfill/engine';
 import { maintenanceStatus, runDbMaintenance } from '@server/lib/dbMaintenance';
@@ -53,6 +53,8 @@ interface ScheduledJob {
   cronSchedule: string;
   running?: () => boolean;
   cancelFn?: () => void;
+  /** Switched off in its settings: listed as off, and never runs. */
+  off?: () => boolean;
 }
 
 export const scheduledJobs: ScheduledJob[] = [];
@@ -577,7 +579,8 @@ export const startJobs = (): void => {
   });
 
   // Report only: Sonarr series and Radarr movies whose anime status disagrees
-  // with Seerr's. Changes nothing.
+  // with Seerr's. Changes nothing. Off while anime is off or the check is
+  // switched off (Settings → Services → Anime).
   scheduledJobs.push({
     id: 'anime-check',
     name: 'Anime Check',
@@ -587,12 +590,16 @@ export const startJobs = (): void => {
     job: schedule.scheduleJob(
       jobs['anime-check'].schedule,
       runJob('Anime Check', () => {
+        if (!animeCheckEnabled()) {
+          return;
+        }
         logger.info('Starting scheduled job: Anime Check', { label: 'Jobs' });
         return animeCheck.run();
       })
     ),
     running: () => animeCheck.status().running,
     cancelFn: () => animeCheck.cancel(),
+    off: () => !animeCheckEnabled(),
   });
 
   // Finds stuck series and searches a few each run. No-op until enabled and set

@@ -1,6 +1,6 @@
 import { MediaServerType } from '@server/constants/server';
 import type { AllSettings } from '@server/lib/settings';
-import { getSettings, SETTINGS_PATH } from '@server/lib/settings';
+import Settings, { getSettings, SETTINGS_PATH } from '@server/lib/settings';
 import { runMigrations } from '@server/lib/settings/migrator';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -82,5 +82,21 @@ describe('settings files', { skip: process.platform === 'win32' }, () => {
     assert.ok(saved.main.apiKey);
     assert.match(saved.sessionSecret, /^[0-9a-f]{64}$/);
     assert.ok(saved.vapidPrivate && saved.vapidPublic);
+  });
+
+  it('loads a file from before the anime switch as auto, with Anime Check on', async () => {
+    const old = {
+      ...installed(),
+      main: { ...installed().main, animeExcludedCountries: ['US'] },
+    };
+    assert.equal('anime' in old.main, false);
+    await fs.writeFile(SETTINGS_PATH, JSON.stringify(old));
+    // As at startup: the file over the defaults.
+    const loaded = await new Settings().load();
+
+    assert.equal(loaded.main.anime, 'auto');
+    assert.equal(loaded.main.animeCheck, true);
+    assert.deepEqual(loaded.main.animeExcludedCountries, ['US']);
+    assert.equal(loaded.animeOn, false);
   });
 });

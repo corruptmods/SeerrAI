@@ -613,6 +613,51 @@ export const musicInAllSearch = (
 
 export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
+/**
+ * Anime handling (Settings → Services → Anime): 'auto' while an anime library
+ * is set up (animeLibrarySetUp), else always on or always off.
+ */
+export type AnimeMode = 'auto' | 'on' | 'off';
+
+export const ANIME_MODES: readonly AnimeMode[] = ['auto', 'on', 'off'];
+
+/** The anime fields a Sonarr or Radarr server can have. */
+type AnimeLibraryFields = Pick<
+  DVRSettings,
+  'activeDirectory' | 'activeProfileId' | 'tags'
+> & {
+  activeAnimeDirectory?: string;
+  activeAnimeProfileId?: number;
+  animeTags?: number[];
+};
+
+/**
+ * Whether some Sonarr or Radarr server has an anime library: an anime root
+ * folder or quality profile other than its standard one, or anime tags other
+ * than its standard tags. Sonarr's anime series type doesn't count: it is
+ * 'anime' on every server unless changed.
+ */
+export const animeLibrarySetUp = (
+  servers: readonly AnimeLibraryFields[]
+): boolean =>
+  servers.some((server) => {
+    const tags = [...(server.tags ?? [])].sort().join();
+    return (
+      (!!server.activeAnimeDirectory &&
+        server.activeAnimeDirectory !== server.activeDirectory) ||
+      (!!server.activeAnimeProfileId &&
+        server.activeAnimeProfileId !== server.activeProfileId) ||
+      (!!server.animeTags?.length &&
+        [...server.animeTags].sort().join() !== tags)
+    );
+  });
+
+/** Whether anime handling is on, from the mode and the servers. */
+export const animeSwitchedOn = (
+  mode: AnimeMode | undefined,
+  servers: readonly AnimeLibraryFields[]
+): boolean => mode === 'on' || (mode !== 'off' && animeLibrarySetUp(servers));
+
 export interface SonarrSettings extends DVRSettings {
   seriesType: 'standard' | 'daily' | 'anime';
   /** Root folders some quality profiles always go to, unless a request manager picks another. */
@@ -737,6 +782,13 @@ export interface MainSettings {
    * Empty on new servers; migration 0011 sets US on older ones.
    */
   animeExcludedCountries: string[];
+  /**
+   * Anime handling (anime request choices, routing to anime folders, profiles
+   * and tags, Anime Check). Old settings files load as 'auto'.
+   */
+  anime: AnimeMode;
+  /** Whether Anime Check runs; it never runs while anime is off. */
+  animeCheck: boolean;
   /** Create accounts for everyone the owner shares the Plex server with. */
   autoImportPlexUsers: boolean;
   /**
@@ -858,6 +910,8 @@ interface FullPublicSettings extends PublicSettings {
   applicationUrl: string;
   disabledFeatures: string[];
   animeExcludedCountries: string[];
+  /** Whether anime handling is on (MainSettings.anime, resolved). */
+  animeEnabled: boolean;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
@@ -1210,6 +1264,8 @@ class Settings {
         overQuotaRequests: false,
         disabledFeatures: [],
         animeExcludedCountries: [],
+        anime: 'auto',
+        animeCheck: true,
         autoImportPlexUsers: false,
         removeUsersWithoutAccess: false,
         removedTitleRequests: 'off',
@@ -1791,6 +1847,17 @@ class Settings {
     this.data.sonarr = data;
   }
 
+  /**
+   * Whether anime handling is on: Settings → Services → Anime, where 'auto'
+   * means while some Sonarr or Radarr has an anime library.
+   */
+  get animeOn(): boolean {
+    return animeSwitchedOn(this.data.main.anime, [
+      ...(this.data.sonarr ?? []),
+      ...(this.data.radarr ?? []),
+    ]);
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -1806,6 +1873,7 @@ class Settings {
       applicationUrl: this.data.main.applicationUrl,
       disabledFeatures: this.data.main.disabledFeatures ?? [],
       animeExcludedCountries: this.data.main.animeExcludedCountries ?? [],
+      animeEnabled: this.animeOn,
       hideAvailable: this.data.main.hideAvailable,
       hideBlocklisted: this.data.main.hideBlocklisted,
       hideRequested: this.data.main.hideRequested,

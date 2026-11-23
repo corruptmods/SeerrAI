@@ -15,6 +15,7 @@ const defaultSettings = {
   applicationUrl: '',
   disabledFeatures: [] as string[],
   animeExcludedCountries: [] as string[],
+  animeEnabled: false,
   hideAvailable: false,
   hideBlocklisted: false,
   hideRequested: false,

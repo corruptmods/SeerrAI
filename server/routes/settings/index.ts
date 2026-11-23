@@ -57,8 +57,12 @@ import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import { searchAllMissing } from '@server/lib/searchMissing';
 import { cleanSeasons, seasonSettings } from '@server/lib/seasons';
-import type { JobId, MainSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import type { AnimeMode, JobId, MainSettings } from '@server/lib/settings';
+import {
+  ANIME_MODES,
+  animeLibrarySetUp,
+  getSettings,
+} from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { requireMusicSettings } from '@server/middleware/music';
@@ -175,6 +179,19 @@ settingsRoutes.post('/main', async (req, res, next) => {
   }
   const keysBefore = settings.main.personalApiKeys ?? 'off';
 
+  const animeAsked = req.body as { anime?: unknown; animeCheck?: unknown };
+  if (
+    (animeAsked.anime !== undefined &&
+      !(ANIME_MODES as readonly unknown[]).includes(animeAsked.anime)) ||
+    (animeAsked.animeCheck !== undefined &&
+      typeof animeAsked.animeCheck !== 'boolean')
+  ) {
+    return next({
+      status: 400,
+      message: 'Anime must be auto, on or off, and Anime Check true or false.',
+    });
+  }
+
   // The primary media server is changed only under Settings → Media Servers.
   const update = omit(req.body, 'mediaServerType');
   settings.main = merge(settings.main, update);
@@ -256,34 +273,82 @@ settingsRoutes.post('/siri', async (req, res, next) => {
   return res.status(200).json({ shortcutUrl });
 });
 
+/** Settings → Services → Anime, as GET and POST /settings/anime return it. */
+const animeSettingsView = () => {
+  const settings = getSettings();
+  return {
+    mode: settings.main.anime ?? 'auto',
+    enabled: settings.animeOn,
+    librarySetUp: animeLibrarySetUp([...settings.sonarr, ...settings.radarr]),
+    check: settings.main.animeCheck !== false,
+    excludedCountries: settings.main.animeExcludedCountries ?? [],
+  };
+};
+
 /*
- * What counts as anime: countries whose anime counts only when in Japanese
- * (utils/isAnime). Set as a whole list, like the features.
+ * Anime handling: on, off, or auto (on while some Sonarr or Radarr has an
+ * anime library); whether Anime Check runs; and what counts as anime:
+ * countries whose anime counts only when in Japanese (utils/isAnime), set as
+ * a whole list like the features. A POST changes only the fields it sends.
  */
 settingsRoutes.get('/anime', (_req, res) => {
-  return res.status(200).json({
-    excludedCountries: getSettings().main.animeExcludedCountries ?? [],
-  });
+  return res.status(200).json(animeSettingsView());
 });
 
 settingsRoutes.post('/anime', async (req, res, next) => {
-  const asked = (req.body as { excludedCountries?: unknown }).excludedCountries;
+  const body = (req.body ?? {}) as {
+    mode?: unknown;
+    check?: unknown;
+    excludedCountries?: unknown;
+  };
+  const { mode, check, excludedCountries: asked } = body;
+  if (mode === undefined && check === undefined && asked === undefined) {
+    return next({
+      status: 400,
+      message: 'Send a mode, check or excludedCountries to change.',
+    });
+  }
   if (
-    !Array.isArray(asked) ||
-    asked.some((code) => typeof code !== 'string' || !/^[a-z]{2}$/i.test(code))
+    mode !== undefined &&
+    !(ANIME_MODES as readonly unknown[]).includes(mode)
+  ) {
+    return next({
+      status: 400,
+      message: 'The anime mode must be auto, on or off.',
+    });
+  }
+  if (check !== undefined && typeof check !== 'boolean') {
+    return next({
+      status: 400,
+      message: 'Whether Anime Check runs must be true or false.',
+    });
+  }
+  if (
+    asked !== undefined &&
+    (!Array.isArray(asked) ||
+      asked.some(
+        (code) => typeof code !== 'string' || !/^[a-z]{2}$/i.test(code)
+      ))
   ) {
     return next({
       status: 400,
       message: 'A list of two-letter country codes is required.',
     });
   }
-  const excludedCountries = [
-    ...new Set(asked.map((code: string) => code.toUpperCase())),
-  ].sort();
   const settings = getSettings();
-  settings.main.animeExcludedCountries = excludedCountries;
+  if (mode !== undefined) {
+    settings.main.anime = mode as AnimeMode;
+  }
+  if (check !== undefined) {
+    settings.main.animeCheck = check as boolean;
+  }
+  if (asked !== undefined) {
+    settings.main.animeExcludedCountries = [
+      ...new Set((asked as string[]).map((code) => code.toUpperCase())),
+    ].sort();
+  }
   await settings.save();
-  return res.status(200).json({ excludedCountries });
+  return res.status(200).json(animeSettingsView());
 });
 
 /*
@@ -1101,18 +1166,20 @@ settingsRoutes.get('/anime-check', async (_req, res) => {
   return res.status(200).json(await animeCheck.lastReport());
 });
 
+/** A scheduled job as the jobs list shows it; `off` when switched off. */
+const jobView = (job: (typeof scheduledJobs)[number]) => ({
+  id: job.id,
+  name: job.name,
+  type: job.type,
+  interval: job.interval,
+  cronSchedule: job.cronSchedule,
+  nextExecutionTime: job.job.nextInvocation(),
+  running: job.running ? job.running() : false,
+  off: job.off ? job.off() : false,
+});
+
 settingsRoutes.get('/jobs', (_req, res) => {
-  return res.status(200).json(
-    scheduledJobs.map((job) => ({
-      id: job.id,
-      name: job.name,
-      type: job.type,
-      interval: job.interval,
-      cronSchedule: job.cronSchedule,
-      nextExecutionTime: job.job.nextInvocation(),
-      running: job.running ? job.running() : false,
-    }))
-  );
+  return res.status(200).json(scheduledJobs.map(jobView));
 });
 
 settingsRoutes.post<{ jobId: string }>('/jobs/:jobId/run', (req, res, next) => {
@@ -1121,18 +1188,16 @@ settingsRoutes.post<{ jobId: string }>('/jobs/:jobId/run', (req, res, next) => {
   if (!scheduledJob) {
     return next({ status: 404, message: 'Job not found.' });
   }
+  if (scheduledJob.off?.()) {
+    return next({
+      status: 409,
+      message: `${scheduledJob.name} is off, so it can't run.`,
+    });
+  }
 
   scheduledJob.job.invoke();
 
-  return res.status(200).json({
-    id: scheduledJob.id,
-    name: scheduledJob.name,
-    type: scheduledJob.type,
-    interval: scheduledJob.interval,
-    cronSchedule: scheduledJob.cronSchedule,
-    nextExecutionTime: scheduledJob.job.nextInvocation(),
-    running: scheduledJob.running ? scheduledJob.running() : false,
-  });
+  return res.status(200).json(jobView(scheduledJob));
 });
 
 settingsRoutes.post<{ jobId: JobId }>(
@@ -1150,15 +1215,7 @@ settingsRoutes.post<{ jobId: JobId }>(
       scheduledJob.cancelFn();
     }
 
-    return res.status(200).json({
-      id: scheduledJob.id,
-      name: scheduledJob.name,
-      type: scheduledJob.type,
-      interval: scheduledJob.interval,
-      cronSchedule: scheduledJob.cronSchedule,
-      nextExecutionTime: scheduledJob.job.nextInvocation(),
-      running: scheduledJob.running ? scheduledJob.running() : false,
-    });
+    return res.status(200).json(jobView(scheduledJob));
   }
 );
 
@@ -1182,15 +1239,7 @@ settingsRoutes.post<{ jobId: JobId }>(
 
       scheduledJob.cronSchedule = req.body.schedule;
 
-      return res.status(200).json({
-        id: scheduledJob.id,
-        name: scheduledJob.name,
-        type: scheduledJob.type,
-        interval: scheduledJob.interval,
-        cronSchedule: scheduledJob.cronSchedule,
-        nextExecutionTime: scheduledJob.job.nextInvocation(),
-        running: scheduledJob.running ? scheduledJob.running() : false,
-      });
+      return res.status(200).json(jobView(scheduledJob));
     } else {
       return next({ status: 400, message: 'Invalid job schedule.' });
     }

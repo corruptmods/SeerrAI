@@ -22,6 +22,8 @@ export interface SonarrRouting {
  * decideAnime decides anime. Anime gets the server's anime folder, profiles,
  * tags and series type where set. A series type on the request (e.g. a
  * rule's daily type) is used as is; otherwise the server's for that kind.
+ * While anime is off, a request's anime or standard type is ignored and the
+ * series goes with the server's standard settings.
  */
 export const sonarrRouting = (
   series: AnimeSignals,
@@ -35,11 +37,16 @@ export const sonarrRouting = (
     animeSetting
   );
 
+  const requestType =
+    decidedBy === 'off' && chosenSeriesType !== 'daily'
+      ? null
+      : chosenSeriesType;
+
   return {
     anime,
     decidedBy,
     seriesType:
-      chosenSeriesType ??
+      requestType ??
       (anime
         ? (settings.animeSeriesType ?? 'anime')
         : (settings.seriesType ?? 'standard')),

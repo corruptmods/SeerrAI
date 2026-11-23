@@ -9,7 +9,7 @@ import {
   ArrowDownOnSquareIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import type { Region } from '@server/lib/settings';
+import type { AnimeMode, Region } from '@server/lib/settings';
 import axios from 'axios';
 import sortBy from 'lodash/sortBy';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +21,20 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
   anime: 'Anime',
   description:
     'What counts as anime decides where requests go in Sonarr and Radarr, and what the Anime page lists.',
+  mode: 'Anime handling',
+  modeTip:
+    'Auto turns it on while a Sonarr or Radarr server has an anime root folder, anime quality profile or anime tags of its own. Off sends everything with the standard settings and hides the anime choices.',
+  modeAuto: 'Auto',
+  modeOn: 'On',
+  modeOff: 'Off',
+  nowOnLibrary: 'On now: a Sonarr or Radarr server has an anime library.',
+  nowOffNoLibrary:
+    'Off now: no Sonarr or Radarr server has an anime root folder, quality profile or tags of its own.',
+  nowOn: 'On, whatever the servers have.',
+  nowOff: 'Off, whatever the servers have.',
+  check: 'Anime Check',
+  checkTip:
+    'Checks daily for titles Sonarr or Radarr treat differently from Seerr AI. It never runs while anime is off.',
   leaveOut: 'Leave out anime made in',
   leaveOutTip:
     'Anime-style titles from these countries count as regular. Japanese-language animation is always anime.',
@@ -32,23 +46,40 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
 
 type Option = { value: string; label: string };
 
+/** GET and POST /settings/anime. */
+interface AnimeSettingsResponse {
+  mode: AnimeMode;
+  /** Whether anime handling is on now. */
+  enabled: boolean;
+  /** Whether some Sonarr or Radarr has an anime library (what auto follows). */
+  librarySetUp: boolean;
+  /** Whether Anime Check runs while anime is on. */
+  check: boolean;
+  excludedCountries: string[];
+}
+
 /*
- * Countries whose anime-style titles count as regular unless in Japanese
- * (utils/isAnime). Saved as a whole list.
+ * Anime handling on, off or auto (on while an anime library is set up), Anime
+ * Check's own switch, and countries whose anime-style titles count as regular
+ * unless in Japanese (utils/isAnime). Saved together.
  */
 const AnimeSettings = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { data, error, mutate } = useSWR<{ excludedCountries: string[] }>(
+  const { data, error, mutate } = useSWR<AnimeSettingsResponse>(
     '/api/v1/settings/anime'
   );
   const { data: regions } = useSWR<Region[]>('/api/v1/regions');
   const [chosen, setChosen] = useState<string[]>();
+  const [mode, setMode] = useState<AnimeMode>();
+  const [check, setCheck] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (data && !chosen) {
       setChosen(data.excludedCountries);
+      setMode(data.mode);
+      setCheck(data.check);
     }
   }, [data, chosen]);
 
@@ -75,14 +106,18 @@ const AnimeSettings = () => {
   const save = async () => {
     setBusy(true);
     try {
-      const saved = await axios.post<{ excludedCountries: string[] }>(
+      const saved = await axios.post<AnimeSettingsResponse>(
         '/api/v1/settings/anime',
-        { excludedCountries: chosen ?? [] }
+        { mode, check, excludedCountries: chosen ?? [] }
       );
       setChosen(saved.data.excludedCountries);
+      setMode(saved.data.mode);
+      setCheck(saved.data.check);
       await mutate(saved.data);
-      // Public settings carry the same list for client-side anime checks.
+      // Public settings carry the switch and the list for the pages.
       await globalMutate('/api/v1/settings/public');
+      await globalMutate('/api/v1/settings/anime-check');
+      await globalMutate('/api/v1/settings/jobs');
       addToast(intl.formatMessage(messages.saved), {
         appearance: 'success',
         autoDismiss: true,
@@ -106,7 +141,7 @@ const AnimeSettings = () => {
         </p>
       </div>
       <div className="section">
-        {!chosen ? (
+        {!chosen || !mode || !data ? (
           error ? (
             <Alert type="error" title={intl.formatMessage(messages.loadFailed)}>
               <Button buttonSize="sm" onClick={() => mutate()}>
@@ -124,6 +159,64 @@ const AnimeSettings = () => {
               void save();
             }}
           >
+            <div className="form-row">
+              <label htmlFor="animeMode" className="text-label">
+                {intl.formatMessage(messages.mode)}
+                <span className="label-tip">
+                  {intl.formatMessage(messages.modeTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <div className="form-input-field">
+                  <select
+                    id="animeMode"
+                    name="animeMode"
+                    value={mode}
+                    disabled={busy}
+                    onChange={(e) => setMode(e.target.value as AnimeMode)}
+                  >
+                    <option value="auto">
+                      {intl.formatMessage(messages.modeAuto)}
+                    </option>
+                    <option value="on">
+                      {intl.formatMessage(messages.modeOn)}
+                    </option>
+                    <option value="off">
+                      {intl.formatMessage(messages.modeOff)}
+                    </option>
+                  </select>
+                </div>
+                <p className="mt-2 text-sm text-gray-400" aria-live="polite">
+                  {intl.formatMessage(
+                    mode === 'auto'
+                      ? data.librarySetUp
+                        ? messages.nowOnLibrary
+                        : messages.nowOffNoLibrary
+                      : mode === 'on'
+                        ? messages.nowOn
+                        : messages.nowOff
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="form-row">
+              <label htmlFor="animeCheck" className="checkbox-label">
+                {intl.formatMessage(messages.check)}
+                <span className="label-tip">
+                  {intl.formatMessage(messages.checkTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <input
+                  type="checkbox"
+                  id="animeCheck"
+                  name="animeCheck"
+                  checked={check}
+                  disabled={busy}
+                  onChange={(e) => setCheck(e.target.checked)}
+                />
+              </div>
+            </div>
             <div className="form-row">
               <label htmlFor="animeExcludedCountries" className="text-label">
                 {intl.formatMessage(messages.leaveOut)}

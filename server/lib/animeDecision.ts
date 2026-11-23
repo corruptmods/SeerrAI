@@ -10,8 +10,11 @@ import { isAnime } from '@server/utils/isAnime';
 export const detectAnime = (media: AnimeSignals): boolean =>
   isAnime(media, getSettings().main.animeExcludedCountries ?? []);
 
-/** Who decided whether a title is anime. */
-export type AnimeDecidedBy = 'title' | 'request' | 'detection';
+/** Whether anime handling is on (Settings → Services → Anime). */
+export const animeOn = (): boolean => getSettings().animeOn;
+
+/** Who decided whether a title is anime; 'off' while anime is off. */
+export type AnimeDecidedBy = 'title' | 'request' | 'detection' | 'off';
 
 /** Series type of the newest request with this `is4k` that has one. */
 export const requestSeriesType = (
@@ -28,7 +31,8 @@ export const requestSeriesType = (
 
 /**
  * Whether a title is anime, and who decided: the request's series type, then
- * the title's own setting, then detection.
+ * the title's own setting, then detection. Nothing is anime while anime is off,
+ * whatever the request or the title says.
  *
  * A request only carries a rule's type that agrees with the title's setting
  * (MediaRequest.request), and saving the setting clears disagreeing request
@@ -39,6 +43,9 @@ export const decideAnime = (
   requestSeriesType?: SeriesType | null,
   animeSetting?: boolean | null
 ): { anime: boolean; decidedBy: AnimeDecidedBy } => {
+  if (!animeOn()) {
+    return { anime: false, decidedBy: 'off' };
+  }
   if (requestSeriesType) {
     return { anime: requestSeriesType === 'anime', decidedBy: 'request' };
   }

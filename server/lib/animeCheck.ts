@@ -95,6 +95,8 @@ export interface AnimeCheckMovieServer {
 export interface AnimeCheckReport {
   finishedAt: string | null;
   running: boolean;
+  /** Whether Anime Check runs: anime is on and the check is switched on. */
+  enabled?: boolean;
   /** Sonarr servers. */
   servers: AnimeCheckServer[];
   /** Radarr servers; absent from older saved reports. */
@@ -232,6 +234,15 @@ const choices = async (
   return chosen;
 };
 
+/**
+ * Whether Anime Check runs: anime is on (Settings → Services → Anime) and the
+ * check itself is switched on.
+ */
+export const animeCheckEnabled = (): boolean => {
+  const settings = getSettings();
+  return settings.animeOn && settings.main.animeCheck !== false;
+};
+
 class AnimeCheck {
   private running = false;
   private cancelled = false;
@@ -254,7 +265,11 @@ class AnimeCheck {
         this.report = { finishedAt: null, running: false, servers: [] };
       }
     }
-    return { ...(this.report as AnimeCheckReport), running: this.running };
+    return {
+      ...(this.report as AnimeCheckReport),
+      running: this.running,
+      enabled: animeCheckEnabled(),
+    };
   }
 
   private async checkServer(
@@ -407,6 +422,15 @@ class AnimeCheck {
 
   public async run(): Promise<void> {
     if (this.running) {
+      return;
+    }
+    if (!animeCheckEnabled()) {
+      logger.debug(
+        getSettings().animeOn
+          ? 'Anime Check is off, so it did not run'
+          : 'Anime is off, so Anime Check did not run',
+        { label: 'Anime Check' }
+      );
       return;
     }
     this.running = true;

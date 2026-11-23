@@ -952,11 +952,15 @@ export class MediaRequest {
     let tags = requestBody.tags;
 
     // The requester's anime choice overrides the title's setting, rules and
-    // detection.
-    const chosenSeriesType =
+    // detection. While anime is off, anime or not isn't anyone's choice: only
+    // a daily type stays.
+    const animeOn = settings.animeOn;
+    const askedSeriesType =
       requestBody.seriesType == null
         ? null
         : toSeriesTypeFor(requestBody.mediaType, requestBody.seriesType);
+    const chosenSeriesType =
+      animeOn || askedSeriesType === 'daily' ? askedSeriesType : null;
     // Rules belong to a server, so match against the target: the chosen server,
     // else the default.
     const chosenServerId = chosenServerFor(
@@ -1004,8 +1008,10 @@ export class MediaRequest {
     // (lib/animeDecision). Movies only use 'anime' or 'standard'.
     const ruleSeriesType =
       ruleResult.seriesType &&
-      (media.animeSetting == null ||
-        (ruleResult.seriesType === 'anime') === media.animeSetting)
+      (animeOn
+        ? media.animeSetting == null ||
+          (ruleResult.seriesType === 'anime') === media.animeSetting
+        : ruleResult.seriesType === 'daily')
         ? ruleResult.seriesType
         : null;
     const seriesType = chosenSeriesType ?? ruleSeriesType;

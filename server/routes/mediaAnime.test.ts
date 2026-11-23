@@ -348,6 +348,22 @@ describe('GET /media/:id/anime', () => {
 });
 
 describe('PUT /media/:id/anime', () => {
+  it('refuses while anime is off, moving nothing', async () => {
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
+    getSettings().main.anime = 'off';
+    try {
+      const res = await call('PUT', media.id, { animeSetting: true });
+      assert.equal(res.status, 409);
+      assert.deepEqual(edits, []);
+      const saved = await getRepository(Media).findOneByOrFail({
+        id: media.id,
+      });
+      assert.equal(saved.animeSetting ?? null, null);
+    } finally {
+      getSettings().main.anime = 'auto';
+    }
+  });
+
   it('sets a series as anime and moves it in Sonarr to match', async () => {
     const media = await linked(MediaType.TV, YORUMAKI, 654);
     const res = await call('PUT', media.id, { animeSetting: true });

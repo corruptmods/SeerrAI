@@ -39,6 +39,11 @@ export interface PublicSettingsResponse {
   disabledFeatures: string[];
   /** Countries whose anime counts as anime only in Japanese (utils/isAnime). */
   animeExcludedCountries: string[];
+  /**
+   * Whether anime handling is on (Settings → Services → Anime): anime request
+   * choices, anime routing and Anime Check.
+   */
+  animeEnabled: boolean;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;

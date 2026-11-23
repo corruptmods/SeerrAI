@@ -2319,9 +2319,60 @@ describe('series type and anime', () => {
     return loginAs('friend@seerr.dev', 'test1234');
   }
 
+  // Anime on: this Sonarr has no anime library for auto to see.
   beforeEach(() => {
     configureSonarr([{ id: 0, isDefault: true, is4k: false }]);
     getSettings().radarr = [];
+    getSettings().main.anime = 'on';
+  });
+
+  afterEach(() => {
+    getSettings().main.anime = 'auto';
+  });
+
+  it('ignores anime choices and rules while anime is off, keeping a daily type', async (t) => {
+    t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToSonarr',
+      async () => undefined
+    );
+    getSettings().main.anime = 'off';
+    await getRepository(OverrideRule).save(
+      new OverrideRule({
+        sonarrServiceId: 0,
+        genre: '16',
+        language: 'ko',
+        seriesType: 'anime',
+      })
+    );
+    const agent = await friendWith(Permission.REQUEST);
+    let res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: KOREAN_ANIMATION,
+      seasons: [1],
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.seriesType, null);
+
+    res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: JAPANESE_ANIMATION,
+      seasons: [1],
+      seriesType: 'anime',
+    });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.seriesType, null);
+
+    // An edit can't tick it either; a daily type still goes through.
+    let edited = await agent
+      .put(`/request/${res.body.id}`)
+      .send({ seasons: [1], seriesType: 'anime' });
+    assert.strictEqual(edited.status, 200);
+    assert.strictEqual(edited.body.seriesType, null);
+    edited = await agent
+      .put(`/request/${res.body.id}`)
+      .send({ seasons: [1], seriesType: 'daily' });
+    assert.strictEqual(edited.body.seriesType, 'daily');
   });
 
   it('leaves anime without the keyword to the anime settings, not an ordinary rule', async () => {

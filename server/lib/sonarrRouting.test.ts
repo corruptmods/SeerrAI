@@ -1,7 +1,8 @@
 import type { SonarrSettings } from '@server/lib/settings';
+import { getSettings } from '@server/lib/settings';
 import { sonarrRouting } from '@server/lib/sonarrRouting';
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 /* Where a series goes in Sonarr, before a request's own folder or profile. */
 
@@ -28,6 +29,18 @@ const koreanAnimation = {
   genres: [{ id: 16 }],
   original_language: 'ko',
 };
+
+// With anime on (Settings → Services → Anime); the switch has its own tests.
+beforeEach(() => {
+  getSettings().main.anime = 'on';
+  getSettings().sonarr = [];
+  getSettings().radarr = [];
+});
+
+afterEach(() => {
+  getSettings().main.anime = 'auto';
+  getSettings().sonarr = [];
+});
 
 describe('sonarrRouting', () => {
   it('sends detected anime to the anime folder, profiles, tags and type', () => {
@@ -112,6 +125,73 @@ describe('sonarrRouting', () => {
       qualityProfile: 1,
       languageProfile: 1,
       tags: [],
+    });
+  });
+});
+
+describe('sonarrRouting with the anime switch', () => {
+  const standard = {
+    anime: false,
+    decidedBy: 'off',
+    seriesType: 'standard',
+    rootFolder: '/tv',
+    qualityProfile: 1,
+    languageProfile: 1,
+    tags: [1],
+  };
+
+  it('sends everything as standard while anime is off, whatever the request or title says', () => {
+    getSettings().main.anime = 'off';
+    assert.deepEqual(sonarrRouting(japaneseSeries, settings), standard);
+    assert.deepEqual(
+      sonarrRouting(japaneseSeries, settings, 'anime', true),
+      standard
+    );
+    assert.deepEqual(
+      sonarrRouting(koreanAnimation, settings, null, true),
+      standard
+    );
+  });
+
+  it("keeps a daily type while anime is off, and the server's own standard type", () => {
+    getSettings().main.anime = 'off';
+    assert.equal(
+      sonarrRouting(japaneseSeries, settings, 'daily').seriesType,
+      'daily'
+    );
+    // A Sonarr that types every series as anime keeps doing so.
+    const allAnime = { ...settings, seriesType: 'anime' } as SonarrSettings;
+    assert.equal(sonarrRouting(japaneseSeries, allAnime).seriesType, 'anime');
+  });
+
+  it('is on when switched on, with no anime library anywhere', () => {
+    getSettings().main.anime = 'on';
+    assert.equal(sonarrRouting(japaneseSeries, settings).rootFolder, '/anime');
+  });
+
+  it('follows the servers in auto: off with no anime library, on with one', () => {
+    getSettings().main.anime = 'auto';
+    // Sonarr's anime series type alone doesn't make an anime library.
+    getSettings().sonarr = [
+      {
+        ...settings,
+        activeAnimeDirectory: undefined,
+        activeAnimeProfileId: undefined,
+        animeTags: [],
+        animeSeriesType: 'anime',
+      } as unknown as SonarrSettings,
+    ];
+    assert.deepEqual(sonarrRouting(japaneseSeries, settings), standard);
+
+    getSettings().sonarr = [settings];
+    assert.deepEqual(sonarrRouting(japaneseSeries, settings), {
+      anime: true,
+      decidedBy: 'detection',
+      seriesType: 'anime',
+      rootFolder: '/anime',
+      qualityProfile: 7,
+      languageProfile: 3,
+      tags: [9],
     });
   });
 });

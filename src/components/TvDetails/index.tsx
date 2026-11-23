@@ -1381,14 +1381,15 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 </div>
               )}
             <AlternativeTitles titles={data.alternativeTitles} />
-            {(data.mediaInfo?.animeSetting ?? isAnime(data)) && (
-              <div className="media-fact">
-                <span>{intl.formatMessage(messages.showtype)}</span>
-                <span className="media-fact-value">
-                  {intl.formatMessage(messages.anime)}
-                </span>
-              </div>
-            )}
+            {settings.currentSettings.animeEnabled &&
+              (data.mediaInfo?.animeSetting ?? isAnime(data)) && (
+                <div className="media-fact">
+                  <span>{intl.formatMessage(messages.showtype)}</span>
+                  <span className="media-fact-value">
+                    {intl.formatMessage(messages.anime)}
+                  </span>
+                </div>
+              )}
             <div className="media-fact">
               <span>{intl.formatMessage(globalMessages.status)}</span>
               <span className="media-fact-value">{data.status}</span>

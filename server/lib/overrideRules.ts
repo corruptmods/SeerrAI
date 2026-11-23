@@ -142,8 +142,11 @@ async function overrideRules({
     !!radarrServer?.activeAnimeDirectory ||
     !!radarrServer?.activeAnimeProfileId;
   // Whether Seerr treats the title as anime: the request's choice (passed as
-  // animeSetting), the title's own setting, else detection.
-  const decidedAnime = animeSetting ?? detectAnime(tmdbMedia);
+  // animeSetting), the title's own setting, else detection. Nothing is anime
+  // while anime is off, so rules naming the anime keyword match nothing.
+  const animeHandling = settings.animeOn;
+  const decidedAnime =
+    animeHandling && (animeSetting ?? detectAnime(tmdbMedia));
   const anime = animeSettings && decidedAnime;
 
   // Read for the server's Discover region, as the title page does for users
@@ -273,6 +276,11 @@ async function overrideRules({
       profileId = prioritizedRule.profileId;
     }
     seriesType = toSeriesTypeFor(mediaType, prioritizedRule.seriesType);
+    // While anime is off a rule can't send anything as anime (or decide that
+    // it isn't); only a daily type stays.
+    if (!animeHandling && seriesType !== 'daily') {
+      seriesType = null;
+    }
     if (prioritizedRule.tags) {
       tags = [
         ...new Set([

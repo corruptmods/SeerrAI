@@ -1,3 +1,4 @@
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import type { SeriesType } from '@server/constants/seriesType';
@@ -13,7 +14,7 @@ const messages = defineMessages('components.RequestModal.AnimeChoice', {
 /**
  * Whether a request goes as anime: the requester's tick, else as
  * lib/animeDecision decides (edited request's type, title setting, matching
- * rule, detection).
+ * rule, detection). Never while anime is off, and nothing is sent.
  */
 export const useAnimeChoice = ({
   detected,
@@ -27,12 +28,17 @@ export const useAnimeChoice = ({
   /** Series type of the request being edited. */
   requestSeriesType?: SeriesType | null;
 }) => {
-  const [choice, setChoice] = useState<boolean | null>(null);
+  const { currentSettings } = useSettings();
+  const enabled = currentSettings.animeEnabled;
+  const [ticked, setChoice] = useState<boolean | null>(null);
   const [ruleSeriesType, setRuleSeriesType] = useState<SeriesType | null>(null);
-  const automatic = requestSeriesType
-    ? requestSeriesType === 'anime'
-    : (animeSetting ??
-      (ruleSeriesType ? ruleSeriesType === 'anime' : detected));
+  const choice = enabled ? ticked : null;
+  const automatic =
+    enabled &&
+    (requestSeriesType
+      ? requestSeriesType === 'anime'
+      : (animeSetting ??
+        (ruleSeriesType ? ruleSeriesType === 'anime' : detected)));
 
   return {
     anime: choice ?? automatic,
@@ -54,9 +60,14 @@ interface AnimeChoiceProps {
   onChange: (checked: boolean) => void;
 }
 
-/** Anime tick in the request dialog, shown to everyone. */
+/** Anime tick in the request dialog, shown to everyone while anime is on. */
 const AnimeChoice = ({ checked, onChange }: AnimeChoiceProps) => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
+
+  if (!currentSettings.animeEnabled) {
+    return null;
+  }
 
   return (
     <div className="mt-4 border-t border-gray-700 pt-4">

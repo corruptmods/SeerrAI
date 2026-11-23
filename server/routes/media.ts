@@ -521,6 +521,12 @@ mediaRoutes.put<
       message: 'animeSetting must be true, false or null.',
     });
   }
+  if (!getSettings().animeOn) {
+    return next({
+      status: 409,
+      message: "Anime is off, so a title can't be set as anime or not.",
+    });
+  }
   try {
     return res
       .status(200)

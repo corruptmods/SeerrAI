@@ -663,7 +663,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               ? 'set on the title'
               : routing.decidedBy === 'request'
                 ? 'chosen for the request'
-                : 'detected'
+                : routing.decidedBy === 'off'
+                  ? 'anime is off'
+                  : 'detected'
           })`,
           {
             label: 'Media Request',
@@ -979,7 +981,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               ? 'set on the title'
               : routing.decidedBy === 'request'
                 ? 'chosen for the request'
-                : 'detected'
+                : routing.decidedBy === 'off'
+                  ? 'anime is off'
+                  : 'detected'
           })`,
           {
             label: 'Media Request',

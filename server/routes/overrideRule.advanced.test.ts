@@ -275,10 +275,12 @@ describe('the request window’s rule preview', () => {
       { id: 1, isDefault: true, is4k: false } as RadarrSettings,
       { id: 2, isDefault: false, is4k: false } as RadarrSettings,
     ];
+    getSettings().main.anime = 'on';
   });
 
   afterEach(() => {
     getSettings().radarr = [];
+    getSettings().main.anime = 'auto';
   });
 
   it('matches the default server’s rules for a server that isn’t one, as the request does', async () => {
@@ -312,6 +314,13 @@ describe('the request window’s rule preview', () => {
     assert.equal(
       (await previewBody({ serviceId: 1, seriesType: 'anime' })).rootFolder,
       '/anime/movies'
+    );
+    // Not while anime is off: the tick is ignored.
+    getSettings().main.anime = 'off';
+    assert.equal(
+      (await previewBody({ serviceId: 1, seriesType: 'anime' })).rootFolder ??
+        null,
+      null
     );
   });
 });

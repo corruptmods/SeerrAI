@@ -170,6 +170,50 @@ describe('judging one movie', () => {
 });
 
 describe('the Anime Check job', () => {
+  it('does nothing while anime is off or the check is switched off, and says so', async (t) => {
+    const sonarr = {
+      id: 0,
+      name: 'Static Garden Sonarr',
+      activeProfileId: 1,
+      activeDirectory: '/tv',
+      activeAnimeDirectory: '/anime',
+      tags: [],
+      animeTags: [],
+    } as unknown as SonarrSettings;
+    const before = {
+      sonarr: getSettings().sonarr,
+      radarr: getSettings().radarr,
+    };
+    const series = t.mock.method(SonarrAPI.prototype, 'getSeries', async () => {
+      throw new Error('Anime Check ran');
+    });
+    try {
+      getSettings().sonarr = [sonarr];
+      getSettings().radarr = [];
+      for (const [anime, check] of [
+        ['off', true],
+        ['on', false],
+        ['auto', false],
+      ] as const) {
+        getSettings().main.anime = anime;
+        getSettings().main.animeCheck = check;
+        await animeCheck.run();
+        assert.equal((await animeCheck.lastReport()).enabled, false);
+      }
+      // Auto with no anime library anywhere is off too.
+      getSettings().main.animeCheck = true;
+      getSettings().sonarr = [{ ...sonarr, activeAnimeDirectory: undefined }];
+      await animeCheck.run();
+      assert.equal((await animeCheck.lastReport()).enabled, false);
+      assert.equal(series.mock.callCount(), 0);
+    } finally {
+      getSettings().main.anime = 'auto';
+      getSettings().main.animeCheck = true;
+      getSettings().sonarr = before.sonarr;
+      getSettings().radarr = before.radarr;
+    }
+  });
+
   it('reports what disagrees, honouring a title set on its page or a type chosen for its request, and changes nothing', async (t) => {
     getSettings().sonarr = [
       {

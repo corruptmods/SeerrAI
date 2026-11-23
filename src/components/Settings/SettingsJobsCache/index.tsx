@@ -45,6 +45,8 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     jobtype: 'Type',
     nextexecution: 'Next Execution',
     runnow: 'Run Now',
+    jobOff: 'Off',
+    jobOffTip: 'Switched off in its settings, so it doesn’t run.',
     canceljob: 'Cancel Job',
     jobstarted: '{jobname} started.',
     jobcancelled: '{jobname} canceled.',
@@ -153,6 +155,8 @@ interface Job {
   cronSchedule: string;
   nextExecutionTime: string;
   running: boolean;
+  /** Switched off in its settings (e.g. Anime Check while anime is off). */
+  off?: boolean;
 }
 
 type JobModalState = {
@@ -566,15 +570,21 @@ const SettingsJobs = () => {
                     </Table.TD>
                     <Table.TD>
                       <div className="text-sm leading-5 text-strong">
-                        <FormattedRelativeTime
-                          value={Math.floor(
-                            (new Date(job.nextExecutionTime).getTime() -
-                              Date.now()) /
-                              1000
-                          )}
-                          updateIntervalInSeconds={1}
-                          numeric="auto"
-                        />
+                        {job.off ? (
+                          <span title={intl.formatMessage(messages.jobOffTip)}>
+                            {intl.formatMessage(messages.jobOff)}
+                          </span>
+                        ) : (
+                          <FormattedRelativeTime
+                            value={Math.floor(
+                              (new Date(job.nextExecutionTime).getTime() -
+                                Date.now()) /
+                                1000
+                            )}
+                            updateIntervalInSeconds={1}
+                            numeric="auto"
+                          />
+                        )}
                       </div>
                     </Table.TD>
                     <Table.TD alignText="right">
@@ -599,6 +609,7 @@ const SettingsJobs = () => {
                       ) : (
                         <Button
                           buttonType="primary"
+                          disabled={job.off}
                           onClick={() => runJob(job)}
                         >
                           <PlayIcon />
@@ -640,16 +651,23 @@ const SettingsJobs = () => {
                   </Badge>
                 </div>
                 <div className="mt-2 text-sm leading-5 text-gray-300">
-                  {intl.formatMessage(messages.nextexecution)}
-                  {': '}
-                  <FormattedRelativeTime
-                    value={Math.floor(
-                      (new Date(job.nextExecutionTime).getTime() - Date.now()) /
-                        1000
-                    )}
-                    updateIntervalInSeconds={1}
-                    numeric="auto"
-                  />
+                  {job.off ? (
+                    intl.formatMessage(messages.jobOffTip)
+                  ) : (
+                    <>
+                      {intl.formatMessage(messages.nextexecution)}
+                      {': '}
+                      <FormattedRelativeTime
+                        value={Math.floor(
+                          (new Date(job.nextExecutionTime).getTime() -
+                            Date.now()) /
+                            1000
+                        )}
+                        updateIntervalInSeconds={1}
+                        numeric="auto"
+                      />
+                    </>
+                  )}
                 </div>
                 <div className="mt-3 flex space-x-2">
                   {job.interval !== 'fixed' && (
@@ -675,6 +693,7 @@ const SettingsJobs = () => {
                     <Button
                       className="flex-1 justify-center"
                       buttonType="primary"
+                      disabled={job.off}
                       onClick={() => runJob(job)}
                     >
                       <PlayIcon />

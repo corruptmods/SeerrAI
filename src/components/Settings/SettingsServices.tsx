@@ -142,6 +142,7 @@ const SettingsServices = () => {
     revalidateRadarr();
     revalidateSonarr();
     mutate('/api/v1/settings/public');
+    mutate('/api/v1/settings/anime');
   };
 
   return (
@@ -172,6 +173,7 @@ const SettingsServices = () => {
           onSave={() => {
             revalidateRadarr();
             mutate('/api/v1/settings/public');
+            mutate('/api/v1/settings/anime');
             setEditRadarrModal({ open: false, radarr: null });
           }}
         />
@@ -186,6 +188,7 @@ const SettingsServices = () => {
           onSave={() => {
             revalidateSonarr();
             mutate('/api/v1/settings/public');
+            mutate('/api/v1/settings/anime');
             setEditSonarrModal({ open: false, sonarr: null });
           }}
         />
@@ -438,11 +441,12 @@ const SettingsServices = () => {
           </li>
         </ul>
       </div>
-      {/* Anime in its own section: what counts as anime, then the check of
-          Sonarr and Radarr against it. */}
+      {/* Anime in its own section: whether it's on and what counts as anime,
+          then the check of Sonarr and Radarr against it while anime is on. */}
       <div className="mt-10 max-w-6xl rounded-lg p-4 ring-1 ring-gray-700 sm:p-6 [&>*:first-child]:mt-0">
         <AnimeSettings />
-        {!!sonarrData?.length && <AnimeCheck />}
+        {settings.currentSettings.animeEnabled &&
+          (!!sonarrData?.length || !!radarrData?.length) && <AnimeCheck />}
       </div>
       {overrideRuleModal.open && radarrData && sonarrData && (
         <OverrideRuleModal

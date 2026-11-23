@@ -324,6 +324,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     applicationUrl: '',
     disabledFeatures: [],
     animeExcludedCountries: [],
+    animeEnabled: false,
     hideAvailable: false,
     hideBlocklisted: false,
     hideRequested: false,

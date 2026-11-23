@@ -32,6 +32,7 @@ const saved = {
   sonarr: settings.sonarr,
   region: settings.main.discoverRegion,
   leaveOut: settings.main.animeExcludedCountries,
+  anime: settings.main.anime,
 };
 
 after(() => {
@@ -39,6 +40,7 @@ after(() => {
   settings.sonarr = saved.sonarr;
   settings.main.discoverRegion = saved.region;
   settings.main.animeExcludedCountries = saved.leaveOut;
+  settings.main.anime = saved.anime;
 });
 
 /**
@@ -95,6 +97,8 @@ const movieFolder = async (tmdbMedia: TmdbMovieDetails) =>
 beforeEach(async () => {
   settings.main.discoverRegion = '';
   settings.main.animeExcludedCountries = [];
+  // Anime on; the servers here have no anime library for auto to see.
+  settings.main.anime = 'on';
   settings.radarr = [{ id: 0, isDefault: true, is4k: false } as RadarrSettings];
   settings.sonarr = [{ id: 0, isDefault: true, is4k: false } as SonarrSettings];
   requester = await getRepository(User).findOneOrFail({
@@ -349,6 +353,38 @@ describe("an override rule naming TMDB's anime keyword", () => {
       ),
       '/cartoons'
     );
+  });
+
+  it('matches nothing while anime is off, and anime goes by the other rules', async () => {
+    settings.main.anime = 'off';
+    const tagged = show({
+      genres: [ANIMATION],
+      original_language: 'ja',
+      origin_country: ['JP'],
+      keywords: { results: [ANIME_KEYWORD] },
+    });
+    assert.equal(await folderFor(tagged), '/cartoons');
+    assert.equal(await folderFor(tagged, true), '/cartoons');
+  });
+
+  it('sets no anime type while anime is off, but keeps a daily one', async () => {
+    await rule({ sonarrServiceId: 0, language: 'ko', seriesType: 'anime' });
+    await rule({ sonarrServiceId: 0, language: 'fr', seriesType: 'daily' });
+    const typeFor = async (language: string) =>
+      (
+        await overrideRules({
+          mediaType: MediaType.TV,
+          is4k: false,
+          tmdbMedia: show({ original_language: language }),
+          requestUser: requester,
+          serviceId: 0,
+        })
+      ).seriesType;
+
+    assert.equal(await typeFor('ko'), 'anime');
+    settings.main.anime = 'off';
+    assert.equal(await typeFor('ko'), null);
+    assert.equal(await typeFor('fr'), 'daily');
   });
 
   it('still matches on its other keywords for anything else', async () => {

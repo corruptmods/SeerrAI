@@ -38,7 +38,10 @@ interface DefaultProfilesProps {
   onChange: (value: UserDefaultProfile[]) => void;
 }
 
-/** One server's profile choices: everything, and anime where it has one. */
+/**
+ * One server's profile choices: everything, and anime where it has one while
+ * anime is on.
+ */
 const ServerProfiles = ({
   service,
   server,
@@ -51,6 +54,7 @@ const ServerProfiles = ({
   onChange: (value: UserDefaultProfile[]) => void;
 }) => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
   const { data, error } = useSWR<ServiceCommonServerWithDetails>(
     `/api/v1/service/${service}/${server.id}`,
     { revalidateOnFocus: false }
@@ -64,7 +68,9 @@ const ServerProfiles = ({
       label: intl.formatMessage(KIND_LABEL[service]),
       serverDefault: server.activeProfileId,
     },
-    ...(service !== 'lidarr' && server.activeAnimeProfileId
+    ...(service !== 'lidarr' &&
+    currentSettings.animeEnabled &&
+    server.activeAnimeProfileId
       ? [
           {
             anime: true,

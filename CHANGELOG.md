@@ -13,7 +13,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Effort** for AI (Settings → AI, and per feature under Advanced): how hard the model thinks before answering, from Lowest (the default, as before) to High. Higher effort gives better answers from cheaper models, but costs more and takes longer.
 - Subtitles of a whole series, season or movie can be replaced on request, existing ones included, from AI Search, issues, Siri and the admin agent. Asking to transcribe a series, season, episode or movie transcribes it even where subtitles exist, and asking to do it again redoes what Whisper made before.
 - **Approve anyway** on Backfill: admins can take files Sonarr's, Radarr's or Lidarr's quality profile turned down. Backfill and the admin agent never take them by themselves.
-- **Anime handling** (Settings → Services → Anime) is Auto, On or Off. Auto turns it on only when a Sonarr or Radarr server has an anime folder, profile or tags of its own; off, everything is requested as standard and the anime choices are hidden. Anime Check has its own switch too.
+- **Anime handling** (Settings → Services → Anime) is Auto, On or Off. Auto turns it on only when a Sonarr or Radarr server has an anime folder, profile, language profile or tags of its own, or an override rule routes anime; off, everything is requested as standard (series included, so set it to On to keep Sonarr's anime series type without any of those) and the anime choices are hidden. Anime Check has its own switch too.
 
 ### Changed
 

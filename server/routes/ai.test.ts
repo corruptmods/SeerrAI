@@ -1071,6 +1071,17 @@ describe('the AI chat', () => {
       );
     });
 
+    it('does not judge films by genres when one named is not a film genre', async () => {
+      // Soap is a genre of series only: a film can't be judged by it.
+      const { body } = await ask(
+        '{"r":"","g":["Horror","Soap"],"titles":[{"t":"Glasswing","k":"movie"},{"t":"Lantern Song","k":"movie"}]}'
+      );
+      assert.deepEqual(
+        body.results.map((r) => r.id),
+        [601, 603]
+      );
+    });
+
     it('keeps every title when no genre is named, as older answers did', async () => {
       const { body } = await ask(
         '{"r":"","titles":[{"t":"Glasswing","k":"movie"},{"t":"Lantern Song","k":"movie"}]}'

@@ -81,20 +81,22 @@ const genreKey = (name: string) =>
 
 /**
  * The genre ids, for one media type, of any of the genres named; null when
- * none of them exist for it, so that type is not filtered.
+ * any of them doesn't exist for it, so that type is not filtered (a result
+ * could fit the one that doesn't).
  */
 export const genreIdsFor = (
   names: string[],
   kind: 'movie' | 'tv'
 ): Set<number> | null => {
   const table = kind === 'movie' ? MOVIE_GENRES : TV_GENRES;
-  const ids = names.flatMap((name) => table[genreKey(name)] ?? []);
-  return ids.length ? new Set(ids) : null;
+  const each = names.map((name) => table[genreKey(name)]);
+  if (!each.length || each.some((ids) => !ids?.length)) return null;
+  return new Set(each.flat() as number[]);
 };
 
 /**
  * Whether a TMDB result has any of the genres named. A media type without
- * any of them, or a result TMDB gave no genres for, is not judged.
+ * one of them, or a result TMDB gave no genres for, is not judged.
  */
 export const fitsGenres = (
   result: { mediaType?: string; genreIds?: number[] },

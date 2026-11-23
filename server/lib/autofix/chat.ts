@@ -535,7 +535,7 @@ export const fixFromChat = async (
               : 'An admin approves it first. Confirm to ask for it.'
           }`
         : kind === 'wrongEpisode' && mediaType === MediaType.TV
-          ? `This checks ${label(result)}${episode} against where each file came from, and replaces what is wrong. Confirm to go ahead.`
+          ? `This checks ${label(result)}${episode} against where each file came from: files that are right but numbered wrong are re-numbered to match, and only files that are really wrong are replaced. Confirm to go ahead.`
           : `This replaces the file of ${label(result)}${episode} with another release. Confirm to go ahead.`,
     results,
     confirm: {
@@ -633,7 +633,7 @@ export const confirmFix = async (
   return {
     reply: `Reported it, and started fixing it: ${
       fix.kind === 'wrongEpisode' && media.mediaType === MediaType.TV
-        ? 'the season is being checked against where each file came from, and what is wrong will be replaced.'
+        ? 'the season is being checked against where each file came from, files that are only numbered wrong will be re-numbered, and files that are really wrong replaced.'
         : 'another release will replace the file once one is found.'
     } What happens is written on the issue, and you will be told.`,
     results: [],

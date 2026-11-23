@@ -8,7 +8,8 @@ import { z } from 'zod';
  * AI fallback for reports `classify` can't read. Only the report text is
  * sent (no author or title). The model can only answer a fix kind or
  * "unclear"; callers decide what to do with file-replacing kinds (confirm
- * first from Siri, leave to an admin on an issue).
+ * first from Siri; on an issue, a series' wrong episode is checked and
+ * fixed, the others are left to an admin).
  */
 
 const KINDS = [

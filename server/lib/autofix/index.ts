@@ -32,6 +32,8 @@ import {
 import type { ReadReport } from '@server/lib/autofix/understand';
 import { REPLACES_FILES, askAboutReport } from '@server/lib/autofix/understand';
 import backfill from '@server/lib/backfill/engine';
+import { RelinkError, moveEpisodeFile } from '@server/lib/backfill/relink';
+import BackfillSonarr from '@server/lib/backfill/sonarr';
 import { featureEnabled } from '@server/lib/features';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import { owner } from '@server/lib/owner';
@@ -57,7 +59,8 @@ import { LessThan } from 'typeorm';
  * Triggered from AI Search or an issue; on an issue each step is a comment.
  *
  * A file is removed only once a replacement release is found (for a season,
- * grabbed). A title is replaced at most once a day, except an admin's season
+ * grabbed). Files that are right but numbered wrong are re-numbered in
+ * place instead, removing and downloading nothing. A title is replaced at most once a day, except an admin's season
  * replace. Non-admin season replacements wait for admin approval.
  */
 
@@ -113,6 +116,11 @@ export interface FixRequest {
   user: User;
   /** Issue to reply on. */
   issueId?: number;
+  /**
+   * Read by the AI model and confirmed by no one: only what the checks find
+   * wrong is changed.
+   */
+  unconfirmed?: boolean;
 }
 
 export interface FixResult {
@@ -345,7 +353,7 @@ const sonarrFor = (media: Media) => {
   const { serverId, id } = serviceOf(media);
   const server = getSettings().sonarr.find((s) => s.id === serverId);
   return server && id
-    ? { api: FixSonarr.forServer(server), id, serverId: server.id }
+    ? { api: FixSonarr.forServer(server), id, serverId: server.id, server }
     : undefined;
 };
 
@@ -443,17 +451,118 @@ export const wrongLength = (expected?: number, actual?: number): boolean =>
   actual !== undefined &&
   Math.abs(actual - expected) > Math.max(5, expected * 0.35);
 
+/** A file that looks wrong; `to` when it is another episode's, to re-number. */
+interface Finding {
+  episode: ArrEpisode;
+  why: string;
+  to?: ArrEpisode;
+}
+
+/** A file to move from the episode it is linked to onto the one it is. */
+interface Move {
+  from: ArrEpisode;
+  to: ArrEpisode;
+}
+
+const nameOf = (ep: ArrEpisode) => label(ep.seasonNumber, ep.episodeNumber);
+
+/** "A", "A and B", "A, B and C". */
+const listOf = (names: string[]) =>
+  names.length > 1
+    ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+    : (names[0] ?? '');
+
+/** Most names listed in one sentence. */
+const MAX_LISTED = 6;
+const clipped = (names: string[]) =>
+  names.length > MAX_LISTED
+    ? listOf([
+        ...names.slice(0, MAX_LISTED),
+        `${names.length - MAX_LISTED} more`,
+      ])
+    : listOf(names);
+
+const renumbered = (changed: string[], season?: number) =>
+  `Re-numbered ${changed.length} file${changed.length === 1 ? '' : 's'} of season ${season} to match Sonarr: ${clipped(changed)}.`;
+
+const leftAlone = (moves: Move[], why: string) => {
+  const names = moves.map((m) => nameOf(m.from));
+  return `Left ${clipped(names)} as ${names.length === 1 ? 'it is' : 'they are'}: ${why}`;
+};
+
 /**
- * A shared numbering offset across a season (files fine, numbering off).
- * Needs at least three, and 80% of the offset files, to agree.
+ * Orders re-numbering so no file is ever imported onto an episode that has
+ * one (Sonarr would replace it): each chain of moves runs from its end,
+ * which must be an episode with no file. Swapped files, chains ending on an
+ * episode whose file is not moving, and files claiming the same episode are
+ * left, each with a sentence why.
  */
-const commonOffset = (offsets: (number | undefined)[]): number | undefined => {
-  const known = offsets.filter((o): o is number => o !== undefined && o !== 0);
-  if (known.length < 3) return undefined;
-  const counts = new Map<number, number>();
-  for (const o of known) counts.set(o, (counts.get(o) ?? 0) + 1);
-  const [offset, count] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  return count >= 3 && count >= known.length * 0.8 ? offset : undefined;
+const planMoves = (
+  moves: Move[],
+  all: ArrEpisode[]
+): { ready: Move[][]; left: string[] } => {
+  const claims = new Map<number, Move[]>();
+  for (const move of moves) {
+    claims.set(move.to.id, [...(claims.get(move.to.id) ?? []), move]);
+  }
+  const left: string[] = [];
+  const usable: Move[] = [];
+  for (const [, claiming] of claims) {
+    if (claiming.length === 1) {
+      usable.push(claiming[0]);
+    } else {
+      left.push(
+        leftAlone(
+          claiming,
+          `their files all came from ${nameOf(claiming[0].to)}’s release, so it is not clear which one it is.`
+        )
+      );
+    }
+  }
+  const byFrom = new Map(usable.map((m) => [m.from.id, m]));
+  const targets = new Set(usable.map((m) => m.to.id));
+  const seen = new Set<number>();
+  const ready: Move[][] = [];
+  for (const start of usable.filter((m) => !targets.has(m.from.id))) {
+    const chain: Move[] = [];
+    for (let m: Move | undefined = start; m; m = byFrom.get(m.to.id)) {
+      chain.push(m);
+      seen.add(m.from.id);
+    }
+    const end = chain[chain.length - 1].to;
+    const now = all.find((ep) => ep.id === end.id) ?? end;
+    if (now.episodeFileId) {
+      left.push(
+        leftAlone(
+          chain,
+          `${nameOf(end)} already has a file that is not being moved, and re-numbering never replaces a file.`
+        )
+      );
+    } else {
+      ready.push([...chain].reverse());
+    }
+  }
+  // What no chain reached goes round in a cycle: files swapped.
+  const cycles = new Set<number>();
+  for (const move of usable) {
+    if (seen.has(move.from.id) || cycles.has(move.from.id)) continue;
+    const cycle: Move[] = [];
+    for (
+      let m: Move | undefined = move;
+      m && !cycles.has(m.from.id);
+      m = byFrom.get(m.to.id)
+    ) {
+      cycle.push(m);
+      cycles.add(m.from.id);
+    }
+    left.push(
+      leftAlone(
+        cycle,
+        `their files are swapped with each other, which cannot be undone without a file being replaced. An admin can swap them in Sonarr.`
+      )
+    );
+  }
+  return { ready, left };
 };
 
 type Outcome = Omit<FixResult, 'kind'>;
@@ -1425,8 +1534,11 @@ class AutoFix {
 
   /**
    * Checks each file in the season against its source release and length.
-   * A shared offset means the numbering is wrong, which needs an admin, not
-   * downloads. Otherwise replaces the reported episode and any that look wrong.
+   * Files that are right but numbered wrong (their release is another
+   * episode) are re-numbered in place first, downloading and removing
+   * nothing; then the reported episode and any others that look wrong are
+   * replaced. Unconfirmed (an AI reading of an issue), only what the checks
+   * find wrong is changed.
    */
   private async wrongEpisode(req: FixRequest): Promise<Outcome> {
     if (req.media.mediaType === MediaType.MOVIE) {
@@ -1456,8 +1568,7 @@ class AutoFix {
           other.id !== ep.id && other.episodeFileId === ep.episodeFileId
       );
 
-    const findings: { episode: ArrEpisode; why: string; offset?: number }[] =
-      [];
+    const findings: Finding[] = [];
     for (const episode of season) {
       const [file, history] = await Promise.all([
         sonarr.api.episodeFile(episode.episodeFileId),
@@ -1488,10 +1599,8 @@ class AutoFix {
         findings.push({
           episode,
           why: `came from “${origin}”, which is ${label(to.seasonNumber, to.episodeNumber)}`,
-          offset:
-            to.seasonNumber === episode.seasonNumber
-              ? to.episodeNumber - episode.episodeNumber
-              : undefined,
+          // One episode's file, named for one other episode: re-numbered.
+          to: mappedTo.length === 1 && !shared(episode) ? to : undefined,
         });
         continue;
       }
@@ -1509,34 +1618,52 @@ class AutoFix {
       }
     }
 
-    const lines = findings
+    const moves = findings
+      .filter((f): f is Finding & { to: ArrEpisode } => !!f.to)
+      .map((f) => ({ from: f.episode, to: f.to }));
+    const plan = planMoves(moves, all);
+    const parts: string[] = [];
+    let moved = false;
+    if (plan.ready.length) {
+      const remap = await this.renumber(req, sonarr, plan.ready);
+      moved = remap.ok;
+      parts.push(remap.message);
+      if (remap.stopped) {
+        return { ok: moved, message: [...parts, ...plan.left].join('\n') };
+      }
+    }
+    parts.push(...plan.left);
+
+    // Episodes being re-numbered, or left for it, are not replaced.
+    const inMoves = new Set(moves.flatMap((m) => [m.from.id, m.to.id]));
+    const wrong = findings.filter((f) => !f.to && !inMoves.has(f.episode.id));
+    const reported = season.find(
+      (ep) =>
+        ep.episodeNumber === req.episodeNumber &&
+        !inMoves.has(ep.id) &&
+        (!req.unconfirmed || wrong.some((f) => f.episode.id === ep.id))
+    );
+    const toReplace = [
+      ...(reported ? [reported] : []),
+      ...wrong.map((f) => f.episode).filter((ep) => ep.id !== reported?.id),
+    ].slice(0, MAX_REPLACED);
+    if (!toReplace.length) {
+      if (moves.length) {
+        return { ok: moved, message: parts.join('\n') };
+      }
+      return {
+        ok: false,
+        message: req.unconfirmed
+          ? `Every file in season ${req.seasonNumber} matches its episode by name and length, so nothing was changed. An admin can look at it if it is still wrong.`
+          : `Every file in season ${req.seasonNumber} matches its episode by name and length. Say which episode is wrong and it will be replaced.`,
+      };
+    }
+    const lines = wrong
       .slice(0, 12)
       .map(
         (f) =>
           `${label(f.episode.seasonNumber, f.episode.episodeNumber)} ${f.why}`
       );
-    const offset = commonOffset(findings.map((f) => f.offset));
-    if (offset !== undefined) {
-      const off = findings.filter((f) => f.offset === offset).length;
-      return {
-        ok: false,
-        message: `${off} of season ${req.seasonNumber}'s ${season.length} files are off by ${offset}: the files are fine but numbered differently from Sonarr. An admin should rename or re-map them rather than download them again.\n${lines.join('\n')}`,
-      };
-    }
-
-    const reported = season.find(
-      (ep) => ep.episodeNumber === req.episodeNumber
-    );
-    const toReplace = [
-      ...(reported ? [reported] : []),
-      ...findings.map((f) => f.episode).filter((ep) => ep.id !== reported?.id),
-    ].slice(0, MAX_REPLACED);
-    if (!toReplace.length) {
-      return {
-        ok: false,
-        message: `Every file in season ${req.seasonNumber} matches its episode by name and length. Say which episode is wrong and it will be replaced.`,
-      };
-    }
     const done: Outcome[] = [];
     for (const episode of toReplace) {
       done.push(
@@ -1552,14 +1679,81 @@ class AutoFix {
       );
     }
     return {
-      ok: done.some((d) => d.ok),
+      ok: moved || done.some((d) => d.ok),
       message: [
-        findings.length
-          ? `Checked season ${req.seasonNumber}; ${findings.length} file${findings.length === 1 ? '' : 's'} looked wrong:\n${lines.join('\n')}`
+        ...parts,
+        wrong.length
+          ? `Checked season ${req.seasonNumber}; ${wrong.length} file${wrong.length === 1 ? '' : 's'} looked wrong:\n${lines.join('\n')}`
           : `Checked season ${req.seasonNumber}; only the reported episode looked wrong.`,
         ...done.map((d) => d.message),
       ].join('\n'),
     };
+  }
+
+  /**
+   * Re-numbers files in place, each chain from its empty end, verifying
+   * each move. Stops at the first failure. Held a day per season.
+   */
+  private async renumber(
+    req: FixRequest,
+    sonarr: NonNullable<ReturnType<typeof sonarrFor>>,
+    chains: Move[][]
+  ): Promise<Outcome & { stopped?: boolean }> {
+    const season = req.seasonNumber;
+    let stopped = false;
+    const outcome = await this.holding(
+      `renumber:season:${req.media.id}:${season}`,
+      DAY,
+      `Season ${season} was already re-numbered in the last day, so it was not re-numbered again. An admin can look at it in Sonarr.`,
+      async () => {
+        const api = BackfillSonarr.forServer(sonarr.server);
+        const ordered = chains.flat();
+        const changed: string[] = [];
+        let notRenamed = 0;
+        for (const [i, move] of ordered.entries()) {
+          try {
+            const result = await moveEpisodeFile(
+              api,
+              sonarr.id,
+              move.from.id,
+              move.to.id
+            );
+            changed.push(`${nameOf(move.from)} is now ${nameOf(move.to)}`);
+            if (!result.renamed) notRenamed++;
+          } catch (e) {
+            stopped = true;
+            logger.warn('Could not re-number an episode file', {
+              label: LABEL,
+              mediaId: req.media.id,
+              errorMessage: message(e),
+            });
+            const why =
+              e instanceof RelinkError
+                ? e.message
+                : 'Sonarr could not be asked to move it.';
+            const left = ordered.slice(i).map((m) => nameOf(m.from));
+            return {
+              ok: changed.length > 0,
+              message: `${
+                changed.length
+                  ? `${renumbered(changed, season)} `
+                  : `Nothing in season ${season} was re-numbered. `
+              }Moving ${nameOf(move.from)} to ${nameOf(move.to)} failed: ${why} Stopped there, so ${listOf(left)} ${left.length === 1 ? 'keeps its' : 'keep their'} old number${left.length === 1 ? '' : 's'}, and nothing else was changed.`,
+            };
+          }
+        }
+        const emptied = chains.map((chain) => chain[chain.length - 1].from);
+        return {
+          ok: true,
+          message: `${renumbered(changed, season)} ${listOf(emptied.map(nameOf))} ${emptied.length === 1 ? 'has' : 'have'} no file now.${
+            notRenamed
+              ? ` Sonarr could not rename ${notRenamed === 1 ? 'one of them' : `${notRenamed} of them`}, so ${notRenamed === 1 ? 'its' : 'their'} file name${notRenamed === 1 ? ' is' : 's are'} unchanged.`
+              : ''
+          }`,
+        };
+      }
+    );
+    return { ...outcome, stopped };
   }
 
   /**
@@ -1600,16 +1794,23 @@ class AutoFix {
         .sort((a, b) => a.id - b.id)
         .map((c) => c.message)
         .join('\n');
-      let asked = options.asked ?? classify(text, issue.issueType);
+      let asked:
+        | Pick<FixRequest, 'kind' | 'language' | 'replace' | 'unconfirmed'>
+        | undefined = options.asked ?? classify(text, issue.issueType);
       if (!asked) {
-        // Rules unclear: ask the model. File-replacing readings are left to
-        // an admin, since nobody confirmed them.
+        // Rules unclear: ask the model. Nobody confirmed its reading, so
+        // broken files and whole seasons are left to an admin. A wrong
+        // episode of a series goes ahead: the season is checked first, and
+        // only what is found wrong is re-numbered or replaced.
         const read = await askAboutReport(text, {
           user: actor,
           episode: issue.media.mediaType === MediaType.TV,
         });
         if (!read) return undefined;
-        if (REPLACES_FILES.includes(read.kind)) {
+        const checked =
+          read.kind === 'wrongEpisode' &&
+          issue.media.mediaType === MediaType.TV;
+        if (REPLACES_FILES.includes(read.kind) && !checked) {
           await getRepository(IssueComment).save(
             new IssueComment({
               issue,
@@ -1619,7 +1820,7 @@ class AutoFix {
           );
           return undefined;
         }
-        asked = read;
+        asked = { ...read, unconfirmed: true };
       }
       // Filed on All Seasons but the text names one: use it and set it on the
       // issue.

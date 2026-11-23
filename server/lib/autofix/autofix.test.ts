@@ -279,6 +279,9 @@ let monitored: number[][] = [];
 /** Sonarr actions, in order. */
 let done: string[] = [];
 let quietRavens: Media;
+/** In-place imports, "from>to" episode numbers, and files renamed. */
+let imported: string[] = [];
+let renamed = 0;
 
 const call = async (method: string, url: string, body?: unknown) => {
   const res = await fetch(`http://127.0.0.1:${port}${url}`, {
@@ -303,6 +306,96 @@ const commentOn = async (issueId: number): Promise<string> => {
   throw new Error('No automatic comment was written');
 };
 
+/**
+ * Sonarr's in-place manual import and rename over `episodes`: an import
+ * gives the file a new record linked to the episodes given, and the episode
+ * it left has none. `ignore` ("1>2") is an import Sonarr does not make.
+ */
+const fakeImports = ({ ignore }: { ignore?: string } = {}) => {
+  const SERIES_PATH = '/tv/Glasswing';
+  const paths = new Map<number, string>(
+    episodes
+      .filter((ep) => ep.episodeFileId)
+      .map((ep) => [
+        ep.episodeFileId,
+        `Season 01/Glasswing - S01E0${ep.episodeNumber} - old.mkv`,
+      ])
+  );
+  let nextId = 900;
+  const numberOf = (id: number) =>
+    episodes.find((ep) => ep.id === id)?.episodeNumber;
+  mock.method(
+    BackfillSonarr.prototype,
+    'getSeriesDetail',
+    async () => ({ id: 77, path: SERIES_PATH }) as never
+  );
+  mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+    episodes.map((ep) => ({ ...ep }))
+  );
+  mock.method(BackfillSonarr.prototype, 'getEpisodeFiles', async () =>
+    [...paths].map(([id, relativePath]) => ({
+      id,
+      relativePath,
+      seasonNumber: 1,
+      size: 1,
+      quality: { quality: { id: 3, name: 'WEBDL-1080p' } },
+    }))
+  );
+  mock.method(
+    BackfillSonarr.prototype,
+    'manualImport',
+    async (files: { path: string; episodeIds: number[] }[]) => {
+      for (const file of files) {
+        const relative = file.path.slice(SERIES_PATH.length + 1);
+        const oldId = [...paths].find(([, p]) => p === relative)?.[0];
+        const from = episodes.find((ep) => ep.episodeFileId === oldId);
+        const move = `${from?.episodeNumber}>${file.episodeIds.map(numberOf).join(',')}`;
+        if (oldId === undefined || move === ignore) continue;
+        for (const ep of episodes) {
+          // Sonarr would replace a file already there.
+          if (
+            file.episodeIds.includes(ep.id) &&
+            ep.episodeFileId &&
+            ep.episodeFileId !== oldId
+          ) {
+            deleted.push(ep.episodeFileId);
+          }
+        }
+        const newId = nextId++;
+        paths.delete(oldId);
+        paths.set(newId, relative);
+        episodes = episodes.map((ep) =>
+          file.episodeIds.includes(ep.id)
+            ? { ...ep, hasFile: true, episodeFileId: newId }
+            : ep.episodeFileId === oldId
+              ? { ...ep, hasFile: false, episodeFileId: 0 }
+              : ep
+        );
+        imported.push(move);
+        done.push(`import:${move}`);
+      }
+      return 1;
+    }
+  );
+  mock.method(BackfillSonarr.prototype, 'getCommand', async (id: number) => ({
+    id,
+    name: 'Command',
+    status: 'completed',
+  }));
+  mock.method(
+    BackfillSonarr.prototype,
+    'renameFiles',
+    async (_seriesId: number, ids: number[]) => {
+      for (const id of ids) {
+        const ep = episodes.find((e) => e.episodeFileId === id);
+        paths.set(id, `Season 01/Glasswing - S01E0${ep?.episodeNumber}.mkv`);
+        renamed++;
+      }
+      return 2;
+    }
+  );
+};
+
 beforeEach(async () => {
   autofix.reset();
   clearAiCache();
@@ -318,6 +411,8 @@ beforeEach(async () => {
   markedFailed = [];
   monitored = [];
   done = [];
+  imported = [];
+  renamed = 0;
   episodes = [1, 2, 3, 4].map((n) => episode(n));
 
   const settings = getSettings();
@@ -719,10 +814,12 @@ describe('Auto-fix: reported issues', () => {
     assert.deepEqual(deleted, []);
   });
 
-  it('checks the whole season for a wrong episode, and replaces the ones that are off', async () => {
-    // Episode 3's file is episode 4's release; episode 1 runs double length.
+  it('replaces what looks wrong, but leaves a file named for an episode that has its own', async () => {
+    // Episode 3's file is episode 4's release, but episode 4 has its own
+    // file; episode 1 runs double length.
     origins = { 103: 'Show S01E04 1080p WEB-DL' };
     episodes[0] = { ...episodes[0], runtime: 45 };
+    fakeImports();
     releases = [
       release({
         guid: 'r1',
@@ -743,23 +840,28 @@ describe('Auto-fix: reported issues', () => {
       problemEpisode: 3,
     });
     const comment = await commentOn(res.body.id);
-    assert.match(comment, /Checked season 1; 2 files looked wrong/);
     assert.match(
       comment,
-      /S01E03 came from “Show S01E04 1080p WEB-DL\.mkv”, which is S01E04/
+      /Left S01E03 as it is: S01E04 already has a file that is not being moved, and re-numbering never replaces a file\./
     );
+    assert.match(comment, /Checked season 1; 1 file looked wrong:/);
     assert.match(comment, /S01E01 runs 23 minutes where the episode is 45/);
-    assert.deepEqual(deleted.sort(), [501, 503]);
-    assert.deepEqual(grabbed.sort(), ['r1', 'r3']);
+    assert.deepEqual(deleted, [501]);
+    assert.deepEqual(grabbed, ['r1']);
+    assert.deepEqual(imported, []);
   });
 
-  it('calls a season numbered off by one a numbering problem, and downloads nothing', async () => {
+  it('re-numbers a season numbered off by one in place, from the empty end, and downloads nothing', async () => {
     origins = {
       101: 'Show S01E02',
       102: 'Show S01E03',
       103: 'Show S01E04',
+      104: 'Show S01E05',
     };
-    episodes = [1, 2, 3, 4, 5].map((n) => episode(n));
+    episodes = [1, 2, 3, 4, 5].map((n) =>
+      n === 5 ? episode(n, { hasFile: false, episodeFileId: 0 }) : episode(n)
+    );
+    fakeImports();
     const res = await call('POST', '/api/v1/issue', {
       issueType: IssueType.OTHER,
       message: 'episodes are mixed up',
@@ -768,12 +870,26 @@ describe('Auto-fix: reported issues', () => {
       problemEpisode: 1,
     });
     const comment = await commentOn(res.body.id);
-    assert.match(
+    assert.equal(
       comment,
-      /off by 1: the files are fine but numbered differently/
+      'Automatic fix: Re-numbered 4 files of season 1 to match Sonarr: S01E04 is now S01E05, S01E03 is now S01E04, S01E02 is now S01E03 and S01E01 is now S01E02. S01E01 has no file now.'
     );
+    // Each onto an episode with no file at that moment.
+    assert.deepEqual(imported, ['4>5', '3>4', '2>3', '1>2']);
+    assert.deepEqual(
+      episodes.map((ep) => [ep.episodeNumber, ep.hasFile]),
+      [
+        [1, false],
+        [2, true],
+        [3, true],
+        [4, true],
+        [5, true],
+      ]
+    );
+    assert.equal(renamed, 4);
     assert.deepEqual(deleted, []);
     assert.deepEqual(grabbed, []);
+    assert.deepEqual(searched, []);
   });
 
   it('finds other subtitles for a subtitle issue, from somewhere else first', async () => {
@@ -1040,6 +1156,56 @@ describe('Auto-fix: reported issues', () => {
     assert.deepEqual(grabbed, []);
   });
 
+  it('checks a season the model reads as a wrong episode, and replaces what it finds wrong', async () => {
+    modelAnswer = JSON.stringify({ kind: 'wrongEpisode' });
+    episodes[1] = { ...episodes[1], runtime: 45 };
+    fakeImports();
+    releases = [
+      release({
+        guid: 'r2',
+        title: 'Harbour Lights S01E02',
+        mappedEpisodeInfo: [{ id: 102 }],
+      }),
+    ];
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'something about this one is not right',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: 2,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.match(comment, /S01E02 runs 23 minutes where the episode is 45/);
+    assert.match(comment, /Replacing S01E02/);
+    assert.deepEqual(deleted, [502]);
+    assert.deepEqual(grabbed, ['r2']);
+  });
+
+  it('changes nothing for a wrong episode the model reads when the season checks out', async () => {
+    modelAnswer = JSON.stringify({ kind: 'wrongEpisode' });
+    releases = [
+      release({
+        guid: 'r2',
+        title: 'Harbour Lights S01E02',
+        mappedEpisodeInfo: [{ id: 102 }],
+      }),
+    ];
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'something about this one is not right',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: 2,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.equal(
+      comment,
+      'Automatic fix: Every file in season 1 matches its episode by name and length, so nothing was changed. An admin can look at it if it is still wrong.'
+    );
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
+  });
+
   it('reads nothing into a report when Understand Reports is off', async () => {
     getSettings().main.disabledFeatures = ['aiReports'];
     modelAnswer = JSON.stringify({ kind: 'broken' });
@@ -1072,6 +1238,70 @@ describe('Auto-fix: reported issues', () => {
     });
     assert.equal(comments.length, 1, 'only the report itself');
     assert.deepEqual(deleted, []);
+  });
+});
+
+describe('Auto-fix: re-numbering a season', () => {
+  const report = async (episodeNumber: number) => {
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'This is the wrong episode',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: episodeNumber,
+    });
+    return commentOn(res.body.id);
+  };
+
+  it('leaves two swapped files as they are, and says so', async () => {
+    origins = { 102: 'Glasswing S01E03', 103: 'Glasswing S01E02' };
+    fakeImports();
+    const comment = await report(2);
+    assert.equal(
+      comment,
+      'Automatic fix: Left S01E02 and S01E03 as they are: their files are swapped with each other, which cannot be undone without a file being replaced. An admin can swap them in Sonarr.'
+    );
+    assert.deepEqual(imported, []);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
+  });
+
+  it('re-numbers first, then replaces a file that is really wrong', async () => {
+    // Episode 3's file is episode 4, which has none; episode 1 runs long.
+    origins = { 103: 'Static Garden S01E04' };
+    episodes[0] = { ...episodes[0], runtime: 45 };
+    episodes[3] = { ...episodes[3], hasFile: false, episodeFileId: 0 };
+    fakeImports();
+    releases = [
+      release({
+        guid: 'r1',
+        title: 'Static Garden S01E01',
+        mappedEpisodeInfo: [{ id: 101 }],
+      }),
+    ];
+    const comment = await report(1);
+    assert.match(
+      comment,
+      /^Automatic fix: Re-numbered 1 file of season 1 to match Sonarr: S01E03 is now S01E04\. S01E03 has no file now\.\n/
+    );
+    assert.match(comment, /S01E01 runs 23 minutes where the episode is 45/);
+    assert.match(comment, /Replacing S01E01/);
+    assert.deepEqual(done, ['import:3>4', 'delete:501', 'grab:r1']);
+    assert.deepEqual(deleted, [501]);
+  });
+
+  it('stops at the first move Sonarr does not make, and says what changed', async () => {
+    origins = { 101: 'Lantern Song S01E02', 102: 'Lantern Song S01E03' };
+    episodes[2] = { ...episodes[2], hasFile: false, episodeFileId: 0 };
+    fakeImports({ ignore: '1>2' });
+    const comment = await report(1);
+    assert.equal(
+      comment,
+      'Automatic fix: Re-numbered 1 file of season 1 to match Sonarr: S01E02 is now S01E03. Moving S01E01 to S01E02 failed: Sonarr did not move the file of S01E01 to S01E02 as expected. Look at both episodes in Sonarr. Stopped there, so S01E01 keeps its old number, and nothing else was changed.'
+    );
+    assert.deepEqual(imported, ['2>3']);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
   });
 });
 

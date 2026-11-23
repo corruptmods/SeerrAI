@@ -10,6 +10,9 @@ import { commandFinished } from '@server/lib/backfill/sonarr';
  * that file: it is neither moved nor deleted, only its record is replaced
  * (ImportApprovedEpisodes, newDownload false). Nothing is downloaded and no
  * other file is touched: every other episode given must have no file.
+ *
+ * The same import moves a file numbered wrong onto the empty episode it
+ * really is (moveEpisodeFile, for auto-fix's re-numbering).
  */
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -31,6 +34,8 @@ export interface RelinkResult {
   fileId: number;
   /** False if already linked to all of them. */
   changed: boolean;
+  /** Moves only: false if Sonarr could not rename it after the move. */
+  renamed?: boolean;
 }
 
 const WAIT_MS = 2000;
@@ -160,5 +165,107 @@ export const relinkEpisodeFile = async (
     episodes: range,
     fileId: relinked.id,
     changed: true,
+  };
+};
+
+/**
+ * Moves a file that holds one episode onto the episode it really is, in
+ * place, then renames it. The target must have no file, or Sonarr would
+ * replace it. Verified afterwards: the file is linked to the target alone,
+ * and the episode it left has no file.
+ */
+export const moveEpisodeFile = async (
+  sonarr: BackfillSonarr,
+  seriesId: number,
+  fromEpisodeId: number,
+  toEpisodeId: number,
+  sleep: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms))
+): Promise<RelinkResult> => {
+  const [series, episodes, files] = await Promise.all([
+    sonarr.getSeriesDetail(seriesId),
+    sonarr.getSeriesEpisodes(seriesId),
+    sonarr.getEpisodeFiles(seriesId),
+  ]);
+  const source = episodes.find((e) => e.id === fromEpisodeId);
+  const target = episodes.find((e) => e.id === toEpisodeId);
+  if (!source || !target) {
+    throw new RelinkError('That episode is no longer in Sonarr.');
+  }
+  const fromName = label(source.seasonNumber, [source.episodeNumber]);
+  const to = label(target.seasonNumber, [target.episodeNumber]);
+  if (!source.episodeFileId) {
+    throw new RelinkError(`${fromName} no longer has a file.`);
+  }
+  if (target.episodeFileId) {
+    throw new RelinkError(
+      `${to} has a file of its own, and files are never replaced here.`
+    );
+  }
+  if (
+    episodes.some(
+      (e) => e.id !== source.id && e.episodeFileId === source.episodeFileId
+    )
+  ) {
+    throw new RelinkError(`The file of ${fromName} holds other episodes too.`);
+  }
+  const file = files.find((f) => f.id === source.episodeFileId);
+  if (!file?.relativePath) {
+    throw new RelinkError(`Sonarr has no record of the file for ${fromName}.`);
+  }
+  const from = file.relativePath;
+  const path =
+    file.path ?? `${series.path.replace(/[\\/]+$/, '')}/${file.relativePath}`;
+
+  // In place, no download id: Sonarr only replaces the file's record.
+  await waitFor(
+    sonarr,
+    await sonarr.manualImport([
+      {
+        path,
+        seriesId,
+        episodeIds: [target.id],
+        quality: file.quality,
+        languages: file.languages ?? [],
+        releaseGroup: file.releaseGroup,
+      },
+    ]),
+    'import',
+    sleep
+  );
+  const moved = (await sonarr.getEpisodeFiles(seriesId)).find(
+    (f) => f.relativePath === from
+  );
+  const now = await sonarr.getSeriesEpisodes(seriesId);
+  const linked = now.filter((e) => moved && e.episodeFileId === moved.id);
+  const left = now.find((e) => e.id === source.id);
+  if (
+    !moved ||
+    linked.length !== 1 ||
+    linked[0].id !== target.id ||
+    left?.episodeFileId
+  ) {
+    throw new RelinkError(
+      `Sonarr did not move the file of ${fromName} to ${to} as expected. Look at both episodes in Sonarr.`
+    );
+  }
+  // Moved either way: a failed rename only leaves the old name.
+  const renamedOk = await sonarr
+    .renameFiles(seriesId, [moved.id])
+    .then((id) => waitFor(sonarr, id, 'rename', sleep))
+    .then(
+      () => true,
+      () => false
+    );
+  const renamed = renamedOk
+    ? (await sonarr.getEpisodeFiles(seriesId)).find((f) => f.id === moved.id)
+    : undefined;
+  return {
+    from,
+    to: renamed?.relativePath ?? from,
+    episodes: to,
+    fileId: moved.id,
+    changed: true,
+    renamed: renamedOk,
   };
 };

@@ -82,7 +82,9 @@ const RequestListPicker = ({
         <BookmarkIcon className="h-4 w-4" />
         <span>{intl.formatMessage(messages.addtolists)}</span>
       </div>
-      <ul className="max-h-32 space-y-1 overflow-y-auto">
+      {/* Scrolls past four lists. Its height fits four whole rows of boxes,
+          and its padding the focus ring, so neither is cut off. */}
+      <ul className="-m-1 max-h-[7.25rem] space-y-1 overflow-y-auto p-1">
         {lists.map((list) => (
           <li key={`request-list-${list.id}`}>
             <label className="flex items-center space-x-2 text-sm text-gray-200">

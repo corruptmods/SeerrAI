@@ -406,7 +406,7 @@ class SiriReports {
         : `That asks an admin to replace all of season ${where.season} of ${where.title}. Should I ask?`;
     }
     if (kind === 'wrongEpisode' && where.season !== undefined) {
-      return `That checks ${name} against where each file came from, and replaces what’s wrong. Should I go ahead?`;
+      return `That checks ${name} against where each file came from, re-numbers files that are only numbered wrong, and replaces any that are really wrong. Should I go ahead?`;
     }
     return `That replaces the file of ${name} with another copy. Should I go ahead?`;
   }

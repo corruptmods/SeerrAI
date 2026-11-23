@@ -2373,6 +2373,12 @@ describe('series type and anime', () => {
       .put(`/request/${res.body.id}`)
       .send({ seasons: [1], seriesType: 'daily' });
     assert.strictEqual(edited.body.seriesType, 'daily');
+    // Null hands it back, as with anime on.
+    edited = await agent
+      .put(`/request/${res.body.id}`)
+      .send({ seasons: [1], seriesType: null });
+    assert.strictEqual(edited.status, 200);
+    assert.strictEqual(edited.body.seriesType, null);
   });
 
   it('leaves anime without the keyword to the anime settings, not an ordinary rule', async () => {

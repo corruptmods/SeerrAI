@@ -246,6 +246,8 @@ export const animeCheckEnabled = (): boolean => {
 class AnimeCheck {
   private running = false;
   private cancelled = false;
+  /** Cancelled because anime or the check was switched off mid-run. */
+  private switchedOff = false;
   private report: AnimeCheckReport | null = null;
 
   public status() {
@@ -254,6 +256,19 @@ class AnimeCheck {
 
   public cancel() {
     this.cancelled = true;
+  }
+
+  /**
+   * Whether the run should stop: cancelled, or anime or the check switched
+   * off since it started, which counts as cancelling it (with anime off every
+   * title would be judged as not anime).
+   */
+  private stopping(): boolean {
+    if (!this.cancelled && !animeCheckEnabled()) {
+      this.cancelled = true;
+      this.switchedOff = true;
+    }
+    return this.cancelled;
   }
 
   /** The last report, from memory or its file. */
@@ -297,7 +312,7 @@ class AnimeCheck {
     const found: { series: SonarrSeries; show: TmdbTvScanDetails }[] = [];
     const queue = [...allSeries];
     const worker = async () => {
-      while (queue.length && !this.cancelled) {
+      while (queue.length && !this.stopping()) {
         const series = queue.shift() as SonarrSeries;
         try {
           const show = series.tmdbId
@@ -371,7 +386,7 @@ class AnimeCheck {
     const found: { movie: RadarrMovie; details: TmdbMovieScanDetails }[] = [];
     const queue = [...allMovies];
     const worker = async () => {
-      while (queue.length && !this.cancelled) {
+      while (queue.length && !this.stopping()) {
         const movie = queue.shift() as RadarrMovie;
         try {
           if (!movie.tmdbId) {
@@ -435,11 +450,12 @@ class AnimeCheck {
     }
     this.running = true;
     this.cancelled = false;
+    this.switchedOff = false;
     try {
       const tmdb = new TheMovieDb();
       const servers: AnimeCheckServer[] = [];
       for (const server of getSettings().sonarr) {
-        if (this.cancelled) {
+        if (this.stopping()) {
           break;
         }
         try {
@@ -460,7 +476,7 @@ class AnimeCheck {
       }
       const movieServers: AnimeCheckMovieServer[] = [];
       for (const server of getSettings().radarr) {
-        if (this.cancelled) {
+        if (this.stopping()) {
           break;
         }
         try {
@@ -480,8 +496,15 @@ class AnimeCheck {
           });
         }
       }
-      if (this.cancelled) {
-        logger.info('Anime Check cancelled', { label: 'Anime Check' });
+      // Checked again last: a switch turned off while titles were judged
+      // would leave them judged as not anime.
+      if (this.stopping()) {
+        logger.info(
+          this.switchedOff
+            ? 'Anime Check stopped because anime or the check was switched off'
+            : 'Anime Check cancelled',
+          { label: 'Anime Check' }
+        );
         return;
       }
 

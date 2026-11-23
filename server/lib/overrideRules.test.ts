@@ -6,13 +6,14 @@ import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import OverrideRule from '@server/entity/OverrideRule';
 import { User } from '@server/entity/User';
+import { refreshAnimeRules } from '@server/lib/animeRules';
 import overrideRules, {
   formatRuleCountries,
   titleCertification,
   titleCountries,
 } from '@server/lib/overrideRules';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, setAnimeRulesSetUp } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { after, beforeEach, describe, it } from 'node:test';
@@ -385,6 +386,76 @@ describe("an override rule naming TMDB's anime keyword", () => {
     settings.main.anime = 'off';
     assert.equal(await typeFor('ko'), null);
     assert.equal(await typeFor('fr'), 'daily');
+  });
+
+  it('turns auto on by itself, with no anime library on any server, and matches', async () => {
+    settings.main.anime = 'auto';
+    assert.equal(settings.animeOn, true);
+    assert.equal(
+      await folderFor(
+        show({
+          genres: [ANIMATION],
+          original_language: 'ja',
+          origin_country: ['JP'],
+        })
+      ),
+      '/anime-rule'
+    );
+
+    // Deleted, auto is off again and anime goes by the other rules.
+    const repository = getRepository(OverrideRule);
+    await repository.remove(
+      await repository.findOneByOrFail({ keywords: '210024' })
+    );
+    assert.equal(settings.animeOn, false);
+    assert.equal(
+      await folderFor(
+        show({
+          genres: [ANIMATION],
+          original_language: 'ja',
+          origin_country: ['JP'],
+        })
+      ),
+      '/cartoons'
+    );
+  });
+
+  it('turns auto on for a rule setting the anime type, until it is changed', async () => {
+    settings.main.anime = 'auto';
+    const repository = getRepository(OverrideRule);
+    await repository.remove(await repository.find());
+    assert.equal(settings.animeOn, false);
+
+    const typed = await rule({
+      sonarrServiceId: 0,
+      language: 'ko',
+      seriesType: 'anime',
+    });
+    assert.equal(settings.animeOn, true);
+    assert.equal(
+      (
+        await overrideRules({
+          mediaType: MediaType.TV,
+          is4k: false,
+          tmdbMedia: show({ original_language: 'ko' }),
+          requestUser: requester,
+          serviceId: 0,
+        })
+      ).seriesType,
+      'anime'
+    );
+
+    typed.seriesType = 'daily';
+    await repository.save(typed);
+    assert.equal(settings.animeOn, false);
+  });
+
+  it('is read again at startup', async () => {
+    settings.main.anime = 'auto';
+    setAnimeRulesSetUp(false);
+    assert.equal(settings.animeOn, false);
+    assert.equal(await refreshAnimeRules(), true);
+    assert.equal(settings.animeOn, true);
   });
 
   it('still matches on its other keywords for anything else', async () => {

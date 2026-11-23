@@ -9,7 +9,7 @@ import {
   ArrowDownOnSquareIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import type { AnimeMode, Region } from '@server/lib/settings';
+import type { AnimeMode, AnimeOnReason, Region } from '@server/lib/settings';
 import axios from 'axios';
 import sortBy from 'lodash/sortBy';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -23,13 +23,18 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
     'What counts as anime decides where requests go in Sonarr and Radarr, and what the Anime page lists.',
   mode: 'Anime handling',
   modeTip:
-    'Auto turns it on while a Sonarr or Radarr server has an anime root folder, anime quality profile or anime tags of its own. Off sends everything with the standard settings and hides the anime choices.',
+    'Auto turns it on while a Sonarr or Radarr server has an anime root folder, quality profile, language profile or tags of its own, or an override rule names the anime keyword or sets the anime series type. Off sends everything with the standard settings and hides the anime choices.',
   modeAuto: 'Auto',
   modeOn: 'On',
   modeOff: 'Off',
-  nowOnLibrary: 'On now: a Sonarr or Radarr server has an anime library.',
+  nowOnBecause: 'On now, because of {reasons}.',
+  reasonFolder: 'an anime root folder',
+  reasonProfile: 'an anime quality profile',
+  reasonLanguageProfile: 'an anime language profile',
+  reasonTags: 'anime tags that differ from the standard ones',
+  reasonRule: 'an override rule for anime',
   nowOffNoLibrary:
-    'Off now: no Sonarr or Radarr server has an anime root folder, quality profile or tags of its own.',
+    'Off now: no Sonarr or Radarr server has an anime root folder, quality profile, language profile or tags of its own, and no override rule is for anime.',
   nowOn: 'On, whatever the servers have.',
   nowOff: 'Off, whatever the servers have.',
   check: 'Anime Check',
@@ -44,6 +49,17 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
   loadFailed: 'The anime settings could not be loaded.',
 });
 
+const reasonMessages: Record<
+  AnimeOnReason,
+  (typeof messages)[keyof typeof messages]
+> = {
+  folder: messages.reasonFolder,
+  profile: messages.reasonProfile,
+  languageProfile: messages.reasonLanguageProfile,
+  tags: messages.reasonTags,
+  rule: messages.reasonRule,
+};
+
 type Option = { value: string; label: string };
 
 /** GET and POST /settings/anime. */
@@ -53,13 +69,16 @@ interface AnimeSettingsResponse {
   enabled: boolean;
   /** Whether some Sonarr or Radarr has an anime library (what auto follows). */
   librarySetUp: boolean;
+  /** What auto sees: the anime library's parts, and anime override rules. */
+  autoReasons?: AnimeOnReason[];
   /** Whether Anime Check runs while anime is on. */
   check: boolean;
   excludedCountries: string[];
 }
 
 /*
- * Anime handling on, off or auto (on while an anime library is set up), Anime
+ * Anime handling on, off or auto (on while an anime library is set up or an
+ * override rule routes anime, saying which), Anime
  * Check's own switch, and countries whose anime-style titles count as regular
  * unless in Japanese (utils/isAnime). Saved together.
  */
@@ -187,15 +206,19 @@ const AnimeSettings = () => {
                   </select>
                 </div>
                 <p className="mt-2 text-sm text-gray-400" aria-live="polite">
-                  {intl.formatMessage(
-                    mode === 'auto'
-                      ? data.librarySetUp
-                        ? messages.nowOnLibrary
-                        : messages.nowOffNoLibrary
-                      : mode === 'on'
-                        ? messages.nowOn
-                        : messages.nowOff
-                  )}
+                  {mode === 'auto'
+                    ? data.autoReasons?.length
+                      ? intl.formatMessage(messages.nowOnBecause, {
+                          reasons: intl.formatList(
+                            data.autoReasons.map((reason) =>
+                              intl.formatMessage(reasonMessages[reason])
+                            )
+                          ),
+                        })
+                      : intl.formatMessage(messages.nowOffNoLibrary)
+                    : intl.formatMessage(
+                        mode === 'on' ? messages.nowOn : messages.nowOff
+                      )}
                 </p>
               </div>
             </div>

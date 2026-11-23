@@ -59,6 +59,7 @@ import { IssueCommentSubscriber } from '@server/subscriber/IssueCommentSubscribe
 import { IssueSubscriber } from '@server/subscriber/IssueSubscriber';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { MediaSubscriber } from '@server/subscriber/MediaSubscriber';
+import { OverrideRuleSubscriber } from '@server/subscriber/OverrideRuleSubscriber';
 import { UserSubscriber } from '@server/subscriber/UserSubscriber';
 import { isPgsql } from '@server/utils/dbType';
 import fs from 'fs';
@@ -132,6 +133,7 @@ const subscribers = [
   IssueSubscriber,
   MediaRequestSubscriber,
   MediaSubscriber,
+  OverrideRuleSubscriber,
   UserSubscriber,
 ];
 

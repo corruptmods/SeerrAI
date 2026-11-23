@@ -60,6 +60,7 @@ import { cleanSeasons, seasonSettings } from '@server/lib/seasons';
 import type { AnimeMode, JobId, MainSettings } from '@server/lib/settings';
 import {
   ANIME_MODES,
+  animeAutoReasons,
   animeLibrarySetUp,
   getSettings,
 } from '@server/lib/settings';
@@ -279,7 +280,9 @@ const animeSettingsView = () => {
   return {
     mode: settings.main.anime ?? 'auto',
     enabled: settings.animeOn,
-    librarySetUp: animeLibrarySetUp([...settings.sonarr, ...settings.radarr]),
+    librarySetUp: animeLibrarySetUp(settings.sonarr, settings.radarr),
+    // What auto sees, whichever mode is chosen.
+    autoReasons: animeAutoReasons(settings.sonarr, settings.radarr),
     check: settings.main.animeCheck !== false,
     excludedCountries: settings.main.animeExcludedCountries ?? [],
   };
@@ -287,7 +290,7 @@ const animeSettingsView = () => {
 
 /*
  * Anime handling: on, off, or auto (on while some Sonarr or Radarr has an
- * anime library); whether Anime Check runs; and what counts as anime:
+ * anime library or an override rule routes anime); whether Anime Check runs; and what counts as anime:
  * countries whose anime counts only when in Japanese (utils/isAnime), set as
  * a whole list like the features. A POST changes only the fields it sends.
  */

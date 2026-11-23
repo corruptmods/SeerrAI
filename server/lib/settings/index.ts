@@ -615,7 +615,8 @@ export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
 /**
  * Anime handling (Settings → Services → Anime): 'auto' while an anime library
- * is set up (animeLibrarySetUp), else always on or always off.
+ * is set up or an override rule routes anime (animeAutoReasons), else always
+ * on or always off.
  */
 export type AnimeMode = 'auto' | 'on' | 'off';
 
@@ -631,32 +632,114 @@ type AnimeLibraryFields = Pick<
   animeTags?: number[];
 };
 
-/**
- * Whether some Sonarr or Radarr server has an anime library: an anime root
- * folder or quality profile other than its standard one, or anime tags other
- * than its standard tags. Sonarr's anime series type doesn't count: it is
- * 'anime' on every server unless changed.
- */
-export const animeLibrarySetUp = (
-  servers: readonly AnimeLibraryFields[]
-): boolean =>
-  servers.some((server) => {
-    const tags = [...(server.tags ?? [])].sort().join();
-    return (
-      (!!server.activeAnimeDirectory &&
-        server.activeAnimeDirectory !== server.activeDirectory) ||
-      (!!server.activeAnimeProfileId &&
-        server.activeAnimeProfileId !== server.activeProfileId) ||
-      (!!server.animeTags?.length &&
-        [...server.animeTags].sort().join() !== tags)
-    );
-  });
+/** A Sonarr server's anime fields, with Sonarr v3's language profiles. */
+type SonarrLibraryFields = AnimeLibraryFields & {
+  activeLanguageProfileId?: number;
+  activeAnimeLanguageProfileId?: number;
+};
 
-/** Whether anime handling is on, from the mode and the servers. */
+/**
+ * What makes auto turn anime on: an anime root folder, quality profile,
+ * language profile (Sonarr v3) or tags of a server's own, or an override rule
+ * that names TMDB's anime keyword or sets the anime series type.
+ */
+export type AnimeOnReason =
+  | 'folder'
+  | 'profile'
+  | 'languageProfile'
+  | 'tags'
+  | 'rule';
+
+const sameTags = (a?: readonly number[], b?: readonly number[]): boolean =>
+  [...new Set(a ?? [])].sort().join() === [...new Set(b ?? [])].sort().join();
+
+/**
+ * How some Sonarr or Radarr server has an anime library: an anime root folder,
+ * quality profile or (Sonarr) language profile other than its standard one,
+ * or anime tags other than its standard tags. Sonarr sends anime with its
+ * anime tags even when they are empty, so any difference counts there; Radarr
+ * falls back to its standard tags, so only anime tags of its own count.
+ * Sonarr's anime series type doesn't count: it is 'anime' on every server
+ * unless changed.
+ */
+export const animeLibraryReasons = (
+  sonarr: readonly SonarrLibraryFields[],
+  radarr: readonly AnimeLibraryFields[]
+): AnimeOnReason[] => {
+  const reasons = new Set<AnimeOnReason>();
+  const check = (server: SonarrLibraryFields, isSonarr: boolean) => {
+    if (
+      server.activeAnimeDirectory &&
+      server.activeAnimeDirectory !== server.activeDirectory
+    ) {
+      reasons.add('folder');
+    }
+    if (
+      server.activeAnimeProfileId &&
+      server.activeAnimeProfileId !== server.activeProfileId
+    ) {
+      reasons.add('profile');
+    }
+    if (
+      isSonarr &&
+      server.activeAnimeLanguageProfileId &&
+      server.activeAnimeLanguageProfileId !== server.activeLanguageProfileId
+    ) {
+      reasons.add('languageProfile');
+    }
+    if (
+      (isSonarr || !!server.animeTags?.length) &&
+      !sameTags(server.animeTags, server.tags)
+    ) {
+      reasons.add('tags');
+    }
+  };
+  sonarr.forEach((server) => check(server, true));
+  radarr.forEach((server) => check(server, false));
+  return [...reasons];
+};
+
+/** Whether some Sonarr or Radarr server has an anime library. */
+export const animeLibrarySetUp = (
+  sonarr: readonly SonarrLibraryFields[],
+  radarr: readonly AnimeLibraryFields[]
+): boolean => animeLibraryReasons(sonarr, radarr).length > 0;
+
+/*
+ * Whether some override rule names TMDB's anime keyword or sets the anime
+ * series type. Rules live in the database, so this is kept here, and
+ * lib/animeRules refreshes it at startup and whenever a rule is written.
+ */
+let animeRuleSetUp = false;
+
+export const animeRulesSetUp = (): boolean => animeRuleSetUp;
+
+export const setAnimeRulesSetUp = (value: boolean): void => {
+  animeRuleSetUp = value;
+};
+
+/**
+ * Why auto has anime on: how the servers have an anime library, and 'rule'
+ * when an override rule routes anime. Empty while auto has it off.
+ */
+export const animeAutoReasons = (
+  sonarr: readonly SonarrLibraryFields[],
+  radarr: readonly AnimeLibraryFields[],
+  rules: boolean = animeRuleSetUp
+): AnimeOnReason[] => [
+  ...animeLibraryReasons(sonarr, radarr),
+  ...(rules ? (['rule'] as const) : []),
+];
+
+/** Whether anime handling is on, from the mode, the servers and the rules. */
 export const animeSwitchedOn = (
   mode: AnimeMode | undefined,
-  servers: readonly AnimeLibraryFields[]
-): boolean => mode === 'on' || (mode !== 'off' && animeLibrarySetUp(servers));
+  sonarr: readonly SonarrLibraryFields[],
+  radarr: readonly AnimeLibraryFields[],
+  rules: boolean = animeRuleSetUp
+): boolean =>
+  mode === 'on' ||
+  (mode !== 'off' && (rules || animeLibrarySetUp(sonarr, radarr)));
 
 export interface SonarrSettings extends DVRSettings {
   seriesType: 'standard' | 'daily' | 'anime';
@@ -1849,13 +1932,15 @@ class Settings {
 
   /**
    * Whether anime handling is on: Settings → Services → Anime, where 'auto'
-   * means while some Sonarr or Radarr has an anime library.
+   * means while some Sonarr or Radarr has an anime library or an override
+   * rule routes anime (animeAutoReasons).
    */
   get animeOn(): boolean {
-    return animeSwitchedOn(this.data.main.anime, [
-      ...(this.data.sonarr ?? []),
-      ...(this.data.radarr ?? []),
-    ]);
+    return animeSwitchedOn(
+      this.data.main.anime,
+      this.data.sonarr ?? [],
+      this.data.radarr ?? []
+    );
   }
 
   get public(): PublicSettings {

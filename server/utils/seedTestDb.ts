@@ -10,6 +10,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
+import { setAnimeRulesSetUp } from '@server/lib/settings';
 import { rollBackOnRelease } from '@server/utils/nestedTransaction';
 import gravatarUrl from 'gravatar-url';
 
@@ -114,6 +115,8 @@ export async function resetTestDb(): Promise<void> {
   assertTestDatabase('reset the test database');
 
   await dataSource.synchronize(true);
+  // No override rules any more, so none routes anime.
+  setAnimeRulesSetUp(false);
   await seedTestUsers();
 }
 

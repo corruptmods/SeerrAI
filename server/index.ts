@@ -6,6 +6,7 @@ import { User } from '@server/entity/User';
 import { initI18n } from '@server/i18n';
 import { startJobs } from '@server/job/schedule';
 import agent from '@server/lib/agent';
+import { refreshAnimeRules } from '@server/lib/animeRules';
 import backfill from '@server/lib/backfill/engine';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
@@ -126,6 +127,8 @@ app
     }
 
     const settings = await getSettings().load();
+    // Override rules that route anime count for auto anime handling.
+    await refreshAnimeRules();
 
     initI18n();
 

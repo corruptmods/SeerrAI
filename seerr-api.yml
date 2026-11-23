@@ -380,7 +380,7 @@ components:
         mode:
           type: string
           enum: [auto, 'on', 'off']
-          description: auto (the default, also for settings saved before this existed) is on while some Sonarr or Radarr server has an anime root folder, an anime quality profile other than its standard one, or anime tags. Off sends every request with the standard settings, ignores anime choices sent with requests, and stops Anime Check.
+          description: auto (the default, also for settings saved before this existed) is on while some Sonarr or Radarr server has an anime root folder or quality profile other than its standard one, a Sonarr server has an anime language profile other than its standard one or anime tags that differ from its standard tags, a Radarr server has anime tags of its own, or an override rule names TMDB's anime keyword or sets the anime series type. Off sends every request with the standard settings, ignores anime choices sent with requests, and stops Anime Check.
           example: auto
         enabled:
           type: boolean
@@ -390,6 +390,14 @@ components:
           type: boolean
           readOnly: true
           description: Whether some Sonarr or Radarr server has an anime library, which auto follows.
+        autoReasons:
+          type: array
+          readOnly: true
+          description: What auto sees, whichever mode is chosen; auto is on while this isn't empty. folder, profile, languageProfile and tags are a server's anime root folder, quality profile, language profile or tags of its own; rule is an override rule that names TMDB's anime keyword or sets the anime series type.
+          items:
+            type: string
+            enum: [folder, profile, languageProfile, tags, rule]
+          example: [folder, rule]
         check:
           type: boolean
           description: Whether Anime Check runs. On by default; it never runs while anime is off.
@@ -397,6 +405,26 @@ components:
         excludedCountries:
           type: array
           description: Countries (ISO 3166-1) whose anime does not count as anime unless it is in Japanese. Empty counts anime from everywhere.
+          items:
+            type: string
+            pattern: '^[A-Za-z]{2}$'
+          example: [US]
+    AnimeSettingsChange:
+      type: object
+      description: What a POST to /settings/anime changes; only the fields sent. Other fields of AnimeSettings, as a GET returns them, are accepted and ignored, so a GET's result can be edited and posted back.
+      properties:
+        mode:
+          type: string
+          enum: [auto, 'on', 'off']
+          description: See AnimeSettings.mode.
+          example: auto
+        check:
+          type: boolean
+          description: Whether Anime Check runs.
+          example: true
+        excludedCountries:
+          type: array
+          description: Replaces the whole list of countries whose anime does not count as anime unless it is in Japanese.
           items:
             type: string
             pattern: '^[A-Za-z]{2}$'
@@ -4756,7 +4784,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnimeSettings'
+              $ref: '#/components/schemas/AnimeSettingsChange'
       responses:
         '200':
           description: The anime settings, as saved
@@ -17311,7 +17339,7 @@ paths:
                   type: string
                   nullable: true
                   enum: [standard, daily, anime, null]
-                  description: Anime or not, as ticked in the request dialog (anime or standard); left out, the title's setting, override rules and anime detection decide. Null on an edit hands it back to them.
+                  description: Anime or not, as ticked in the request dialog (anime or standard); left out, the title's setting, override rules and anime detection decide. Null on an edit hands it back to them. While anime is off, only daily or null is taken; anime or standard is ignored.
                 userId:
                   type: number
                   nullable: true

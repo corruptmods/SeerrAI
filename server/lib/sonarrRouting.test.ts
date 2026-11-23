@@ -177,11 +177,22 @@ describe('sonarrRouting with the anime switch', () => {
         ...settings,
         activeAnimeDirectory: undefined,
         activeAnimeProfileId: undefined,
-        animeTags: [],
+        activeAnimeLanguageProfileId: undefined,
+        animeTags: [1],
         animeSeriesType: 'anime',
       } as unknown as SonarrSettings,
     ];
     assert.deepEqual(sonarrRouting(japaneseSeries, settings), standard);
+
+    // Anime tags of none, unlike the standard tags, send anime without them:
+    // that is an anime library too.
+    getSettings().sonarr = [
+      {
+        ...getSettings().sonarr[0],
+        animeTags: [],
+      } as SonarrSettings,
+    ];
+    assert.equal(sonarrRouting(japaneseSeries, settings).anime, true);
 
     getSettings().sonarr = [settings];
     assert.deepEqual(sonarrRouting(japaneseSeries, settings), {

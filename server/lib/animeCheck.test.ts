@@ -214,6 +214,75 @@ describe('the Anime Check job', () => {
     }
   });
 
+  it('stops without a report when anime or the check is switched off while it runs', async (t) => {
+    const before = {
+      sonarr: getSettings().sonarr,
+      radarr: getSettings().radarr,
+    };
+    const tvShow = t.mock.fn(async () => ({
+      id: 1,
+      genres: [{ id: 16 }],
+      original_language: 'ja',
+      keywords: { results: [] },
+    }));
+    Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
+      configurable: true,
+      set() {},
+      get: () => tvShow,
+    });
+    try {
+      getSettings().radarr = [];
+      for (const switchOff of [
+        () => (getSettings().main.anime = 'off'),
+        () => (getSettings().main.animeCheck = false),
+      ]) {
+        getSettings().main.anime = 'on';
+        getSettings().main.animeCheck = true;
+        getSettings().sonarr = [
+          {
+            id: 0,
+            name: 'Lantern Song Sonarr',
+            activeProfileId: 1,
+            activeDirectory: '/tv',
+            activeAnimeDirectory: '/anime',
+            tags: [],
+            animeTags: [],
+          } as unknown as SonarrSettings,
+        ];
+        const last = await animeCheck.lastReport();
+        t.mock.method(SonarrAPI.prototype, 'getSeries', async () => {
+          switchOff();
+          return [
+            {
+              id: 1,
+              title: 'Lantern Song',
+              tmdbId: 1,
+              tvdbId: 10,
+              path: '/anime/Lantern Song',
+              seriesType: 'anime',
+            },
+          ];
+        });
+        await animeCheck.run();
+
+        const after = await animeCheck.lastReport();
+        assert.equal(after.running, false);
+        assert.equal(after.finishedAt, last.finishedAt);
+        assert.deepEqual(after.servers, last.servers);
+        // Stopped before looking the series up.
+        assert.equal(tvShow.mock.callCount(), 0);
+        t.mock.restoreAll();
+      }
+    } finally {
+      delete (TheMovieDb.prototype as { getTvShowForScan?: unknown })
+        .getTvShowForScan;
+      getSettings().main.anime = 'auto';
+      getSettings().main.animeCheck = true;
+      getSettings().sonarr = before.sonarr;
+      getSettings().radarr = before.radarr;
+    }
+  });
+
   it('reports what disagrees, honouring a title set on its page or a type chosen for its request, and changes nothing', async (t) => {
     getSettings().sonarr = [
       {

@@ -1,5 +1,12 @@
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
-import { animeLibrarySetUp, getSettings } from '@server/lib/settings';
+import {
+  animeAutoReasons,
+  animeLibraryReasons,
+  animeLibrarySetUp,
+  animeSwitchedOn,
+  getSettings,
+  setAnimeRulesSetUp,
+} from '@server/lib/settings';
 import migrateAnimeExcludedCountries from '@server/lib/settings/migrations/0011_anime_excluded_countries';
 import settingsRoutes from '@server/routes/settings';
 import express from 'express';
@@ -44,6 +51,7 @@ beforeEach(() => {
   settings.main.animeCheck = true;
   settings.sonarr = [];
   settings.radarr = [];
+  setAnimeRulesSetUp(false);
 });
 
 /** What GET /settings/anime says on a new server, with `changes`. */
@@ -51,6 +59,7 @@ const view = (changes: Record<string, unknown> = {}) => ({
   mode: 'auto',
   enabled: false,
   librarySetUp: false,
+  autoReasons: [],
   check: true,
   excludedCountries: [],
   ...changes,
@@ -157,51 +166,153 @@ describe('the anime settings', () => {
   it('are on in auto once a server has an anime library, and say so publicly', async () => {
     getSettings().sonarr = [sonarr({ activeAnimeDirectory: '/anime' })];
     const res = await request(app).get('/api/v1/settings/anime');
-    assert.deepEqual(res.body, view({ enabled: true, librarySetUp: true }));
+    assert.deepEqual(
+      res.body,
+      view({ enabled: true, librarySetUp: true, autoReasons: ['folder'] })
+    );
     assert.equal(getSettings().fullPublicSettings.animeEnabled, true);
 
     getSettings().main.anime = 'off';
     assert.equal(getSettings().fullPublicSettings.animeEnabled, false);
   });
+
+  it('are on in auto for an override rule that routes anime, and say so', async () => {
+    setAnimeRulesSetUp(true);
+    const res = await request(app).get('/api/v1/settings/anime');
+    assert.deepEqual(res.body, view({ enabled: true, autoReasons: ['rule'] }));
+    assert.equal(getSettings().fullPublicSettings.animeEnabled, true);
+
+    // Off still wins, and the reasons still say what auto would see.
+    getSettings().main.anime = 'off';
+    const off = await request(app).get('/api/v1/settings/anime');
+    assert.deepEqual(off.body, view({ mode: 'off', autoReasons: ['rule'] }));
+  });
+
+  it('take back what a GET returned, with its fields that only say how things are', async () => {
+    getSettings().sonarr = [sonarr({ activeAnimeDirectory: '/anime' })];
+    setAnimeRulesSetUp(true);
+    const got = await request(app).get('/api/v1/settings/anime');
+    assert.equal(got.status, 200);
+
+    const res = await request(app)
+      .post('/api/v1/settings/anime')
+      .send({
+        ...got.body,
+        mode: 'off',
+        excludedCountries: ['us'],
+        // Ignored: these only say how things are.
+        enabled: true,
+        librarySetUp: false,
+        autoReasons: [],
+      });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(
+      res.body,
+      view({
+        mode: 'off',
+        librarySetUp: true,
+        autoReasons: ['folder', 'rule'],
+        excludedCountries: ['US'],
+      })
+    );
+    assert.equal(getSettings().main.anime, 'off');
+  });
 });
+
+const animeLibraryReasonsFor = (
+  sonarrServers: SonarrSettings[],
+  radarrServers: RadarrSettings[] = []
+) => animeLibraryReasons(sonarrServers, radarrServers);
 
 describe('auto: whether an anime library is set up', () => {
   it('is not, with no servers or only standard settings', () => {
-    assert.equal(animeLibrarySetUp([]), false);
-    assert.equal(animeLibrarySetUp([sonarr(), radarr()]), false);
+    assert.equal(animeLibrarySetUp([], []), false);
+    assert.equal(animeLibrarySetUp([sonarr()], [radarr()]), false);
   });
 
   it("doesn't count Sonarr's anime series type, which every server has", () => {
     assert.equal(
-      animeLibrarySetUp([sonarr({ animeSeriesType: 'anime' })]),
+      animeLibrarySetUp([sonarr({ animeSeriesType: 'anime' })], []),
       false
     );
   });
 
   it("doesn't count anime settings that are the standard ones again", () => {
     assert.equal(
-      animeLibrarySetUp([
-        sonarr({
-          activeAnimeDirectory: '/tv',
-          activeAnimeProfileId: 1,
-          tags: [3, 4],
-          animeTags: [4, 3],
-        }),
-      ]),
+      animeLibrarySetUp(
+        [
+          sonarr({
+            activeAnimeDirectory: '/tv',
+            activeAnimeProfileId: 1,
+            activeLanguageProfileId: 2,
+            activeAnimeLanguageProfileId: 2,
+            tags: [3, 4],
+            animeTags: [4, 3],
+          }),
+        ],
+        []
+      ),
       false
     );
   });
 
   it('is, with an anime folder, profile or tags of its own on any server', () => {
-    assert.equal(
-      animeLibrarySetUp([sonarr({ activeAnimeDirectory: '/anime' })]),
-      true
+    assert.deepEqual(
+      animeLibraryReasonsFor([sonarr({ activeAnimeDirectory: '/anime' })]),
+      ['folder']
     );
-    assert.equal(
-      animeLibrarySetUp([radarr(), radarr({ activeAnimeProfileId: 7 })]),
-      true
+    assert.deepEqual(
+      animeLibraryReasonsFor(
+        [],
+        [radarr(), radarr({ activeAnimeProfileId: 7 })]
+      ),
+      ['profile']
     );
-    assert.equal(animeLibrarySetUp([radarr({ animeTags: [9] })]), true);
+    assert.deepEqual(animeLibraryReasonsFor([], [radarr({ animeTags: [9] })]), [
+      'tags',
+    ]);
+  });
+
+  it("counts a Sonarr's standard tags with no anime tags, which anime goes without", () => {
+    // Sonarr sends anime with its anime tags, even none.
+    assert.deepEqual(
+      animeLibraryReasonsFor([sonarr({ tags: [5], animeTags: [] })]),
+      ['tags']
+    );
+    assert.deepEqual(animeLibraryReasonsFor([sonarr({ tags: [5] })]), ['tags']);
+    // Radarr sends anime with its standard tags when it has no anime tags.
+    assert.deepEqual(
+      animeLibraryReasonsFor([], [radarr({ tags: [5], animeTags: [] })]),
+      []
+    );
+  });
+
+  it('counts a Sonarr v3 anime language profile other than its standard one', () => {
+    assert.deepEqual(
+      animeLibraryReasonsFor([
+        sonarr({ activeLanguageProfileId: 1, activeAnimeLanguageProfileId: 3 }),
+      ]),
+      ['languageProfile']
+    );
+  });
+
+  it('names each reason once, whichever servers have it', () => {
+    assert.deepEqual(
+      animeLibraryReasonsFor(
+        [sonarr({ activeAnimeDirectory: '/anime', animeTags: [2] })],
+        [radarr({ activeAnimeDirectory: '/anime-movies' })]
+      ),
+      ['folder', 'tags']
+    );
+  });
+});
+
+describe('auto: override rules that route anime', () => {
+  it('turn anime on with no anime library anywhere, and are named', () => {
+    assert.equal(animeSwitchedOn('auto', [sonarr()], [radarr()], true), true);
+    assert.deepEqual(animeAutoReasons([sonarr()], [radarr()], true), ['rule']);
+    assert.equal(animeSwitchedOn('auto', [sonarr()], [radarr()], false), false);
+    assert.equal(animeSwitchedOn('off', [], [], true), false);
   });
 });
 

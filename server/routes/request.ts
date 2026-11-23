@@ -1405,14 +1405,19 @@ requestRoutes.put<{ requestId: string }>(
 
         // Anime flag from the request dialog: omitted keeps the current value,
         // null reverts to the title's setting and detection. While anime is
-        // off only a daily type is taken; an anime choice is ignored.
+        // off only a daily type, or null to hand the choice back, is taken; an
+        // anime or standard choice is ignored.
         const setChosenSeriesType = () => {
           if (req.body.seriesType !== undefined) {
             const seriesType = toSeriesTypeFor(
               request.type,
               req.body.seriesType
             );
-            if (getSettings().animeOn || seriesType === 'daily') {
+            if (
+              getSettings().animeOn ||
+              seriesType === 'daily' ||
+              req.body.seriesType === null
+            ) {
               request.seriesType = seriesType;
             }
           }

@@ -265,6 +265,33 @@ describe('User Access Check', () => {
     assert.equal(await userAccessCheck.run(), 1);
     assert.equal(await exists(person.id), false);
   });
+
+  it('removes someone deleted from Emby', async () => {
+    const settings = getSettings();
+    settings.plex.connected = false;
+    settings.main.mediaServerType = MediaServerType.EMBY;
+    settings.emby.connected = true;
+    settings.emby.apiKey = 'key';
+    const person = await getRepository(User).save(
+      new User({
+        email: 'emby@example.invalid',
+        embyUsername: 'lantern',
+        embyUserId: 'f'.repeat(32),
+        userType: UserType.EMBY,
+        permissions: Permission.REQUEST,
+        avatar: '',
+      })
+    );
+    jellyfinAccounts.push({ Id: 'f'.repeat(32), Name: 'lantern' });
+    await userAccessCheck.run();
+    assert.equal(await userAccessCheck.run(), 0);
+    assert.equal(await exists(person.id), true);
+
+    jellyfinAccounts.pop();
+    await userAccessCheck.run();
+    assert.equal(await userAccessCheck.run(), 1);
+    assert.equal(await exists(person.id), false);
+  });
 });
 
 describe('deleting a user from their media server too', () => {

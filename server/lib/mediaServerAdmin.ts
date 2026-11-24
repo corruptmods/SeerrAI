@@ -16,6 +16,7 @@ import { User } from '@server/entity/User';
 import type { MediaServerRemovalImpact } from '@server/interfaces/api/mediaServerInterfaces';
 import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
+import cacheManager from '@server/lib/cache';
 import matchWatch from '@server/lib/matchWatch';
 import {
   connectedServers,
@@ -28,6 +29,8 @@ import { usableProviderLinks } from '@server/lib/oidc';
 import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { getSettings } from '@server/lib/settings';
+import { forgetSiloPictures } from '@server/lib/siloAccounts';
+import { stopSiloHistory } from '@server/lib/siloHistory';
 import logger from '@server/logger';
 import { IsNull, Not } from 'typeorm';
 
@@ -247,6 +250,10 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   // Silo's episode list is rebuilt by its next full scan, and its play
   // history copied again when it is connected again.
   if (kind === 'silo') {
+    // A history read under way stops before writing its plays back.
+    stopSiloHistory();
+    forgetSiloPictures();
+    cacheManager.getCache('libraryaccess').flush();
     await getRepository(SiloEpisode).clear();
     await getRepository(SiloPlay).clear();
     // A key can't delete itself; the next sign-in to connect deletes it.

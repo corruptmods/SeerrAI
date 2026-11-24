@@ -257,11 +257,43 @@ const markCopiedTo = async (newest: Date | undefined): Promise<void> => {
   await settings.save();
 };
 
+/**
+ * Bumped when Silo is removed or replaced: a read started before stops
+ * before writing anything more, so the old Silo's plays never come back.
+ */
+let generation = 0;
+
+/** A read stopped because Silo was removed or replaced meanwhile. */
+export class SiloHistoryStopped extends Error {
+  constructor() {
+    super('Silo was removed or replaced while its history was being read.');
+    this.name = 'SiloHistoryStopped';
+  }
+}
+
+/** Throws once the Silo a read started on is no longer the connected one. */
+type StillCurrent = () => void;
+
+const stillCurrentFrom = (): StillCurrent => {
+  const started = generation;
+  const serverId = getSettings().silo.serverId;
+  return () => {
+    if (
+      generation !== started ||
+      getSettings().silo.serverId !== serverId ||
+      !isConnected('silo')
+    ) {
+      throw new SiloHistoryStopped();
+    }
+  };
+};
+
 /** Reads plays that ended from `after` on (everything without it). */
 const readFrom = async (
   client: SiloAPI,
   after: Date | undefined,
   retry: boolean,
+  still: StillCurrent,
   seen?: Set<string>
 ): Promise<{ read: number; stored: number; newest?: Date }> => {
   let read = 0;
@@ -271,6 +303,7 @@ const readFrom = async (
     if (!newest && page.length) newest = new Date(page[0].ended_at);
     read += page.length;
     page.forEach((entry) => seen?.add(entry.session_id));
+    still();
     stored += await storePage(client, page, retry);
   }
   return { read, stored, newest };
@@ -302,6 +335,7 @@ const dropUnlisted = async (seen: Set<string>): Promise<number> => {
 };
 
 const run = async (full: boolean): Promise<SiloHistoryResult> => {
+  const still = stillCurrentFrom();
   const client = siloClient();
   await client.getCompatibleInfo();
   if (!full) {
@@ -309,21 +343,29 @@ const run = async (full: boolean): Promise<SiloHistoryResult> => {
     const after = mark
       ? new Date(mark.getTime() - SILO_HISTORY_OVERLAP_MS)
       : undefined;
-    const { read, stored, newest } = await readFrom(client, after, false);
+    const { read, stored, newest } = await readFrom(
+      client,
+      after,
+      false,
+      still
+    );
+    still();
     await markCopiedTo(newest);
     return { full, read, stored, removed: 0 };
   }
   // Everything, then again from just before the newest play Silo listed: a
   // play Silo moved on while the long read ran is listed by the second read.
   const seen = new Set<string>();
-  const all = await readFrom(client, undefined, true, seen);
+  const all = await readFrom(client, undefined, true, still, seen);
   const since = all.newest
     ? new Date(all.newest.getTime() - SILO_HISTORY_OVERLAP_MS)
     : undefined;
   const late = since
-    ? await readFrom(client, since, true, seen)
+    ? await readFrom(client, since, true, still, seen)
     : { read: 0, stored: 0 };
+  still();
   const removed = await dropUnlisted(seen);
+  still();
   await markCopiedTo(all.newest);
   return {
     full,
@@ -348,16 +390,27 @@ export const syncSiloHistory = async ({
     if (!full || current.full) return current.promise;
     await current.promise.catch(() => undefined);
   }
-  const promise = run(full)
+  const promise: Promise<SiloHistoryResult> = run(full)
     .then((result) => {
       syncedAt = Date.now();
       return result;
     })
     .finally(() => {
-      current = undefined;
+      // A read stopped by stopSiloHistory may end after a new one began.
+      if (current?.promise === promise) current = undefined;
     });
   current = { full, promise };
   return promise;
+};
+
+/**
+ * Silo was removed or replaced: a read under way stops before writing more,
+ * and the next read starts afresh.
+ */
+export const stopSiloHistory = (): void => {
+  generation += 1;
+  current = undefined;
+  syncedAt = 0;
 };
 
 /**

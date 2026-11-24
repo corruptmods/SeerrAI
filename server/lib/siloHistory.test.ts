@@ -2,10 +2,13 @@ import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
+import availabilitySync from '@server/lib/availabilitySync';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { getSettings } from '@server/lib/settings';
+import { forgetPreviousSilo } from '@server/lib/siloConnect';
 import {
   SILO_HISTORY_OVERLAP_MS,
+  SiloHistoryStopped,
   resetSiloHistorySync,
   siloHistorySync,
   syncSiloHistory,
@@ -252,6 +255,34 @@ describe('copying Silo’s play history', () => {
       historyCalls()[0].query.ended_after,
       new Date(Date.parse(at(30)) - SILO_HISTORY_OVERLAP_MS).toISOString()
     );
+  });
+
+  it('writes nothing more once Silo is replaced mid-read', async (t) => {
+    const soon = t.mock.method(
+      availabilitySync,
+      'runSoon',
+      async () => undefined
+    );
+    silo.plays = Array.from({ length: 250 }, (_, i) =>
+      play(`s-${String(i).padStart(3, '0')}`, 'movie-glasswing', i)
+    );
+    let reset: Promise<number> | undefined;
+    // An admin connects a different Silo while the first page is stored.
+    silo.afterHistoryPage = () => {
+      silo.afterHistoryPage = undefined;
+      reset = forgetPreviousSilo();
+    };
+    await assert.rejects(() => syncSiloHistory(), SiloHistoryStopped);
+    await reset;
+    assert.equal(await getRepository(SiloPlay).count(), 0);
+    assert.equal(getSettings().silo.historyCopiedTo, '');
+    assert.equal(soon.mock.callCount(), 1, 'availability checked again');
+
+    // The next read starts afresh.
+    silo.calls = [];
+    await syncSiloHistory();
+    assert.equal(historyCalls()[0].query.ended_after, undefined);
+    assert.equal(await getRepository(SiloPlay).count(), 250);
   });
 
   it('reads once for callers that ask at the same time', async () => {

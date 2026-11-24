@@ -360,6 +360,9 @@ export const siloProfiles = (
 /** How long a picture lookup's profiles are reused. */
 const PICTURE_PROFILES_TTL = 2 * 60 * 1000;
 
+/** Forgets every account's profiles read for pictures (Silo replaced). */
+export const forgetSiloPictures = (): void => pictureLookups.clear();
+
 const pictureLookups = new Map<
   string,
   { at: number; profiles: Promise<SiloAccountProfile[]> }

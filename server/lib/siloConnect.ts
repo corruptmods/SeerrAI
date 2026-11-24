@@ -12,12 +12,16 @@ import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
+import availabilitySync from '@server/lib/availabilitySync';
+import cacheManager from '@server/lib/cache';
 import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import { siloDeviceId, siloLibraries } from '@server/lib/silo';
+import { forgetSiloPictures } from '@server/lib/siloAccounts';
+import { stopSiloHistory } from '@server/lib/siloHistory';
 import logger from '@server/logger';
 import { In, IsNull, Not } from 'typeorm';
 
@@ -394,6 +398,9 @@ export interface SiloResetActor {
 export const forgetPreviousSilo = async (
   actor?: SiloResetActor
 ): Promise<number> => {
+  // A history read under way stops before writing the old Silo's plays.
+  stopSiloHistory();
+  forgetSiloPictures();
   const users = getRepository(User);
   const linked = await users.find({
     select: { id: true, userType: true },
@@ -426,6 +433,15 @@ export const forgetPreviousSilo = async (
   await getRepository(MediaLibraryItem).delete({ server: 'silo' });
   await getRepository(SiloEpisode).clear();
   await getRepository(SiloPlay).clear();
+  // Who may see which of the old Silo's libraries no longer holds.
+  cacheManager.getCache('libraryaccess').flush();
+  // Titles only the old Silo had are no longer available.
+  availabilitySync.runSoon().catch((e) =>
+    logger.error('Availability sync after replacing Silo failed', {
+      label: 'Silo',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    })
+  );
   return linked.length;
 };
 

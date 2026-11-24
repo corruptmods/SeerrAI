@@ -239,6 +239,48 @@ describe('the copy in memory', () => {
     assert.equal(asked.length, 2);
   });
 
+  it('forgets one person without dropping what another is reading', async () => {
+    connect('plex');
+    plays.plex = [play({ titleId: 'p-glass', finished: true })];
+    const other = new User({ id: 9001, plexId: 7002 });
+    const reading = watchedFor(other);
+    forgetWatched(viewer.id);
+    await reading;
+    assert.ok(watchedCached(other), 'their read was kept');
+
+    await watchedFor(viewer);
+    assert.ok(watchedCached(viewer));
+    forgetWatched(viewer.id);
+    assert.ok(watchedCached(other), 'their copy was kept');
+    forgetWatched();
+    const again = watchedFor(other);
+    forgetWatched();
+    await again;
+    assert.equal(watchedCached(other), undefined, 'everyone is dropped');
+  });
+
+  it('forgets the person whose read was in flight', async () => {
+    connect('plex');
+    plays.plex = [play({ titleId: 'p-glass', finished: true })];
+    const reading = watchedFor(viewer);
+    forgetWatched(viewer.id);
+    await reading;
+    assert.equal(watchedCached(viewer), undefined);
+  });
+
+  it('keeps the entry read most recently', async () => {
+    connect('plex');
+    plays.plex = [play({ titleId: 'p-glass', finished: true })];
+    const first = new User({ id: 9101, plexId: 7101 });
+    await watchedFor(first);
+    for (let i = 0; i < 600; i++) {
+      await watchedFor(new User({ id: 9200 + i, plexId: 7200 + i }));
+      // Read all along, so it is never the oldest.
+      watchedCached(first);
+    }
+    assert.ok(watchedCached(first));
+  });
+
   it('gives up waiting after the time allowed', async () => {
     connect('plex');
     mock.method(

@@ -28,6 +28,7 @@ import { Permission } from '@server/lib/permissions';
 import { makeKey } from '@server/lib/personalApiKeys';
 import type { LidarrSettings, RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { watchedCached, watchedFor } from '@server/lib/watched';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
 import { setupTestDb } from '@server/test/db';
@@ -681,6 +682,26 @@ describe('a person’s Trakt username', () => {
     );
 
     assert.strictEqual((await save('')).body.traktUsername, null);
+  });
+});
+
+describe('a person’s Trakt history when they save settings', () => {
+  it('is only read afresh when the Trakt username changed', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const them = new User({ id: userId });
+    const save = (traktUsername: string) =>
+      agent
+        .post(`/user/${userId}/settings/main`)
+        .send({ username: 'friend', traktUsername });
+
+    await save('');
+    await watchedFor(them);
+    assert.ok(watchedCached(them), 'read once');
+    await save('');
+    assert.ok(watchedCached(them), 'nothing changed, so kept');
+    await save('some.one_2');
+    assert.equal(watchedCached(them), undefined, 'a new name starts afresh');
+    await save('');
   });
 });
 

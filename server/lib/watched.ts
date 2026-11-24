@@ -83,8 +83,14 @@ interface Entry {
 const cache = new Map<string, Entry>();
 /** One read per key at a time; a second caller joins it. */
 const inFlight = new Map<string, Promise<Watched>>();
-/** Bumped by forgetWatched, so a read started before it is not kept. */
-let generation = 0;
+/**
+ * Bumped by forgetWatched, so a read started before it is not kept: for
+ * everyone at once, or for one user, whose other readers are left alone.
+ */
+let everyone = 0;
+const forgotten = new Map<number, number>();
+const generationOf = (userId: number) =>
+  everyone + (forgotten.get(userId) ?? 0);
 /** Users whose Trakt is not asked about until then, after a failure. */
 const traktPaused = new Map<number, number>();
 /** When each user was last warned about their Trakt profile. */
@@ -208,7 +214,7 @@ const refresh = (user: User, key: string): Promise<Watched> => {
   if (running) {
     return running;
   }
-  const started = generation;
+  const started = generationOf(user.id);
   const previous = cache.get(key);
   const traktName = traktNameOf(user);
   const run = (async () => {
@@ -228,7 +234,7 @@ const refresh = (user: User, key: string): Promise<Watched> => {
       keys: new Set([...server.keys, ...trakt.keys]),
       traktRecent: trakt.recent,
     };
-    if (started === generation) {
+    if (started === generationOf(user.id)) {
       remember(key, { at: Date.now(), server, trakt, value });
     }
     logger.debug('Read what was watched', {
@@ -281,6 +287,12 @@ export const watchedCached = (user: User): Watched | undefined => {
     if (!hit || Date.now() - hit.at >= FRESH_MS) {
       void refresh(user, key);
     }
+    if (hit) {
+      // Most recently used goes last, so a title read often is not the
+      // first to go.
+      cache.delete(key);
+      cache.set(key, hit);
+    }
     return hit?.value;
   } catch {
     return undefined;
@@ -320,11 +332,12 @@ export const awaitWithin = <T>(
  * next time even after a failure.
  */
 export const forgetWatched = (userId?: number) => {
-  generation++;
   if (userId === undefined) {
+    everyone++;
     traktPaused.clear();
     traktWarned.clear();
   } else {
+    forgotten.set(userId, (forgotten.get(userId) ?? 0) + 1);
     traktPaused.delete(userId);
     traktWarned.delete(userId);
   }

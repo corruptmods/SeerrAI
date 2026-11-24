@@ -279,9 +279,13 @@ userSettingsRoutes.post<
       user.settings.watchlistSyncMovies = req.body.watchlistSyncMovies;
       user.settings.watchlistSyncTv = req.body.watchlistSyncTv;
       if (traktUsername !== undefined) {
+        const renamed =
+          (user.settings.traktUsername ?? null) !== (traktUsername || null);
         user.settings.traktUsername = traktUsername || null;
-        // Their Trakt history is read afresh under the new name.
-        forgetWatched(user.id);
+        // Their Trakt history is read afresh under a new name.
+        if (renamed) {
+          forgetWatched(user.id);
+        }
       }
       if (defaultProfiles !== undefined) {
         user.settings.defaultProfiles = defaultProfiles;

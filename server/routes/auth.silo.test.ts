@@ -10,7 +10,11 @@ import {
   resetSignInMemoryForTests,
   stillMaySignIn,
 } from '@server/lib/signIn';
-import { resetSiloDevicesForTests } from '@server/lib/siloAccounts';
+import {
+  checkSiloDevice,
+  resetSiloDevicesForTests,
+  startSiloDevice,
+} from '@server/lib/siloAccounts';
 import userAccessCheck from '@server/lib/userAccessCheck';
 import { checkUser } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -408,5 +412,37 @@ describe('whether Silo still lets someone in', () => {
     } finally {
       settings.main.removeUsersWithoutAccess = false;
     }
+  });
+});
+
+// Last: the limit on asking for codes lasts beyond one test.
+describe('asking Silo for codes', () => {
+  it('makes room per address, never crowding out someone else', async () => {
+    const other = await startSiloDevice('203.0.113.9');
+    const mine = [];
+    for (let i = 0; i < 6; i++) {
+      mine.push(await startSiloDevice('198.51.100.7'));
+    }
+    // The address's oldest went to make room for its sixth.
+    assert.deepEqual(await checkSiloDevice(mine[0].handle), {
+      status: 'expired',
+    });
+    assert.equal((await checkSiloDevice(mine[5].handle)).status, 'pending');
+    assert.equal((await checkSiloDevice(other.handle)).status, 'pending');
+  });
+
+  it('limits how many codes one address asks for', async () => {
+    // Ten in a window (earlier tests here asked for some of them).
+    let res;
+    for (let i = 0; i < 11; i++) {
+      res = await request(app).post('/auth/silo/device/start');
+      if (res.status !== 200) break;
+    }
+    assert.equal(res?.status, 429);
+    assert.ok(Number(res?.headers['retry-after']) > 0);
+    assert.equal(
+      (await request(app).post('/auth/silo/device/start')).status,
+      429
+    );
   });
 });

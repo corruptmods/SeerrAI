@@ -17,7 +17,7 @@ import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { startSession } from '@server/lib/signIn';
-import { SignInLimiter } from '@server/lib/signInLimiter';
+import { SignInLimiter, addressGroupOf } from '@server/lib/signInLimiter';
 import {
   SiloSignInError,
   cancelSiloDevice,
@@ -51,6 +51,9 @@ import { z } from 'zod';
 const siloAuthRoutes = Router();
 
 const siloLimiter = new SignInLimiter('silo', { capAccount: true });
+
+/** Codes one address may ask Silo for, as wrong passwords are counted. */
+const deviceLimiter = new SignInLimiter('silo-device');
 
 const passwordBody = z.object({
   username: z.string().min(1).max(256),
@@ -435,10 +438,13 @@ const deviceSignInOpen = async (next: NextFunction): Promise<boolean> => {
   return true;
 };
 
-siloAuthRoutes.post('/device/start', async (_req, res, next) => {
+siloAuthRoutes.post('/device/start', async (req, res, next) => {
   if (!(await deviceSignInOpen(next))) return;
+  // Each start asks Silo for a code; anyone can ask, so each address is
+  // limited.
+  if (!deviceLimiter.take(req, res, 'start')) return;
   try {
-    return res.status(200).json(await startSiloDevice());
+    return res.status(200).json(await startSiloDevice(addressGroupOf(req.ip)));
   } catch (e) {
     return refuse(next, e);
   }

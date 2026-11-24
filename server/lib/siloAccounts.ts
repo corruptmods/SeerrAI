@@ -117,17 +117,33 @@ interface PendingDevice {
   expiresAt: number;
   /** The signed-in user linking Silo; undefined for a sign-in. */
   userId?: number;
+  /** Who started it (their address group), so one can't crowd out others. */
+  address: string;
 }
 
 const pending = new Map<string, PendingDevice>();
-/** Most device sign-ins waiting at once; the oldest go first. */
-const MAX_PENDING = 500;
+/** Most device sign-ins one address has waiting; its oldest go first. */
+const MAX_PENDING_PER_ADDRESS = 5;
+/** Most waiting at once from everyone, a memory bound; the oldest go first. */
+const MAX_PENDING = 5000;
 
-const prunePending = (now = Date.now()) => {
+/** Drops expired sign-ins, and makes room for one more from `address`. */
+const prunePending = (address: string, now = Date.now()) => {
+  let fromAddress = 0;
   for (const [handle, entry] of pending) {
-    if (entry.expiresAt <= now || pending.size > MAX_PENDING) {
+    if (entry.expiresAt <= now) pending.delete(handle);
+    else if (entry.address === address) fromAddress += 1;
+  }
+  for (const [handle, entry] of pending) {
+    if (fromAddress < MAX_PENDING_PER_ADDRESS) break;
+    if (entry.address === address) {
       pending.delete(handle);
+      fromAddress -= 1;
     }
+  }
+  for (const handle of pending.keys()) {
+    if (pending.size < MAX_PENDING) break;
+    pending.delete(handle);
   }
 };
 
@@ -171,8 +187,12 @@ const peopleAddress = (url: string): string => {
   }
 };
 
-/** Starts a device sign-in, for signing in or for linking `userId`. */
+/**
+ * Starts a device sign-in, for signing in or for linking `userId`, from
+ * `address` (addressGroupOf the request's).
+ */
 export const startSiloDevice = async (
+  address: string,
   userId?: number
 ): Promise<SiloDeviceCode> => {
   let start;
@@ -181,12 +201,17 @@ export const startSiloDevice = async (
   } catch (e) {
     throw signInFailure(e);
   }
-  prunePending();
+  prunePending(address);
   const expiresAt =
     Date.parse(start.expires_at) ||
     Date.now() + Math.max(start.expires_in, 60) * 1000;
   const handle = randomBytes(24).toString('hex');
-  pending.set(handle, { deviceCode: start.device_code, expiresAt, userId });
+  pending.set(handle, {
+    deviceCode: start.device_code,
+    expiresAt,
+    userId,
+    address,
+  });
   return {
     handle,
     userCode: start.user_code,

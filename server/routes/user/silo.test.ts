@@ -152,7 +152,7 @@ describe('linking a Silo account', () => {
     assert.equal(res.body.code, ApiErrorCode.PasswordChangeRequired);
   });
 
-  it('links with a code, keeping the profile it was approved as', async () => {
+  it('links with a code, leaving the profile to choose', async () => {
     const agent = await signedIn('friend@seerr.dev');
     const start = await agent.post(
       `/user/${FRIEND}/settings/linked-accounts/silo/device/start`

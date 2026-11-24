@@ -71,6 +71,7 @@ import {
 import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
+import { addressGroupOf } from '@server/lib/signInLimiter';
 import {
   SiloSignInError,
   checkSiloDevice,
@@ -982,7 +983,9 @@ userSettingsRoutes.post<{ id: string }>(
       return res.status(400).json({ message: 'Silo is not connected.' });
     }
     try {
-      return res.status(200).json(await startSiloDevice(req.user.id));
+      return res
+        .status(200)
+        .json(await startSiloDevice(addressGroupOf(req.ip), req.user.id));
     } catch (e) {
       return siloLinkFailure(res, e);
     }

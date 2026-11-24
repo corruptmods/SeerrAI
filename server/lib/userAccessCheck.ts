@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import {
+  USER_ID,
   connectedServers,
   jellyfinClient,
   serverName,
@@ -35,7 +36,9 @@ const serverIdOf = (kind: MediaServerKind, user: User): string | null =>
     ? user.plexId
       ? String(user.plexId)
       : null
-    : normalizeJellyfinGuid(user.jellyfinUserId);
+    : kind === 'silo'
+      ? (user.siloUserId ?? null)
+      : normalizeJellyfinGuid(user[USER_ID[kind]]);
 
 /** Everyone the server still has, by serverIdOf. Throws if it can't tell. */
 const presentOn = async (kind: MediaServerKind): Promise<Set<string>> => {
@@ -123,6 +126,7 @@ class UserAccessCheck {
               id: true,
               plexId: true,
               jellyfinUserId: true,
+              embyUserId: true,
               permissions: true,
               userType: true,
             },

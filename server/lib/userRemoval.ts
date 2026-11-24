@@ -1,4 +1,5 @@
 import PlexTvAPI from '@server/api/plextv';
+import { SiloError } from '@server/api/silo/client';
 import { USER_ID } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -9,6 +10,11 @@ import type { JellyfinFamilyKind } from '@server/lib/mediaServers';
 import { isConnected, jellyfinClient } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
+import {
+  SILO_NEEDS_USERS_SCOPE,
+  siloClient,
+  siloHasScope,
+} from '@server/lib/silo';
 
 /**
  * Deletes a Seerr AI account with its requests and sessions.
@@ -65,9 +71,55 @@ const jellyfinKindOf = (user: User): JellyfinFamilyKind | undefined =>
       : undefined;
 
 /**
+ * Switches someone's Silo account off (admin:users scope): they can no
+ * longer sign in to Silo, and their account and history stay there.
+ */
+const switchOffInSilo = async (user: User): Promise<string> => {
+  if (!isConnected('silo')) {
+    throw new MediaServerRemovalError(400, 'Silo is not connected.');
+  }
+  if (!user.siloUserId) {
+    throw new MediaServerRemovalError(
+      400,
+      'This user has no Silo account to switch off.'
+    );
+  }
+  if (!siloHasScope('admin:users')) {
+    throw new MediaServerRemovalError(400, SILO_NEEDS_USERS_SCOPE);
+  }
+  const client = siloClient();
+  let found;
+  try {
+    found = await client.getAdminUserForChange(user.siloUserId);
+  } catch (e) {
+    if (e instanceof SiloError && e.status === 404) return 'Silo';
+    throw e;
+  }
+  if (found.account.role === 'admin') {
+    throw new MediaServerRemovalError(
+      409,
+      'They are an administrator on Silo, so Seerr AI won’t switch them off.'
+    );
+  }
+  if (found.account.enabled !== false) {
+    try {
+      await client.updateAdminUser(user.siloUserId, found.tag, {
+        enabled: false,
+      });
+    } catch (e) {
+      if (e instanceof SiloError && e.status === 403) {
+        throw new MediaServerRemovalError(400, SILO_NEEDS_USERS_SCOPE);
+      }
+      throw e;
+    }
+  }
+  return 'Silo';
+};
+
+/**
  * Takes someone off the media server their account comes from: ends their
- * Plex friendship, or disables their Jellyfin or Emby account. Returns the
- * server's name. Someone the server no longer has counts as done.
+ * Plex friendship, or disables their Jellyfin, Emby or Silo account. Returns
+ * the server's name. Someone the server no longer has counts as done.
  */
 export const removeFromMediaServer = async (user: User): Promise<string> => {
   if (user.userType === UserType.PLEX) {
@@ -105,6 +157,10 @@ export const removeFromMediaServer = async (user: User): Promise<string> => {
     }
     await plexTv.removeFriend(user.plexId);
     return 'Plex';
+  }
+
+  if (user.userType === UserType.SILO) {
+    return switchOffInSilo(user);
   }
 
   const kind = jellyfinKindOf(user);

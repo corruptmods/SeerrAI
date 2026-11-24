@@ -13187,7 +13187,7 @@ paths:
         - in: query
           name: fromMediaServer
           required: false
-          description: Also take them off their media server first (admins only) - ends a Plex friendship, or disables a Jellyfin or Emby account. If that fails, the user is not deleted.
+          description: Also take them off their media server first (admins only) - ends a Plex friendship, or disables a Jellyfin or Emby account, or switches off a Silo account (needs the admin:users scope on Seerr AI's Silo key). If that fails, the user is not deleted.
           schema:
             type: string
             enum: ['true', 'false']

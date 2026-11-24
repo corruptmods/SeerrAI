@@ -48,7 +48,7 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
     'Hourly, give everyone you share your Plex server with an account, with the default permissions below',
   removeUsersWithoutAccess: 'Remove Users Who Lose Access',
   removeUsersWithoutAccessTip:
-    'Hourly, delete the account and requests of anyone no longer shared on your Plex server or deleted from Jellyfin or Emby. They must be missing on two checks in a row; admins are never removed.',
+    'Hourly, delete the account and requests of anyone no longer shared on your Plex server, deleted from Jellyfin or Emby, or deleted or switched off in Silo. They must be missing on two checks in a row; admins are never removed.',
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
   musicRequestLimitLabel: 'Global Album Request Limit',

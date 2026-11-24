@@ -360,3 +360,44 @@ describe('importing Silo users', () => {
     );
   });
 });
+
+describe('deleting a Silo user from Silo too', () => {
+  const siloUser = (accountId: string) =>
+    getRepository(User).save(
+      new User({
+        email: `silo-${accountId}@example.invalid`,
+        siloUserId: accountId,
+        siloUsername: accountId,
+        userType: UserType.SILO,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+
+  it('switches their Silo account off, then deletes them', async () => {
+    getSettings().silo.optionalScopes = ['admin:users'];
+    const person = await siloUser('acct-new');
+    const owner = await signedIn('admin@seerr.dev');
+    const res = await owner.delete(`/user/${person.id}?fromMediaServer=true`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(silo.accounts[2].enabled, false);
+    assert.equal(await getRepository(User).findOneBy({ id: person.id }), null);
+  });
+
+  it('keeps the user when the key may not, or they are a Silo administrator', async () => {
+    getSettings().silo.optionalScopes = [];
+    const person = await siloUser('acct-new');
+    const owner = await signedIn('admin@seerr.dev');
+    let res = await owner.delete(`/user/${person.id}?fromMediaServer=true`);
+    assert.equal(res.status, 400);
+    assert.match(res.body.message, /admin:users/);
+
+    getSettings().silo.optionalScopes = ['admin:users'];
+    const admin = await siloUser('acct-owner');
+    res = await owner.delete(`/user/${admin.id}?fromMediaServer=true`);
+    assert.equal(res.status, 409);
+    assert.ok(await getRepository(User).findOneBy({ id: admin.id }));
+    assert.notEqual(silo.accounts[0].enabled, false);
+    assert.notEqual(silo.accounts[2].enabled, false);
+  });
+});

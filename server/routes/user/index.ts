@@ -791,7 +791,8 @@ router.delete<{ id: string }>(
       }
 
       // Also off their media server: ends a Plex friendship, or disables a
-      // Jellyfin or Emby account. First, so a refusal leaves both in place.
+      // Jellyfin, Emby or Silo account. First, so a refusal leaves both in
+      // place.
       if (req.query.fromMediaServer === 'true') {
         if (!req.user?.hasPermission(Permission.ADMIN)) {
           return next({

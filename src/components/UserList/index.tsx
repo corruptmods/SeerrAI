@@ -189,7 +189,6 @@ const UserList = () => {
   const canRemoveFromServer =
     currentHasPermission(Permission.ADMIN) &&
     !!deleteServer &&
-    deleteServer !== 'silo' &&
     importServers.includes(deleteServer);
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;

@@ -10,7 +10,11 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
 import { getSettings } from '@server/lib/settings';
-import { isCompletedPlay, watchSource } from '@server/lib/watchHistory';
+import {
+  STARTED_PERCENT,
+  isCompletedPlay,
+  watchSource,
+} from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapMovieResult, mapTvResult } from '@server/models/Search';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
@@ -27,9 +31,6 @@ const RECENT_MS = 5 * 60 * 1000;
 const recent = new Map<string, { at: number; value: Activity }>();
 /** Longest title taken from watch history. */
 const MAX_PLAYED_TITLE = 200;
-
-/** Plays below this percent are someone sampling a title. */
-const STARTED_PERCENT = 20;
 
 export interface Activity {
   /** Watch history, or requests when there is none. */

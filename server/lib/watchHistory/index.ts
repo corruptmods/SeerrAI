@@ -8,6 +8,7 @@ import type { WatchSource } from '@server/lib/watchHistory/types';
 
 export {
   COMPLETE_PERCENT,
+  STARTED_PERCENT,
   isCompletedPlay,
 } from '@server/lib/watchHistory/types';
 export type { Play, WatchSource } from '@server/lib/watchHistory/types';

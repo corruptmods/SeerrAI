@@ -58,6 +58,9 @@ export interface WatchSource {
 /** Below this, a play is just sampling the title. */
 export const COMPLETE_PERCENT = 85;
 
+/** Below this, someone only sampled a title; from here on they watched it. */
+export const STARTED_PERCENT = 20;
+
 /**
  * Finished per the server, or by percentage (some Tautulli records have only
  * that).

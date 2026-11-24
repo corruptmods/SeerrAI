@@ -124,6 +124,25 @@ export const toSiloError = (e: unknown): SiloError => {
   return new SiloError(0, undefined, messageFor(0));
 };
 
+/**
+ * A collection's items. Anything that isn't a collection (a proxy's sign-in
+ * page answering 200, say) is an error, never "nothing there".
+ */
+const itemsOf = <T>(collection: SiloCollection<T> | undefined): T[] => {
+  if (
+    !collection ||
+    typeof collection !== 'object' ||
+    !Array.isArray(collection.items)
+  ) {
+    throw new SiloError(
+      502,
+      'bad_page',
+      'Silo sent something that is not a list. Check the address and URL base.'
+    );
+  }
+  return collection.items;
+};
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type ListParams = Record<
@@ -256,13 +275,7 @@ class SiloAPI extends ExternalAPI {
         params: { ...params, limit: SILO_PAGE_LIMIT, cursor },
         paramsSerializer: { indexes: null },
       });
-      if (!page || typeof page !== 'object' || !Array.isArray(page.items)) {
-        throw new SiloError(
-          502,
-          'bad_page',
-          'Silo sent something that is not a list. Check the address and URL base.'
-        );
-      }
+      itemsOf(page);
       if (page.page?.has_more && !page.page.next_cursor) {
         throw new SiloError(
           502,
@@ -336,7 +349,7 @@ class SiloAPI extends ExternalAPI {
     // One unpaged collection; the route takes no paging parameters.
     const libraries =
       await this.patient<SiloCollection<SiloUserLibrary>>('/user/libraries');
-    return libraries.items ?? [];
+    return itemsOf(libraries);
   }
 
   /** Every catalog item matching the query. */
@@ -511,7 +524,7 @@ class SiloAPI extends ExternalAPI {
     const profiles = await (wait
       ? this.patient<SiloCollection<SiloAccountProfile>>(endpoint)
       : this.call<SiloCollection<SiloAccountProfile>>(endpoint));
-    return profiles.items ?? [];
+    return itemsOf(profiles);
   }
 
   /**

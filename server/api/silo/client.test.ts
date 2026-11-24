@@ -65,6 +65,25 @@ describe('the Silo client', () => {
       () => broken.listCatalogItems(),
       (e: SiloError) => e.status === 502
     );
+    // Unpaged collections too.
+    (broken as unknown as { patient: () => Promise<unknown> }).patient =
+      async () => '<html>Sign in to the proxy</html>';
+    await assert.rejects(
+      () => broken.getUserLibraries(),
+      (e: SiloError) => e.status === 502
+    );
+    await assert.rejects(
+      () => broken.getAccountProfiles('1'),
+      (e: SiloError) => e.status === 502
+    );
+    (broken as unknown as { call: () => Promise<unknown> }).call =
+      async () => ({
+        profiles: [],
+      });
+    await assert.rejects(
+      () => broken.getAccountProfiles('1', { wait: false }),
+      (e: SiloError) => e.status === 502
+    );
   });
 
   it('stops at an API major it does not know', async () => {
@@ -214,7 +233,8 @@ describe('the Silo client, for people', () => {
       'seerr-ai-test'
     );
     assert.equal(approved.status, 'approved');
-    assert.equal(approved.profile_id, 'p-2');
+    // Silo names a profile only for a temporary session.
+    assert.equal(approved.profile_id, '');
     assert.equal(approved.tokens?.user.username, 'harbour');
     assert.equal(
       (await open.pollDeviceLogin(start.device_code, 'seerr-ai-test')).status,

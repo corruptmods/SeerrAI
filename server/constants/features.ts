@@ -3,6 +3,7 @@
 // settings pages.
 export const FEATURES = [
   'suggestedForYou',
+  'hideWatched',
   'deletingSoon',
   'releaseCalendar',
   'arrivalEstimates',

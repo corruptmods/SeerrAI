@@ -41,6 +41,11 @@ import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { getSeriesProgress } from '@server/lib/seriesProgress';
 import { getSuggestions } from '@server/lib/suggestions';
+import {
+  WATCHED_WAIT_MS,
+  watchedKey,
+  watchedWithin,
+} from '@server/lib/watched';
 import { getWatchedBy } from '@server/lib/watchedBy';
 import logger from '@server/logger';
 import { mapMovieResult, mapTvResult } from '@server/models/Search';
@@ -750,6 +755,12 @@ export const pickForRoom = async (
   const included = people.filter(
     (p) => p.id === caller.id || featureEnabled('aiPicker', p)
   );
+  // What anyone included has watched is left out, for those who hide it.
+  const watchedByAny = Promise.all(
+    included
+      .filter((p) => featureEnabled('hideWatched', p))
+      .map((p) => watchedWithin(p, WATCHED_WAIT_MS))
+  );
 
   // Candidates from each person's suggestions, ranked so titles several of
   // them would like come first.
@@ -789,7 +800,15 @@ export const pickForRoom = async (
     );
   }
 
-  let ranked = [...score.values()].sort((a, b) => b.s - a.s);
+  const watched = await watchedByAny;
+  let ranked = [...score.values()]
+    .filter(
+      ({ result }) =>
+        !watched.some((seen) =>
+          seen?.keys.has(watchedKey(result.media_type, result.id))
+        )
+    )
+    .sort((a, b) => b.s - a.s);
   const media = await Media.getRelatedMedia(
     caller,
     ranked.map((c) => ({

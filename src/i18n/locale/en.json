@@ -687,6 +687,8 @@
   "components.Common.FeatureSwitches.autoFixTip": "Fixes reported issues right away: subtitles, missing episodes, broken or wrong files. Comments with what it did",
   "components.Common.FeatureSwitches.deletingSoon": "Deleting Soon",
   "components.Common.FeatureSwitches.deletingSoonTip": "The row, poster badges and Keep button for titles Maintainerr is about to remove",
+  "components.Common.FeatureSwitches.hideWatched": "Hide What You’ve Watched",
+  "components.Common.FeatureSwitches.hideWatchedTip": "Leaves titles you’ve already watched out of Suggested for You, Pick for the Room and AI Search suggestions",
   "components.Common.FeatureSwitches.listRequests": "Request What’s Added to Lists",
   "components.Common.FeatureSwitches.listRequestsTip": "Adding a title to a list requests it for you, unless it’s already here or requested",
   "components.Common.FeatureSwitches.music": "Music",

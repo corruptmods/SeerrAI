@@ -1,5 +1,5 @@
 import TheMovieDb from '@server/api/themoviedb';
-import { featureOn } from '@server/constants/features';
+import { FEATURES, featureOn, isAiFeature } from '@server/constants/features';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
@@ -108,6 +108,16 @@ describe('feature switches', () => {
     assert.equal(featureOn('deletingSoon', ['deletingSoon'], []), false);
     assert.equal(featureOn('deletingSoon', [], ['deletingSoon']), false);
     assert.equal(featureOn('deletingSoon', undefined, undefined), true);
+  });
+
+  it('hide what was watched unless turned off, with no AI model needed', () => {
+    assert.equal(featureEnabled('hideWatched'), true);
+    assert.equal(isAiFeature('hideWatched'), false);
+    assert.equal(
+      FEATURES.indexOf('hideWatched'),
+      FEATURES.indexOf('suggestedForYou') + 1,
+      'listed beside Suggested for You'
+    );
   });
 
   it('lets an admin turn features off for everyone, ignoring unknown names', async () => {

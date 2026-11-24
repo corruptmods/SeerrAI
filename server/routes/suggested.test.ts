@@ -6,8 +6,10 @@ import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
+import { UserSettings } from '@server/entity/UserSettings';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { forgetWatched, watchedFor } from '@server/lib/watched';
 import discoverRoutes from '@server/routes/discover';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
@@ -318,8 +320,29 @@ describe('GET /discover/suggested', () => {
     await get();
     await get(2);
 
-    assert.equal(historyAsks, 1);
+    // Once for the suggestions, once for what has been watched.
+    assert.equal(historyAsks, 2);
     assert.equal(tmdbAsks, 1);
+  });
+
+  it('leaves out what they watched after the day’s list was made', async () => {
+    await library(10, MediaType.MOVIE, '110');
+    await library(12, MediaType.MOVIE, '112');
+    history = [moviePlay(110)];
+    movieRecs = { 10: [{ id: 12 }, { id: 19 }] };
+    assert.deepEqual(ids((await get()).body.results), ['movie:12', 'movie:19']);
+
+    // Later that day they watch most of 12.
+    forgetWatched();
+    history = [{ ...moviePlay(112, 0), percent_complete: 60 }, moviePlay(110)];
+    await watchedFor(actingAs);
+    assert.deepEqual(ids((await get()).body.results), ['movie:19']);
+
+    // Unless they turned that off.
+    actingAs.settings = await getRepository(UserSettings).save(
+      new UserSettings({ user: actingAs, disabledFeatures: ['hideWatched'] })
+    );
+    assert.deepEqual(ids((await get()).body.results), ['movie:12', 'movie:19']);
   });
 });
 

@@ -28,6 +28,8 @@ const HISTORY_LENGTH = 3000;
 const FRESH_MS = 30 * 60 * 1000;
 /** People kept in memory; the least recently used go first. */
 const MAX_PEOPLE = 500;
+/** Longest an answer waits for what was watched before going without. */
+export const WATCHED_WAIT_MS = 1500;
 
 const EMPTY: Watched = { keys: new Set() };
 

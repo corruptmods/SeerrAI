@@ -11,6 +11,7 @@ import { AiProviderError, complete } from '@server/lib/ai/providers';
 import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { aiReady, getSettings } from '@server/lib/settings';
+import { forgetWatched } from '@server/lib/watched';
 import logger from '@server/logger';
 import { isUniqueViolation } from '@server/utils/isUniqueViolation';
 import { createHash } from 'node:crypto';
@@ -162,6 +163,7 @@ const remember = (key: string, value: string, ms: number) => {
 export const clearAiCache = () => {
   cache.clear();
   forgetRecentActivity();
+  forgetWatched();
 };
 
 /** A short, stable cache key from any parts. */

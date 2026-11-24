@@ -1743,6 +1743,125 @@ describe('who can be included in a pick', () => {
   });
 });
 
+describe('picking for a room', () => {
+  // Suggestions are cached a day per Plex account: these ids are this
+  // block's own.
+  const titles: Record<number, string> = {
+    7201: 'Glasswing',
+    7202: 'Static Garden',
+    7203: 'Lantern Song',
+    7204: 'Harbour Lights',
+  };
+  const keyOf = (tmdbId: number) => `pick-${tmdbId}`;
+  let partner: User;
+
+  beforeEach(async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: 'tautulli.test',
+      apiKey: 'k',
+    };
+    member.plexId = 7301;
+    await getRepository(User).save(member);
+    partner = await makeUser('ai-pick-partner', Permission.REQUEST);
+    partner.plexId = 7302;
+    await getRepository(User).save(partner);
+    const list = await getRepository(MediaList).save(
+      new MediaList({ name: 'Ours', ownerId: member.id })
+    );
+    await getRepository(MediaListMember).save(
+      new MediaListMember({
+        listId: list.id,
+        userId: partner.id,
+        acceptedAt: new Date(),
+      })
+    );
+    for (const tmdbId of Object.keys(titles).map(Number)) {
+      await getRepository(Media).save(
+        new Media({
+          tmdbId,
+          mediaType: MediaType.MOVIE,
+          ratingKey: keyOf(tmdbId),
+        })
+      );
+    }
+    const watch = (tmdbId: number, percent = 100) => ({
+      media_type: 'movie',
+      rating_key: keyOf(tmdbId),
+      title: titles[tmdbId],
+      year: 2001,
+      date: Math.floor(Date.now() / 1000) - 600,
+      watched_status: percent === 100 ? 1 : 0,
+      percent_complete: percent,
+    });
+    Object.defineProperty(TautulliAPI.prototype, 'getUserHistory', {
+      configurable: true,
+      value: async (user: User) =>
+        user.plexId === 7301
+          ? [watch(7201)]
+          : // Partway through Lantern Song.
+            [watch(7203, 50), watch(7202)],
+    });
+    stub(
+      'getMovieRecommendations',
+      async ({ movieId }: { movieId: number }) => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: (movieId === 7201 ? [7203, 7204] : [7204]).map((id) => ({
+          id,
+          title: titles[id],
+          release_date: '2001-01-01',
+          genre_ids: [],
+          overview: '',
+          popularity: 1,
+          vote_average: 7,
+          vote_count: 1,
+          adult: false,
+          original_language: 'en',
+          original_title: titles[id],
+          video: false,
+        })),
+      })
+    );
+  });
+
+  after(() => {
+    getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: '',
+      apiKey: '',
+    };
+  });
+
+  const pick = () =>
+    call<{ reason: string }[]>('POST', '/api/v1/ai/pick', {
+      people: [partner.id],
+      kind: 'any',
+      availableOnly: false,
+    });
+
+  it('leaves out what anyone in the room has watched', async () => {
+    answers = ['{"p":[{"n":1,"w":"Viewer1 and Viewer2 both would."}]}'];
+    const picked = await pick();
+    assert.equal(picked.status, 200);
+    const offered = calls[0].prompt.split('Titles:')[1];
+    assert.match(offered, /Harbour Lights/);
+    assert.doesNotMatch(offered, /Lantern Song/);
+  });
+
+  it('keeps it for someone who turned hiding off', async () => {
+    partner.settings = await getRepository(UserSettings).save(
+      new UserSettings({ user: partner, disabledFeatures: ['hideWatched'] })
+    );
+    answers = ['{"p":[{"n":1,"w":"Viewer1 would."}]}'];
+    await pick();
+    assert.match(calls[0].prompt.split('Titles:')[1], /Lantern Song/);
+  });
+});
+
 describe('reviewing what is about to be deleted', () => {
   it('reads how much a title was watched only while Who Watched is on', async () => {
     const media = await getRepository(Media).save(

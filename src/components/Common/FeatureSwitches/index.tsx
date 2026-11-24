@@ -8,6 +8,9 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Common.FeatureSwitches', {
   suggestedForYou: 'Suggested for You',
   suggestedForYouTip: 'A Discover row and page picked from what you’ve watched',
+  hideWatched: 'Hide What You’ve Watched',
+  hideWatchedTip:
+    'Leaves titles you’ve already watched out of Suggested for You, Pick for the Room and AI Search suggestions',
   deletingSoon: 'Deleting Soon',
   deletingSoonTip:
     'The row, poster badges and Keep button for titles Maintainerr is about to remove',

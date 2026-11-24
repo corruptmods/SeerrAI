@@ -11,6 +11,8 @@ import {
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
+import { featureEnabled } from '@server/lib/features';
+import { dropWatched, watchedCached } from '@server/lib/watched';
 import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
@@ -186,12 +188,8 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
     .map(({ result }) => result);
 };
 
-/**
- * A user's suggestions, best first. Empty without readable watch history
- * (Plex without Tautulli), without a media server account, or with nothing
- * finished yet.
- */
-export const getSuggestions = (user: User): Promise<SuggestionResult[]> => {
+/** The day's list, built once a day. */
+const builtFor = (user: User): Promise<SuggestionResult[]> => {
   const now = Date.now();
   for (const [key, entry] of built) {
     if (now - entry.at >= REBUILD_MS) {
@@ -211,4 +209,22 @@ export const getSuggestions = (user: User): Promise<SuggestionResult[]> => {
   });
   built.set(key, { at: now, value });
   return value;
+};
+
+/**
+ * A user's suggestions, best first. Empty without readable watch history
+ * (Plex without Tautulli), without a media server account, or with nothing
+ * finished yet. What they watched after the day's list was built is left
+ * out, as they last were known, unless they turned that off.
+ */
+export const getSuggestions = async (
+  user: User
+): Promise<SuggestionResult[]> => {
+  if (!featureEnabled('hideWatched', user)) {
+    return builtFor(user);
+  }
+  // Asked first too, so a stale copy is read afresh while the list is built.
+  watchedCached(user);
+  const suggestions = await builtFor(user);
+  return dropWatched(watchedCached(user)?.keys, suggestions);
 };

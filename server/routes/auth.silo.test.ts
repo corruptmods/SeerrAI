@@ -4,6 +4,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
+import PreparedEmail from '@server/lib/email';
 import { getSettings, siloDefaults } from '@server/lib/settings';
 import {
   maySignIn,
@@ -24,7 +25,15 @@ import express from 'express';
 import session from 'express-session';
 import schedule from 'node-schedule';
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+  mock,
+} from 'node:test';
 import request from 'supertest';
 
 /*
@@ -191,6 +200,41 @@ describe('signing in to Silo with a password', () => {
       .send({ username: 'lantern', password: 'song' });
     assert.equal(res.status, 403);
     assert.equal(silo.calls.length, 0, 'Silo not asked');
+  });
+});
+
+describe('a new Silo user’s email', () => {
+  it('is confirmed by mail when Silo didn’t vouch for it', async () => {
+    const settings = getSettings();
+    const before = {
+      email: settings.notifications.agents.email.enabled,
+      url: settings.main.applicationUrl,
+    };
+    settings.notifications.agents.email.enabled = true;
+    settings.main.applicationUrl = 'https://seerr.example.invalid';
+    const sent = mock.method(PreparedEmail.prototype, 'send', async () => {
+      return undefined;
+    });
+    try {
+      const res = await request(app).post('/auth/silo').send({
+        username: 'lantern',
+        password: 'song',
+        email: 'lantern@example.invalid',
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const user = await users().findOneByOrFail({ siloUserId: 'acct-guest' });
+      assert.equal(user.emailVerified, false);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(sent.mock.callCount(), 1);
+      const [message] = sent.mock.calls[0].arguments as [
+        { message: { to: string } },
+      ];
+      assert.equal(message.message.to, 'lantern@example.invalid');
+    } finally {
+      sent.mock.restore();
+      settings.notifications.agents.email.enabled = before.email;
+      settings.main.applicationUrl = before.url;
+    }
   });
 });
 

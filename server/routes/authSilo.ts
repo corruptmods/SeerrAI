@@ -4,6 +4,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
+import { sendEmailConfirmation } from '@server/lib/emailConfirmation';
 import { saveFirstOwner } from '@server/lib/firstOwner';
 import { mainAccountOn, takeEmail } from '@server/lib/manageUser';
 import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
@@ -188,6 +189,10 @@ const signInAccount = async (
       await user.setPassword(password);
     }
     await userRepository.save(user);
+    // An email Silo didn't vouch for is confirmed by mail, as with Jellyfin.
+    if (!vouched) {
+      void sendEmailConfirmation(user);
+    }
     logger.info('Created a user for a Silo account', {
       label: 'API',
       ip: req.ip,

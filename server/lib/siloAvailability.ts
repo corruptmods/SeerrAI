@@ -63,6 +63,9 @@ export class SiloAvailability {
             .filter((item) => item.series_id === seriesId)
             .map((item) => item.content_id)
         );
+        // None of several listed is more likely a wrong answer than the
+        // whole series gone; keep them (the series' own check sees it gone).
+        if (rows.length > 1 && present.size === 0) return rows;
         const gone = rows.filter((row) => !present.has(row.contentId));
         if (gone.length) {
           await forgetEpisodes(gone.map((row) => row.contentId));

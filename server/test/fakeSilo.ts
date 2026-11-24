@@ -23,7 +23,10 @@ import type { AddressInfo } from 'node:net';
 export interface FakeSiloCall {
   method: string;
   path: string;
+  /** Each parameter's last value. */
   query: Record<string, string>;
+  /** Each parameter's every value, for those sent more than once. */
+  queryAll: Record<string, string[]>;
   auth?: string;
   body?: Record<string, unknown>;
 }
@@ -321,6 +324,10 @@ export const createFakeSilo = (): FakeSilo => {
   ) => {
     const url = new URL(req.url ?? '/', 'http://silo.test');
     const query = Object.fromEntries(url.searchParams.entries());
+    const queryAll: Record<string, string[]> = {};
+    for (const name of url.searchParams.keys()) {
+      queryAll[name] = url.searchParams.getAll(name);
+    }
     const auth = req.headers.authorization?.replace(/^Bearer /, '');
     let body: Record<string, unknown> | undefined;
     try {
@@ -334,6 +341,7 @@ export const createFakeSilo = (): FakeSilo => {
         method: req.method ?? 'GET',
         path: url.pathname,
         query,
+        queryAll,
         auth,
       });
       if (!picture || (picture.needsKey && !(auth && fake.keys.has(auth)))) {
@@ -346,7 +354,14 @@ export const createFakeSilo = (): FakeSilo => {
       return res.end(picture.body);
     }
     const path = url.pathname.slice('/api/v2'.length);
-    fake.calls.push({ method: req.method ?? 'GET', path, query, auth, body });
+    fake.calls.push({
+      method: req.method ?? 'GET',
+      path,
+      query,
+      queryAll,
+      auth,
+      body,
+    });
 
     if (fake.down) {
       return problem(res, 503, 'unavailable', 'Silo is down.');
@@ -531,7 +546,9 @@ export const createFakeSilo = (): FakeSilo => {
     const page = <T>(list: T[]) => {
       const limit = Number(query.limit ?? 50);
       const filters = JSON.stringify(
-        Object.entries(query).filter(([k]) => k !== 'limit' && k !== 'cursor')
+        Object.entries(queryAll).filter(
+          ([k]) => k !== 'limit' && k !== 'cursor'
+        )
       );
       let offset = 0;
       if (query.cursor) {
@@ -606,7 +623,8 @@ export const createFakeSilo = (): FakeSilo => {
         ) {
           return problem(res, 403, 'permission_denied', 'Paths.');
         }
-        const ids = query.content_ids?.split(',');
+        // One parameter per id (explode); a comma is part of the id.
+        const ids = queryAll.content_ids;
         if (ids && ids.length > 200) {
           return problem(res, 422, 'validation_failed', 'Too many ids.');
         }

@@ -301,6 +301,32 @@ describe('the Silo recently added scan', () => {
       'season 1 kept'
     );
   });
+
+  it('counts again every series new episodes arrived in', async () => {
+    shows.set(9311, fakeShow(9311, 'Static Garden', [season(1, 2)]));
+    shows.set(9312, fakeShow(9312, 'Lantern Song', [season(1, 2)]));
+    silo.items = [
+      siloSeries('series-tmdb-9311', { tmdbId: 9311 }),
+      siloEpisode('series-tmdb-9311', 1, 1),
+      siloSeries('series-tmdb-9312', { tmdbId: 9312, title: 'Lantern Song' }),
+      siloEpisode('series-tmdb-9312', 1, 1),
+    ];
+    await scanner().run();
+    const now = new Date().toISOString();
+    silo.items.push(
+      siloEpisode('series-tmdb-9311', 1, 2, { addedAt: now }),
+      siloEpisode('series-tmdb-9312', 1, 2, { addedAt: now })
+    );
+    await scanner(true).run();
+    assert.equal(
+      (await media(9311, MediaType.TV)).status,
+      MediaStatus.AVAILABLE
+    );
+    assert.equal(
+      (await media(9312, MediaType.TV)).status,
+      MediaStatus.AVAILABLE
+    );
+  });
 });
 
 describe('Silo availability', () => {
@@ -400,5 +426,24 @@ describe('Silo episodes in database maintenance', () => {
     report = await runDbMaintenance();
     assert.equal(report?.removed.siloEpisodes, 1);
     assert.equal(await getRepository(SiloEpisode).count(), 0);
+  });
+
+  it('keeps every episode when Silo lists none of several', async () => {
+    await getRepository(SiloEpisode).save(
+      [1, 2, 3].map(
+        (episode) =>
+          new SiloEpisode({
+            contentId: `series-y-1-${episode}`,
+            seriesId: 'series-y',
+            libraryIds: ['2'],
+            season: 1,
+            episode,
+          })
+      )
+    );
+    silo.items = [];
+    const report = await runDbMaintenance();
+    assert.equal(report?.removed.siloEpisodes, 0);
+    assert.equal(await getRepository(SiloEpisode).count(), 3);
   });
 });

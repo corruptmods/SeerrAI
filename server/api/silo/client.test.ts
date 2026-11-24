@@ -38,11 +38,18 @@ describe('the Silo client', () => {
     const found = await client().getCatalogItems(ids);
     assert.equal(found.length, 250);
     const batches = silo.calls.filter((c) => c.path === '/admin/catalog/items');
-    assert.equal(batches.length, 2);
+    assert.equal(batches.length, 3);
+    // One content_ids parameter per id, as Silo reads them.
+    assert.ok(batches.every((c) => c.queryAll.content_ids.length <= 100));
+    assert.equal(
+      batches.flatMap((c) => c.queryAll.content_ids).length,
+      ids.length
+    );
     assert.ok(
-      batches.every((c) => c.query.content_ids.split(',').length <= 200)
+      batches.every((c) => c.queryAll.content_ids.every((id) => !/,/.test(id)))
     );
   });
+
 
   it('stops at an API major it does not know', async () => {
     silo.apiMajor = 3;

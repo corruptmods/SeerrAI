@@ -32,6 +32,12 @@ export const SILO_PAGE_LIMIT = 200;
 /** Most content_ids one catalog request takes, unless Silo says otherwise. */
 export const SILO_MAX_CONTENT_IDS = 200;
 
+/**
+ * Content ids Seerr AI asks for at once. Each is its own content_ids
+ * parameter, so a batch stays well under a proxy's 8k request line.
+ */
+export const SILO_CONTENT_ID_BATCH = 100;
+
 /** The scopes Seerr AI needs on its key. */
 export const SILO_REQUIRED_SCOPES = [
   'admin:monitor:read',
@@ -207,15 +213,23 @@ class SiloAPI extends ExternalAPI {
   }
 
   /** Every page of a cursor-paged collection. */
+  /**
+   * Every page of a cursor-paged collection. A list value is sent as one
+   * parameter per entry (content_ids=a&content_ids=b), as Silo reads them.
+   */
   public async listAll<T>(
     endpoint: string,
-    params: Record<string, string | number | boolean | undefined> = {}
+    params: Record<
+      string,
+      string | number | boolean | string[] | undefined
+    > = {}
   ): Promise<T[]> {
     const items: T[] = [];
     let cursor: string | undefined;
     for (;;) {
       const page = await this.patient<SiloCollection<T>>(endpoint, {
         params: { ...params, limit: SILO_PAGE_LIMIT, cursor },
+        paramsSerializer: { indexes: null },
       });
       items.push(...(page.items ?? []));
       cursor = page.page?.has_more ? page.page.next_cursor : undefined;
@@ -281,7 +295,7 @@ class SiloAPI extends ExternalAPI {
    */
   public async getCatalogItems(
     contentIds: string[],
-    batchSize = SILO_MAX_CONTENT_IDS
+    batchSize = SILO_CONTENT_ID_BATCH
   ): Promise<SiloCatalogItem[]> {
     const ids = [...new Set(contentIds.filter(Boolean))];
     const size = Math.max(1, Math.min(batchSize, SILO_MAX_CONTENT_IDS));
@@ -289,7 +303,7 @@ class SiloAPI extends ExternalAPI {
     for (let start = 0; start < ids.length; start += size) {
       found.push(
         ...(await this.listAll<SiloCatalogItem>('/admin/catalog/items', {
-          content_ids: ids.slice(start, start + size).join(','),
+          content_ids: ids.slice(start, start + size),
         }))
       );
     }

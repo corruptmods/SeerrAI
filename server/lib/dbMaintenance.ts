@@ -202,6 +202,15 @@ const pruneSiloEpisodes = async (): Promise<number> => {
     });
     return 0;
   }
+  // Silo answering "none of these" for many ids is far more likely a wrong
+  // answer than every episode gone at once; keep them all.
+  if (stored.length > 1 && present.size === 0) {
+    logger.warn(
+      'Silo listed none of the stored episodes; keeping them all this time',
+      { label: LABEL, episodes: stored.length }
+    );
+    return 0;
+  }
   const gone = stored.filter((id) => !present.has(id));
   for (let i = 0; i < gone.length; i += DELETE_CHUNK) {
     await repo.delete({ contentId: In(gone.slice(i, i + DELETE_CHUNK)) });

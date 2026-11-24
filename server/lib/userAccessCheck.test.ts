@@ -439,4 +439,39 @@ describe('deleting a user from their media server too', () => {
     assert.ok(await exists(two.id));
     assert.equal(set.mock.callCount(), 1);
   });
+
+  it('disables an Emby account by its Emby id', async () => {
+    const settings = getSettings();
+    settings.emby.connected = true;
+    settings.emby.apiKey = 'key';
+    const policy = { IsAdministrator: false, IsDisabled: false };
+    const read = mock.method(
+      JellyfinAPI.prototype,
+      'getPolicyAccount',
+      async (id: string) => ({ Id: id, Name: 'em', Policy: { ...policy } })
+    );
+    const set = mock.method(
+      JellyfinAPI.prototype,
+      'setPolicy',
+      async () => undefined
+    );
+    const person = await getRepository(User).save(
+      new User({
+        email: 'em@example.invalid',
+        embyUsername: 'em',
+        embyUserId: 'emby-account-1',
+        userType: UserType.EMBY,
+        permissions: Permission.REQUEST,
+        avatar: '',
+      })
+    );
+
+    assert.equal((await deleteFromServer(person.id)).status, 200);
+    assert.equal(read.mock.calls[0].arguments[0], 'emby-account-1');
+    assert.deepEqual(set.mock.calls[0].arguments, [
+      'emby-account-1',
+      { ...policy, IsDisabled: true },
+    ]);
+    assert.equal(await exists(person.id), false);
+  });
 });

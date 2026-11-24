@@ -1,4 +1,5 @@
 import PlexTvAPI from '@server/api/plextv';
+import { USER_ID } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -117,7 +118,9 @@ export const removeFromMediaServer = async (user: User): Promise<string> => {
   if (!isConnected(kind) || !getSettings()[kind].apiKey) {
     throw new MediaServerRemovalError(400, `${name} is not connected.`);
   }
-  if (!user.jellyfinUserId) {
+  // Each server's own id: an Emby account has no Jellyfin id.
+  const serverId = user[USER_ID[kind]];
+  if (!serverId) {
     throw new MediaServerRemovalError(
       400,
       `This user has no ${name} account to disable.`
@@ -126,7 +129,7 @@ export const removeFromMediaServer = async (user: User): Promise<string> => {
   const client = await jellyfinClient(kind);
   let account;
   try {
-    account = await client.getPolicyAccount(user.jellyfinUserId);
+    account = await client.getPolicyAccount(serverId);
   } catch (e) {
     if (e.response?.status === 404 || e.response?.status === 400) {
       return name;

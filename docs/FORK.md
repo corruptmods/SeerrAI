@@ -10,8 +10,35 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `e59ffce7` (13 November 2026).
+Upstream `develop` has been read through `3f3fee54` (23 November 2026).
 Start the next read from that commit.
+
+From `e59ffce7` to `3f3fee54`:
+- Already here: #3461 (requests whose server was deleted are failed, with
+  the reason; the fork also fails ones with no default server, and Lidarr's,
+  and the reconciler sends the notification), #3659 (pending requests
+  complete when the title becomes available, never sent to Radarr or
+  Sonarr again), #3704 (no badge-only pushes; the unused `isAdmin` push
+  field is now removed), #3720 (quota labels point at their fields, music
+  and songs included), #3229 (studio and network sliders use the
+  region and language client), #3714 (play buttons are built per server
+  from play links, 4K ones labelled), #3732 (CI already typechecks).
+- Taken: from #3727, nodemailer 10.6.0 and node-gyp 12.4.0 (Next.js was
+  already 16.4.6). node-gyp now downloads with undici, so
+  make-fetch-happen, cacache and http-cache-semantics left the tree, with
+  that advisory's ignore entry and the `cacache>glob` override; node-gyp's
+  undici is pinned like cheerio's. #3647, widened: a shared
+  `useLiveRequest` hook stops film, series and music request rows and cards
+  fetching their request again on mount, focus and reconnect (2.4.4's
+  request trimming hadn't reached them); they poll only while in view and
+  take each fresh copy from the list. #3715, in part: the DNS cache isn't
+  sent while it's off, the stats table filters `cacheMaxEntries`, and ages
+  use react-intl instead of humanize-duration, which threw in 8 of the
+  fork's locales. Its restart prompt isn't needed: network settings apply
+  live here.
+- Not taken: #3564 (a refactor of server names that fixes nothing; names
+  here come from play links and `SERVER_NAMES`), and the CI scorecard,
+  git-cliff, AI-policy, Cypress and Helm commits, which don't apply.
 
 From `a05a7978` to `e59ffce7`, only `e59ffce7` landed: newer GitHub Actions.
 The fork's workflows take the same versions, pinned by commit as before.
@@ -331,23 +358,22 @@ below it on its own (`pnpm why <package>`).
 |---|---|---|
 | `handlebars >=4.7.10` | [CVE-2026-106446](https://github.com/advisories/GHSA-8r5x-fm3f-whwj), [CVE-2026-106445](https://github.com/advisories/GHSA-p8wg-vrv2-v86f), [CVE-2026-106444](https://github.com/advisories/GHSA-xw65-4hp5-5hc7), and the 4.7.8 advisories ([GHSA-2w6w-674q-4c4q](https://github.com/advisories/GHSA-2w6w-674q-4c4q) and others) | Only through eslint-plugin-formatjs (ts-jest), a development tool; nothing in the image uses it |
 | `follow-redirects >=1.16.2` | [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p), and before it [CVE-2026-111756](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [CVE-2026-111755](https://github.com/advisories/GHSA-8r9p-f939-6h3c) | Through axios: credential headers sent on after a cross-origin redirect |
-| `typeorm>glob`, `cacache>glob` `>=14.0.2 <15` | [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), and through glob 14 its minimatch 11 past [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) | typeorm finds entity and migration files with it (`glob.sync`, still in 14); cacache is node-gyp's, while sqlite3 is built |
+| `typeorm>glob` `>=14.0.2 <15` | [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), and through glob 14 its minimatch 11 past [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) | typeorm finds entity and migration files with it (`glob.sync`, still in 14) |
 | `source-map-js >=1.2.2` | [CVE-2026-93749](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) | Through Next's PostCSS; build only |
 | `tar >=7.5.21` | [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw), [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m) | Through sqlite3's build; denial of service on unpacking |
 | `nodemailer 10.1.4` | [GHSA-8c8m-p3m8-cjg8](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8), [GHSA-m943-m63m-w62w](https://github.com/advisories/GHSA-m943-m63m-w62w), [GHSA-85x2-q946-cp5h](https://github.com/advisories/GHSA-85x2-q946-cp5h), and before them [GHSA-v53p-9fqp-m79j](https://github.com/advisories/GHSA-v53p-9fqp-m79j), [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v), [GHSA-8vvx-rff5-p5rq](https://github.com/advisories/GHSA-8vvx-rff5-p5rq) and the 9.x advisories | Sends every email |
 | `body-parser >=2.4.0` | [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828) | Through Express: reads every request body |
 | `multer >=2.5.0` | [GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m) | Through express-openapi-validator, for uploads |
 | `fast-uri >=3.1.9 <4` | [GHSA-w74x-v6f9-j3xg](https://github.com/advisories/GHSA-w74x-v6f9-j3xg), [GHSA-wjr9-j795-jxcr](https://github.com/advisories/GHSA-wjr9-j795-jxcr), [GHSA-xhq7-xmqj-769h](https://github.com/advisories/GHSA-xhq7-xmqj-769h), [GHSA-333x-w4r6-6crp](https://github.com/advisories/GHSA-333x-w4r6-6crp) | Through express-openapi-validator's ajv, which checks addresses in API requests; ajv wants 3.x |
-| `cheerio>undici >=6.29.1 <7` | [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685) | Through email-templates' juice, which inlines email styles; Seerr AI's own undici is a direct dependency, at 8.12.3 |
-| `ip-address >=10.7.3` | The ip-address advisories up to 10.7.0 (subnet checks across address families, leading-zero octets) | Only through node-gyp's proxy support, while sqlite3 is built |
+| `cheerio>undici`, `node-gyp>undici` `>=6.29.1 <7` | [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685) | Through email-templates' juice, which inlines email styles, and node-gyp's downloads (from 12.4) while sqlite3 is built; Seerr AI's own undici is a direct dependency, at 8.12.3 |
+| `ip-address >=10.7.4` | The ip-address advisories up to 10.7.0 (subnet checks across address families, leading-zero octets) | A direct dependency, and through express-rate-limit |
 
 `compression` is a direct dependency, held at 1.8.2 for
-[CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). One advisory is knowingly
-left: [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (http-cache-semantics, no
-fixed version), inside node-gyp, which only runs if sqlite3 has to be
-built. So is [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+[CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). Two advisories are knowingly
+left. [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
 (picomatch, no fixed version): only node-gyp's tinyglobby brings it, with
-node-gyp's own patterns, and the image deletes all three with node-gyp. And [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+node-gyp's own patterns, and the image deletes all three with node-gyp.
+And [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
 (minimatch, fixed only in 11) is left in minimatch 3 under
 email-templates' @ladjs/i18n: its multimatch is only called by that
 package's Koa redirect middleware, which nothing here uses, and minimatch

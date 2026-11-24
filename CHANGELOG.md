@@ -19,15 +19,23 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - A wrong episode reported by anyone is fixed: files that are fine but numbered wrong are re-numbered in place to match Sonarr, without downloading or deleting anything, and only files that are really wrong are replaced. Issues the AI reads as a wrong episode are acted on too.
 
+### Faster
+
+- Request lists and the Recent Requests row no longer fetch each request again when they open, when you come back to the app, or when you go back online.
+
 ### Fixed
 
 - A finished download no longer flashes back to "Downloading" with a percentage between Importing and being added to the media server.
 - Checkboxes in the request window's "Also add to" list are no longer cut off.
 - AI Search keeps to the genre you ask for: titles of another genre, such as an anime among slasher films, are left out.
 - Backfill picks up a film Radarr has no release date for, such as a TV movie, by TMDB's date after the usual wait. Radarr counts such films as never out, so neither it nor Backfill searched for them. A film searched by hand that isn't out yet also keeps the packs found for it.
+- Retrying a request from the request list refreshes the list, so it leaves the Failed filter.
+- Settings → Jobs & Cache no longer shows empty DNS cache tables while the DNS cache is off, and no longer breaks in Brazilian and European Portuguese, Mexican Spanish, Norwegian, Chinese, Luxembourgish and Kabyle once lookups are cached.
+- Emails use nodemailer 10.6.0, which encodes some header text and addresses more correctly.
 
 ### Security
 
+- http-cache-semantics is no longer in the build ([CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp)): node-gyp 12.4.0, which only builds sqlite3, no longer uses it.
 - Next.js 16.4.6, past two advisories about its `use cache` feature ([GHSA-mfr8-8qww-v76h](https://github.com/advisories/GHSA-mfr8-8qww-v76h), [GHSA-vc7v-qv4w-wrv8](https://github.com/advisories/GHSA-vc7v-qv4w-wrv8)). Seerr AI doesn't use that feature.
 - picomatch is no longer in the image ([GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), no fixed version yet). Only the tool that builds sqlite3 during install used it.
 

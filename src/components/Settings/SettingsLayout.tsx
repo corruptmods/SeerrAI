@@ -60,11 +60,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       regex: /^\/settings\/music/,
     },
     // Each server's own settings (/settings/plex, /settings/jellyfin,
-    // /settings/emby) are reached from here, with Edit.
+    // /settings/emby, /settings/silo) are reached from here, with Edit.
     {
       text: intl.formatMessage(messages.menuMediaServers),
       route: '/settings/media-servers',
-      regex: /^\/settings\/(media-servers|plex|jellyfin|emby)/,
+      regex: /^\/settings\/(media-servers|plex|jellyfin|emby|silo)/,
     },
     {
       text: intl.formatMessage(messages.menuServices),

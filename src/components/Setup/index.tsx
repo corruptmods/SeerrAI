@@ -74,6 +74,8 @@ const Setup = () => {
     [MediaServerType.EMBY]: '/api/v1/settings/emby',
     [MediaServerType.PLEX]: '/api/v1/settings/plex',
     [MediaServerType.NOT_CONFIGURED]: null,
+    // Silo can't be set up as the primary server yet.
+    [MediaServerType.SILO]: null,
   };
 
   const { data: mediaServerSettings, error: mediaServerSettingsError } =

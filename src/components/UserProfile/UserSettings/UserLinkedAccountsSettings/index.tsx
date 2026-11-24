@@ -5,6 +5,7 @@ import Alert from '@app/components/Common/Alert';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import Dropdown from '@app/components/Common/Dropdown';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiloLogo from '@app/components/Common/SiloLogo';
 import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
 import LinkJellyfinQuickConnectModal from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/LinkJellyfinQuickConnectModal';
 import usePlexLogin from '@app/hooks/usePlexLogin';
@@ -53,6 +54,7 @@ const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
   plex: PlexLogo,
   jellyfin: JellyfinLogo,
   emby: EmbyLogo,
+  silo: SiloLogo,
 };
 
 type LinkedAccount = {
@@ -114,6 +116,7 @@ const UserLinkedAccountsSettings = () => {
       plex: user.plexUsername,
       jellyfin: user.jellyfinUsername,
       emby: user.embyUsername,
+      silo: user.siloUsername,
     };
     return accountServers(user).map((kind) => ({
       kind,
@@ -167,6 +170,8 @@ const UserLinkedAccountsSettings = () => {
   // Connected servers and providers not linked yet.
   const linkable = [
     ...mediaServers
+      // Linking a Silo account isn't offered yet.
+      .filter((server) => server.kind !== 'silo')
       .filter((server) => !accounts.some((a) => a.kind === server.kind))
       .map(({ kind }) => ({
         key: kind,
@@ -175,7 +180,7 @@ const UserLinkedAccountsSettings = () => {
           if (kind === 'plex') {
             setError(null);
             plexLogin.login();
-          } else {
+          } else if (kind !== 'silo') {
             setJellyfinModalKind(kind);
           }
         },

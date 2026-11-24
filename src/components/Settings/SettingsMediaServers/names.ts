@@ -5,4 +5,5 @@ export const SERVER_NAMES: Record<MediaServerKind, string> = {
   plex: 'Plex',
   jellyfin: 'Jellyfin',
   emby: 'Emby',
+  silo: 'Silo',
 };

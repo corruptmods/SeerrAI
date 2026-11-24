@@ -49,7 +49,11 @@ const messages = defineMessages('components.Login', {
   orsigninwith: 'Or sign in with',
 });
 
-const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
+// The servers people sign in with; Silo sign-in isn't offered yet.
+const SERVER_LOGOS: Record<
+  Exclude<MediaServerKind, 'silo'>,
+  typeof PlexLogo
+> = {
   plex: PlexLogo,
   jellyfin: JellyfinLogo,
   emby: EmbyLogo,

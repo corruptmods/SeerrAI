@@ -173,9 +173,14 @@ const UserList = () => {
   };
 
   const [isDeleting, setDeleting] = useState(false);
-  const [importFrom, setImportFrom] = useState<MediaServerKind>();
-  const importServers = settings.currentSettings.mediaServers.map(
+  const [importFrom, setImportFrom] =
+    useState<Exclude<MediaServerKind, 'silo'>>();
+  const connectedKinds = settings.currentSettings.mediaServers.map(
     (server) => server.kind
+  );
+  // Importing Silo accounts isn't offered yet.
+  const importServers = connectedKinds.filter(
+    (kind): kind is Exclude<MediaServerKind, 'silo'> => kind !== 'silo'
   );
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
@@ -189,6 +194,7 @@ const UserList = () => {
   const canRemoveFromServer =
     currentHasPermission(Permission.ADMIN) &&
     !!deleteServer &&
+    deleteServer !== 'silo' &&
     importServers.includes(deleteServer);
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;

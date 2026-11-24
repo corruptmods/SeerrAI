@@ -92,6 +92,8 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'jellyfin-recently-added-scan': 'Jellyfin Recently Added Scan',
     'emby-full-scan': 'Emby Full Library Scan',
     'emby-recently-added-scan': 'Emby Recently Added Scan',
+    'silo-full-scan': 'Silo Full Library Scan',
+    'silo-recently-added-scan': 'Silo Recently Added Scan',
     'availability-sync': 'Media Availability Sync',
     'radarr-scan': 'Radarr Scan',
     'sonarr-scan': 'Sonarr Scan',

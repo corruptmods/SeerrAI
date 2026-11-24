@@ -11,12 +11,14 @@ export const SERVER_NAMES: Record<MediaServerKind, string> = {
   plex: 'Plex',
   jellyfin: 'Jellyfin',
   emby: 'Emby',
+  silo: 'Silo',
 };
 
 const KIND_OF_USER_TYPE: Partial<Record<number, MediaServerKind>> = {
   [UserType.PLEX]: 'plex',
   [UserType.JELLYFIN]: 'jellyfin',
   [UserType.EMBY]: 'emby',
+  [UserType.SILO]: 'silo',
 };
 
 /** The server of a user's main account; none for a password account. */

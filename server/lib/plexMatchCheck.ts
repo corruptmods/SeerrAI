@@ -630,11 +630,15 @@ class PlexMatchCheck {
       problems: [],
     };
     // Servers this run can't speak for: not read, or not reached.
-    let unread: MediaServerName[] = connectedServers().map(
+    // Match Check doesn't read Silo yet.
+    const checked = connectedServers().filter(
+      (server): server is Exclude<typeof server, 'silo'> => server !== 'silo'
+    );
+    let unread: MediaServerName[] = checked.map(
       (server) => serverName(server) as MediaServerName
     );
     try {
-      const servers = connectedServers();
+      const servers = checked;
       if (!servers.length) {
         throw new Error('No media server is set up.');
       }

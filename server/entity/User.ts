@@ -91,6 +91,7 @@ export class User {
     'jellyfinAuthToken',
     'embyDeviceId',
     'embyAuthToken',
+    'siloProfileId',
     'plexToken',
     'settings',
     // Whether someone's Plex sign-in lapsed is only for them and admins.
@@ -132,6 +133,9 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   public embyUsername?: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  public siloUsername?: string | null;
+
   @Column({ nullable: true })
   public username?: string;
 
@@ -167,6 +171,17 @@ export class User {
 
   @Column({ type: 'varchar', nullable: true, select: false })
   public embyAuthToken?: string | null;
+
+  /** The user's Silo account (Account.id). */
+  @Column({ type: 'varchar', nullable: true })
+  public siloUserId?: string | null;
+
+  /**
+   * The household profile on that account the user chose; null counts every
+   * profile on the account.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public siloProfileId?: string | null;
 
   @Column({ type: 'varchar', nullable: true, select: false })
   public plexToken?: string | null;
@@ -407,6 +422,7 @@ export class User {
       this.plexUsername ||
       this.jellyfinUsername ||
       this.embyUsername ||
+      this.siloUsername ||
       `User #${this.id}`;
   }
 

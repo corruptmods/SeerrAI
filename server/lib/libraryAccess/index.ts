@@ -139,6 +139,12 @@ class LibraryAccess {
         `${serverName(kind)} is not connected.`
       );
     }
+    if (kind === 'silo') {
+      throw new LibraryAccessError(
+        400,
+        "Library sharing isn't available for Silo yet."
+      );
+    }
     return isJellyfinFamily(kind) ? jellyfinAccess(kind) : plexAccess();
   }
 

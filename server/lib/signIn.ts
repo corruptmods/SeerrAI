@@ -73,7 +73,12 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
 export const maySignIn = async (
   user: Pick<
     User,
-    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+    | 'id'
+    | 'userType'
+    | 'plexId'
+    | 'jellyfinUserId'
+    | 'embyUserId'
+    | 'siloUserId'
   >,
   how: 'passkey' | 'password' | 'signedIn'
 ): Promise<boolean> => {
@@ -119,7 +124,10 @@ export const maySignIn = async (
       const answer =
         kind === 'plex'
           ? await plexLetsIn(user, how)
-          : await jellyfinLetsIn(user, kind, how);
+          : kind === 'silo'
+            ? // Signing in with a Silo account isn't offered yet.
+              false
+            : await jellyfinLetsIn(user, kind, how);
       if (answer) {
         return true;
       }

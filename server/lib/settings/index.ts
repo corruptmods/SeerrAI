@@ -47,7 +47,8 @@ export interface Library {
   id: string;
   name: string;
   enabled: boolean;
-  type: 'show' | 'movie';
+  /** 'mixed' only on Silo: a library holding both films and series. */
+  type: 'show' | 'movie' | 'mixed';
   lastScan?: number;
 }
 
@@ -109,6 +110,56 @@ export interface JellyfinSettings {
   adminUserId?: string;
 }
 
+/** API key scopes Seerr AI can use on Silo beyond the two it needs. */
+export type SiloOptionalScope = 'admin:users' | 'admin:catalog:paths';
+
+/** A Silo server, reached with an administrator's API key. */
+export interface SiloSettings {
+  name: string;
+  ip: string;
+  port: number;
+  useSsl?: boolean;
+  urlBase?: string;
+  externalHostname?: string;
+  forgotPasswordUrl?: string;
+  libraries: Library[];
+  /** Always empty: Silo has no music libraries. Kept for the shared shape. */
+  musicLibraries: MusicLibrary[];
+  /** Silo's stable deployment id (GET /system/identity). */
+  serverId: string;
+  apiKey: string;
+  /** Seerr is connected to this server (see lib/mediaServers). */
+  connected?: boolean;
+  /** People may sign in with their account on this server. */
+  signIn?: boolean;
+  /** Silo's build, as it last reported it. */
+  serverVersion?: string;
+  /** Digest of the API contract Silo last reported; logged when it changes. */
+  contractDigest?: string;
+  /** Optional scopes the key was found to hold at connect. */
+  optionalScopes?: SiloOptionalScope[];
+}
+
+/** An unconfigured Silo server. */
+export const siloDefaults = (): SiloSettings => ({
+  name: '',
+  ip: '',
+  port: 8090,
+  useSsl: false,
+  urlBase: '',
+  externalHostname: '',
+  forgotPasswordUrl: '',
+  libraries: [],
+  musicLibraries: [],
+  serverId: '',
+  apiKey: '',
+  connected: false,
+  signIn: false,
+  serverVersion: '',
+  contractDigest: '',
+  optionalScopes: [],
+});
+
 /** Default music settings. */
 export const musicDefaults = (): MusicSettings => ({
   musicbrainzUrl: MUSICBRAINZ_URL,
@@ -147,7 +198,8 @@ export const jellyfinDefaults = (): JellyfinSettings => ({
  * always counts as connected. Helpers live in lib/mediaServers.
  */
 export const connectedKindsOf = (
-  settings: Pick<AllSettings, 'main' | 'plex' | 'jellyfin' | 'emby'>
+  settings: Pick<AllSettings, 'main' | 'plex' | 'jellyfin' | 'emby'> &
+    Partial<Pick<AllSettings, 'silo'>>
 ): MediaServerKind[] => {
   const primary = kindOfType(settings.main.mediaServerType);
   return [
@@ -1024,6 +1076,8 @@ interface FullPublicSettings extends PublicSettings {
   jellyfinServerName?: string;
   embyExternalHost?: string;
   embyForgotPasswordUrl?: string;
+  siloExternalHost?: string;
+  siloForgotPasswordUrl?: string;
   partialRequestsEnabled: boolean;
   enableSpecialEpisodes: boolean;
   cacheImages: boolean;
@@ -1259,6 +1313,8 @@ export type JobId =
   | 'jellyfin-full-scan'
   | 'emby-recently-added-scan'
   | 'emby-full-scan'
+  | 'silo-recently-added-scan'
+  | 'silo-full-scan'
   | 'image-cache-cleanup'
   | 'availability-sync'
   | 'process-blocklisted-tags'
@@ -1283,6 +1339,7 @@ export interface AllSettings {
   plex: PlexSettings;
   jellyfin: JellyfinSettings;
   emby: JellyfinSettings;
+  silo: SiloSettings;
   tautulli: TautulliSettings;
   trakt: TraktSettings;
   maintainerr: MaintainerrSettings[];
@@ -1398,6 +1455,7 @@ class Settings {
       },
       jellyfin: jellyfinDefaults(),
       emby: jellyfinDefaults(),
+      silo: siloDefaults(),
       tautulli: {},
       trakt: {},
       maintainerr: [],
@@ -1619,6 +1677,13 @@ class Settings {
         'emby-full-scan': {
           schedule: '0 10 3 * * *',
         },
+        // Offset from Jellyfin's and Emby's too.
+        'silo-recently-added-scan': {
+          schedule: '0 4-59/5 * * * *',
+        },
+        'silo-full-scan': {
+          schedule: '0 20 3 * * *',
+        },
         'image-cache-cleanup': {
           schedule: '0 0 5 * * *',
         },
@@ -1736,6 +1801,14 @@ class Settings {
 
   set emby(data: JellyfinSettings) {
     this.data.emby = mergeSettings(this.data.emby, data);
+  }
+
+  get silo(): SiloSettings {
+    return this.data.silo;
+  }
+
+  set silo(data: SiloSettings) {
+    this.data.silo = mergeSettings(this.data.silo, data);
   }
 
   get pendingEmbySplit(): boolean {
@@ -1977,7 +2050,8 @@ class Settings {
         kind,
         name: this.data[kind]?.name ?? '',
         primary: index === 0 && kind === kindOfType(this.main.mediaServerType),
-        signIn: this.data[kind]?.signIn !== false,
+        // Signing in with a Silo account isn't offered yet.
+        signIn: kind !== 'silo' && this.data[kind]?.signIn !== false,
       })),
       oidcProviders: oidcApplicationUrl(this.data.main.applicationUrl)
         ? this.oidc.providers
@@ -1990,6 +2064,8 @@ class Settings {
         this.jellyfinFamilyPublic().jellyfinForgotPasswordUrl,
       embyExternalHost: this.data.emby?.externalHostname,
       embyForgotPasswordUrl: this.data.emby?.jellyfinForgotPasswordUrl,
+      siloExternalHost: this.data.silo?.externalHostname,
+      siloForgotPasswordUrl: this.data.silo?.forgotPasswordUrl,
       movie4kEnabled: this.data.radarr.some(
         (radarr) => radarr.is4k && radarr.isDefault
       ),

@@ -2,6 +2,7 @@ import JellyfinAPI from '@server/api/jellyfin';
 import type {
   JellyfinFamilyKind,
   MediaServerKind,
+  MusicServerKind,
 } from '@server/constants/server';
 import {
   AUTH_TOKEN,
@@ -9,9 +10,11 @@ import {
   MEDIA_ID,
   MEDIA_SERVER_KINDS,
   MUSIC_ALBUM_ID,
+  MUSIC_SERVER_KINDS,
   USERNAME,
   USER_ID,
   isJellyfinFamily,
+  isMusicServerKind,
   kindOfType,
   typeOfKind,
 } from '@server/constants/server';
@@ -34,17 +37,20 @@ export {
   MEDIA_ID,
   MEDIA_SERVER_KINDS,
   MUSIC_ALBUM_ID,
+  MUSIC_SERVER_KINDS,
   USERNAME,
   USER_ID,
   isJellyfinFamily,
+  isMusicServerKind,
 };
-export type { JellyfinFamilyKind, MediaServerKind };
+export type { JellyfinFamilyKind, MediaServerKind, MusicServerKind };
 
 /** The account type a user signing in with each server gets. */
 export const USER_TYPE: Record<MediaServerKind, UserType> = {
   plex: UserType.PLEX,
   jellyfin: UserType.JELLYFIN,
   emby: UserType.EMBY,
+  silo: UserType.SILO,
 };
 
 /** The server an account type belongs to; undefined for local accounts. */
@@ -60,7 +66,7 @@ export const kindOfUserType = (
 export const primaryServer = (): MediaServerKind | undefined =>
   kindOfType(getSettings().main.mediaServerType);
 
-/** Connected servers: primary first, then Plex, Jellyfin, Emby. */
+/** Connected servers: primary first, then Plex, Jellyfin, Emby, Silo. */
 export const connectedServers = (): MediaServerKind[] =>
   connectedKindsOf(getSettings());
 
@@ -75,8 +81,14 @@ export const isConnected = (kind: MediaServerKind): boolean =>
 export const jellyfinFamilyServer = (): JellyfinFamilyKind | undefined =>
   connectedServers().find(isJellyfinFamily);
 
-export const serverName = (kind: MediaServerKind): string =>
-  kind === 'plex' ? 'Plex' : kind === 'emby' ? 'Emby' : 'Jellyfin';
+const SERVER_NAMES: Record<MediaServerKind, string> = {
+  plex: 'Plex',
+  jellyfin: 'Jellyfin',
+  emby: 'Emby',
+  silo: 'Silo',
+};
+
+export const serverName = (kind: MediaServerKind): string => SERVER_NAMES[kind];
 
 /** A Jellyfin or Emby server's settings. */
 export const jellyfinFamily = (kind: JellyfinFamilyKind): JellyfinSettings =>
@@ -100,14 +112,22 @@ export const hostnameOf = ({
 
 /** The address Seerr reaches this server at. */
 export const hostnameFor = (kind: MediaServerKind): string =>
-  hostnameOf(kind === 'plex' ? getSettings().plex : jellyfinFamily(kind));
+  hostnameOf(
+    kind === 'plex' || kind === 'silo'
+      ? getSettings()[kind]
+      : jellyfinFamily(kind)
+  );
 
 /**
- * The user-facing Jellyfin or Emby address for links: the external one when
- * set.
+ * The user-facing Jellyfin, Emby or Silo address for links: the external one
+ * when set.
  */
-export const externalHostFor = (kind: JellyfinFamilyKind): string =>
-  jellyfinFamily(kind).externalHostname || hostnameFor(kind);
+export const externalHostFor = (
+  kind: Exclude<MediaServerKind, 'plex'>
+): string =>
+  (kind === 'silo'
+    ? getSettings().silo.externalHostname
+    : jellyfinFamily(kind).externalHostname) || hostnameFor(kind);
 
 /**
  * Links to open one item: its page in the server's web app, plus the iOS app
@@ -124,6 +144,11 @@ export const serverItemLinks = (
         webAppUrl ? webAppUrl : 'https://app.plex.tv/desktop'
       }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${itemId}`,
       iosUrl: `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${itemId}&server=${machineId}`,
+    };
+  }
+  if (kind === 'silo') {
+    return {
+      url: `${externalHostFor(kind).replace(/\/+$/, '')}/item/${encodeURIComponent(itemId)}`,
     };
   }
   // Jellyfin and Emby name their item page differently.
@@ -143,6 +168,8 @@ export const albumPlayLinks = (
   albums: Pick<MusicAlbum, 'ratingKey' | 'jellyfinItemId' | 'embyItemId'>[]
 ): PlayLink[] =>
   connectedServers().flatMap((kind) => {
+    // Silo has no music libraries.
+    if (!isMusicServerKind(kind)) return [];
     const column = MUSIC_ALBUM_ID[kind];
     const itemId = albums.find((album) => album[column])?.[column];
     if (!itemId) return [];
@@ -158,12 +185,21 @@ export const albumPlayLinks = (
   });
 
 /**
+ * Whether Seerr AI offers signing in with this server at all. Signing in with
+ * a Silo account isn't offered yet.
+ */
+export const signInOffered = (kind: MediaServerKind): boolean =>
+  kind !== 'silo';
+
+/**
  * Whether users may sign in with this server: connected and its own switch
  * (Settings → Media Servers) on. The legacy main.mediaServerLogin only
  * mirrors these (lib/mediaServerAdmin).
  */
 export const signInAllowed = (kind: MediaServerKind): boolean =>
-  isConnected(kind) && getSettings()[kind]?.signIn !== false;
+  signInOffered(kind) &&
+  isConnected(kind) &&
+  getSettings()[kind]?.signIn !== false;
 
 /**
  * At setup, makes a server primary and connects it; its sign-in follows the
@@ -186,7 +222,9 @@ export const connectAsPrimary = (
 
 /** Servers a user has a linked account from. */
 export const linkedServers = (
-  user: Partial<Pick<User, 'plexId' | 'jellyfinUserId' | 'embyUserId'>>
+  user: Partial<
+    Pick<User, 'plexId' | 'jellyfinUserId' | 'embyUserId' | 'siloUserId'>
+  >
 ): MediaServerKind[] =>
   MEDIA_SERVER_KINDS.filter((kind) => !!user[USER_ID[kind]]);
 

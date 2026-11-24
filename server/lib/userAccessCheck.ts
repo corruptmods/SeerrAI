@@ -26,6 +26,7 @@ const TYPES: Record<MediaServerKind, UserType> = {
   plex: UserType.PLEX,
   jellyfin: UserType.JELLYFIN,
   emby: UserType.EMBY,
+  silo: UserType.SILO,
 };
 
 /** The server's own id for an account here, comparable with presentOn's. */
@@ -62,6 +63,9 @@ const presentOn = async (kind: MediaServerKind): Promise<Set<string>> => {
     );
   }
 
+  if (kind === 'silo') {
+    throw new Error("Silo accounts aren't checked yet.");
+  }
   if (!getSettings()[kind].apiKey) {
     throw new Error(`${serverName(kind)} has no API key in Seerr AI.`);
   }
@@ -96,7 +100,8 @@ class UserAccessCheck {
     try {
       const missingNow = new Set<number>();
 
-      for (const kind of connectedServers()) {
+      // Nobody signs in with a Silo account yet, so there is none to check.
+      for (const kind of connectedServers().filter((k) => k !== 'silo')) {
         let present: Set<string>;
         try {
           present = await presentOn(kind);

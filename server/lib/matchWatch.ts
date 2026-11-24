@@ -222,24 +222,32 @@ export const compareAlbum = (
   return clearlyAnotherAlbum(expected, album) ? problem() : { state: 'right' };
 };
 
-/** Servers whose libraries should hold this kind of title. */
-const serversFor = (kind: MatchKind): MediaServerKind[] =>
-  connectedServers().filter((server) => {
-    const settings =
-      server === 'plex' ? getSettings().plex : jellyfinFamily(server);
-    if (kind === 'music') {
-      return (
-        musicReady() &&
-        (settings.musicLibraries ?? []).some((library) => library.enabled)
-      );
-    }
-    const type = kind === 'movie' ? 'movie' : 'show';
-    return settings.libraries.some(
-      (library) => library.enabled && library.type === type
-    );
-  });
+/** The servers Match Watch reads; Silo isn't read yet. */
+type CheckedServer = Exclude<MediaServerKind, 'silo'>;
 
-const kindOfServer = (name: MediaServerName): MediaServerKind =>
+const isChecked = (server: MediaServerKind): server is CheckedServer =>
+  server !== 'silo';
+
+/** Servers whose libraries should hold this kind of title. */
+const serversFor = (kind: MatchKind): CheckedServer[] =>
+  connectedServers()
+    .filter(isChecked)
+    .filter((server) => {
+      const settings =
+        server === 'plex' ? getSettings().plex : jellyfinFamily(server);
+      if (kind === 'music') {
+        return (
+          musicReady() &&
+          (settings.musicLibraries ?? []).some((library) => library.enabled)
+        );
+      }
+      const type = kind === 'movie' ? 'movie' : 'show';
+      return settings.libraries.some(
+        (library) => library.enabled && library.type === type
+      );
+    });
+
+const kindOfServer = (name: MediaServerName): CheckedServer =>
   name === 'Plex' ? 'plex' : name === 'Emby' ? 'emby' : 'jellyfin';
 
 /**
@@ -287,7 +295,7 @@ class Reading {
 
   /** A server's newest films or series, with folders and ids. */
   public newest(
-    server: MediaServerKind,
+    server: CheckedServer,
     kind: 'movie' | 'series',
     since: Date
   ): Promise<MatchItem[]> {
@@ -297,7 +305,7 @@ class Reading {
   }
 
   private async readNewest(
-    server: MediaServerKind,
+    server: CheckedServer,
     kind: 'movie' | 'series',
     since: Date
   ): Promise<MatchItem[]> {
@@ -363,7 +371,7 @@ class Reading {
 
   /** One film or series by server id; undefined once gone. */
   public async item(
-    server: MediaServerKind,
+    server: CheckedServer,
     kind: 'movie' | 'series',
     key: string
   ): Promise<MatchItem | undefined> {
@@ -378,7 +386,7 @@ class Reading {
 
   /** A server's newest albums, with folders and MusicBrainz ids. */
   public newestAlbums(
-    server: MediaServerKind,
+    server: CheckedServer,
     since: Date
   ): Promise<ServerAlbum[]> {
     return sinceShared(this.albums, server, since, () =>
@@ -387,7 +395,7 @@ class Reading {
   }
 
   private async readAlbums(
-    server: MediaServerKind,
+    server: CheckedServer,
     since: Date
   ): Promise<ServerAlbum[]> {
     const found: ServerAlbum[] = [];
@@ -430,7 +438,7 @@ class Reading {
 
   /** One album by server id; undefined once gone. */
   public async album(
-    server: MediaServerKind,
+    server: CheckedServer,
     key: string
   ): Promise<ServerAlbum | undefined> {
     if (server === 'plex') {
@@ -458,7 +466,7 @@ const plexAlbum = (album: PlexMusicItem): ServerAlbum => ({
 });
 
 const jellyfinAlbum = (
-  server: MediaServerKind,
+  server: CheckedServer,
   album: JellyfinMatchItem
 ): ServerAlbum => {
   const tagged = album as unknown as Parameters<typeof providerId>[0];

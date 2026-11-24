@@ -32,6 +32,8 @@ export interface PublicSettingsResponse {
   jellyfinForgotPasswordUrl?: string;
   embyExternalHost?: string;
   embyForgotPasswordUrl?: string;
+  siloExternalHost?: string;
+  siloForgotPasswordUrl?: string;
   initialized: boolean;
   applicationTitle: string;
   applicationUrl: string;

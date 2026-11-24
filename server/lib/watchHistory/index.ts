@@ -25,6 +25,10 @@ const serverWatchSource = (
       ? new TautulliWatchSource(tautulli)
       : undefined;
   }
+  // Silo's watch history isn't read yet.
+  if (server === 'silo') {
+    return undefined;
+  }
   const { ip, apiKey } = jellyfinFamily(server);
   return ip && apiKey ? new JellyfinWatchSource(server, apiKey) : undefined;
 };

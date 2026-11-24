@@ -3,7 +3,10 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import type { MediaServerKind } from '@server/constants/server';
+import type {
+  MediaServerKind,
+  MusicServerKind,
+} from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
@@ -14,7 +17,9 @@ import {
   MEDIA_ID,
   MEDIA_SERVER_KINDS,
   MUSIC_ALBUM_ID,
+  MUSIC_SERVER_KINDS,
   connectedServers,
+  isMusicServerKind,
 } from '@server/lib/mediaServers';
 import type {
   AlbumMatch,
@@ -51,9 +56,11 @@ import { In } from 'typeorm';
 
 /** Enabled music libraries on a server. */
 export const enabledMusicLibraries = (kind: MediaServerKind): MusicLibrary[] =>
-  (getSettings()[kind]?.musicLibraries ?? []).filter(
-    (library) => library.enabled
-  );
+  isMusicServerKind(kind)
+    ? (getSettings()[kind]?.musicLibraries ?? []).filter(
+        (library) => library.enabled
+      )
+    : [];
 
 /** True when no connected server has a music library enabled. */
 export const lidarrOnly = (): boolean =>
@@ -205,7 +212,7 @@ export const fromLidarr = (album: IndexAlbum): Partial<MusicAlbum> => ({
 });
 
 const withoutServerIds = (row: MusicAlbum, except?: string): boolean =>
-  MEDIA_SERVER_KINDS.every(
+  MUSIC_SERVER_KINDS.every(
     (kind) => MUSIC_ALBUM_ID[kind] === except || !row[MUSIC_ALBUM_ID[kind]]
   );
 
@@ -222,7 +229,7 @@ export interface Recorded {
  * marks albums available with the server's id. Never lowers a status.
  */
 export const recordServerAlbums = async (
-  kind: MediaServerKind,
+  kind: MusicServerKind,
   matches: AlbumMatch[],
   index?: LidarrIndex
 ): Promise<Recorded> => {
@@ -518,7 +525,7 @@ export const markGone = async (
   for (const row of rows) {
     const changes: Partial<MusicAlbum> = {};
     let anywhere = false;
-    for (const kind of MEDIA_SERVER_KINDS) {
+    for (const kind of MUSIC_SERVER_KINDS) {
       const listed = seen.albums.get(kind)?.has(row.id) ?? false;
       anywhere ||= listed;
       if (!listed && row[MUSIC_ALBUM_ID[kind]]) {

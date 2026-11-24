@@ -614,12 +614,14 @@ const unlinkAccount = async (
           plexToken: null,
           plexTokenExpiredAt: null,
         }
-      : jellyfinAccountColumns(kind, {
-          userId: null,
-          username: null,
-          authToken: null,
-          deviceId: null,
-        });
+      : kind === 'silo'
+        ? { siloUserId: null, siloUsername: null, siloProfileId: null }
+        : jellyfinAccountColumns(kind, {
+            userId: null,
+            username: null,
+            authToken: null,
+            deviceId: null,
+          });
 
   // The account type moves to another linked account, primary server
   // first, else it becomes a password account.

@@ -16,6 +16,7 @@ import { SiloScanner } from '@server/lib/scanners/silo';
 import { saveEpisodes } from '@server/lib/scanners/silo/episodes';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
 import {
   createFakeSilo,
@@ -438,6 +439,45 @@ describe('Silo availability', () => {
     assert.equal(
       (await media(9403, MediaType.MOVIE)).status,
       MediaStatus.AVAILABLE
+    );
+  });
+});
+
+describe('Silo in the availability sync, speaking another API major', () => {
+  it('keeps Silo’s titles and goes on with the other servers', async () => {
+    silo.items = [siloMovie('movie-tmdb-9404', { tmdbId: 9404 })];
+    await scanner().run();
+    // Gone from Silo, but Silo now answers in an API Seerr AI doesn't know.
+    silo.items = [];
+    silo.apiMajor = 3;
+    const errors = mock.method(logger, 'error', () => logger);
+    const warnings = mock.method(logger, 'warn', () => logger);
+    const asked = silo.calls.length;
+    try {
+      await availabilitySync.run();
+    } finally {
+      errors.mock.restore();
+      warnings.mock.restore();
+    }
+    assert.equal(
+      (await media(9404, MediaType.MOVIE)).status,
+      MediaStatus.AVAILABLE,
+      'Silo’s title kept'
+    );
+    assert.ok(
+      !errors.mock.calls.some((c) =>
+        String(c.arguments[0]).includes('Sync interrupted')
+      ),
+      'not stopped'
+    );
+    assert.ok(
+      warnings.mock.calls.some((c) =>
+        String(c.arguments[0]).includes('the other servers are checked')
+      )
+    );
+    assert.ok(
+      !silo.calls.slice(asked).some((c) => c.path === '/admin/catalog/items'),
+      'Silo not asked about titles'
     );
   });
 });

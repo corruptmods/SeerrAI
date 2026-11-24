@@ -6,6 +6,7 @@ import PlexAPI from '@server/api/plexapi';
 import RadarrAPI, { type RadarrMovie } from '@server/api/servarr/radarr';
 import type { SonarrSeason, SonarrSeries } from '@server/api/servarr/sonarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import { SiloIncompatibleError } from '@server/api/silo/compat';
 import TheMovieDb from '@server/api/themoviedb';
 import type {
   TmdbTvDetails,
@@ -514,12 +515,23 @@ class AvailabilitySync {
       return true;
     }
 
-    // Silo uses its API key; it must speak the API Seerr AI knows.
+    // Silo uses its API key; it must speak the API Seerr AI knows. One that
+    // answers in another API major is left out: its titles are kept as they
+    // are while the other servers are checked. One that can't be reached
+    // stops the sync, as any server does.
     if (server === 'silo') {
       const client = siloClient();
       try {
         await recordSiloInfo(await client.getCompatibleInfo());
       } catch (e) {
+        if (e instanceof SiloIncompatibleError) {
+          logger.warn(
+            `${e.message} Its titles are kept as they are; the other servers are checked.`,
+            { label: 'AvailabilitySync' }
+          );
+          this.silo = undefined;
+          return true;
+        }
         logger.error('Sync interrupted: Silo cannot be reached.', {
           label: 'AvailabilitySync',
           errorMessage: e instanceof Error ? e.message : String(e),

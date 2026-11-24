@@ -17,6 +17,7 @@ import type {
 import cacheManager from '@server/lib/cache';
 import { jellyfinAccess } from '@server/lib/libraryAccess/jellyfin';
 import { plexAccess } from '@server/lib/libraryAccess/plex';
+import { siloAccess } from '@server/lib/libraryAccess/silo';
 import type {
   AccessServer,
   ServerAccess,
@@ -29,9 +30,10 @@ import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { In } from 'typeorm';
 
 /*
- * Library sharing on Plex, Jellyfin and Emby: per person, or one library for
- * everyone at once. Jellyfin/Emby admins are never changed; nobody is left
- * with no library. Each change is recorded for history and Undo.
+ * Library sharing on Plex, Jellyfin, Emby and Silo: per person, or one
+ * library for everyone at once. Jellyfin, Emby and Silo admins are never
+ * changed; nobody is left with no library. Each change is recorded for
+ * history and Undo. Silo needs the optional admin:users scope.
  */
 
 export { LibraryAccessError };
@@ -46,7 +48,7 @@ const sameSet = (a: string[], b: string[]): boolean =>
 
 /** Normalizes a server person id to the form stored on User. */
 const plainId = (kind: MediaServerKind, id: string): string =>
-  kind === 'plex' ? id : (normalizeJellyfinGuid(id) ?? id);
+  kind === 'plex' || kind === 'silo' ? id : (normalizeJellyfinGuid(id) ?? id);
 
 /** Plans a bulk add/remove of one library, with the moves to make. */
 export const planBulk = (
@@ -139,12 +141,7 @@ class LibraryAccess {
         `${serverName(kind)} is not connected.`
       );
     }
-    if (kind === 'silo') {
-      throw new LibraryAccessError(
-        400,
-        "Library sharing isn't available for Silo yet."
-      );
-    }
+    if (kind === 'silo') return siloAccess();
     return isJellyfinFamily(kind) ? jellyfinAccess(kind) : plexAccess();
   }
 

@@ -4,6 +4,7 @@ import type {
   SiloAccount,
   SiloAccountProfile,
   SiloAdminUser,
+  SiloAdminUserChange,
   SiloApiKeyCreated,
   SiloBranding,
   SiloCatalogCapabilities,
@@ -97,6 +98,9 @@ const messageFor = (status: number, code?: string): string => {
       return "Silo didn't allow this request.";
     case 404:
       return 'Silo has nothing at this address. Check the address and URL base.';
+    case 412:
+    case 428:
+      return 'The account changed in Silo meanwhile. Try again.';
     case 429:
       return 'Silo is limiting requests. Try again in a moment.';
     default:
@@ -164,6 +168,8 @@ export interface CatalogQuery {
   type?: SiloItemType;
   /** Only items Silo first saw at or after this time. */
   addedAfter?: Date;
+  /** Each file's path too; needs the admin:catalog:paths scope. */
+  includeFilePaths?: boolean;
 }
 
 /** What connecting with a key found it may do. */
@@ -360,6 +366,7 @@ class SiloAPI extends ExternalAPI {
       library_id: query.libraryId,
       type: query.type,
       added_after: query.addedAfter?.toISOString(),
+      include_file_paths: query.includeFilePaths || undefined,
     });
   }
 
@@ -504,6 +511,51 @@ class SiloAPI extends ExternalAPI {
     return this.patient<SiloAdminUser>(
       `/admin/users/${encodeURIComponent(accountId)}`
     );
+  }
+
+  /**
+   * One account with the tag a change to it must send back; a SiloError
+   * with status 404 when Silo has no such one.
+   */
+  public async getAdminUserForChange(
+    accountId: string
+  ): Promise<{ account: SiloAdminUser; tag: string }> {
+    try {
+      const response = await this.axios.get<SiloAdminUser>(
+        `/admin/users/${encodeURIComponent(accountId)}`
+      );
+      const tag = response.headers?.etag;
+      if (!response.data?.id || typeof tag !== 'string' || !tag) {
+        throw new SiloError(
+          502,
+          'bad_account',
+          'Silo sent an account Seerr AI could not change.'
+        );
+      }
+      return { account: response.data, tag };
+    } catch (e) {
+      throw toSiloError(e);
+    }
+  }
+
+  /**
+   * Changes an account (admin:users). `tag` is from the read just before:
+   * Silo refuses the change if the account changed since.
+   */
+  public async updateAdminUser(
+    accountId: string,
+    tag: string,
+    change: SiloAdminUserChange
+  ): Promise<void> {
+    try {
+      await this.axios.put(
+        `/admin/users/${encodeURIComponent(accountId)}`,
+        change,
+        { headers: { 'If-Match': tag } }
+      );
+    } catch (e) {
+      throw toSiloError(e);
+    }
   }
 
   /** Every account on Silo. */

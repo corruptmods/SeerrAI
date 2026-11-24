@@ -2702,6 +2702,17 @@ components:
         notice:
           type: string
           description: Only in the answer to connecting, when connecting changed something the admin should know (a different Silo than before removes every link to the old one).
+        unavailable:
+          type: array
+          description: Silo only, while connected. Features its API key can't offer for lack of an optional scope, each with why in words.
+          items:
+            type: object
+            properties:
+              feature:
+                type: string
+                enum: [librarySharing, matchCheck]
+              reason:
+                type: string
       required:
         - kind
         - name

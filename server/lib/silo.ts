@@ -7,7 +7,11 @@ import type {
 } from '@server/api/silo/types';
 import { siloResolutionHeight } from '@server/lib/mediaQuality';
 import { hostnameFor } from '@server/lib/mediaServers';
-import type { Library, SiloSettings } from '@server/lib/settings';
+import type {
+  Library,
+  SiloOptionalScope,
+  SiloSettings,
+} from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
@@ -18,6 +22,18 @@ import logger from '@server/logger';
  */
 
 export const siloSettings = (): SiloSettings => getSettings().silo;
+
+/** Whether Seerr AI's key was found to hold an optional scope. */
+export const siloHasScope = (scope: SiloOptionalScope): boolean =>
+  (siloSettings().optionalScopes ?? []).includes(scope);
+
+/** Why library sharing and switching accounts off are unavailable. */
+export const SILO_NEEDS_USERS_SCOPE =
+  "Seerr AI's Silo key lacks the admin:users scope, so Silo accounts can't be changed from here. In Silo, make a key with it, then paste it under Settings → Silo.";
+
+/** Why Match Check and Match Watch skip Silo. */
+export const SILO_NEEDS_PATHS_SCOPE =
+  "Silo isn't checked: Seerr AI's Silo key lacks the admin:catalog:paths scope it needs to see each title's folder. In Silo, make a key with it, then paste it under Settings → Silo.";
 
 /** A client for the connected Silo, with its saved key. */
 export const siloClient = (options?: { timeout?: number }): SiloAPI =>

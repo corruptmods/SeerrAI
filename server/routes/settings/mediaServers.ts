@@ -36,6 +36,11 @@ import {
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import {
+  SILO_NEEDS_PATHS_SCOPE,
+  SILO_NEEDS_USERS_SCOPE,
+  siloHasScope,
+} from '@server/lib/silo';
+import {
   SiloResetNeeded,
   resetToNewSilo,
   storeSilo,
@@ -99,9 +104,22 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
           : { webAppUrl: settings.plex.webAppUrl ?? '' }),
       },
       ownerAccount: owner?.[USERNAME[kind]] || undefined,
+      ...(kind === 'silo' && connected.includes(kind)
+        ? { unavailable: siloUnavailable() }
+        : {}),
     };
   });
 };
+
+/** What Silo's key can't do, by the optional scopes it lacks. */
+const siloUnavailable = (): NonNullable<MediaServerSummary['unavailable']> => [
+  ...(siloHasScope('admin:users')
+    ? []
+    : [{ feature: 'librarySharing' as const, reason: SILO_NEEDS_USERS_SCOPE }]),
+  ...(siloHasScope('admin:catalog:paths')
+    ? []
+    : [{ feature: 'matchCheck' as const, reason: SILO_NEEDS_PATHS_SCOPE }]),
+];
 
 /**
  * The servers as listed; `notice` is something connecting changed that the

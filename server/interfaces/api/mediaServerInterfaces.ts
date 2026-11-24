@@ -8,10 +8,7 @@ export interface MediaServerSummary {
   connected: boolean;
   primary: boolean;
   signIn: boolean;
-  /**
-   * Whether people can sign in with this server at all; false for Silo,
-   * which also can't be made primary yet.
-   */
+  /** Whether people can sign in with this server at all. */
   signInOffered: boolean;
   libraries: number;
   enabledLibraries: number;
@@ -30,6 +27,14 @@ export interface MediaServerSummary {
   ownerAccount?: string;
   /** Something connecting just changed that the admin should know. */
   notice?: string;
+  /**
+   * Features this server's connection can't offer, and why in words (Silo:
+   * an optional key scope it lacks).
+   */
+  unavailable?: {
+    feature: 'librarySharing' | 'matchCheck';
+    reason: string;
+  }[];
 }
 
 /** Users who would lose sign-in methods if the server were removed. */

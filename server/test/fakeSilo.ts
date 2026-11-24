@@ -143,6 +143,11 @@ export interface FakeSilo {
   rateLimited: number;
   /** While set, every call gets a server error. */
   down: boolean;
+  /**
+   * Every library id Silo has, for checking account changes; `libraries`
+   * (what /user/libraries lists) when unset.
+   */
+  allLibraryIds?: string[];
   /** The settings for a connected Silo with the given key. */
   settings: (overrides?: Partial<SiloSettings>) => SiloSettings;
   reset: () => void;
@@ -244,6 +249,10 @@ export const createFakeSilo = (): FakeSilo => {
   let nextCode = 1;
   /** Keys Silo minted, by their id. */
   const keyIds = new Map<string, string>();
+  /** Each account's revision, which its tag names. */
+  let revisions = new Map<string, number>();
+  const tagOf = (account: FakeSiloAccount) =>
+    `"account-${account.id}-${revisions.get(account.id) ?? 1}"`;
 
   const deviceByUserCode = (userCode: string) =>
     [...fake.devices.values()].find(
@@ -349,6 +358,8 @@ export const createFakeSilo = (): FakeSilo => {
       fake.mintNonAdminKeys = false;
       fake.rateLimited = 0;
       fake.down = false;
+      fake.allLibraryIds = undefined;
+      revisions = new Map();
       sessions = new Map();
     },
     port: () => (server?.address() as AddressInfo | null)?.port ?? 0,
@@ -586,6 +597,51 @@ export const createFakeSilo = (): FakeSilo => {
     if (!key) {
       return problem(res, 401, 'authentication_required', 'Bad key.');
     }
+    // Changing an account: admin:users only, guarded by its tag.
+    const changing = /^\/admin\/users\/([^/]+)$/.exec(path);
+    if (req.method === 'PUT' && changing && changing[1] !== 'policy-defaults') {
+      if (key.scopes.length && !key.scopes.includes('admin:users')) {
+        return problem(res, 403, 'permission_denied', 'Scope.');
+      }
+      if (!key.admin) {
+        return problem(res, 403, 'permission_denied', 'Admins only.');
+      }
+      const id = decodeURIComponent(changing[1]);
+      const account = fake.accounts.find((a) => a.id === id);
+      if (!account) {
+        return problem(res, 404, 'not_found', 'No such account.');
+      }
+      const match = req.headers['if-match'];
+      if (!match) {
+        return problem(res, 428, 'precondition_required', 'Send If-Match.');
+      }
+      if (match !== tagOf(account)) {
+        return problem(res, 412, 'precondition_failed', 'Stale.');
+      }
+      const known = new Set(
+        fake.allLibraryIds ?? fake.libraries.map((l) => l.id)
+      );
+      if (body && 'library_ids' in body) {
+        const ids = body.library_ids;
+        if (
+          ids !== null &&
+          (!Array.isArray(ids) ||
+            ids.some((libraryId) => !known.has(String(libraryId))))
+        ) {
+          return problem(res, 422, 'validation_failed', 'body.library_ids');
+        }
+        account.libraryIds = ids === null ? undefined : (ids as string[]);
+      }
+      if (body && typeof body.enabled === 'boolean') {
+        if (account.role === 'admin' && key.scopes.length) {
+          return problem(res, 403, 'permission_denied', 'Not on an admin.');
+        }
+        account.enabled = body.enabled;
+      }
+      revisions.set(id, (revisions.get(id) ?? 1) + 1);
+      res.writeHead(204);
+      return res.end();
+    }
     if (req.method !== 'GET') {
       return problem(res, 405, 'method_not_allowed', 'Read only here.');
     }
@@ -776,9 +832,11 @@ export const createFakeSilo = (): FakeSilo => {
         if (!account) {
           return problem(res, 404, 'not_found', 'No such account.');
         }
-        return route === '/admin/users/{id}'
-          ? json(res, 200, adminUser(account))
-          : json(res, 200, { items: account.profiles ?? [] });
+        if (route === '/admin/users/{id}') {
+          res.setHeader('ETag', tagOf(account));
+          return json(res, 200, adminUser(account));
+        }
+        return json(res, 200, { items: account.profiles ?? [] });
       }
       case '/user/libraries':
         return json(res, 200, { items: fake.libraries });

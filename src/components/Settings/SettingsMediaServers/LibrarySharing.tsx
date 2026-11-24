@@ -103,6 +103,8 @@ const relative = (iso: string) => (
 
 interface LibrarySharingProps {
   servers: { kind: MediaServerKind; name: string }[];
+  /** Why a connected server isn't listed (Silo without the scope). */
+  notes?: string[];
 }
 
 /** A dialog that fades in and out. */
@@ -132,7 +134,7 @@ const Fade = ({
  * and taking one from (or giving it to) everyone at once, with a preview first
  * and Undo after.
  */
-const LibrarySharing = ({ servers }: LibrarySharingProps) => {
+const LibrarySharing = ({ servers, notes = [] }: LibrarySharingProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [chosen, setChosen] = useState<MediaServerKind>();
@@ -157,7 +159,23 @@ const LibrarySharing = ({ servers }: LibrarySharingProps) => {
   const [working, setWorking] = useState(false);
   const [undoing, setUndoing] = useState<AccessChangeView>();
 
-  if (!kind) return null;
+  const heading = (
+    <div className="mb-6">
+      <h3 className="heading">{intl.formatMessage(messages.librarySharing)}</h3>
+      <p className="description">
+        {intl.formatMessage(messages.librarySharingDescription)}
+      </p>
+      {notes.map((note) => (
+        <p key={note} className="mt-2 text-sm text-gray-400">
+          {note}
+        </p>
+      ))}
+    </div>
+  );
+
+  if (!kind) {
+    return notes.length ? <div className="mt-10">{heading}</div> : null;
+  }
 
   const people = data?.people.filter((p) => !p.admin) ?? [];
 
@@ -270,14 +288,7 @@ const LibrarySharing = ({ servers }: LibrarySharingProps) => {
 
   return (
     <div className="mt-10">
-      <div className="mb-6">
-        <h3 className="heading">
-          {intl.formatMessage(messages.librarySharing)}
-        </h3>
-        <p className="description">
-          {intl.formatMessage(messages.librarySharingDescription)}
-        </p>
-      </div>
+      {heading}
       <div className="section max-w-6xl">
         {servers.length > 1 && (
           <div

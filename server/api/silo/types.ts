@@ -45,6 +45,11 @@ export interface SiloCatalogVersion {
   codec_video?: string;
   bitrate_kbps?: number;
   edition?: string;
+  /**
+   * The file's path on Silo's server; only when asked for, with a key that
+   * holds admin:catalog:paths.
+   */
+  file_path?: string;
 }
 
 export type SiloItemType = 'movie' | 'series' | 'episode';
@@ -125,11 +130,22 @@ export interface SiloAdminUser {
   is_owner?: boolean;
   /** Explicit library allowlist; null inherits the group's. */
   library_ids?: string[] | null;
+  /** Its access group; null or absent when it has none. */
+  access_group_id?: string | null;
   /** The policy Silo enforces, its access group's included. */
   effective_policy?: {
     /** Libraries the account may see; null means every library. */
     library_ids?: string[] | null;
   };
+}
+
+/**
+ * PUT /admin/users/{id}: the fields Seerr AI changes. An omitted field keeps
+ * its value; library_ids null restores the access group's list.
+ */
+export interface SiloAdminUserChange {
+  library_ids?: string[] | null;
+  enabled?: boolean;
 }
 
 /** A row of GET /admin/users/{id}/profiles: one household profile. */

@@ -398,9 +398,22 @@ const SettingsMediaServers = () => {
       {data?.some((server) => server.connected) && (
         <LibrarySharing
           servers={data
-            // Library sharing doesn't cover Silo yet.
-            .filter((server) => server.connected && server.kind !== 'silo')
+            // Silo's key may lack the scope to change its accounts.
+            .filter(
+              (server) =>
+                server.connected &&
+                !server.unavailable?.some(
+                  (off) => off.feature === 'librarySharing'
+                )
+            )
             .map((server) => ({ kind: server.kind, name: nameOf(server) }))}
+          notes={data.flatMap((server) =>
+            server.connected
+              ? (server.unavailable ?? [])
+                  .filter((off) => off.feature === 'librarySharing')
+                  .map((off) => off.reason)
+              : []
+          )}
         />
       )}
 

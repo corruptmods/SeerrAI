@@ -10187,6 +10187,7 @@ paths:
                         type: boolean
                   dnsCache:
                     type: object
+                    description: Only while the DNS cache is on (Settings → Network).
                     properties:
                       stats:
                         type: object
@@ -10194,7 +10195,7 @@ paths:
                           size:
                             type: number
                             example: 1
-                          maxSize:
+                          cacheMaxEntries:
                             type: number
                             example: 500
                           hits:
@@ -10213,7 +10214,8 @@ paths:
                             type: number
                             example: 0.95
                       entries:
-                        type: array
+                        type: object
+                        description: Each cached hostname's lookup, by hostname.
                         additionalProperties:
                           type: object
                           properties:

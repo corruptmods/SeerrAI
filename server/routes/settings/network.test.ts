@@ -1,5 +1,6 @@
 import { getSettings } from '@server/lib/settings';
 import settingsRoutes from '@server/routes/settings';
+import { applyDnsCache } from '@server/utils/dnsCache';
 import { liveProxyTrust } from '@server/utils/trustedProxies';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
@@ -141,5 +142,27 @@ describe('the trusted proxy settings', () => {
     await save({ trustProxy: false });
     assert.equal(liveProxyTrust('127.0.0.1', 0), false);
     assert.equal(liveProxyTrust(cloudflare, 1), false);
+  });
+});
+
+describe('the DNS cache on Settings → Jobs & Cache', () => {
+  it('is left out while the DNS cache is off, so its sections hide', async () => {
+    applyDnsCache({ enabled: false });
+    const res = await request(app).get('/api/v1/settings/cache');
+    assert.equal(res.status, 200);
+    assert.equal('dnsCache' in res.body, false);
+  });
+
+  it('shows its totals and lookups while on', async () => {
+    applyDnsCache({ enabled: true });
+    try {
+      const res = await request(app).get('/api/v1/settings/cache');
+      assert.equal(res.status, 200);
+      assert.equal(typeof res.body.dnsCache.stats.cacheMaxEntries, 'number');
+      assert.equal(typeof res.body.dnsCache.stats.hitRate, 'number');
+      assert.deepEqual(res.body.dnsCache.entries, {});
+    } finally {
+      applyDnsCache({ enabled: false });
+    }
   });
 });

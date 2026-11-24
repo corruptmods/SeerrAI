@@ -73,7 +73,6 @@ import { appDataPath } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
 import { dnsCache } from '@server/utils/dnsCache';
 import { isProxyAddress } from '@server/utils/trustedProxies';
-import type { DnsEntries, DnsStats } from 'dns-caching';
 import { Router } from 'express';
 import fs from 'fs';
 import { escapeRegExp, merge, omit, set, sortBy } from 'lodash';
@@ -1279,9 +1278,6 @@ settingsRoutes.get('/cache', async (_req, res) => {
     imageConversionAvailable(),
   ]);
 
-  const stats: DnsStats | undefined = dnsCache?.getStats();
-  const entries: DnsEntries | undefined = dnsCache?.getCacheEntries();
-
   return res.status(200).json({
     apiCaches,
     imageCache: {
@@ -1301,9 +1297,10 @@ settingsRoutes.get('/cache', async (_req, res) => {
       limit: ImageProxy.sizeLimit(),
       conversion,
     },
-    dnsCache: {
-      stats,
-      entries,
+    // Left out while the DNS cache is off, which hides its sections.
+    dnsCache: dnsCache && {
+      stats: dnsCache.getStats(),
+      entries: dnsCache.getCacheEntries(),
     },
   });
 });

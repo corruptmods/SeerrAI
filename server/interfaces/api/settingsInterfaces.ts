@@ -127,9 +127,10 @@ export interface CacheResponse {
    * available.
    */
   imageCacheTotal: { size: number; limit: number; conversion: boolean };
-  dnsCache: {
-    stats: DnsStats | undefined;
-    entries: DnsEntries | undefined;
+  /** Only while the DNS cache is on. */
+  dnsCache?: {
+    stats: DnsStats;
+    entries: DnsEntries;
   };
 }
 

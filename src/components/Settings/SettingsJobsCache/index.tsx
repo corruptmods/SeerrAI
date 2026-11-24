@@ -28,7 +28,6 @@ import type {
 import type { JobId } from '@server/lib/settings';
 import axios from 'axios';
 import cronstrue from 'cronstrue/i18n';
-import humanizeDuration from 'humanize-duration';
 import { Fragment, useReducer, useState } from 'react';
 import type { MessageDescriptor } from 'react-intl';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
@@ -357,14 +356,6 @@ const SettingsJobs = () => {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const formatAge = (milliseconds: number): string => {
-    return humanizeDuration(milliseconds, {
-      units: ['m', 's'],
-      round: true,
-      language: locale,
-    });
   };
 
   return (
@@ -807,7 +798,14 @@ const SettingsJobs = () => {
                       <Table.TD>{data.activeAddress}</Table.TD>
                       <Table.TD>{intl.formatNumber(data.hits)}</Table.TD>
                       <Table.TD>{intl.formatNumber(data.misses)}</Table.TD>
-                      <Table.TD>{formatAge(data.age)}</Table.TD>
+                      <Table.TD className="whitespace-nowrap">
+                        {/* When it was looked up, in the reader's language. */}
+                        <FormattedRelativeTime
+                          value={-Math.floor(data.age / 1000)}
+                          updateIntervalInSeconds={1}
+                          numeric="auto"
+                        />
+                      </Table.TD>
                       <Table.TD alignText="right">
                         <Button
                           buttonType="danger"
@@ -841,7 +839,7 @@ const SettingsJobs = () => {
                 <thead>
                   <tr>
                     {Object.entries(cacheData.dnsCache?.stats ?? {})
-                      .filter(([statName]) => statName !== 'maxSize')
+                      .filter(([statName]) => statName !== 'cacheMaxEntries')
                       .map(([statName]) => (
                         <Table.TH key={`dns-stat-header-${statName}`}>
                           {messages[statName]
@@ -854,7 +852,7 @@ const SettingsJobs = () => {
                 <Table.TBody>
                   <tr>
                     {Object.entries(cacheData.dnsCache?.stats ?? {})
-                      .filter(([statName]) => statName !== 'maxSize')
+                      .filter(([statName]) => statName !== 'cacheMaxEntries')
                       .map(([statName, statValue]) => (
                         <Table.TD key={`dns-stat-${statName}`}>
                           {statName === 'hitRate'

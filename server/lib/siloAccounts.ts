@@ -22,7 +22,8 @@ export type SiloSignInReason =
   | 'passwordChange'
   | 'rateLimited'
   | 'notAdmin'
-  | 'unreachable';
+  | 'unreachable'
+  | 'differentServer';
 
 /** A failed Silo sign-in, with a status and a plain message. */
 export class SiloSignInError extends Error {
@@ -74,6 +75,47 @@ export const signInFailure = (e: unknown): SiloSignInError => {
 const openClient = (hostname = hostnameFor('silo')) =>
   new SiloAPI(hostname, undefined, { timeout: 15_000 });
 
+/** How long Silo's identity, once read, is trusted. */
+const IDENTITY_MS = 60_000;
+let identity: { hostname: string; serverId: string; at: number } | undefined;
+
+/** For tests: reads Silo's identity afresh next time. */
+export const resetSiloIdentityForTests = (): void => {
+  identity = undefined;
+};
+
+export const DIFFERENT_SILO =
+  'The Silo at this address is not the one Seerr AI was connected to, so Silo accounts are not accepted. An administrator must connect Silo again under Settings → Media Servers.';
+
+/**
+ * Refuses when the Silo answering at the saved address is not the one
+ * Seerr AI connected to (a rebuilt server reuses small account ids, so an
+ * old link would let someone else in). Read anonymously, at most once a
+ * minute.
+ */
+export const assertSameSilo = async (): Promise<void> => {
+  const expected = getSettings().silo.serverId;
+  if (!expected) return;
+  const hostname = hostnameFor('silo');
+  let found =
+    identity &&
+    identity.hostname === hostname &&
+    Date.now() - identity.at < IDENTITY_MS
+      ? identity.serverId
+      : undefined;
+  if (!found) {
+    try {
+      found = (await openClient(hostname).getIdentity()).server_id;
+    } catch (e) {
+      throw signInFailure(e);
+    }
+    identity = { hostname, serverId: found, at: Date.now() };
+  }
+  if (found !== expected) {
+    throw new SiloSignInError(409, 'differentServer', DIFFERENT_SILO);
+  }
+};
+
 /** The account an approved sign-in belongs to, after closing its session. */
 const closeAndCheck = async (
   client: SiloAPI,
@@ -95,6 +137,8 @@ export const siloPasswordSignIn = async (
   password: string,
   hostname?: string
 ): Promise<SiloAccount> => {
+  // At the saved address, only the Silo Seerr AI connected to.
+  if (!hostname) await assertSameSilo();
   const client = openClient(hostname);
   let tokens;
   try {
@@ -244,6 +288,7 @@ export const checkSiloDevice = async (
     pending.delete(handle);
     return { status: 'expired' };
   }
+  await assertSameSilo();
   const client = openClient();
   let poll;
   try {

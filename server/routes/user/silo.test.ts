@@ -5,7 +5,10 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 import { resetSignInMemoryForTests } from '@server/lib/signIn';
-import { resetSiloDevicesForTests } from '@server/lib/siloAccounts';
+import {
+  resetSiloDevicesForTests,
+  resetSiloIdentityForTests,
+} from '@server/lib/siloAccounts';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
 import settingsRoutes from '@server/routes/settings';
@@ -53,6 +56,7 @@ const FRIEND = 2;
 beforeEach(async () => {
   silo.reset();
   resetSiloDevicesForTests();
+  resetSiloIdentityForTests();
   resetSignInMemoryForTests();
   silo.accounts = [
     {
@@ -150,6 +154,17 @@ describe('linking a Silo account', () => {
       .send({ username: 'lantern', password: 'song' });
     assert.equal(res.status, 403);
     assert.equal(res.body.code, ApiErrorCode.PasswordChangeRequired);
+  });
+
+  it('links nothing from a different Silo at the same address', async () => {
+    silo.serverId = '9c1d2e3f-0000-4000-8000-000000000002';
+    const agent = await signedIn('friend@seerr.dev');
+    const res = await agent
+      .post(`/user/${FRIEND}/settings/linked-accounts/silo`)
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(res.status, 409);
+    assert.match(res.body.message, /not the one Seerr AI was connected to/);
+    assert.equal((await friend()).siloUserId, null);
   });
 
   it('links with a code, leaving the profile to choose', async () => {

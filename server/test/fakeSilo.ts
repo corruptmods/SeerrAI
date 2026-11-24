@@ -330,6 +330,7 @@ export const createFakeSilo = (): FakeSilo => {
       fake.apiMajor = 2;
       fake.serverVersion = '1.0.0';
       fake.contractDigest = 'a'.repeat(64);
+      fake.serverId = '3f2a9d5e-6b1c-4c7e-9a0d-2f4b8c1e7a35';
       fake.keys = new Map([['sa_test', { scopes: [], admin: true }]]);
       fake.accounts = [];
       fake.devices = new Map();

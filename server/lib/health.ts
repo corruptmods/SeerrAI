@@ -570,13 +570,31 @@ const serviceDown = (id: string, name: string, e: unknown): HealthCheck => ({
  * the scans do.
  */
 export const siloCheck = async (
-  api: Pick<SiloAPI, 'getCompatibleInfo' | 'getServerStatus'>
+  api: Pick<SiloAPI, 'getCompatibleInfo' | 'getServerStatus' | 'getIdentity'>,
+  /** The server id Seerr AI connected to; checked when given. */
+  serverId?: string
 ): Promise<HealthCheck> => {
   const started = Date.now();
   try {
     const info = await withTimeout(api.getCompatibleInfo(), SERVICE_TIMEOUT_MS);
     const status = await withTimeout(api.getServerStatus(), SERVICE_TIMEOUT_MS);
     const found: { status: HealthStatus; item: HealthItem }[] = [];
+    if (serverId) {
+      const answering = await withTimeout(
+        api.getIdentity(),
+        SERVICE_TIMEOUT_MS
+      );
+      if (answering.server_id !== serverId) {
+        found.push({
+          status: 'error',
+          item: {
+            title: 'A different Silo answers at this address',
+            detail:
+              'Silo sign-ins and account links are refused until an administrator connects Silo again (Settings → Media Servers).',
+          },
+        });
+      }
+    }
     if (status.restart_required) {
       found.push({
         status: 'warning',
@@ -774,7 +792,12 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
   }
 
   if (mediaServers.includes('silo') && settings.silo.ip) {
-    pending.push(siloCheck(siloClient({ timeout: SERVICE_TIMEOUT_MS })));
+    pending.push(
+      siloCheck(
+        siloClient({ timeout: SERVICE_TIMEOUT_MS }),
+        settings.silo.serverId
+      )
+    );
   }
 
   for (const kind of mediaServers.filter(isJellyfinFamily)) {

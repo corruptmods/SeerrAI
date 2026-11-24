@@ -41,6 +41,8 @@ const messages = defineMessages('components.Login', {
     'This Silo account has a temporary password. Sign in to Silo, change it, then try again.',
   siloAccessDenied:
     'This Silo account has no account here yet. Ask the owner to import it.',
+  siloDifferentServer:
+    'The Silo at this address is not the one this server was connected to. Ask an administrator to connect Silo again.',
 });
 
 interface SiloLoginProps {
@@ -71,6 +73,9 @@ const SiloLogin = ({ revalidate }: SiloLoginProps) => {
       }
       if (status === 429) {
         return intl.formatMessage(messages.toomanyattempts);
+      }
+      if (status === 409) {
+        return intl.formatMessage(messages.siloDifferentServer);
       }
       return intl.formatMessage(messages.loginerror);
     },

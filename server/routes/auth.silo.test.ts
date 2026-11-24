@@ -1,3 +1,4 @@
+import SiloAPI from '@server/api/silo/client';
 import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
@@ -5,6 +6,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
+import { siloCheck } from '@server/lib/health';
 import { getSettings, siloDefaults } from '@server/lib/settings';
 import {
   maySignIn,
@@ -14,6 +16,7 @@ import {
 import {
   checkSiloDevice,
   resetSiloDevicesForTests,
+  resetSiloIdentityForTests,
   startSiloDevice,
 } from '@server/lib/siloAccounts';
 import userAccessCheck from '@server/lib/userAccessCheck';
@@ -71,6 +74,7 @@ after(() => silo.stop());
 beforeEach(() => {
   silo.reset();
   resetSiloDevicesForTests();
+  resetSiloIdentityForTests();
   resetSignInMemoryForTests();
   silo.accounts = [
     {
@@ -200,6 +204,58 @@ describe('signing in to Silo with a password', () => {
       .send({ username: 'lantern', password: 'song' });
     assert.equal(res.status, 403);
     assert.equal(silo.calls.length, 0, 'Silo not asked');
+  });
+});
+
+describe('a different Silo at the same address', () => {
+  it('signs nobody in, by password or by code, and Health says so', async () => {
+    const linked = await users().save(
+      new User({
+        email: 'old-link@example.invalid',
+        siloUserId: 'acct-guest',
+        siloUsername: 'lantern',
+        userType: UserType.SILO,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    // Rebuilt: the same small account ids now name other people.
+    silo.serverId = '9c1d2e3f-0000-4000-8000-000000000001';
+
+    const res = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(res.status, 409);
+    assert.match(res.body.message, /not the one Seerr AI was connected to/);
+    assert.deepEqual(silo.openSessions(), []);
+    assert.ok(!silo.calls.some((call) => call.path === '/auth/login'));
+
+    const agent = request.agent(app);
+    const code = (await agent.post('/auth/silo/device/start')).body;
+    silo.approveDevice(code.userCode, 'acct-guest');
+    const check = await agent
+      .post('/auth/silo/device/check')
+      .send({ handle: code.handle });
+    assert.equal(check.status, 409);
+    assert.notEqual((await agent.get('/auth/me')).body.id, linked.id);
+
+    const health = await siloCheck(
+      new SiloAPI(`http://127.0.0.1:${silo.port()}`, 'sa_test'),
+      getSettings().silo.serverId
+    );
+    assert.equal(health.status, 'error');
+    assert.ok(
+      health.items.some((item) => /different Silo/.test(item.title)),
+      JSON.stringify(health)
+    );
+
+    // The same Silo again: back to normal.
+    silo.serverId = getSettings().silo.serverId;
+    resetSiloIdentityForTests();
+    const again = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(again.status, 200, JSON.stringify(again.body));
   });
 });
 

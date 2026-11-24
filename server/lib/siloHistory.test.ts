@@ -310,6 +310,16 @@ describe('copying Silo’s play history', () => {
     assert.deepEqual(done, ['reader', 'nightly']);
   });
 
+  it('counts a play once when Silo replaced its session', async () => {
+    silo.plays = [
+      play('s-first', 'movie-glasswing', 1, { end_reason: 'replaced' }),
+      play('s-then', 'movie-glasswing', 2),
+      play('s-cut', 'movie-glasswing', 3, { end_reason: 'aborted' }),
+    ];
+    await syncSiloHistory();
+    assert.deepEqual([...(await stored()).keys()].sort(), ['s-cut', 's-then']);
+  });
+
   it('reads once for callers that ask at the same time', async () => {
     silo.plays = [play('s-1', 'movie-glasswing', 1)];
     await Promise.all([syncSiloHistory(), syncSiloHistory()]);

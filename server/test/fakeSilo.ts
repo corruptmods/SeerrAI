@@ -67,6 +67,8 @@ export interface FakeSiloPlay {
   end_position_seconds?: number;
   duration_seconds?: number;
   completed: boolean;
+  /** Default 'stopped'. */
+  end_reason?: string;
 }
 
 /** Something playing now. */
@@ -712,7 +714,7 @@ export const createFakeSilo = (): FakeSilo => {
         client_version: null,
         video_decision: null,
         audio_decision: null,
-        end_reason: 'stopped',
+        end_reason: play.end_reason ?? 'stopped',
         subtitle: null,
         lifecycle_seq: null,
       };

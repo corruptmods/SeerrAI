@@ -95,9 +95,19 @@ const viewerNameOf = (entry: SiloPlaybackHistoryEntry): string => {
   return named || entry.username?.trim() || profile;
 };
 
-/** Whether Silo's row could be a film or episode play. */
+/**
+ * An attempt Silo ended because the same play went on under a new session
+ * (a client switched version or play method): that session has its own row,
+ * so this one would count the viewing twice. Aborted plays (the server gave
+ * up on them) are real viewing and are kept.
+ */
+const isReplaced = (entry: SiloPlaybackHistoryEntry): boolean =>
+  entry.end_reason === 'replaced';
+
+/** Whether Silo's row could be a film or episode play, counted once. */
 const isVideo = (entry: SiloPlaybackHistoryEntry): boolean =>
   !blank(entry.media_item_id) &&
+  !isReplaced(entry) &&
   (blank(entry.media_type) || VIDEO.has(entry.media_type ?? ''));
 
 /**
@@ -352,7 +362,8 @@ const readFrom = async (
   for await (const page of client.playbackHistoryPages({ endedAfter: after })) {
     if (!newest && page.length) newest = new Date(page[0].ended_at);
     read += page.length;
-    page.forEach((entry) => seen?.add(entry.session_id));
+    // A replaced attempt stored before is dropped by the nightly re-read.
+    page.forEach((entry) => !isReplaced(entry) && seen?.add(entry.session_id));
     still();
     stored += await storePage(client, page, retry);
   }

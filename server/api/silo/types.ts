@@ -240,6 +240,12 @@ export interface SiloPlaybackHistoryEntry {
   series_title?: string;
   season_number?: number | null;
   episode_number?: number | null;
+  /**
+   * Why the attempt ended: stopped, terminated, expired, aborted, or
+   * replaced (the same play went on under a new session with its own row).
+   * Null when unknown.
+   */
+  end_reason?: string | null;
 }
 
 /** A row of GET /admin/sessions: something playing now. */

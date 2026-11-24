@@ -16,6 +16,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- **Remove Users Who Lose Access** now removes people deleted from Emby: Emby accounts were checked by the wrong id, so none was ever found missing.
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.
 
 ## 2.5.0 (24 November 2026)

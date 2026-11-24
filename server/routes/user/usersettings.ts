@@ -74,6 +74,7 @@ import { endSessions } from '@server/lib/signIn';
 import { addressGroupOf } from '@server/lib/signInLimiter';
 import {
   SiloSignInError,
+  cancelSiloDevice,
   checkSiloDevice,
   siloAvatarPath,
   siloPasswordSignIn,
@@ -1017,6 +1018,25 @@ userSettingsRoutes.post<{ id: string }>(
     } catch (e) {
       return siloLinkFailure(res, e);
     }
+  }
+);
+
+/** Withdraws a code someone started for linking and no longer wants. */
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/silo/device/cancel',
+  isOwnProfile(),
+  signedInOnly,
+  async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ code: ApiErrorCode.Unauthorized });
+    }
+    const parsed = siloHandleBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Invalid request body.' });
+    }
+    // Only their own code; anyone else's handle changes nothing.
+    await cancelSiloDevice(parsed.data.handle, req.user.id);
+    return res.status(204).send();
   }
 );
 

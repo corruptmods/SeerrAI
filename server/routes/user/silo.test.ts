@@ -176,6 +176,36 @@ describe('linking a Silo account', () => {
     assert.equal(user.siloProfileId, null);
   });
 
+  it('withdraws a code for linking, in Silo too, but only one’s own', async () => {
+    const agent = await signedIn('friend@seerr.dev');
+    const start = await agent.post(
+      `/user/${FRIEND}/settings/linked-accounts/silo/device/start`
+    );
+    assert.equal(start.status, 200);
+    const owner = await signedIn('admin@seerr.dev');
+    let res = await owner
+      .post('/user/1/settings/linked-accounts/silo/device/cancel')
+      .send({ handle: start.body.handle });
+    assert.equal(res.status, 204);
+    assert.ok(
+      !silo.calls.some((c) => c.path === '/auth/device/cancel'),
+      'someone else’s code is left alone'
+    );
+
+    res = await agent
+      .post(`/user/${FRIEND}/settings/linked-accounts/silo/device/cancel`)
+      .send({ handle: start.body.handle });
+    assert.equal(res.status, 204);
+    assert.ok(silo.calls.some((c) => c.path === '/auth/device/cancel'));
+    // Approving it now links nothing.
+    silo.approveDevice(start.body.userCode, 'acct-friend');
+    res = await agent
+      .post(`/user/${FRIEND}/settings/linked-accounts/silo/device/check`)
+      .send({ handle: start.body.handle });
+    assert.deepEqual(res.body, { status: 'expired' });
+    assert.equal((await friend()).siloUserId, null);
+  });
+
   it('unlinks, forgetting the chosen profile', async () => {
     await getRepository(User).update(FRIEND, {
       siloUserId: 'acct-friend',

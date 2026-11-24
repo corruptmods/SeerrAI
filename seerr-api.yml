@@ -15680,6 +15680,32 @@ paths:
                   - status
         '422':
           description: Account already linked to a user
+  /user/{userId}/settings/linked-accounts/silo/device/cancel:
+    post:
+      summary: Withdraw a code for linking Silo
+      description: Withdraws a code this user started for linking Silo, in Seerr AI and in Silo. Another user's code is left alone.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '204':
+          description: Withdrawn, or nothing to withdraw
   /user/{userId}/settings/linked-accounts/silo/profiles:
     get:
       summary: A user's Silo profiles, and the one chosen as theirs

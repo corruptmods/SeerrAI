@@ -135,7 +135,8 @@ const SiloCodeModal = ({
 
   const close = () => {
     stop();
-    if (code && !linking && (state === 'waiting' || state === 'opened')) {
+    // Withdrawn in Silo too, signing in or linking alike.
+    if (code && (state === 'waiting' || state === 'opened')) {
       axios
         .post(`${endpoint}/device/cancel`, { handle: code.handle })
         .catch(() => undefined);

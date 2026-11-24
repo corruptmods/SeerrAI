@@ -14,6 +14,7 @@ import { getSettings } from '@server/lib/settings';
 import { watchSource } from '@server/lib/watchHistory';
 import { CompositeWatchSource } from '@server/lib/watchHistory/composite';
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
+import { SiloWatchSource } from '@server/lib/watchHistory/silo';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
 import type { Play, WatchSource } from '@server/lib/watchHistory/types';
 import { getWatchedBy } from '@server/lib/watchedBy';
@@ -359,6 +360,56 @@ describe('who watched a title, on several servers', () => {
     assert.equal(
       watchedBy?.[0].lastWatched,
       new Date((now - DAY) * 1000).toISOString()
+    );
+  });
+
+  it('counts someone’s Plex account and Silo profile as one person', async () => {
+    connect('plex', 'silo');
+    getSettings().silo = { ...getSettings().silo, apiKey: 'sk' };
+    const sam = await getRepository(User).save(
+      new User({
+        email: 'multi-sam@test.local',
+        plexUsername: 'Sam',
+        plexId: 103,
+        siloUserId: '7',
+        siloProfileId: '70',
+        permissions: Permission.REQUEST,
+        avatar: '/s.png',
+      })
+    );
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 9102,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.AVAILABLE,
+        ratingKey: '12',
+        siloMediaId: 'movie-12',
+      })
+    );
+    assert.equal(watchSource()?.label, 'Tautulli and Silo');
+    assert.equal(watchSource()?.viewerOf(sam), 'plex:103,silo:7/70');
+    mock.method(TautulliWatchSource.prototype, 'titleHistory', async () => [
+      play({ at: now - 3 * DAY, itemId: '12', viewerId: '103' }),
+    ]);
+    mock.method(SiloWatchSource.prototype, 'titleHistory', async () => [
+      play({ at: now - DAY, itemId: 'movie-12', viewerId: '7/70' }),
+      // Another profile on the same account, nobody here.
+      play({
+        at: now - 2 * DAY,
+        itemId: 'movie-12',
+        viewerId: '7/71',
+        viewerName: 'Garden',
+      }),
+    ]);
+
+    const watchedBy = await getWatchedBy(media);
+
+    assert.deepEqual(
+      watchedBy?.map((w) => [w.user?.id ?? null, w.name, w.count]),
+      [
+        [sam.id, 'Sam', 2],
+        [null, 'Garden', 1],
+      ]
     );
   });
 

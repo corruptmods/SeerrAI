@@ -289,6 +289,12 @@ const baseCacheDirectory = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/cache/images`
   : path.join(__dirname, '../../config/cache/images');
 
+/**
+ * An image's path for the log, without its query or fragment: a signed
+ * address (a Silo picture's ?exp=&sig=) works for anyone until it expires.
+ */
+export const loggedPath = (path: string): string => path.split(/[?#]/, 1)[0];
+
 class ImageProxy {
   public static async clearCache(key: string) {
     let deletedImages = 0;
@@ -776,7 +782,7 @@ class ImageProxy {
         // an unawaited background revalidation.
         logger.debug('Image fetch failed', {
           label: 'Image Cache',
-          path,
+          path: loggedPath(path),
           errorMessage: e instanceof Error ? e.message : String(e),
         });
 
@@ -869,14 +875,14 @@ class ImageProxy {
         ImageProxy.missing.set(cacheKey, Date.now() + this.missingForMs);
         logger.debug('Image not found upstream', {
           label: 'Image Cache',
-          path,
+          path: loggedPath(path),
         });
         return null;
       }
       logger.warn('Something went wrong caching image.', {
         label: 'Image Cache',
         errorMessage: e.message,
-        path,
+        path: loggedPath(path),
       });
       return null;
     }
@@ -970,7 +976,7 @@ class ImageProxy {
         .catch((e) => {
           logger.warn('Could not convert an image', {
             label: 'Image Cache',
-            path,
+            path: loggedPath(path),
             variant,
             errorMessage: e instanceof Error ? e.message : String(e),
           });

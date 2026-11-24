@@ -1,4 +1,5 @@
 import type { MediaServerKind } from '@server/constants/server';
+import { isMusicServerKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 
 /*
@@ -55,6 +56,14 @@ export const connectedAccountServers = (
   accountServers(user).filter((kind) =>
     mediaServers.some((server) => server.kind === kind)
   );
+
+/** Connected servers with music libraries, in order (never Silo). */
+export const musicServers = (
+  mediaServers: { kind: MediaServerKind }[]
+): MediaServerKind[] =>
+  mediaServers
+    .map((server) => server.kind)
+    .filter((kind) => isMusicServerKind(kind));
 
 /** Servers allowed for sign-in, primary first. */
 export const signInServers = (settings: {

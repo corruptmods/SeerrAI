@@ -9,7 +9,7 @@ import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
+import { SERVER_NAMES, musicServers } from '@app/utils/mediaServerAccounts';
 import {
   ArrowTopRightOnSquareIcon,
   MagnifyingGlassIcon,
@@ -197,9 +197,10 @@ const MusicManage = ({
                 </ConfirmButton>
                 <div className="mt-2 text-xs text-gray-400">
                   {intl.formatMessage(messages.clearDataWarning, {
+                    // Only servers with music libraries scan music back in.
                     mediaServerName: intl.formatList(
-                      settings.currentSettings.mediaServers.map(
-                        (server) => SERVER_NAMES[server.kind]
+                      musicServers(settings.currentSettings.mediaServers).map(
+                        (kind) => SERVER_NAMES[kind]
                       ),
                       { type: 'disjunction' }
                     ),

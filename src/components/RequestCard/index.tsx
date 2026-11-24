@@ -11,6 +11,7 @@ import OverQuotaBadge from '@app/components/OverQuotaBadge';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import StatusBadge from '@app/components/StatusBadge';
+import useLiveRequest from '@app/hooks/useLiveRequest';
 import useNearScreen, {
   bothRefs,
   useLoadWhenNear,
@@ -23,11 +24,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { pictureLoading } from '@app/utils/nearScreen';
-import {
-  getRequestDownloadStatus,
-  refreshIntervalHelper,
-  watchRequest,
-} from '@app/utils/refreshIntervalHelper';
+import { getRequestDownloadStatus } from '@app/utils/refreshIntervalHelper';
 import { withProperties } from '@app/utils/typeHelpers';
 import {
   ArrowPathIcon,
@@ -261,19 +258,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     data: requestData,
     error: requestError,
     mutate: revalidate,
-  } = useSWR<NonFunctionProperties<MediaRequest>>(
-    `/api/v1/request/${request.id}`,
-    {
-      fallbackData: request,
-      // Only poll while visible.
-      refreshInterval: inView
-        ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
-            watchRequest,
-            request
-          )
-        : 0,
-    }
-  );
+  } = useLiveRequest(request, inView);
 
   const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 

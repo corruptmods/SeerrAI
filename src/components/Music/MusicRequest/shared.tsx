@@ -8,15 +8,12 @@ import {
   songDownloads,
   songName,
 } from '@app/components/Music/musicHelpers';
+import useLiveRequest from '@app/hooks/useLiveRequest';
 import useRequestAction from '@app/hooks/useRequestAction';
 import useRetryRequest from '@app/hooks/useRetryRequest';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import {
-  refreshIntervalHelper,
-  watchRequest,
-} from '@app/utils/refreshIntervalHelper';
 import { albumCoverUrl } from '@server/api/coverartarchive';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
@@ -25,7 +22,7 @@ import axios from 'axios';
 import { useState } from 'react';
 import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
-import useSWR, { mutate } from 'swr';
+import { mutate } from 'swr';
 
 /*
  * Shared by the music request card and list row. Nothing here calls TMDB:
@@ -294,14 +291,9 @@ export const useMusicRequest = (request: Request, inView: boolean) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isApproving, setIsApproving] = useState(false);
-  const { data: requestData, mutate: revalidate } = useSWR<Request>(
-    `/api/v1/request/${request.id}`,
-    {
-      fallbackData: request,
-      refreshInterval: inView
-        ? refreshIntervalHelper<Request>(watchRequest, request)
-        : 0,
-    }
+  const { data: requestData, mutate: revalidate } = useLiveRequest(
+    request,
+    inView
   );
 
   const approve = async () => {

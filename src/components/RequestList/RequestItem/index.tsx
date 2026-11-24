@@ -18,6 +18,7 @@ import RequestEta, {
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import StatusBadge from '@app/components/StatusBadge';
+import useLiveRequest from '@app/hooks/useLiveRequest';
 import useNearScreen, {
   bothRefs,
   useLoadWhenNear,
@@ -31,11 +32,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { pictureLoading } from '@app/utils/nearScreen';
-import {
-  getRequestDownloadStatus,
-  refreshIntervalHelper,
-  watchRequest,
-} from '@app/utils/refreshIntervalHelper';
+import { getRequestDownloadStatus } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -348,18 +345,10 @@ const RequestItem = ({
       : `/api/v1/tv/${request.media.tmdbId}`;
   const titleKey = useLoadWhenNear(url, near);
   const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
-  const { data: requestData, mutate: revalidate } = useSWR<
-    NonFunctionProperties<MediaRequest>
-  >(`/api/v1/request/${request.id}`, {
-    fallbackData: request,
-    // Poll only while visible.
-    refreshInterval: inView
-      ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
-          watchRequest,
-          request
-        )
-      : 0,
-  });
+  const { data: requestData, mutate: revalidate } = useLiveRequest(
+    request,
+    inView
+  );
 
   const [isApproving, setIsApproving] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
@@ -411,7 +400,11 @@ const RequestItem = ({
 
   const { retry: retryRequest, isRetrying } = useRetryRequest(
     request,
-    revalidate,
+    (retried) => {
+      revalidate(retried);
+      // A filtered list (Failed) may no longer hold it.
+      revalidateList();
+    },
     messages.failedretry
   );
 

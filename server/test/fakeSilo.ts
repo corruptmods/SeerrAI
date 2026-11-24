@@ -48,6 +48,34 @@ export interface FakeSiloAccount {
   /** Holds a temporary password it must change first. */
   passwordChangeRequired?: boolean;
   profiles?: SiloAccountProfile[];
+  /** Its own library allowlist; null for every library (the default). */
+  libraryIds?: string[] | null;
+  /** Its access group's libraries, when it sets none of its own. */
+  groupLibraryIds?: string[] | null;
+}
+
+/**
+ * A finished play as Silo stores it. Titles and episode numbers are joined
+ * from `items` when listed, as Silo joins its live catalog.
+ */
+export interface FakeSiloPlay {
+  session_id: string;
+  user_id: string;
+  profile_id?: string;
+  media_item_id: string;
+  ended_at: string;
+  end_position_seconds?: number;
+  duration_seconds?: number;
+  completed: boolean;
+}
+
+/** Something playing now. */
+export interface FakeSiloPlaying {
+  session_id: string;
+  user_id: string;
+  profile_id?: string;
+  media_item_id?: string;
+  paused?: boolean;
 }
 
 /** A device sign-in Seerr AI started. */
@@ -79,6 +107,12 @@ export interface FakeSilo {
   accounts: FakeSiloAccount[];
   libraries: SiloUserLibrary[];
   items: SiloCatalogItem[];
+  /** Finished plays (/admin/playback-history). */
+  plays: FakeSiloPlay[];
+  /** Called after each page of playback history is sent. */
+  afterHistoryPage?: () => void;
+  /** What is playing now (/admin/sessions). */
+  playing: FakeSiloPlaying[];
   status: SiloServerStatus;
   /** Device sign-ins, by device code. */
   devices: Map<string, FakeSiloDevice>;
@@ -261,6 +295,8 @@ export const createFakeSilo = (): FakeSilo => {
     },
     libraries: [],
     items: [],
+    plays: [],
+    playing: [],
     status: {
       started_at: '2026-11-01T00:00:00.000Z',
       restart_required: false,
@@ -297,6 +333,9 @@ export const createFakeSilo = (): FakeSilo => {
       fake.lockedNames = new Set();
       fake.libraries = [];
       fake.items = [];
+      fake.plays = [];
+      fake.afterHistoryPage = undefined;
+      fake.playing = [];
       fake.refuseKeyCreation = false;
       fake.mintNonAdminKeys = false;
       fake.rateLimited = 0;
@@ -606,9 +645,115 @@ export const createFakeSilo = (): FakeSilo => {
       role: account.role,
       enabled: account.enabled !== false,
       is_owner: account.id === fake.accounts[0]?.id,
-      library_ids: null,
+      library_ids: account.libraryIds ?? null,
       password_change_required: !!account.passwordChangeRequired,
+      effective_policy: {
+        // An admin sees every library; null inherits the group's (all here).
+        library_ids:
+          account.role === 'admin'
+            ? null
+            : account.libraryIds === undefined
+              ? (account.groupLibraryIds ?? null)
+              : account.libraryIds,
+      },
     });
+
+    /**
+     * A play as Silo lists it: titles, type and episode numbers come from
+     * the catalog as it is now, and are blank once the item is gone.
+     */
+    const historyRow = (play: FakeSiloPlay) => {
+      const item = fake.items.find((i) => i.content_id === play.media_item_id);
+      const series = item?.series_id
+        ? fake.items.find((i) => i.content_id === item.series_id)
+        : undefined;
+      const account = fake.accounts.find((a) => a.id === play.user_id);
+      const profile = account?.profiles?.find((p) => p.id === play.profile_id);
+      return {
+        session_id: play.session_id,
+        user_id: play.user_id,
+        username: account?.username ?? '',
+        profile_id: play.profile_id ?? '',
+        profile_name: profile?.name ?? play.profile_id ?? '',
+        media_item_id: play.media_item_id,
+        media_file_id: '1',
+        media_title: item?.title ?? '',
+        media_type: item?.type ?? '',
+        play_method: 'direct',
+        started_at: play.ended_at,
+        ended_at: play.ended_at,
+        end_position_seconds: play.end_position_seconds ?? 0,
+        duration_seconds: play.duration_seconds ?? null,
+        completed: play.completed,
+        played_seconds: null,
+        series_title: item?.type === 'episode' ? (series?.title ?? '') : '',
+        season_number: item?.season_number ?? null,
+        episode_number: item?.episode_number ?? null,
+        measured: false,
+        start_position_seconds: null,
+        paused_seconds: null,
+        measured_since: null,
+        measured_until: null,
+        client_ip: null,
+        device_id: null,
+        device_platform: null,
+        client_name: null,
+        client_version: null,
+        video_decision: null,
+        audio_decision: null,
+        end_reason: 'stopped',
+        subtitle: null,
+        lifecycle_seq: null,
+      };
+    };
+
+    /** A live session as Silo lists it, titled from the catalog. */
+    const sessionRow = (session: FakeSiloPlaying) => {
+      const item = fake.items.find(
+        (i) => i.content_id === session.media_item_id
+      );
+      const series = item?.series_id
+        ? fake.items.find((i) => i.content_id === item.series_id)
+        : undefined;
+      return {
+        session_id: session.session_id,
+        user_id: session.user_id,
+        username:
+          fake.accounts.find((a) => a.id === session.user_id)?.username ?? '',
+        profile_id: session.profile_id ?? '',
+        profile_name: session.profile_id ?? '',
+        media_file_id: '1',
+        requested_media_file_id: '1',
+        ...(session.media_item_id
+          ? { media_item_id: session.media_item_id }
+          : {}),
+        media_title: item?.title ?? '',
+        media_type: item?.type ?? '',
+        ...(item?.type === 'episode'
+          ? {
+              series_title: series?.title ?? '',
+              season_number: item.season_number,
+              episode_number: item.episode_number,
+            }
+          : {}),
+        play_method: 'direct',
+        reporting_node: 'local',
+        file_duration: 3600,
+        started_at: '2026-11-24T00:00:00.000Z',
+        updated_at: '2026-11-24T00:00:00.000Z',
+        position_seconds: 60,
+        is_paused: !!session.paused,
+        has_playback_control: true,
+        stream_location: 'local',
+        audio_track_index: 0,
+        transcode_audio: false,
+        stream_bitrate_kbps: null,
+        target_bitrate_kbps: null,
+        source_bitrate_kbps: null,
+        source_audio_channels: null,
+        subtitle: null,
+      };
+    };
 
     switch (route) {
       case '/admin/users/{id}':
@@ -667,9 +812,84 @@ export const createFakeSilo = (): FakeSilo => {
       }
       case '/admin/users':
         return page(fake.accounts.map(adminUser));
-      case '/admin/playback-history':
+      case '/admin/playback-history': {
+        const limit = Number(query.limit ?? 50);
+        const filters = JSON.stringify(
+          Object.entries(queryAll).filter(
+            ([k]) => k !== 'limit' && k !== 'cursor'
+          )
+        );
+        // Keyset paging as Silo's: newest ended first, session id breaking
+        // ties, each page strictly after the last row of the one before.
+        let after: { at: number; id: string } | undefined;
+        if (query.cursor) {
+          const [bound, at, id] = Buffer.from(query.cursor, 'base64url')
+            .toString()
+            .split('|');
+          if (bound !== filters) {
+            return problem(res, 422, 'invalid_cursor', 'Wrong cursor.');
+          }
+          after = { at: Number(at), id };
+        }
+        const time = (value?: string) =>
+          value === undefined ? undefined : new Date(value).getTime();
+        const from = time(query.ended_after);
+        const until = time(query.ended_before);
+        if (
+          (from !== undefined && Number.isNaN(from)) ||
+          (until !== undefined && Number.isNaN(until))
+        ) {
+          return problem(res, 422, 'validation_failed', 'Bad time.');
+        }
+        const sorted = fake.plays
+          .map((play) => ({ play, at: new Date(play.ended_at).getTime() }))
+          .filter(
+            ({ play, at }) =>
+              (!query.user_id || play.user_id === query.user_id) &&
+              (!query.profile_id || play.profile_id === query.profile_id) &&
+              (!query.media_item_id ||
+                play.media_item_id === query.media_item_id) &&
+              (!query.completed ||
+                query.completed === 'all' ||
+                String(play.completed) === query.completed) &&
+              (from === undefined || at >= from) &&
+              (until === undefined || at < until) &&
+              (!after ||
+                at < after.at ||
+                (at === after.at && play.session_id < after.id))
+          )
+          .sort((a, b) =>
+            b.at !== a.at
+              ? b.at - a.at
+              : b.play.session_id < a.play.session_id
+                ? -1
+                : 1
+          );
+        const rows = sorted.slice(0, limit);
+        const more = sorted.length > limit;
+        const last = rows[rows.length - 1];
+        json(res, 200, {
+          items: rows.map(({ play }) => historyRow(play)),
+          page: {
+            has_more: more,
+            ...(more && last
+              ? {
+                  next_cursor: Buffer.from(
+                    `${filters}|${last.at}|${last.play.session_id}`
+                  ).toString('base64url'),
+                }
+              : {}),
+          },
+        });
+        fake.afterHistoryPage?.();
+        return;
+      }
       case '/admin/sessions':
-        return page([]);
+        return page(
+          fake.playing
+            .filter((s) => !query.user_id || s.user_id === query.user_id)
+            .map(sessionRow)
+        );
       default:
         return problem(res, 404, 'not_found', 'No such route.');
     }

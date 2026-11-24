@@ -13,6 +13,8 @@ import type {
   SiloDeviceStart,
   SiloIdentity,
   SiloItemType,
+  SiloPlaybackHistoryEntry,
+  SiloPlaybackSession,
   SiloProblemBody,
   SiloServerStatus,
   SiloSystemInfo,
@@ -124,6 +126,20 @@ export const toSiloError = (e: unknown): SiloError => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+type ListParams = Record<
+  string,
+  string | number | boolean | string[] | undefined
+>;
+
+export interface PlaybackHistoryQuery {
+  userId?: string;
+  profileId?: string;
+  /** Plays that ended at or after this time. */
+  endedAfter?: Date;
+  /** Plays that ended before this time. */
+  endedBefore?: Date;
+}
+
 export interface CatalogQuery {
   libraryId?: string;
   type?: SiloItemType;
@@ -212,7 +228,6 @@ class SiloAPI extends ExternalAPI {
     }
   }
 
-  /** Every page of a cursor-paged collection. */
   /**
    * Every page of a cursor-paged collection. A list value is sent as one
    * parameter per entry (content_ids=a&content_ids=b), as Silo reads them. A
@@ -221,12 +236,20 @@ class SiloAPI extends ExternalAPI {
    */
   public async listAll<T>(
     endpoint: string,
-    params: Record<
-      string,
-      string | number | boolean | string[] | undefined
-    > = {}
+    params: ListParams = {}
   ): Promise<T[]> {
     const items: T[] = [];
+    for await (const page of this.pages<T>(endpoint, params)) {
+      items.push(...page);
+    }
+    return items;
+  }
+
+  /** The pages of a cursor-paged collection one by one, as listAll reads them. */
+  public async *pages<T>(
+    endpoint: string,
+    params: ListParams = {}
+  ): AsyncGenerator<T[]> {
     let cursor: string | undefined;
     for (;;) {
       const page = await this.patient<SiloCollection<T>>(endpoint, {
@@ -240,7 +263,6 @@ class SiloAPI extends ExternalAPI {
           'Silo sent something that is not a list. Check the address and URL base.'
         );
       }
-      items.push(...page.items);
       if (page.page?.has_more && !page.page.next_cursor) {
         throw new SiloError(
           502,
@@ -248,9 +270,32 @@ class SiloAPI extends ExternalAPI {
           'Silo said there was more to read but gave no way to read it.'
         );
       }
+      yield page.items;
       cursor = page.page?.has_more ? page.page.next_cursor : undefined;
-      if (!cursor) return items;
+      if (!cursor) return;
     }
+  }
+
+  /**
+   * Finished plays, newest ended first, a page at a time. endedAfter is
+   * inclusive, endedBefore exclusive, as Silo reads them.
+   */
+  public playbackHistoryPages(
+    query: PlaybackHistoryQuery = {}
+  ): AsyncGenerator<SiloPlaybackHistoryEntry[]> {
+    return this.pages<SiloPlaybackHistoryEntry>('/admin/playback-history', {
+      user_id: query.userId,
+      profile_id: query.profileId,
+      ended_after: query.endedAfter?.toISOString(),
+      ended_before: query.endedBefore?.toISOString(),
+    });
+  }
+
+  /** What is playing now; one account's sessions when userId is given. */
+  public listSessions(userId?: string): Promise<SiloPlaybackSession[]> {
+    return this.listAll<SiloPlaybackSession>('/admin/sessions', {
+      user_id: userId,
+    });
   }
 
   public getSystemInfo(): Promise<SiloSystemInfo> {

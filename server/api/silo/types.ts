@@ -125,6 +125,11 @@ export interface SiloAdminUser {
   is_owner?: boolean;
   /** Explicit library allowlist; null inherits the group's. */
   library_ids?: string[] | null;
+  /** The policy Silo enforces, its access group's included. */
+  effective_policy?: {
+    /** Libraries the account may see; null means every library. */
+    library_ids?: string[] | null;
+  };
 }
 
 /** A row of GET /admin/users/{id}/profiles: one household profile. */
@@ -205,4 +210,49 @@ export interface SiloProblemBody {
   detail?: string;
   error?: string;
   message?: string;
+}
+
+/** A row of GET /admin/playback-history: one finished playback attempt. */
+export interface SiloPlaybackHistoryEntry {
+  /** Unique per attempt. Silo may update a row later, moving ended_at on. */
+  session_id: string;
+  user_id: string;
+  /** Empty when the account no longer exists. */
+  username?: string;
+  profile_id?: string;
+  /** The profile's name then; its id when none was recorded. */
+  profile_name?: string;
+  /** Empty when the attempt wasn't attributed to an item. */
+  media_item_id: string;
+  /** Episode or item title; empty when the item left the catalog. */
+  media_title?: string;
+  /** 'episode', or the catalog item type; empty when unknown. */
+  media_type?: string;
+  ended_at: string;
+  /** Where the play ended, in seconds into the media. */
+  end_position_seconds?: number;
+  duration_seconds?: number | null;
+  completed: boolean;
+  /** An episode's series title; empty otherwise, or once it left. */
+  series_title?: string;
+  season_number?: number | null;
+  episode_number?: number | null;
+}
+
+/** A row of GET /admin/sessions: something playing now. */
+export interface SiloPlaybackSession {
+  session_id: string;
+  user_id: string;
+  username?: string;
+  profile_id?: string;
+  profile_name?: string;
+  /** The episode for an episode; absent when unknown. */
+  media_item_id?: string;
+  media_title?: string;
+  media_type?: string;
+  series_title?: string;
+  season_number?: number;
+  episode_number?: number;
+  is_paused?: boolean;
+  position_seconds?: number;
 }

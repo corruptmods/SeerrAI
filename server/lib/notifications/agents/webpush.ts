@@ -63,7 +63,6 @@ interface PushNotificationPayload {
   actionUrlTitle?: string;
   requestId?: number;
   pendingRequestsCount?: number;
-  isAdmin?: boolean;
   /**
    * Localized Approve/Decline labels and failure text; the service worker has
    * no i18n.
@@ -348,7 +347,6 @@ class WebPushAgent
       actionUrl,
       actionUrlTitle,
       pendingRequestsCount: payload.pendingRequestsCount,
-      isAdmin: payload.isAdmin,
       actionLabels:
         type === Notification.MEDIA_PENDING
           ? {

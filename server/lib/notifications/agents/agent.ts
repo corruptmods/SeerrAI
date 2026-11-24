@@ -25,7 +25,6 @@ export interface NotificationPayload {
   issue?: Issue;
   comment?: IssueComment;
   pendingRequestsCount?: number;
-  isAdmin?: boolean;
   /**
    * In-app path for notifications not about a title or issue (e.g. Backfill
    * approval).

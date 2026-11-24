@@ -36,7 +36,9 @@ const settingsBody = z.object({
 
 /** The settings as the page sees them: never the saved key. */
 const shown = (silo: SiloSettings) => {
-  const { keyId: _keyId, ...rest } = silo;
+  const rest: Partial<SiloSettings> = { ...silo };
+  // Only for deleting Seerr AI's own key later.
+  delete rest.keyId;
   return { ...rest, apiKey: '', hasApiKey: !!silo.apiKey };
 };
 

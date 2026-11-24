@@ -95,7 +95,12 @@ const messageOf = (e: unknown, fallback: string): string => {
     : fallback;
 };
 
-const SettingsSilo = () => {
+interface SettingsSiloProps {
+  /** At first-run setup: only the libraries and the scan. */
+  isSetupSettings?: boolean;
+}
+
+const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [reading, setReading] = useState(false);
@@ -284,220 +289,227 @@ const SettingsSilo = () => {
         </div>
       </div>
 
-      <div className="mb-6 mt-10">
-        <h3 className="heading">{intl.formatMessage(messages.settings)}</h3>
-        <p className="description">
-          {intl.formatMessage(messages.settingsDescription)}
-          {data?.serverVersion && data.serverVersion !== 'unavailable' && (
-            <>
-              {' '}
-              {intl.formatMessage(messages.version, {
-                version: data.serverVersion,
-              })}
-            </>
-          )}
-        </p>
-      </div>
-      <Formik
-        initialValues={{
-          hostname: data?.ip ?? '',
-          port: data?.port ?? 8090,
-          useSsl: !!data?.useSsl,
-          urlBase: data?.urlBase ?? '',
-          externalUrl: data?.externalHostname ?? '',
-          forgotPasswordUrl: data?.forgotPasswordUrl ?? '',
-          apiKey: '',
-        }}
-        enableReinitialize
-        validationSchema={schema}
-        onSubmit={async (values) => {
-          try {
-            await axios.post(ENDPOINT, {
-              hostname: values.hostname,
-              port: Number(values.port),
-              useSsl: values.useSsl,
-              urlBase: values.urlBase,
-              externalHostname: values.externalUrl,
-              forgotPasswordUrl: values.forgotPasswordUrl,
-              ...(values.apiKey ? { apiKey: values.apiKey } : {}),
-            });
-            addToast(intl.formatMessage(messages.saved), {
-              autoDismiss: true,
-              appearance: 'success',
-            });
-          } catch (e) {
-            addToast(messageOf(e, intl.formatMessage(messages.saveFailed)), {
-              autoDismiss: true,
-              appearance: 'error',
-            });
-          } finally {
-            mutate();
-          }
-        }}
-      >
-        {({
-          errors,
-          touched,
-          values,
-          setFieldValue,
-          handleSubmit,
-          isSubmitting,
-          isValid,
-        }) => (
-          <form className="section" onSubmit={handleSubmit}>
-            <div className="form-row">
-              <label htmlFor="silo-hostname" className="text-label">
-                {intl.formatMessage(messages.hostname)}
-                <span className="label-required">*</span>
-              </label>
-              <div className="form-input-area">
-                <div className="form-input-field">
-                  <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100 sm:text-sm">
-                    {values.useSsl ? 'https://' : 'http://'}
-                  </span>
-                  <Field
-                    type="text"
-                    inputMode="url"
-                    id="silo-hostname"
-                    name="hostname"
-                    className="rounded-r-only"
-                  />
+      {!isSetupSettings && (
+        <>
+          <div className="mb-6 mt-10">
+            <h3 className="heading">{intl.formatMessage(messages.settings)}</h3>
+            <p className="description">
+              {intl.formatMessage(messages.settingsDescription)}
+              {data?.serverVersion && data.serverVersion !== 'unavailable' && (
+                <>
+                  {' '}
+                  {intl.formatMessage(messages.version, {
+                    version: data.serverVersion,
+                  })}
+                </>
+              )}
+            </p>
+          </div>
+          <Formik
+            initialValues={{
+              hostname: data?.ip ?? '',
+              port: data?.port ?? 8090,
+              useSsl: !!data?.useSsl,
+              urlBase: data?.urlBase ?? '',
+              externalUrl: data?.externalHostname ?? '',
+              forgotPasswordUrl: data?.forgotPasswordUrl ?? '',
+              apiKey: '',
+            }}
+            enableReinitialize
+            validationSchema={schema}
+            onSubmit={async (values) => {
+              try {
+                await axios.post(ENDPOINT, {
+                  hostname: values.hostname,
+                  port: Number(values.port),
+                  useSsl: values.useSsl,
+                  urlBase: values.urlBase,
+                  externalHostname: values.externalUrl,
+                  forgotPasswordUrl: values.forgotPasswordUrl,
+                  ...(values.apiKey ? { apiKey: values.apiKey } : {}),
+                });
+                addToast(intl.formatMessage(messages.saved), {
+                  autoDismiss: true,
+                  appearance: 'success',
+                });
+              } catch (e) {
+                addToast(
+                  messageOf(e, intl.formatMessage(messages.saveFailed)),
+                  {
+                    autoDismiss: true,
+                    appearance: 'error',
+                  }
+                );
+              } finally {
+                mutate();
+              }
+            }}
+          >
+            {({
+              errors,
+              touched,
+              values,
+              setFieldValue,
+              handleSubmit,
+              isSubmitting,
+              isValid,
+            }) => (
+              <form className="section" onSubmit={handleSubmit}>
+                <div className="form-row">
+                  <label htmlFor="silo-hostname" className="text-label">
+                    {intl.formatMessage(messages.hostname)}
+                    <span className="label-required">*</span>
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100 sm:text-sm">
+                        {values.useSsl ? 'https://' : 'http://'}
+                      </span>
+                      <Field
+                        type="text"
+                        inputMode="url"
+                        id="silo-hostname"
+                        name="hostname"
+                        className="rounded-r-only"
+                      />
+                    </div>
+                    {errors.hostname && touched.hostname && (
+                      <div className="error">{errors.hostname}</div>
+                    )}
+                  </div>
                 </div>
-                {errors.hostname && touched.hostname && (
-                  <div className="error">{errors.hostname}</div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-port" className="text-label">
-                {intl.formatMessage(messages.port)}
-                <span className="label-required">*</span>
-              </label>
-              <div className="form-input-area">
-                <Field
-                  type="text"
-                  inputMode="numeric"
-                  id="silo-port"
-                  name="port"
-                  className="short"
-                />
-                {errors.port && touched.port && (
-                  <div className="error">{errors.port}</div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-ssl" className="checkbox-label">
-                {intl.formatMessage(messages.useSsl)}
-              </label>
-              <div className="form-input-area">
-                <Field
-                  type="checkbox"
-                  id="silo-ssl"
-                  name="useSsl"
-                  onChange={() => setFieldValue('useSsl', !values.useSsl)}
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-urlbase" className="text-label">
-                {intl.formatMessage(messages.urlBase)}
-              </label>
-              <div className="form-input-area">
-                <div className="form-input-field">
-                  <Field
-                    type="text"
-                    inputMode="url"
-                    id="silo-urlbase"
-                    name="urlBase"
-                  />
+                <div className="form-row">
+                  <label htmlFor="silo-port" className="text-label">
+                    {intl.formatMessage(messages.port)}
+                    <span className="label-required">*</span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="text"
+                      inputMode="numeric"
+                      id="silo-port"
+                      name="port"
+                      className="short"
+                    />
+                    {errors.port && touched.port && (
+                      <div className="error">{errors.port}</div>
+                    )}
+                  </div>
                 </div>
-                {errors.urlBase && touched.urlBase && (
-                  <div className="error">{errors.urlBase}</div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-apikey" className="text-label">
-                {intl.formatMessage(messages.apiKey)}
-                {data?.hasApiKey && (
-                  <span className="label-tip">
-                    {intl.formatMessage(messages.apiKeyTip)}
-                  </span>
-                )}
-              </label>
-              <div className="form-input-area">
-                <div className="form-input-field">
-                  <SensitiveInput
-                    as="field"
-                    type="text"
-                    id="silo-apikey"
-                    name="apiKey"
-                    autoComplete="off"
-                  />
+                <div className="form-row">
+                  <label htmlFor="silo-ssl" className="checkbox-label">
+                    {intl.formatMessage(messages.useSsl)}
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="silo-ssl"
+                      name="useSsl"
+                      onChange={() => setFieldValue('useSsl', !values.useSsl)}
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-external" className="text-label">
-                {intl.formatMessage(messages.externalUrl)}
-                <span className="label-tip">
-                  {intl.formatMessage(messages.externalUrlTip)}
-                </span>
-              </label>
-              <div className="form-input-area">
-                <div className="form-input-field">
-                  <Field
-                    type="text"
-                    inputMode="url"
-                    id="silo-external"
-                    name="externalUrl"
-                  />
+                <div className="form-row">
+                  <label htmlFor="silo-urlbase" className="text-label">
+                    {intl.formatMessage(messages.urlBase)}
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <Field
+                        type="text"
+                        inputMode="url"
+                        id="silo-urlbase"
+                        name="urlBase"
+                      />
+                    </div>
+                    {errors.urlBase && touched.urlBase && (
+                      <div className="error">{errors.urlBase}</div>
+                    )}
+                  </div>
                 </div>
-                {errors.externalUrl && touched.externalUrl && (
-                  <div className="error">{errors.externalUrl}</div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              <label htmlFor="silo-forgot" className="text-label">
-                {intl.formatMessage(messages.forgotPasswordUrl)}
-              </label>
-              <div className="form-input-area">
-                <div className="form-input-field">
-                  <Field
-                    type="text"
-                    inputMode="url"
-                    id="silo-forgot"
-                    name="forgotPasswordUrl"
-                  />
+                <div className="form-row">
+                  <label htmlFor="silo-apikey" className="text-label">
+                    {intl.formatMessage(messages.apiKey)}
+                    {data?.hasApiKey && (
+                      <span className="label-tip">
+                        {intl.formatMessage(messages.apiKeyTip)}
+                      </span>
+                    )}
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <SensitiveInput
+                        as="field"
+                        type="text"
+                        id="silo-apikey"
+                        name="apiKey"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
                 </div>
-                {errors.forgotPasswordUrl && touched.forgotPasswordUrl && (
-                  <div className="error">{errors.forgotPasswordUrl}</div>
-                )}
-              </div>
-            </div>
-            <SaveBar>
-              <div className="flex justify-end">
-                <span className="ml-3 inline-flex rounded-md shadow-sm">
-                  <Button
-                    buttonType="primary"
-                    type="submit"
-                    disabled={isSubmitting || !isValid}
-                  >
-                    <ArrowDownOnSquareIcon />
-                    <span>
-                      {isSubmitting
-                        ? intl.formatMessage(globalMessages.saving)
-                        : intl.formatMessage(globalMessages.save)}
+                <div className="form-row">
+                  <label htmlFor="silo-external" className="text-label">
+                    {intl.formatMessage(messages.externalUrl)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.externalUrlTip)}
                     </span>
-                  </Button>
-                </span>
-              </div>
-            </SaveBar>
-          </form>
-        )}
-      </Formik>
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <Field
+                        type="text"
+                        inputMode="url"
+                        id="silo-external"
+                        name="externalUrl"
+                      />
+                    </div>
+                    {errors.externalUrl && touched.externalUrl && (
+                      <div className="error">{errors.externalUrl}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label htmlFor="silo-forgot" className="text-label">
+                    {intl.formatMessage(messages.forgotPasswordUrl)}
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <Field
+                        type="text"
+                        inputMode="url"
+                        id="silo-forgot"
+                        name="forgotPasswordUrl"
+                      />
+                    </div>
+                    {errors.forgotPasswordUrl && touched.forgotPasswordUrl && (
+                      <div className="error">{errors.forgotPasswordUrl}</div>
+                    )}
+                  </div>
+                </div>
+                <SaveBar>
+                  <div className="flex justify-end">
+                    <span className="ml-3 inline-flex rounded-md shadow-sm">
+                      <Button
+                        buttonType="primary"
+                        type="submit"
+                        disabled={isSubmitting || !isValid}
+                      >
+                        <ArrowDownOnSquareIcon />
+                        <span>
+                          {isSubmitting
+                            ? intl.formatMessage(globalMessages.saving)
+                            : intl.formatMessage(globalMessages.save)}
+                        </span>
+                      </Button>
+                    </span>
+                  </div>
+                </SaveBar>
+              </form>
+            )}
+          </Formik>
+        </>
+      )}
     </>
   );
 };

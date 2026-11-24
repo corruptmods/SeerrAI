@@ -3,6 +3,7 @@ import Button from '@app/components/Common/Button';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
 import { plexLoginFailure } from '@app/components/Login/plexLoginFailure';
 import JellyfinSetup from '@app/components/Setup/JellyfinSetup';
+import SiloSetup from '@app/components/Setup/SiloSetup';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { MediaServerType } from '@server/constants/server';
@@ -17,6 +18,7 @@ const messages = defineMessages('components.Setup', {
   signinWithJellyfin: 'Enter your Jellyfin details',
   signinWithEmby: 'Enter your Emby details',
   signinWithPlex: 'Enter your Plex details',
+  signinWithSilo: 'Enter Silo’s address and a Silo administrator’s details',
   back: 'Go back',
 });
 
@@ -77,6 +79,8 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
           <FormattedMessage {...messages.signinWithJellyfin} />
         ) : serverType === MediaServerType.EMBY ? (
           <FormattedMessage {...messages.signinWithEmby} />
+        ) : serverType === MediaServerType.SILO ? (
+          <FormattedMessage {...messages.signinWithSilo} />
         ) : (
           <FormattedMessage {...messages.signinWithPlex} />
         )}
@@ -116,6 +120,9 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
           serverType={serverType}
           onCancel={onCancel}
         />
+      )}
+      {serverType === MediaServerType.SILO && (
+        <SiloSetup revalidate={revalidate} onCancel={onCancel} />
       )}
     </div>
   );

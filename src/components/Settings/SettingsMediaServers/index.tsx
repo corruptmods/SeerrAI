@@ -357,7 +357,7 @@ const SettingsMediaServers = () => {
                             icon: PencilIcon,
                             href: `/settings/${server.kind}`,
                           },
-                          // Silo can't be primary yet (signInOffered).
+                          // Only a server people can sign in with can be primary.
                           ...(!server.primary && server.signInOffered !== false
                             ? [
                                 {

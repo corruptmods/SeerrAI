@@ -1,9 +1,9 @@
 import EmbyLogo from '@app/assets/services/emby-icon-only.svg';
 import JellyfinLogo from '@app/assets/services/jellyfin-icon.svg';
-import PlexLogo from '@app/assets/services/plex.svg';
 import Button from '@app/components/Common/Button';
 import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiloLogo from '@app/components/Common/SiloLogo';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
 import { StackedLogo } from '@app/components/Layout/Sidebar/BrandLogo';
 import JellyfinLogin from '@app/components/Login/JellyfinLogin';
@@ -13,6 +13,7 @@ import PasskeyLoginButton, {
   passkeyMessages,
 } from '@app/components/Login/PasskeyLoginButton';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
+import SiloLogin from '@app/components/Login/SiloLogin';
 import { plexLoginFailure } from '@app/components/Login/plexLoginFailure';
 import {
   OPTION_BUTTON,
@@ -29,11 +30,8 @@ import { safeRedirect } from '@app/utils/loginRedirect';
 import { SERVER_NAMES, signInServers } from '@app/utils/mediaServerAccounts';
 import { Transition } from '@headlessui/react';
 import { XCircleIcon } from '@heroicons/react/24/solid';
-import type {
-  JellyfinFamilyKind,
-  MediaServerKind,
-} from '@server/constants/server';
-import { isJellyfinFamily, typeOfKind } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import { typeOfKind } from '@server/constants/server';
 import axios from 'axios';
 import { useRouter } from 'next/dist/client/router';
 import { useEffect, useRef, useState } from 'react';
@@ -49,14 +47,21 @@ const messages = defineMessages('components.Login', {
   orsigninwith: 'Or sign in with',
 });
 
-// The servers people sign in with; Silo sign-in isn't offered yet.
-const SERVER_LOGOS: Record<
-  Exclude<MediaServerKind, 'silo'>,
-  typeof PlexLogo
-> = {
-  plex: PlexLogo,
-  jellyfin: JellyfinLogo,
-  emby: EmbyLogo,
+/** Servers signed in with a form here: all but Plex, which has its button. */
+type FormServerKind = Exclude<MediaServerKind, 'plex'>;
+
+const isFormServer = (kind: MediaServerKind): kind is FormServerKind =>
+  kind !== 'plex';
+
+/*
+ * Each form server's mark, at the size of the others: Jellyfin and Emby's
+ * are SVGs the button sizes; Silo's is its official icon, an image, given
+ * the same size and spacing.
+ */
+const SERVER_LOGOS: Record<FormServerKind, React.ReactNode> = {
+  jellyfin: <JellyfinLogo className="shrink-0" />,
+  emby: <EmbyLogo className="shrink-0" />,
+  silo: <SiloLogo className="mr-2 h-5 w-5 shrink-0" />,
 };
 
 const Login = () => {
@@ -115,11 +120,12 @@ const Login = () => {
     revalidateOnFocus: false,
   });
 
-  // Primary server first. Plex uses its button; Jellyfin/Emby share one form.
+  // Primary server first. Plex uses its button; Jellyfin, Emby and Silo each
+  // have a form, one shown at a time.
   const servers = signInServers(settings.currentSettings);
   const plexSignIn = servers.includes('plex');
-  const formServers = servers.filter(isJellyfinFamily);
-  const [formServer, setFormServer] = useState<JellyfinFamilyKind | undefined>(
+  const formServers = servers.filter(isFormServer);
+  const [formServer, setFormServer] = useState<FormServerKind | undefined>(
     formServers[0]
   );
   const shownServer =
@@ -140,8 +146,7 @@ const Login = () => {
   const compact = loginFormVisible;
   const { supported: passkeysSupported } = usePasskeySupport();
 
-  const serverFormButton = (kind: JellyfinFamilyKind) => {
-    const Logo = SERVER_LOGOS[kind];
+  const serverFormButton = (kind: FormServerKind) => {
     return (
       <Button
         data-testid="mediaserver-login-button"
@@ -154,7 +159,7 @@ const Login = () => {
           setMediaServerLogin(true);
         }}
       >
-        <Logo className="shrink-0" />
+        {SERVER_LOGOS[kind]}
         <span className="truncate">{SERVER_NAMES[kind]}</span>
       </Button>
     );
@@ -312,7 +317,9 @@ const Login = () => {
                   }}
                 >
                   <div ref={loginRef} className="button-container">
-                    {showingServerForm && shownServer ? (
+                    {showingServerForm && shownServer === 'silo' ? (
+                      <SiloLogin revalidate={revalidate} />
+                    ) : showingServerForm && shownServer ? (
                       <JellyfinLogin
                         serverType={typeOfKind(shownServer)}
                         revalidate={revalidate}

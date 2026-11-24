@@ -6,7 +6,7 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
-import type { JellyfinFamilyKind } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
 import axios from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -14,7 +14,8 @@ import useSWR from 'swr';
 
 interface JellyfinImportProps {
   /** Server to import users from. */
-  kind: JellyfinFamilyKind;
+  /** Jellyfin, Emby or Silo. */
+  kind: Exclude<MediaServerKind, 'plex'>;
   onCancel?: () => void;
   onComplete?: () => void;
 }
@@ -82,7 +83,9 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
         `/api/v1/user/import-from-${kind}`,
         kind === 'emby'
           ? { embyUserIds: selectedUsers }
-          : { jellyfinUserIds: selectedUsers }
+          : kind === 'silo'
+            ? { siloUserIds: selectedUsers }
+            : { jellyfinUserIds: selectedUsers }
       );
 
       const { createdUsers, refreshedUsers, skippedUsers } = importResponse;

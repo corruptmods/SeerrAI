@@ -7,7 +7,8 @@ import defineMessages from '@app/utils/defineMessages';
 import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { Transition } from '@headlessui/react';
 import { QrCodeIcon } from '@heroicons/react/24/outline';
-import type { JellyfinFamilyKind } from '@server/constants/server';
+import { ApiErrorCode } from '@server/constants/error';
+import type { MediaServerKind } from '@server/constants/server';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useState } from 'react';
@@ -32,13 +33,16 @@ const messages = defineMessages(
     errorDisabled: 'This {mediaServerName} account is switched off.',
     errorUnknown: 'An unknown error occurred',
     quickConnect: 'Use Quick Connect',
+    siloCode: 'Use a code from Silo instead',
+    siloPasswordChange:
+      'This Silo account has a temporary password. Sign in to Silo, change it, then try again.',
   }
 );
 
 interface LinkJellyfinModalProps {
   show: boolean;
-  /** Media server kind the account is on. */
-  kind: JellyfinFamilyKind;
+  /** Media server kind the account is on: Jellyfin, Emby or Silo. */
+  kind: Exclude<MediaServerKind, 'plex'>;
   onClose: () => void;
   onSave: () => void;
   onSwitchToQuickConnect: () => void;
@@ -60,9 +64,11 @@ const LinkJellyfinModal = ({
     username: Yup.string().required(
       intl.formatMessage(messages.usernameRequired)
     ),
-    password: Yup.string().required(
-      intl.formatMessage(messages.passwordRequired)
-    ),
+    // A Silo account may have no password (a directory account checks its own).
+    password:
+      kind === 'silo'
+        ? Yup.string()
+        : Yup.string().required(intl.formatMessage(messages.passwordRequired)),
   });
 
   const applicationName = settings.currentSettings.applicationTitle;
@@ -104,6 +110,10 @@ const LinkJellyfinModal = ({
                   mediaServerName,
                 })
               );
+            } else if (
+              e?.response?.data?.code === ApiErrorCode.PasswordChangeRequired
+            ) {
+              setError(intl.formatMessage(messages.siloPasswordChange));
             } else if (e?.response?.status === 403) {
               setError(
                 intl.formatMessage(messages.errorDisabled, { mediaServerName })
@@ -179,7 +189,7 @@ const LinkJellyfinModal = ({
                     <div className="error">{errors.password}</div>
                   )}
                 </div>
-                {kind === 'jellyfin' && (
+                {(kind === 'jellyfin' || kind === 'silo') && (
                   <div className="mt-4">
                     <Button
                       buttonType="ghost"
@@ -191,7 +201,13 @@ const LinkJellyfinModal = ({
                       className="w-full gap-2"
                     >
                       <QrCodeIcon />
-                      <span>{intl.formatMessage(messages.quickConnect)}</span>
+                      <span>
+                        {intl.formatMessage(
+                          kind === 'silo'
+                            ? messages.siloCode
+                            : messages.quickConnect
+                        )}
+                      </span>
                     </Button>
                   </div>
                 )}

@@ -6,11 +6,13 @@ import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiloLogo from '@app/components/Common/SiloLogo';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
 import { StackedLogo } from '@app/components/Layout/Sidebar/BrandLogo';
 import SettingsJellyfin from '@app/components/Settings/SettingsJellyfin';
 import SettingsPlex from '@app/components/Settings/SettingsPlex';
 import SettingsServices from '@app/components/Settings/SettingsServices';
+import SettingsSilo from '@app/components/Settings/SettingsSilo';
 import SetupSteps from '@app/components/Setup/SetupSteps';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
@@ -31,6 +33,7 @@ const messages = defineMessages('components.Setup', {
   configjellyfin: 'Configure Jellyfin',
   configplex: 'Configure Plex',
   configemby: 'Configure Emby',
+  configsilo: 'Configure Silo',
   setup: 'Setup',
   finish: 'Finish Setup',
   finishing: 'Finishing…',
@@ -74,8 +77,7 @@ const Setup = () => {
     [MediaServerType.EMBY]: '/api/v1/settings/emby',
     [MediaServerType.PLEX]: '/api/v1/settings/plex',
     [MediaServerType.NOT_CONFIGURED]: null,
-    // Silo can't be set up as the primary server yet.
-    [MediaServerType.SILO]: null,
+    [MediaServerType.SILO]: '/api/v1/settings/silo',
   };
 
   const { data: mediaServerSettings, error: mediaServerSettingsError } =
@@ -184,8 +186,8 @@ const Setup = () => {
               <div className="mb-2 flex justify-center pb-6 text-sm">
                 {intl.formatMessage(messages.subtitle)}
               </div>
-              <div className="grid grid-cols-3">
-                <div className="flex flex-col divide-y divide-gray-600 rounded-l border border-gray-600 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4">
+                <div className="flex flex-col divide-y divide-gray-600 rounded-tl border border-gray-600 py-2 sm:rounded-l">
                   <div className="mb-2 flex flex-1 items-center justify-center px-2 py-2">
                     <JellyfinLogo className="service-logo h-10" />
                   </div>
@@ -201,7 +203,7 @@ const Setup = () => {
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-col divide-y divide-gray-600 border-y border-gray-600 py-2">
+                <div className="flex flex-col divide-y divide-gray-600 rounded-tr border-y border-r border-gray-600 py-2 sm:rounded-none sm:border-r-0">
                   <div className="mb-2 flex flex-1 items-center justify-center px-2 py-2">
                     <PlexLogo className="service-logo h-8" />
                   </div>
@@ -217,7 +219,7 @@ const Setup = () => {
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-col divide-y divide-gray-600 rounded-r border border-gray-600 py-2">
+                <div className="flex flex-col divide-y divide-gray-600 rounded-bl border-x border-b border-gray-600 py-2 sm:rounded-none sm:border-y sm:border-l sm:border-r-0">
                   <div className="mb-2 flex flex-1 items-center justify-center px-2 py-2">
                     <EmbyLogo className="service-logo h-9" />
                   </div>
@@ -230,6 +232,23 @@ const Setup = () => {
                       className="button-md relative z-10 inline-flex h-full w-full items-center justify-center rounded-md border border-gray-600 bg-transparent px-4 py-2 text-sm font-medium leading-5 text-strong transition duration-150 ease-in-out hover:z-20 hover:border-gray-200 focus:z-20 focus:border-gray-100 focus:outline-none active:border-gray-100"
                     >
                       {intl.formatMessage(messages.configemby)}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col divide-y divide-gray-600 rounded-br border-b border-r border-gray-600 py-2 sm:rounded-r sm:border">
+                  <div className="mb-2 flex flex-1 items-center justify-center gap-2 px-2 py-2">
+                    <SiloLogo className="h-9 w-9" />
+                    <span className="text-xl font-bold">Silo</span>
+                  </div>
+                  <div className="px-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setMediaServerType(MediaServerType.SILO);
+                        setCurrentStep(2);
+                      }}
+                      className="button-md relative z-10 inline-flex h-full w-full items-center justify-center rounded-md border border-gray-600 bg-transparent px-4 py-2 text-sm font-medium leading-5 text-strong transition duration-150 ease-in-out hover:z-20 hover:border-gray-200 focus:z-20 focus:border-gray-100 focus:outline-none active:border-gray-100"
+                    >
+                      {intl.formatMessage(messages.configsilo)}
                     </button>
                   </div>
                 </div>
@@ -256,6 +275,8 @@ const Setup = () => {
               )}
               {mediaServerType === MediaServerType.PLEX ? (
                 <SettingsPlex isSetupSettings />
+              ) : mediaServerType === MediaServerType.SILO ? (
+                <SettingsSilo isSetupSettings />
               ) : (
                 <SettingsJellyfin
                   isSetupSettings

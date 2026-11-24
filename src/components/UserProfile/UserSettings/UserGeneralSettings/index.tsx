@@ -72,8 +72,11 @@ const messages = defineMessages(
     plexwatchlistsyncseriestip:
       'Automatically request series on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink>',
     traktusername: 'Trakt Username',
+    traktusernamepublic: 'Your Trakt profile must be public.',
     traktusernametip:
-      'What is on your public Trakt watchlist is requested for you, with the switches below.',
+      'What is on your Trakt watchlist is requested for you, with the switches below.',
+    traktusernamehistorytip:
+      'What you watched there also counts as watched, so it is left out of your suggestions.',
     validationtraktusername:
       'A Trakt username is letters, numbers, dots, dashes and underscores',
     traktwatchlistsyncmoviestip:
@@ -151,6 +154,17 @@ const UserGeneralSettings = () => {
       'plex'
     );
   const traktWatchlist = !!currentSettings.traktReady;
+  const autoRequests = hasPermission(
+    [
+      Permission.AUTO_REQUEST,
+      Permission.AUTO_REQUEST_MOVIE,
+      Permission.AUTO_REQUEST_TV,
+    ],
+    { type: 'or' }
+  );
+  // Asked for when it requests their watchlist, or counts what they watched.
+  const traktName =
+    traktWatchlist && (autoRequests || currentSettings.traktHistory);
   const syncTip = <T,>(plexOnly: T, traktOnly: T, both: T): T =>
     plexWatchlist && traktWatchlist
       ? both
@@ -623,39 +637,39 @@ const UserGeneralSettings = () => {
                       )}
                   </>
                 )}
-              {traktWatchlist &&
-                hasPermission(
-                  [
-                    Permission.AUTO_REQUEST,
-                    Permission.AUTO_REQUEST_MOVIE,
-                    Permission.AUTO_REQUEST_TV,
-                  ],
-                  { type: 'or' }
-                ) && (
-                  <div className="form-row">
-                    <label htmlFor="traktUsername" className="text-label">
-                      <span>{intl.formatMessage(messages.traktusername)}</span>
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.traktusernametip)}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          id="traktUsername"
-                          name="traktUsername"
-                          type="text"
-                          autoComplete="off"
-                        />
-                      </div>
-                      {errors.traktUsername &&
-                        touched.traktUsername &&
-                        typeof errors.traktUsername === 'string' && (
-                          <div className="error">{errors.traktUsername}</div>
-                        )}
+              {traktName && (
+                <div className="form-row">
+                  <label htmlFor="traktUsername" className="text-label">
+                    <span>{intl.formatMessage(messages.traktusername)}</span>
+                    <span className="label-tip">
+                      {[
+                        intl.formatMessage(messages.traktusernamepublic),
+                        autoRequests &&
+                          intl.formatMessage(messages.traktusernametip),
+                        currentSettings.traktHistory &&
+                          intl.formatMessage(messages.traktusernamehistorytip),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      <Field
+                        id="traktUsername"
+                        name="traktUsername"
+                        type="text"
+                        autoComplete="off"
+                      />
                     </div>
+                    {errors.traktUsername &&
+                      touched.traktUsername &&
+                      typeof errors.traktUsername === 'string' && (
+                        <div className="error">{errors.traktUsername}</div>
+                      )}
                   </div>
-                )}
+                </div>
+              )}
               {hasPermission(
                 [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_MOVIE],
                 { type: 'or' }

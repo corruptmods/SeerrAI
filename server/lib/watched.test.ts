@@ -1,3 +1,5 @@
+import type { TraktWatched } from '@server/api/trakt';
+import TraktAPI, { TraktError } from '@server/api/trakt';
 import { MediaType } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import {
@@ -8,6 +10,7 @@ import {
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
+import type { UserSettings } from '@server/entity/UserSettings';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
@@ -20,6 +23,7 @@ import {
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
 import type { Play } from '@server/lib/watchHistory/types';
+import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
@@ -128,6 +132,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   const settings = getSettings();
+  settings.trakt = {};
   settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
   for (const kind of MEDIA_SERVER_KINDS) settings[kind].connected = false;
   mock.restoreAll();
@@ -272,5 +277,137 @@ describe('leaving watched titles out', () => {
     assert.deepEqual(dropWatched(undefined, [{ id: 1, mediaType: 'movie' }]), [
       { id: 1, mediaType: 'movie' },
     ]);
+  });
+});
+
+describe('what they watched on Trakt', () => {
+  const NAME = 'lantern-fan';
+  let trakt: { movies: TraktWatched[] | Error; shows: TraktWatched[] | Error };
+  let traktAsks: string[] = [];
+  /** Moves the clock this many minutes on from now; mocked once a test. */
+  let offset = 0;
+  const later = (minutes: number) => {
+    if (!offset) {
+      mock.method(Date, 'now', () => (now + offset * 60) * 1000);
+    }
+    offset = minutes;
+  };
+
+  beforeEach(() => {
+    offset = 0;
+    getSettings().trakt = { clientId: 'c'.repeat(64), watchHistory: true };
+    viewer.settings = { traktUsername: NAME } as UserSettings;
+    traktAsks = [];
+    trakt = {
+      movies: [
+        {
+          type: 'movie',
+          title: 'Lantern Song',
+          year: 2004,
+          tmdbId: 7104,
+          lastWatchedAt: now - 3600,
+        },
+        // No TMDB id: their taste, but no key.
+        { type: 'movie', title: 'Glasswing Live', lastWatchedAt: now - 60 },
+      ],
+      shows: [
+        {
+          type: 'show',
+          title: 'Harbour Lights',
+          year: 1999,
+          tmdbId: 7103,
+          lastWatchedAt: now - 7200,
+        },
+      ],
+    };
+    for (const kind of ['movies', 'shows'] as const) {
+      mock.method(
+        TraktAPI.prototype,
+        kind === 'movies' ? 'watchedMovies' : 'watchedShows',
+        async (name: string) => {
+          traktAsks.push(`${kind}:${name}`);
+          const answer = trakt[kind];
+          if (answer instanceof Error) throw answer;
+          return answer;
+        }
+      );
+    }
+    connect('plex');
+    plays.plex = [play({ titleId: 'p-glass', finished: true })];
+  });
+
+  it('counts alongside the media server, once an admin turns it on', async () => {
+    const watched = await watchedFor(viewer);
+    assert.deepEqual([...watched.keys].sort(), [
+      'movie:7101',
+      'movie:7104',
+      'tv:7103',
+    ]);
+    assert.deepEqual(
+      watched.traktRecent.map((t) => [t.title, t.kind, t.key]),
+      [
+        ['Glasswing Live', 'movie', undefined],
+        ['Lantern Song', 'movie', 'movie:7104'],
+        ['Harbour Lights', 'tv', 'tv:7103'],
+      ]
+    );
+    assert.deepEqual(traktAsks.sort(), [`movies:${NAME}`, `shows:${NAME}`]);
+  });
+
+  it('asks Trakt nothing while the admin switch is off, or with no name', async () => {
+    getSettings().trakt = { clientId: 'c'.repeat(64) };
+    assert.deepEqual(await keys(), ['movie:7101']);
+    getSettings().trakt = { clientId: 'c'.repeat(64), watchHistory: true };
+    viewer.settings = { traktUsername: null } as UserSettings;
+    assert.deepEqual(await keys(), ['movie:7101']);
+    assert.deepEqual(traktAsks, []);
+  });
+
+  it('stops asking about a private profile for hours, warning once', async () => {
+    const warn = mock.method(logger, 'warn', () => logger);
+    trakt.movies = new TraktError('private', `${NAME} is private.`);
+    assert.deepEqual(await keys(), ['movie:7101']);
+    assert.equal(traktAsks.length, 2);
+
+    // Due again within the hour: the server is read, Trakt is not.
+    later(31);
+    assert.deepEqual(await keys(), ['movie:7101']);
+    assert.equal(traktAsks.length, 2);
+    assert.equal(asked.length, 2);
+
+    // Hours later, asked again.
+    later(7 * 60);
+    trakt.movies = [];
+    assert.deepEqual(await keys(), ['movie:7101', 'tv:7103']);
+    assert.equal(traktAsks.length, 4);
+
+    assert.equal(warn.mock.callCount(), 1);
+    assert.doesNotMatch(
+      JSON.stringify(warn.mock.calls[0].arguments),
+      new RegExp(NAME),
+      'the Trakt name is not logged'
+    );
+  });
+
+  it('keeps the last Trakt answer while Trakt is busy, and the server’s while it is down', async () => {
+    await watchedFor(viewer);
+    later(31);
+    trakt.shows = new TraktError('rateLimited', 'Busy.');
+    plays.plex = [play({ titleId: 'p-static', finished: true })];
+    assert.deepEqual(await keys(), ['movie:7102', 'movie:7104', 'tv:7103']);
+
+    later(62);
+    trakt.shows = [];
+    plays.plex = new Error('Tautulli is down');
+    assert.deepEqual(await keys(), ['movie:7102', 'movie:7104']);
+  });
+
+  it('starts afresh under a new Trakt name', async () => {
+    await watchedFor(viewer);
+    viewer.settings = { traktUsername: 'harbour-fan' } as UserSettings;
+    trakt.movies = [];
+    trakt.shows = [];
+    assert.deepEqual(await keys(), ['movie:7101']);
+    assert.ok(traktAsks.includes('movies:harbour-fan'));
   });
 });

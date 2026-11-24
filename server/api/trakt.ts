@@ -3,8 +3,8 @@ import { getAppVersion } from '@server/utils/appVersion';
 import { isAxiosError } from 'axios';
 
 /*
- * Reads public Trakt lists and watchlists with only an app Client ID, no
- * sign-in. Each admin creates a Trakt app (developer.trakt.tv/apps) and
+ * Reads public Trakt lists, watchlists and what people watched with only an
+ * app Client ID, no sign-in. Each admin creates a Trakt app (developer.trakt.tv/apps) and
  * pastes its Client ID into Settings; Trakt deletes apps unused for 30 days,
  * which regular watchlist sync prevents.
  *
@@ -50,6 +50,25 @@ export interface TraktTitle {
   tvdbId?: number;
   /** When listed, in Unix seconds. */
   listedAt?: number;
+}
+
+/** One title someone watched, from their public Trakt profile. */
+interface TraktWatchedItem {
+  plays?: number;
+  last_watched_at?: string | null;
+  movie?: TraktMedia | null;
+  show?: TraktMedia | null;
+}
+
+/** A movie or series someone watched, as Trakt has it. */
+export interface TraktWatched {
+  type: 'movie' | 'show';
+  title: string;
+  year?: number;
+  /** Missing when Trakt could not match the title to TMDB. */
+  tmdbId?: number;
+  /** Their latest play, in Unix seconds. */
+  lastWatchedAt?: number;
 }
 
 /** Where a pasted Trakt link points. */
@@ -136,6 +155,11 @@ export const parseTraktUrl = (text: string): TraktSource | undefined => {
   return undefined;
 };
 
+const unixSeconds = (iso?: string | null): number | undefined => {
+  const at = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(at) ? Math.floor(at / 1000) : undefined;
+};
+
 const asTitle = (item: TraktListItem): TraktTitle | undefined => {
   const media =
     item.type === 'movie'
@@ -146,16 +170,30 @@ const asTitle = (item: TraktListItem): TraktTitle | undefined => {
   if (!media?.title) {
     return undefined;
   }
-  const listedAt = item.listed_at ? Date.parse(item.listed_at) : NaN;
   return {
     type: item.type as 'movie' | 'show',
     title: media.title,
     year: media.year ?? undefined,
     tmdbId: media.ids?.tmdb ?? undefined,
     tvdbId: media.ids?.tvdb ?? undefined,
-    listedAt: Number.isFinite(listedAt)
-      ? Math.floor(listedAt / 1000)
-      : undefined,
+    listedAt: unixSeconds(item.listed_at),
+  };
+};
+
+const asWatched = (
+  type: 'movie' | 'show',
+  item: TraktWatchedItem
+): TraktWatched | undefined => {
+  const media = type === 'movie' ? item.movie : item.show;
+  if (!media?.title) {
+    return undefined;
+  }
+  return {
+    type,
+    title: media.title,
+    year: media.year ?? undefined,
+    tmdbId: media.ids?.tmdb ?? undefined,
+    lastWatchedAt: unixSeconds(item.last_watched_at),
   };
 };
 
@@ -173,6 +211,8 @@ class TraktAPI extends ExternalAPI {
           // policy asks apps to name themselves.
           'User-Agent': `SeerrAI/${getAppVersion()}`,
         },
+        // Shared by every client: well inside Trakt's limit for an app.
+        rateLimit: { maxRequests: 2, maxRPS: 2 },
       }
     );
   }
@@ -190,11 +230,47 @@ class TraktAPI extends ExternalAPI {
         : source.kind === 'list'
           ? `/users/${pathPart(source.user)}/lists/${pathPart(source.list)}/items/movie,show`
           : `/lists/${encodeURIComponent(source.id)}/items/movie,show`;
-    const items: TraktListItem[] = [];
+    return (await this.allPages<TraktListItem>(path))
+      .map(asTitle)
+      .filter((title): title is TraktTitle => !!title);
+  }
+
+  /** Films on a public Trakt profile's watched history, one entry each. */
+  public async watchedMovies(user: string): Promise<TraktWatched[]> {
+    return (
+      await this.allPages<TraktWatchedItem>(
+        `/users/${pathPart(user)}/watched/movies`
+      )
+    )
+      .map((item) => asWatched('movie', item))
+      .filter((title): title is TraktWatched => !!title);
+  }
+
+  /**
+   * Series on a public Trakt profile's watched history: any with an episode
+   * watched, without the per-episode detail.
+   */
+  public async watchedShows(user: string): Promise<TraktWatched[]> {
+    return (
+      await this.allPages<TraktWatchedItem>(
+        `/users/${pathPart(user)}/watched/shows`,
+        { extended: 'noseasons' }
+      )
+    )
+      .map((item) => asWatched('show', item))
+      .filter((title): title is TraktWatched => !!title);
+  }
+
+  /** Every page of a paged answer; one page when Trakt does not page it. */
+  private async allPages<T>(
+    path: string,
+    params: Record<string, string> = {}
+  ): Promise<T[]> {
+    const items: T[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const response = await this.call(() =>
-        this.axios.get<TraktListItem[]>(path, {
-          params: { page, limit: PAGE_LIMIT },
+        this.axios.get<T[]>(path, {
+          params: { ...params, page, limit: PAGE_LIMIT },
         })
       );
       items.push(...(Array.isArray(response.data) ? response.data : []));
@@ -203,7 +279,7 @@ class TraktAPI extends ExternalAPI {
         break;
       }
     }
-    return items.map(asTitle).filter((title): title is TraktTitle => !!title);
+    return items;
   }
 
   /**

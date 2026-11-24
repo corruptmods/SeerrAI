@@ -40,11 +40,12 @@ describe('Trakt in Settings', () => {
       .post('/settings/trakt')
       .send({ clientId: ` ${ID} ` });
     assert.equal(saved.status, 200);
-    assert.deepEqual(saved.body, { hasClientId: true });
+    assert.deepEqual(saved.body, { hasClientId: true, watchHistory: false });
     assert.deepEqual(checked, [ID]);
     assert.equal(getSettings().trakt.clientId, ID);
     assert.deepEqual((await request(app).get('/settings/trakt')).body, {
       hasClientId: true,
+      watchHistory: false,
     });
   });
 
@@ -66,9 +67,47 @@ describe('Trakt in Settings', () => {
   });
 
   it('removes it', async () => {
-    getSettings().trakt = { clientId: ID };
+    getSettings().trakt = { clientId: ID, watchHistory: true };
     const removed = await request(app).delete('/settings/trakt');
-    assert.deepEqual(removed.body, { hasClientId: false });
+    assert.deepEqual(removed.body, { hasClientId: false, watchHistory: false });
+    assert.deepEqual(getSettings().trakt, {});
+  });
+
+  it('leaves watch history off until an admin turns it on', async () => {
+    await request(app).post('/settings/trakt').send({ clientId: ID });
+    assert.equal(getSettings().trakt.watchHistory, undefined);
+    assert.equal(getSettings().fullPublicSettings.traktHistory, false);
+  });
+
+  it('turns watch history on and off without the Client ID typed again', async () => {
+    getSettings().trakt = { clientId: ID };
+    const on = await request(app)
+      .post('/settings/trakt')
+      .send({ watchHistory: true });
+    assert.equal(on.status, 200);
+    assert.deepEqual(on.body, { hasClientId: true, watchHistory: true });
+    assert.deepEqual(getSettings().trakt, { clientId: ID, watchHistory: true });
+    assert.equal(getSettings().fullPublicSettings.traktHistory, true);
+    assert.deepEqual(checked, [], 'the saved ID is not tested again');
+
+    // A new ID keeps the switch as it was.
+    const other = 'b'.repeat(64);
+    await request(app).post('/settings/trakt').send({ clientId: other });
+    assert.deepEqual(getSettings().trakt, {
+      clientId: other,
+      watchHistory: true,
+    });
+
+    await request(app).post('/settings/trakt').send({ watchHistory: false });
+    assert.equal(getSettings().fullPublicSettings.traktHistory, false);
+  });
+
+  it('needs a Client ID before anything else', async () => {
+    const refused = await request(app)
+      .post('/settings/trakt')
+      .send({ watchHistory: true });
+    assert.equal(refused.status, 400);
+    assert.equal(refused.body.problem, 'format');
     assert.deepEqual(getSettings().trakt, {});
   });
 });

@@ -84,6 +84,8 @@ export interface PublicSettingsResponse {
   subtitlesReady: boolean;
   /** A Trakt Client ID is set. */
   traktReady: boolean;
+  /** Trakt is set up and what people watched there is used. */
+  traktHistory: boolean;
   /** Lidarr is set up and music is not disabled for everyone. */
   musicReady: boolean;
   /** All search lists music below movies and series (Settings → Music). */

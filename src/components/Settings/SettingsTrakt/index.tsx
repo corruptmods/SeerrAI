@@ -17,10 +17,11 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsTrakt', {
   title: 'Trakt',
   description:
-    'The key Seerr AI reads Trakt with. With it, people can paste a public Trakt list or watchlist link into Import on any of their lists, and have their public Trakt watchlist requested (in their profile). Nobody signs in to Trakt.',
+    'The key Seerr AI reads Trakt with. With it, people can paste a public Trakt list or watchlist link into Import on any of their lists and have their public Trakt watchlist requested. With Use What People Watched on Trakt on, what they watched there also counts as watched. Each person adds their Trakt username in their profile, which must be public; nobody signs in to Trakt.',
   addTrakt: 'Add Trakt',
   usedBy: 'Used by',
   listsAndWatchlists: 'List imports and watchlists',
+  listsWatchlistsAndHistory: 'List imports, watchlists and watch history',
   removed: 'Trakt removed.',
   removeTitle: 'Remove Trakt',
   removeConfirm:
@@ -35,9 +36,10 @@ const messages = defineMessages('components.Settings.SettingsTrakt', {
 const SettingsTrakt = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { data, error, mutate } = useSWR<{ hasClientId: boolean }>(
-    '/api/v1/settings/trakt'
-  );
+  const { data, error, mutate } = useSWR<{
+    hasClientId: boolean;
+    watchHistory?: boolean;
+  }>('/api/v1/settings/trakt');
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -76,6 +78,7 @@ const SettingsTrakt = () => {
       {editing && (
         <TraktModal
           saved={!!data?.hasClientId}
+          watchHistory={!!data?.watchHistory}
           onClose={() => setEditing(false)}
           onSave={() => {
             void refresh();
@@ -120,7 +123,11 @@ const SettingsTrakt = () => {
                 }
                 detail={{
                   label: intl.formatMessage(messages.usedBy),
-                  value: intl.formatMessage(messages.listsAndWatchlists),
+                  value: intl.formatMessage(
+                    data.watchHistory
+                      ? messages.listsWatchlistsAndHistory
+                      : messages.listsAndWatchlists
+                  ),
                 }}
                 onEdit={() => setEditing(true)}
                 onDelete={() => setDeleting(true)}

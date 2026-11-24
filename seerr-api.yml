@@ -2121,7 +2121,19 @@ components:
       properties:
         hasClientId:
           type: boolean
+        watchHistory:
+          type: boolean
+          description: What people watched on Trakt counts as watched and helps AI Search. Off by default.
     TraktSettingsBody:
+      type: object
+      properties:
+        clientId:
+          type: string
+          description: Needed unless one is saved already; tested with Trakt before it is saved.
+        watchHistory:
+          type: boolean
+          description: Use what people watched on Trakt. Left as it is when not given.
+    TraktClientIdBody:
       type: object
       required:
         - clientId
@@ -2361,6 +2373,12 @@ components:
         browserApps:
           type: boolean
           description: Browser apps on allowed sites may link (Settings → Network).
+        traktReady:
+          type: boolean
+          description: A Trakt Client ID is set. Set through /settings/trakt.
+        traktHistory:
+          type: boolean
+          description: Trakt is set up and what people watched there is used. Set through /settings/trakt.
         musicReady:
           type: boolean
           description: A default Lidarr is set up and music is not turned off for everyone.
@@ -9202,8 +9220,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/TraktSettingsShown'
     post:
-      summary: Set the Trakt Client ID
-      description: Tests it with Trakt first and refuses to save one Trakt does not accept.
+      summary: Set the Trakt Client ID, and whether watch history is used
+      description: Tests a new Client ID with Trakt first and refuses to save one Trakt does not accept. Without a Client ID, keeps the saved one and changes only the switch.
       tags:
         - settings
       requestBody:
@@ -9238,7 +9256,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TraktSettingsBody'
+              $ref: '#/components/schemas/TraktClientIdBody'
       responses:
         '200':
           description: Trakt accepts it

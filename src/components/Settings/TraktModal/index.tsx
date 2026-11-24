@@ -22,24 +22,38 @@ const messages = defineMessages('components.Settings.SettingsTrakt', {
     'Trakt did not accept that Client ID. Check it, and that Trakt has approved the app.',
   unreachable: 'Could not reach Trakt. Try again in a while.',
   format: 'That does not look like a Trakt Client ID.',
+  watchHistory: 'Use What People Watched on Trakt',
+  watchHistoryTip:
+    'What each person watched on their public Trakt profile is left out of their suggestions and helps AI Search know their taste. They add their Trakt username in their profile.',
+  savedSettings: 'Trakt settings saved.',
 });
 
 interface TraktModalProps {
   /** Whether a Client ID is saved already: editing it, else adding Trakt. */
   saved: boolean;
+  /** Whether what people watched on Trakt is used now. */
+  watchHistory: boolean;
   onClose: () => void;
   onSave: () => void;
 }
 
 /**
  * Adds or replaces the Client ID of the admin's own Trakt app: Trakt must
- * accept it before it is saved, and it is never shown again after.
+ * accept it before it is saved, and it is never shown again after. Once one
+ * is saved, the watch history switch can change on its own.
  */
-const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
+const TraktModal = ({
+  saved,
+  watchHistory: historyOn,
+  onClose,
+  onSave,
+}: TraktModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [clientId, setClientId] = useState('');
+  const [watchHistory, setWatchHistory] = useState(historyOn);
   const [busy, setBusy] = useState(false);
+  const canSave = !!clientId.trim() || saved;
 
   const reason = (e: unknown) => {
     const problem = isAxiosError(e) ? e.response?.data?.problem : undefined;
@@ -53,11 +67,19 @@ const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
   const save = async () => {
     setBusy(true);
     try {
-      await axios.post('/api/v1/settings/trakt', { clientId: clientId.trim() });
-      addToast(intl.formatMessage(messages.connected), {
-        appearance: 'success',
-        autoDismiss: true,
+      await axios.post('/api/v1/settings/trakt', {
+        ...(clientId.trim() && { clientId: clientId.trim() }),
+        watchHistory,
       });
+      addToast(
+        intl.formatMessage(
+          clientId.trim() ? messages.connected : messages.savedSettings
+        ),
+        {
+          appearance: 'success',
+          autoDismiss: true,
+        }
+      );
       onSave();
     } catch (e) {
       addToast(intl.formatMessage(messages.saveFailed, { reason: reason(e) }), {
@@ -91,7 +113,7 @@ const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
               ? intl.formatMessage(globalMessages.save)
               : intl.formatMessage(messages.addTrakt)
         }
-        okDisabled={busy || !clientId.trim()}
+        okDisabled={busy || !canSave}
         onOk={() => void save()}
         title={intl.formatMessage(
           saved ? messages.editTrakt : messages.addTrakt
@@ -101,7 +123,7 @@ const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
           className="mb-6"
           onSubmit={(e) => {
             e.preventDefault();
-            if (clientId.trim() && !busy) void save();
+            if (canSave && !busy) void save();
           }}
         >
           <div className="form-row">
@@ -138,6 +160,23 @@ const TraktModal = ({ saved, onClose, onSave }: TraktModalProps) => {
                   {intl.formatMessage(messages.savedTip)}
                 </p>
               )}
+            </div>
+          </div>
+          <div className="form-row">
+            <label htmlFor="traktWatchHistory" className="checkbox-label">
+              {intl.formatMessage(messages.watchHistory)}
+              <span className="label-tip">
+                {intl.formatMessage(messages.watchHistoryTip)}
+              </span>
+            </label>
+            <div className="form-input-area">
+              <input
+                type="checkbox"
+                id="traktWatchHistory"
+                name="traktWatchHistory"
+                checked={watchHistory}
+                onChange={(e) => setWatchHistory(e.target.checked)}
+              />
             </div>
           </div>
         </form>

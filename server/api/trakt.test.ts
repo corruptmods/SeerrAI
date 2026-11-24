@@ -50,6 +50,38 @@ before(async () => {
       url.pathname === '/users/someone/watchlist/movie,show/added/desc'
     ) {
       body = Array.from({ length: 30 }, (_, i) => item(i + 1));
+    } else if (url.pathname === '/users/someone/watched/movies') {
+      body = [
+        {
+          plays: 2,
+          last_watched_at: '2026-03-02T20:00:00.000Z',
+          movie: {
+            title: 'Glasswing',
+            year: 2011,
+            ids: { trakt: 1, tmdb: 501 },
+          },
+        },
+        {
+          plays: 1,
+          last_watched_at: null,
+          movie: { title: 'Static Garden', year: null, ids: { trakt: 2 } },
+        },
+        { plays: 1, movie: null },
+      ];
+    } else if (url.pathname === '/users/someone/watched/shows') {
+      // 300 series: pages of 250 and 50, should Trakt page them.
+      pages = 2;
+      const from = (page - 1) * 250 + 1;
+      const to = Math.min(page * 250, 300);
+      body = Array.from({ length: to - from + 1 }, (_, i) => ({
+        plays: 3,
+        last_watched_at: new Date(Date.UTC(2026, 0, 1)).toISOString(),
+        show: {
+          title: `Series ${from + i}`,
+          year: 2000,
+          ids: { trakt: from + i, tmdb: 9000 + from + i },
+        },
+      }));
     } else if (url.pathname === '/genres/movies') {
       body = [{ name: 'Action', slug: 'action' }];
     }
@@ -200,6 +232,56 @@ describe('the Trakt client', () => {
         name
       );
     }
+    assert.deepEqual(seen, []);
+  });
+
+  it('reads the films someone watched, with when they last did', async () => {
+    const films = await new TraktAPI('client-id', base).watchedMovies(
+      'someone'
+    );
+    assert.deepEqual(films, [
+      {
+        type: 'movie',
+        title: 'Glasswing',
+        year: 2011,
+        tmdbId: 501,
+        lastWatchedAt: Date.UTC(2026, 2, 2, 20) / 1000,
+      },
+      {
+        type: 'movie',
+        title: 'Static Garden',
+        year: undefined,
+        tmdbId: undefined,
+        lastWatchedAt: undefined,
+      },
+    ]);
+  });
+
+  it('reads the series someone watched, every page, without each episode', async () => {
+    const series = await new TraktAPI('client-id', base).watchedShows(
+      'someone'
+    );
+    assert.equal(series.length, 300);
+    assert.deepEqual(series[0], {
+      type: 'show',
+      title: 'Series 1',
+      year: 2000,
+      tmdbId: 9001,
+      lastWatchedAt: Date.UTC(2026, 0, 1) / 1000,
+    });
+    assert.deepEqual(
+      seen.map((s) => s.path),
+      [
+        '/users/someone/watched/shows?extended=noseasons&page=1&limit=250',
+        '/users/someone/watched/shows?extended=noseasons&page=2&limit=250',
+      ]
+    );
+  });
+
+  it('never asks for what a made-up name watched', async () => {
+    const api = new TraktAPI('client-id', base);
+    await assert.rejects(api.watchedMovies('..'), TraktError);
+    await assert.rejects(api.watchedShows('a/b'), TraktError);
     assert.deepEqual(seen, []);
   });
 

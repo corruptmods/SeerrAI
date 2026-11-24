@@ -1,4 +1,6 @@
+import TraktAPI, { TraktError } from '@server/api/trakt';
 import type { User } from '@server/entity/User';
+import { getSettings } from '@server/lib/settings';
 import {
   isCompletedPlay,
   STARTED_PERCENT,
@@ -10,16 +12,31 @@ import logger from '@server/logger';
  * What someone has already watched, so what is suggested to them can leave
  * it out. A film counts once finished or played past STARTED_PERCENT; a
  * series once any of its episodes does. Read from the media server's watch
- * history (Tautulli for Plex, the server itself for Jellyfin and Emby).
+ * history (Tautulli for Plex, the server itself for Jellyfin and Emby) and,
+ * once an admin turns it on, from the person's public Trakt profile.
  *
  * Kept in memory per user and served stale while a fresh copy is read, so
  * nothing waits on it for long. It never throws: what could not be read is
- * left out, and the rest is still used.
+ * left out, and the rest is still used. The media server and Trakt fail
+ * apart.
  */
+
+/** A title someone watched on Trakt, for their taste. */
+export interface TraktRecent {
+  title: string;
+  year?: number;
+  kind: 'movie' | 'tv';
+  /** Their latest play, in Unix seconds. */
+  at: number;
+  /** Its key in the watched set; missing when Trakt has no TMDB id. */
+  key?: string;
+}
 
 export interface Watched {
   /** "movie:<TMDB id>" and "tv:<TMDB id>". */
   keys: ReadonlySet<string>;
+  /** What they watched most recently on Trakt, newest first. */
+  traktRecent: readonly TraktRecent[];
 }
 
 /** Plays read: as many as Suggested for You reads. */
@@ -30,36 +47,68 @@ const FRESH_MS = 30 * 60 * 1000;
 const MAX_PEOPLE = 500;
 /** Longest an answer waits for what was watched before going without. */
 export const WATCHED_WAIT_MS = 1500;
+/** Recent Trakt titles kept. */
+const TRAKT_RECENT = 20;
+/** A private profile or wrong name lasts until fixed: asked again after. */
+const TRAKT_LASTING_PAUSE_MS = 6 * 60 * 60 * 1000;
+/** Trakt busy or down: asked again after. */
+const TRAKT_PASSING_PAUSE_MS = 15 * 60 * 1000;
+const TRAKT_WARN_MS = 60 * 60 * 1000;
 
-const EMPTY: Watched = { keys: new Set() };
+const EMPTY: Watched = { keys: new Set(), traktRecent: [] };
 
 /** The key a title has in the watched set. */
 export const watchedKey = (mediaType: string, tmdbId: number) =>
   `${mediaType}:${tmdbId}`;
 
+/** What one source gave, kept apart so each can fail on its own. */
+interface Part {
+  keys: ReadonlySet<string>;
+  recent: readonly TraktRecent[];
+}
+
+const NOTHING: Part = { keys: new Set(), recent: [] };
+
 interface Entry {
   at: number;
+  server: Part;
+  trakt: Part;
   value: Watched;
 }
 
 /**
- * Keyed on the media server account as well as the user: history belongs to
- * the account, so relinking another one starts afresh.
+ * Keyed on the media server account and Trakt name as well as the user:
+ * history belongs to the account, so relinking another one starts afresh.
  */
 const cache = new Map<string, Entry>();
 /** One read per key at a time; a second caller joins it. */
 const inFlight = new Map<string, Promise<Watched>>();
 /** Bumped by forgetWatched, so a read started before it is not kept. */
 let generation = 0;
+/** Users whose Trakt is not asked about until then, after a failure. */
+const traktPaused = new Map<number, number>();
+/** When each user was last warned about their Trakt profile. */
+const traktWarned = new Map<number, number>();
+
+/**
+ * The Trakt name whose history counts for this user: only once an admin
+ * turned Trakt history on and the person gave one.
+ */
+export const traktNameOf = (user: User): string | undefined => {
+  const { clientId, watchHistory } = getSettings().trakt ?? {};
+  return (
+    (clientId && watchHistory && user.settings?.traktUsername) || undefined
+  );
+};
 
 const keyOf = (user: User) =>
-  `${user.id}:${watchSource()?.viewerOf(user) ?? ''}`;
+  `${user.id}:${watchSource()?.viewerOf(user) ?? ''}:${traktNameOf(user) ?? ''}`;
 
 /** TMDB keys of everything this user watched on the media server. */
-const fromServer = async (user: User): Promise<Set<string>> => {
+const fromServer = async (user: User): Promise<Part> => {
   const source = watchSource();
   if (!source || !source.viewerOf(user)) {
-    return new Set();
+    return NOTHING;
   }
   const history = await source.history(user, HISTORY_LENGTH);
   const titleIds = new Set<string>();
@@ -73,14 +122,81 @@ const fromServer = async (user: User): Promise<Set<string>> => {
     }
   }
   const media = await source.mediaFor([...titleIds]);
-  return new Set(
-    [...media.values()].map((item) => watchedKey(item.mediaType, item.tmdbId))
-  );
+  return {
+    keys: new Set(
+      [...media.values()].map((item) => watchedKey(item.mediaType, item.tmdbId))
+    ),
+    recent: [],
+  };
 };
 
-const remember = (key: string, value: Watched) => {
+/**
+ * What the user watched on Trakt. A failure pauses asking for a while;
+ * until then, the last answer stands.
+ */
+const fromTrakt = async (
+  user: User,
+  name: string,
+  previous: Part | undefined
+): Promise<Part> => {
+  const clientId = getSettings().trakt.clientId;
+  if (!clientId || Date.now() < (traktPaused.get(user.id) ?? 0)) {
+    return previous ?? NOTHING;
+  }
+  try {
+    const trakt = new TraktAPI(clientId);
+    const [movies, shows] = await Promise.all([
+      trakt.watchedMovies(name),
+      trakt.watchedShows(name),
+    ]);
+    traktPaused.delete(user.id);
+    traktWarned.delete(user.id);
+    const titles: TraktRecent[] = [...movies, ...shows].map((title) => {
+      const kind = title.type === 'movie' ? 'movie' : 'tv';
+      return {
+        title: title.title,
+        year: title.year,
+        kind,
+        at: title.lastWatchedAt ?? 0,
+        key: title.tmdbId ? watchedKey(kind, title.tmdbId) : undefined,
+      };
+    });
+    return {
+      keys: new Set(titles.flatMap((title) => (title.key ? [title.key] : []))),
+      recent: titles
+        .filter((title) => title.at > 0)
+        .sort((a, b) => b.at - a.at)
+        .slice(0, TRAKT_RECENT),
+    };
+  } catch (e) {
+    const problem = e instanceof TraktError ? e.problem : 'unreachable';
+    const lasting = ['private', 'notFound', 'badKey'].includes(problem);
+    traktPaused.set(
+      user.id,
+      Date.now() + (lasting ? TRAKT_LASTING_PAUSE_MS : TRAKT_PASSING_PAUSE_MS)
+    );
+    // Messages can carry the Trakt name; only the kind of problem is logged.
+    const last = traktWarned.get(user.id) ?? 0;
+    if (lasting && Date.now() - last >= TRAKT_WARN_MS) {
+      traktWarned.set(user.id, Date.now());
+      logger.warn(
+        'Could not read what someone watched on Trakt. Their Trakt profile must be public, under the name in their profile settings',
+        { label: 'Watched', userId: user.id, problem }
+      );
+    } else {
+      logger.debug('Could not read what someone watched on Trakt', {
+        label: 'Watched',
+        userId: user.id,
+        problem,
+      });
+    }
+    return previous ?? NOTHING;
+  }
+};
+
+const remember = (key: string, entry: Entry) => {
   cache.delete(key);
-  cache.set(key, { at: Date.now(), value });
+  cache.set(key, entry);
   while (cache.size > MAX_PEOPLE) {
     cache.delete(cache.keys().next().value as string);
   }
@@ -93,29 +209,37 @@ const refresh = (user: User, key: string): Promise<Watched> => {
     return running;
   }
   const started = generation;
-  const previous = cache.get(key)?.value;
+  const previous = cache.get(key);
+  const traktName = traktNameOf(user);
   const run = (async () => {
-    const server = await fromServer(user).catch((e) => {
-      logger.debug('Could not read watch history for what was watched', {
-        label: 'Watched',
-        userId: user.id,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
-      // "Could not ask" is not "watched nothing": keep what was known.
-      return new Set(previous?.keys ?? []);
-    });
-    const value: Watched = { keys: server };
+    const [server, trakt] = await Promise.all([
+      fromServer(user).catch((e) => {
+        logger.debug('Could not read watch history for what was watched', {
+          label: 'Watched',
+          userId: user.id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+        // "Could not ask" is not "watched nothing": keep what was known.
+        return previous?.server ?? NOTHING;
+      }),
+      traktName ? fromTrakt(user, traktName, previous?.trakt) : NOTHING,
+    ]);
+    const value: Watched = {
+      keys: new Set([...server.keys, ...trakt.keys]),
+      traktRecent: trakt.recent,
+    };
     if (started === generation) {
-      remember(key, value);
+      remember(key, { at: Date.now(), server, trakt, value });
     }
     logger.debug('Read what was watched', {
       label: 'Watched',
       userId: user.id,
-      titles: value.keys.size,
+      fromServer: server.keys.size,
+      fromTrakt: trakt.keys.size,
     });
     return value;
   })()
-    .catch(() => previous ?? EMPTY)
+    .catch(() => previous?.value ?? EMPTY)
     .finally(() => {
       if (inFlight.get(key) === run) {
         inFlight.delete(key);
@@ -191,9 +315,19 @@ export const awaitWithin = <T>(
     );
   });
 
-/** Forgets one user's watched titles, or everyone's. */
+/**
+ * Forgets one user's watched titles, or everyone's, and asks Trakt again
+ * next time even after a failure.
+ */
 export const forgetWatched = (userId?: number) => {
   generation++;
+  if (userId === undefined) {
+    traktPaused.clear();
+    traktWarned.clear();
+  } else {
+    traktPaused.delete(userId);
+    traktWarned.delete(userId);
+  }
   for (const map of [cache, inFlight] as Map<string, unknown>[]) {
     for (const key of [...map.keys()]) {
       if (userId === undefined || key.startsWith(`${userId}:`)) {

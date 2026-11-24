@@ -354,6 +354,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     aiReady: false,
     subtitlesReady: false,
     traktReady: false,
+    traktHistory: false,
     musicReady: false,
     musicSearch: { inAll: false },
     musicSongs: false,

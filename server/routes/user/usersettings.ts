@@ -70,6 +70,7 @@ import {
 import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
+import { forgetWatched } from '@server/lib/watched';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { quickConnectSecret } from '@server/routes/auth';
@@ -279,6 +280,8 @@ userSettingsRoutes.post<
       user.settings.watchlistSyncTv = req.body.watchlistSyncTv;
       if (traktUsername !== undefined) {
         user.settings.traktUsername = traktUsername || null;
+        // Their Trakt history is read afresh under the new name.
+        forgetWatched(user.id);
       }
       if (defaultProfiles !== undefined) {
         user.settings.defaultProfiles = defaultProfiles;

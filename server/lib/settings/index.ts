@@ -443,11 +443,16 @@ export interface TautulliSettings {
 }
 
 /**
- * Trakt public lists and watchlists, via the admin's app Client ID only; no
- * Trakt sign-in.
+ * Trakt public lists, watchlists and watch history, via the admin's app
+ * Client ID only; no Trakt sign-in.
  */
 export interface TraktSettings {
   clientId?: string;
+  /**
+   * What people watched on Trakt counts as watched, and helps AI Search.
+   * Off unless an admin turns it on.
+   */
+  watchHistory?: boolean;
 }
 
 export interface DVRSettings {
@@ -1036,6 +1041,8 @@ interface FullPublicSettings extends PublicSettings {
   subtitlesReady: boolean;
   /** A Trakt Client ID is set. */
   traktReady: boolean;
+  /** Trakt is ready and what people watched there is used. */
+  traktHistory: boolean;
   /** A default Lidarr exists and music isn't globally off. */
   musicReady: boolean;
   /** Whether All search includes music. */
@@ -2011,6 +2018,9 @@ class Settings {
         this.data.bazarr?.hostname && this.data.bazarr?.apiKey
       ),
       traktReady: !!this.data.trakt?.clientId,
+      traktHistory: !!(
+        this.data.trakt?.clientId && this.data.trakt.watchHistory
+      ),
       musicReady:
         (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
         !(this.data.main.disabledFeatures ?? []).includes('music'),

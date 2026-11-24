@@ -84,7 +84,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   lookHealth:
     'Health: whether each service answers, what Radarr, Sonarr, Prowlarr and Bazarr report, low disks and stuck titles. Admins are notified of new problems.',
   lookMatch:
-    'Match Check (on Health): folders your media server matched to the wrong title. For Plex, Fix match there puts it right; in Jellyfin and Emby, use Identify.',
+    'Match Check (on Health): folders your media server matched to the wrong title. For Plex, Fix match there puts it right; in Jellyfin and Emby, use Identify; in Silo, Match Item.',
   lookBackfill:
     'Backfill: what it found, what waits for approval, and its downloads.',
   lookJobs: 'Jobs & Cache: when each job runs, and Run now.',

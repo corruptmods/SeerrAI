@@ -40,9 +40,12 @@ export class NotIdentifiedError extends Error {
 const EXAMPLES = 5;
 
 interface Wording {
-  /** Plex, Jellyfin or Emby. */
+  /** Plex, Jellyfin, Emby or Silo. */
   server: string;
-  /** What the server calls it: Plex matches, Jellyfin and Emby identify. */
+  /**
+   * What the server calls it: Plex and Silo match, Jellyfin and Emby
+   * identify.
+   */
   verb: 'matched' | 'identified';
   /** Where in the server to speed it up. */
   hint: string;

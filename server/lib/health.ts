@@ -1520,6 +1520,11 @@ export const fixMatchText = (
       ? `Fix Match in Plex, searching ${typed(want)}${also ? ` or ${typed(also)}` : ''}`
       : 'Fix Match in Plex';
   }
+  if (server === 'Silo') {
+    return want
+      ? `Match Item in Silo, entering ${entered(want)}${also ? ` or ${entered(also)}` : ''}`
+      : 'Match Item in Silo';
+  }
   return want
     ? `Identify in ${server}, entering ${entered(want)}${also ? ` or ${entered(also)}` : ''}`
     : `Identify in ${server}`;
@@ -1701,18 +1706,22 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
               : undefined,
       };
     }),
-    detail: report.error
-      ? `The last check could not finish: ${report.error}`
-      : report.finishedAt
-        ? [
-            `${report.checked} checked ${ago(new Date(report.finishedAt))}`,
-            report.notChecked
-              ? `${report.notChecked} could not be compared (no folder, or no id both sides have)`
-              : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')
-        : 'Runs nightly (Settings → Jobs → Match Check)',
+    detail: [
+      report.error
+        ? `The last check could not finish: ${report.error}`
+        : report.finishedAt
+          ? [
+              `${report.checked} checked ${ago(new Date(report.finishedAt))}`,
+              report.notChecked
+                ? `${report.notChecked} could not be compared (no folder, or no id both sides have)`
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          : 'Runs nightly (Settings → Jobs → Match Check)',
+      // Servers left out on purpose (Silo without its scope).
+      ...(report.notes ?? []),
+    ].join(' · '),
     items: items.map((p) => ({
       ...plexMatchText(p),
       ...(fixable(p) ? { fix: problemKey(p) } : {}),

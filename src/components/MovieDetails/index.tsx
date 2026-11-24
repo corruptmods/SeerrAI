@@ -718,6 +718,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               data.mediaInfo.jellyfinMediaId4k ||
               data.mediaInfo.embyMediaId ||
               data.mediaInfo.embyMediaId4k ||
+              data.mediaInfo.siloMediaId ||
+              data.mediaInfo.siloMediaId4k ||
               data.mediaInfo.status !== MediaStatus.UNKNOWN ||
               data.mediaInfo.status4k !== MediaStatus.UNKNOWN) && (
               <Tooltip content={intl.formatMessage(messages.managemovie)}>
@@ -805,7 +807,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 itemKey={
                   data.mediaInfo.ratingKey ??
                   data.mediaInfo.jellyfinMediaId ??
-                  data.mediaInfo.embyMediaId
+                  data.mediaInfo.embyMediaId ??
+                  data.mediaInfo.siloMediaId
                 }
               />
             )}

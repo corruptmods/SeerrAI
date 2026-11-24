@@ -3,6 +3,7 @@ import type { PlexLibraryItem, PlexMusicItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import type { SiloCatalogItem } from '@server/api/silo/types';
 import { MediaType } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
@@ -43,10 +44,12 @@ import plexMatchCheck, {
   plexMatchItem,
   problemKey,
   radarrFileFacts,
+  siloMatchItem,
 } from '@server/lib/plexMatchCheck';
 import { providerId } from '@server/lib/scanners/music/jellyfin';
 import { plexMbid } from '@server/lib/scanners/music/plex';
 import { getSettings } from '@server/lib/settings';
+import { siloClient, siloHasScope, siloSettings } from '@server/lib/silo';
 import logger from '@server/logger';
 import type { MatchKind } from '@server/utils/plexMatch';
 import { In, IsNull, LessThanOrEqual, MoreThanOrEqual, Not } from 'typeorm';
@@ -222,11 +225,14 @@ export const compareAlbum = (
   return clearlyAnotherAlbum(expected, album) ? problem() : { state: 'right' };
 };
 
-/** The servers Match Watch reads; Silo isn't read yet. */
-type CheckedServer = Exclude<MediaServerKind, 'silo'>;
+/**
+ * The servers Match Watch reads: Silo only when its key may see file paths
+ * (admin:catalog:paths), as Match Check.
+ */
+type CheckedServer = MediaServerKind;
 
-const isChecked = (server: MediaServerKind): server is CheckedServer =>
-  server !== 'silo';
+const isChecked = (server: MediaServerKind): boolean =>
+  server !== 'silo' || siloHasScope('admin:catalog:paths');
 
 /** Servers whose libraries should hold this kind of title. */
 const serversFor = (kind: MatchKind): CheckedServer[] =>
@@ -234,7 +240,11 @@ const serversFor = (kind: MatchKind): CheckedServer[] =>
     .filter(isChecked)
     .filter((server) => {
       const settings =
-        server === 'plex' ? getSettings().plex : jellyfinFamily(server);
+        server === 'plex'
+          ? getSettings().plex
+          : server === 'silo'
+            ? siloSettings()
+            : jellyfinFamily(server);
       if (kind === 'music') {
         return (
           musicReady() &&
@@ -243,12 +253,19 @@ const serversFor = (kind: MatchKind): CheckedServer[] =>
       }
       const type = kind === 'movie' ? 'movie' : 'show';
       return settings.libraries.some(
-        (library) => library.enabled && library.type === type
+        (library) =>
+          library.enabled && (library.type === type || library.type === 'mixed')
       );
     });
 
 const kindOfServer = (name: MediaServerName): CheckedServer =>
-  name === 'Plex' ? 'plex' : name === 'Emby' ? 'emby' : 'jellyfin';
+  name === 'Plex'
+    ? 'plex'
+    : name === 'Emby'
+      ? 'emby'
+      : name === 'Silo'
+        ? 'silo'
+        : 'jellyfin';
 
 /**
  * Shares a "recently added since" read between titles; re-reads for a title
@@ -343,6 +360,9 @@ class Reading {
       }
       return items;
     }
+    if (server === 'silo') {
+      return this.readNewestSilo(kind, since);
+    }
     const api = await jellyfinClient(server);
     const items: MatchItem[] = [];
     for (const library of jellyfinFamily(server).libraries) {
@@ -369,6 +389,62 @@ class Reading {
     return items;
   }
 
+  /**
+   * Silo's newest films, or the series of its newest episodes, with the
+   * folders their files are in.
+   */
+  private async readNewestSilo(
+    kind: 'movie' | 'series',
+    since: Date
+  ): Promise<MatchItem[]> {
+    const client = siloClient({ timeout: TIMEOUT_MS });
+    const type = kind === 'movie' ? 'movie' : 'show';
+    const newestFirst = (a: SiloCatalogItem, b: SiloCatalogItem) =>
+      Date.parse(b.added_at) - Date.parse(a.added_at);
+    const items: MatchItem[] = [];
+    for (const library of siloSettings().libraries) {
+      if (
+        !library.enabled ||
+        (library.type !== type && library.type !== 'mixed')
+      ) {
+        continue;
+      }
+      // Start a little before the import, as for the other servers.
+      const added = (
+        await client.listCatalogItems({
+          libraryId: library.id,
+          type: kind === 'movie' ? 'movie' : 'episode',
+          addedAfter: new Date(since.getTime() - HOUR_MS),
+          includeFilePaths: true,
+        })
+      )
+        .sort(newestFirst)
+        .slice(0, NEWEST);
+      if (kind === 'movie') {
+        items.push(...added.map((film) => siloMatchItem('movie', film)));
+        continue;
+      }
+      const files = new Map<string, string[]>();
+      for (const episode of added) {
+        if (!episode.series_id) continue;
+        files.set(episode.series_id, [
+          ...(files.get(episode.series_id) ?? []),
+          ...episode.versions.flatMap((v) =>
+            v.file_path ? [v.file_path] : []
+          ),
+        ]);
+      }
+      if (!files.size) continue;
+      const series = await client.getCatalogItems([...files.keys()]);
+      items.push(
+        ...series.map((show) =>
+          siloMatchItem('series', show, files.get(show.content_id))
+        )
+      );
+    }
+    return items;
+  }
+
   /** One film or series by server id; undefined once gone. */
   public async item(
     server: CheckedServer,
@@ -378,6 +454,13 @@ class Reading {
     if (server === 'plex') {
       const item = await (await this.plexClient()).getMatchItem(key);
       return item ? plexMatchItem(kind, item as PlexLibraryItem) : undefined;
+    }
+    if (server === 'silo') {
+      // Folders don't matter here: the check compares by the *arr's folder.
+      const [item] = await siloClient({ timeout: TIMEOUT_MS }).getCatalogItems([
+        key,
+      ]);
+      return item ? siloMatchItem(kind, item) : undefined;
     }
     const api = await jellyfinClient(server);
     const [item] = await api.getMatchItems({ ids: [key] }, TIMEOUT_MS);
@@ -399,6 +482,8 @@ class Reading {
     since: Date
   ): Promise<ServerAlbum[]> {
     const found: ServerAlbum[] = [];
+    // Silo has no music libraries.
+    if (server === 'silo') return found;
     if (server === 'plex') {
       const plex = await this.plexClient();
       for (const library of getSettings().plex.musicLibraries ?? []) {
@@ -441,6 +526,7 @@ class Reading {
     server: CheckedServer,
     key: string
   ): Promise<ServerAlbum | undefined> {
+    if (server === 'silo') return undefined;
     if (server === 'plex') {
       try {
         const album = await (await this.plexClient()).getMusicItem(key);

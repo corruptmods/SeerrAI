@@ -1269,7 +1269,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 itemKey={
                   data.mediaInfo.ratingKey ??
                   data.mediaInfo.jellyfinMediaId ??
-                  data.mediaInfo.embyMediaId
+                  data.mediaInfo.embyMediaId ??
+                  data.mediaInfo.siloMediaId
                 }
               />
             )}

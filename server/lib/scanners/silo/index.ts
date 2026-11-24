@@ -82,8 +82,8 @@ export class SiloScanner
     this.libraryItems = new LibraryItems('silo');
     this.unidentified = new UnidentifiedTitles({
       server: 'Silo',
-      verb: 'identified',
-      hint: "check the title's match in Silo",
+      verb: 'matched',
+      hint: 'use Match Item on the title',
     });
   }
 

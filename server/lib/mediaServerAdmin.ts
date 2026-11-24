@@ -222,6 +222,10 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   if (isJellyfinFamily(kind) || kind === 'silo') {
     settings[kind].apiKey = '';
   }
+  // Its play history copy is cleared below and read in full on reconnecting.
+  if (kind === 'silo') {
+    settings.silo.historyCopiedTo = '';
+  }
   deriveMediaServerLogin();
   await settings.save();
 

@@ -216,6 +216,44 @@ describe('copying Silo’s play history', () => {
     await assert.rejects(() => syncSiloHistory(), /API v3/);
   });
 
+  it('reads again from the old mark after a read that failed part-way', async () => {
+    silo.plays = [play('s-first', 'movie-glasswing', 0)];
+    await syncSiloHistory();
+    silo.plays.push(
+      ...Array.from({ length: 250 }, (_, i) =>
+        play(`n-${String(i).padStart(3, '0')}`, 'movie-glasswing', 10 + i)
+      )
+    );
+    // Silo stops answering after the first (newest) page.
+    silo.afterHistoryPage = () => {
+      silo.afterHistoryPage = undefined;
+      silo.down = true;
+    };
+    await assert.rejects(() => syncSiloHistory());
+    assert.equal(getSettings().silo.historyCopiedTo, at(0), 'not moved');
+    silo.down = false;
+    silo.calls = [];
+    await syncSiloHistory();
+    assert.equal(
+      historyCalls()[0].query.ended_after,
+      new Date(Date.parse(at(0)) - SILO_HISTORY_OVERLAP_MS).toISOString()
+    );
+    assert.equal(await getRepository(SiloPlay).count(), 251, 'no hole');
+    assert.equal(getSettings().silo.historyCopiedTo, at(259));
+  });
+
+  it('moves on past plays it doesn’t keep, such as books', async () => {
+    silo.plays = [play('s-book', 'book-1', 30)];
+    await syncSiloHistory();
+    assert.equal(await getRepository(SiloPlay).count(), 0);
+    silo.calls = [];
+    await syncSiloHistory();
+    assert.equal(
+      historyCalls()[0].query.ended_after,
+      new Date(Date.parse(at(30)) - SILO_HISTORY_OVERLAP_MS).toISOString()
+    );
+  });
+
   it('reads once for callers that ask at the same time', async () => {
     silo.plays = [play('s-1', 'movie-glasswing', 1)];
     await Promise.all([syncSiloHistory(), syncSiloHistory()]);

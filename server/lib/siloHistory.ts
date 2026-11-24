@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
 import { isConnected } from '@server/lib/mediaServers';
+import { getSettings } from '@server/lib/settings';
 import { siloClient } from '@server/lib/silo';
 import logger from '@server/logger';
 import { In } from 'typeorm';
@@ -13,10 +14,13 @@ import { In } from 'typeorm';
  * don't walk Silo's history each time.
  *
  * Every few minutes (the silo-history-sync job, and before a watch history
- * read) Seerr AI reads the plays that ended since the newest it holds, less
- * an overlap, and stores them by Silo's session id: Silo may update a play
- * later, moving its end on, and the overlap covers plays Silo was recording
- * while the last read ran. The first read copies everything.
+ * read) Seerr AI reads the plays that ended since the last read that
+ * finished (its mark, settings.silo.historyCopiedTo), less an overlap, and
+ * stores them by Silo's session id: Silo may update a play later, moving its
+ * end on, and the overlap covers plays Silo was recording while the last
+ * read ran. The mark moves to the newest play Silo listed, of any kind, only
+ * once a read has gone through every page, so a read that fails part-way
+ * is read again from the old mark. The first read copies everything.
  *
  * Silo's history names neither the episode's series nor anything once the
  * item has left its catalog, so each new play's title is found when it is
@@ -237,14 +241,20 @@ const storePage = async (
   return rows.length;
 };
 
-/** When the newest stored play ended; undefined when none is stored. */
-const newestStored = async (): Promise<Date | undefined> => {
-  const [newest] = await getRepository(SiloPlay).find({
-    select: { id: true, endedAt: true },
-    order: { endedAt: 'DESC' },
-    take: 1,
-  });
-  return newest?.endedAt;
+/** Until when the copy is complete; undefined before a first full read. */
+const copiedTo = (): Date | undefined => {
+  const mark = getSettings().silo.historyCopiedTo;
+  const time = mark ? Date.parse(mark) : NaN;
+  return Number.isFinite(time) ? new Date(time) : undefined;
+};
+
+/** Moves the mark on, after a read that went through every page. */
+const markCopiedTo = async (newest: Date | undefined): Promise<void> => {
+  const mark = copiedTo();
+  if (!newest || (mark && mark.getTime() >= newest.getTime())) return;
+  const settings = getSettings();
+  settings.silo.historyCopiedTo = newest.toISOString();
+  await settings.save();
 };
 
 /** Reads plays that ended from `after` on (everything without it). */
@@ -295,11 +305,12 @@ const run = async (full: boolean): Promise<SiloHistoryResult> => {
   const client = siloClient();
   await client.getCompatibleInfo();
   if (!full) {
-    const newest = await newestStored();
-    const after = newest
-      ? new Date(newest.getTime() - SILO_HISTORY_OVERLAP_MS)
+    const mark = copiedTo();
+    const after = mark
+      ? new Date(mark.getTime() - SILO_HISTORY_OVERLAP_MS)
       : undefined;
-    const { read, stored } = await readFrom(client, after, false);
+    const { read, stored, newest } = await readFrom(client, after, false);
+    await markCopiedTo(newest);
     return { full, read, stored, removed: 0 };
   }
   // Everything, then again from just before the newest play Silo listed: a
@@ -313,6 +324,7 @@ const run = async (full: boolean): Promise<SiloHistoryResult> => {
     ? await readFrom(client, since, true, seen)
     : { read: 0, stored: 0 };
   const removed = await dropUnlisted(seen);
+  await markCopiedTo(all.newest);
   return {
     full,
     read: all.read,
@@ -392,6 +404,11 @@ export const pruneSiloPlays = async (): Promise<number> => {
   if (!isConnected('silo')) {
     const count = await repo.count();
     if (count) await repo.clear();
+    const settings = getSettings();
+    if (settings.silo.historyCopiedTo) {
+      settings.silo.historyCopiedTo = '';
+      await settings.save();
+    }
     return count;
   }
   try {

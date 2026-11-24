@@ -473,6 +473,8 @@ export const storeSilo = async (
   if (silo.serverId && silo.serverId !== connection.serverId) {
     silo.libraries = [];
     silo.keyId = '';
+    // The old Silo's play history copy goes; the new one is read in full.
+    silo.historyCopiedTo = '';
     reset = SILO_LINKS_RESET;
   }
   Object.assign(silo, siloAddressOf(input), {

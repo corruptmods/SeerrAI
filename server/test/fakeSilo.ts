@@ -323,6 +323,8 @@ export const createFakeSilo = (): FakeSilo => {
       apiKey: 'sa_test',
       serverId: fake.serverId,
       connected: true,
+      // Settings merge, so an unset mark must be written as empty.
+      historyCopiedTo: '',
       ...overrides,
     }),
     reset: () => {

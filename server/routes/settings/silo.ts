@@ -46,6 +46,7 @@ const shown = (silo: SiloSettings) => {
   const rest: Partial<SiloSettings> = { ...silo };
   // Only for deleting Seerr AI's own key later.
   delete rest.keyId;
+  delete rest.historyCopiedTo;
   return { ...rest, apiKey: '', hasApiKey: !!silo.apiKey };
 };
 

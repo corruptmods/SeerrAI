@@ -143,6 +143,12 @@ export interface SiloSettings {
   keyId?: string;
   /** Optional scopes the key was found to hold at connect. */
   optionalScopes?: SiloOptionalScope[];
+  /**
+   * Seerr AI's copy of Silo's play history holds every play that ended
+   * before this (ISO time), less an overlap: moved on only when a read
+   * finishes. Unset or empty: the next read copies everything.
+   */
+  historyCopiedTo?: string;
 }
 
 /** An unconfigured Silo server. */

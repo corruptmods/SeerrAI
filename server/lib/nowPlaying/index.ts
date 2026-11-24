@@ -6,19 +6,21 @@ import type { MediaServerKind } from '@server/constants/server';
 import { MEDIA_ID, USER_ID } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import SiloEpisode from '@server/entity/SiloEpisode';
 import { User } from '@server/entity/User';
 import {
   connectedServers,
   isJellyfinFamily,
   jellyfinClient,
 } from '@server/lib/mediaServers';
+import { siloClient } from '@server/lib/silo';
 import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
  * What a user is watching, for Siri's "Fix this show": current sessions on
- * each connected server, else what they stopped in the last half hour (they
+ * each connected server (Silo's as /admin/sessions lists them), else what they stopped in the last half hour (they
  * may have stopped it to report it). Only library titles count, since only
  * those can be reported.
  */
@@ -105,6 +107,58 @@ const fromJellyfin = (
   };
 };
 
+/**
+ * A user's Silo sessions: their account's, or only their chosen profile's.
+ * Silo names the episode playing, not its series, so the series comes from
+ * the scans' episode list, else Silo's catalog.
+ */
+const fromSilo = async (user: User): Promise<Session[]> => {
+  const account = user.siloUserId;
+  if (!account) return [];
+  const client = siloClient({ timeout: 10_000 });
+  const playing = (await client.listSessions(account)).filter(
+    (s) =>
+      s.user_id === account &&
+      (!user.siloProfileId || s.profile_id === user.siloProfileId) &&
+      !!s.media_item_id &&
+      (s.media_type === 'movie' || s.media_type === 'episode')
+  );
+  const episodeIds = playing
+    .filter((s) => s.media_type === 'episode')
+    .map((s) => s.media_item_id as string);
+  const seriesOf = new Map<string, string>();
+  if (episodeIds.length) {
+    const known = await getRepository(SiloEpisode).find({
+      select: { contentId: true, seriesId: true },
+      where: { contentId: In(episodeIds) },
+    });
+    known.forEach((row) => seriesOf.set(row.contentId, row.seriesId));
+    const ask = episodeIds.filter((id) => !seriesOf.has(id));
+    if (ask.length) {
+      for (const item of await client.getCatalogItems(ask)) {
+        if (item.series_id) seriesOf.set(item.content_id, item.series_id);
+      }
+    }
+  }
+  return playing.flatMap((s): Session[] => {
+    const id = s.media_item_id as string;
+    const movie = s.media_type === 'movie';
+    const titleId = movie ? id : seriesOf.get(id);
+    if (!titleId) return [];
+    return [
+      {
+        server: 'silo',
+        titleId,
+        movie,
+        title: (movie ? s.media_title : s.series_title) ?? '',
+        season: movie ? undefined : s.season_number,
+        episode: movie ? undefined : s.episode_number,
+        paused: !!s.is_paused,
+      },
+    ];
+  });
+};
+
 class NowPlayingReader {
   /**
    * This user's sessions on a server. Plex sessions list the owner as user
@@ -135,6 +189,7 @@ class NowPlayingReader {
         })
         .flatMap((s) => fromPlex(s) ?? []);
     }
+    if (server === 'silo') return fromSilo(user);
     if (!isJellyfinFamily(server)) return [];
     const viewer = user[USER_ID[server]];
     if (!viewer) return [];

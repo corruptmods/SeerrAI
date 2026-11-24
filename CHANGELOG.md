@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.5.0 (24 November 2026)
+
+An Effort setting for AI and AI Search that keeps to the genre you ask for, one switch for anime, subtitles fixed or transcribed for a whole title, wrong episodes re-numbered, TV films and Approve anyway in Backfill, and fixes from upstream.
 
 ### New
 

@@ -9,6 +9,7 @@ import { forgetPreviousSilo } from '@server/lib/siloConnect';
 import {
   SILO_HISTORY_OVERLAP_MS,
   SiloHistoryStopped,
+  freshSiloHistory,
   resetSiloHistorySync,
   siloHistorySync,
   syncSiloHistory,
@@ -283,6 +284,30 @@ describe('copying Silo’s play history', () => {
     await syncSiloHistory();
     assert.equal(historyCalls()[0].query.ended_after, undefined);
     assert.equal(await getRepository(SiloPlay).count(), 250);
+  });
+
+  it('tells readers at once while Silo just failed, then asks again', async () => {
+    silo.down = true;
+    await assert.rejects(() => freshSiloHistory());
+    const asked = silo.calls.length;
+    await assert.rejects(() => freshSiloHistory());
+    assert.equal(silo.calls.length, asked, 'not asked again yet');
+    silo.down = false;
+    resetSiloHistorySync();
+    await freshSiloHistory();
+  });
+
+  it('serves the copy while the nightly re-read runs', async () => {
+    silo.plays = Array.from({ length: 1000 }, (_, i) =>
+      play(`s-${String(i).padStart(4, '0')}`, 'movie-glasswing', i)
+    );
+    const done: string[] = [];
+    const nightly = syncSiloHistory({ full: true }).then(() =>
+      done.push('nightly')
+    );
+    await freshSiloHistory().then(() => done.push('reader'));
+    await nightly;
+    assert.deepEqual(done, ['reader', 'nightly']);
   });
 
   it('reads once for callers that ask at the same time', async () => {

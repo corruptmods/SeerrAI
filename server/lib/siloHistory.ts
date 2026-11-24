@@ -41,6 +41,12 @@ export const SILO_HISTORY_OVERLAP_MS = 15 * 60 * 1000;
 /** A read this recent is fresh enough for watch history. */
 const FRESH_MS = 30 * 1000;
 
+/**
+ * After a read fails, watch history readers are told at once for this long
+ * instead of each waiting on Silo again.
+ */
+const FAILED_MS = 30 * 1000;
+
 /** Rows written per statement. */
 const WRITE_CHUNK = 50;
 
@@ -434,6 +440,8 @@ const run = async (full: boolean): Promise<SiloHistoryResult> => {
 
 let current: { full: boolean; promise: Promise<SiloHistoryResult> } | undefined;
 let syncedAt = 0;
+/** The last read's failure, and when, while it is recent. */
+let failed: { at: number; error: unknown } | undefined;
 
 /**
  * Copies Silo's new plays (a full re-read with `full`). One read at a time:
@@ -450,7 +458,14 @@ export const syncSiloHistory = async ({
   const promise: Promise<SiloHistoryResult> = run(full)
     .then((result) => {
       syncedAt = Date.now();
+      failed = undefined;
       return result;
+    })
+    .catch((error) => {
+      if (!(error instanceof SiloHistoryStopped)) {
+        failed = { at: Date.now(), error };
+      }
+      throw error;
     })
     .finally(() => {
       // A read stopped by stopSiloHistory may end after a new one began.
@@ -468,6 +483,7 @@ export const stopSiloHistory = (): void => {
   generation += 1;
   current = undefined;
   syncedAt = 0;
+  failed = undefined;
 };
 
 /**
@@ -475,13 +491,20 @@ export const stopSiloHistory = (): void => {
  * when Silo can't be read: "could not ask" is not "watched nothing".
  */
 export const freshSiloHistory = async (): Promise<void> => {
+  // The nightly re-read takes long: the copy is served as it is meanwhile.
+  if (current?.full) return;
   if (Date.now() - syncedAt < FRESH_MS && !current) return;
+  // Silo just failed: say so at once rather than wait on it again.
+  if (failed && Date.now() - failed.at < FAILED_MS && !current) {
+    throw failed.error;
+  }
   await syncSiloHistory();
 };
 
 /** Forgets when the copy was last brought up to date (tests). */
 export const resetSiloHistorySync = (): void => {
   syncedAt = 0;
+  failed = undefined;
 };
 
 /** The silo-history-sync job: never throws; Silo down is retried next run. */

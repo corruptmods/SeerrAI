@@ -45,16 +45,15 @@ RUN if [ -d node_modules/.pnpm ]; then \
 # Build tools that other packages bring along but the running server never
 # loads: Next's compiler (next.config is plain JavaScript), and @swc/core,
 # ts-node and typescript (the server runs compiled from dist/); node-gyp
-# and the download cache and file matching it uses, which only build sqlite3
-# at install. Source maps go too: nothing reads them.
+# and the file matching it uses, which only build sqlite3 at install (its
+# undici stays: cheerio uses it at runtime). Source maps go too: nothing
+# reads them.
 RUN rm -rf \
   node_modules/.pnpm/@next+swc-* \
   node_modules/.pnpm/@swc+core* \
   node_modules/.pnpm/ts-node@* \
   node_modules/.pnpm/typescript@* \
   node_modules/.pnpm/node-gyp@* \
-  node_modules/.pnpm/make-fetch-happen@* \
-  node_modules/.pnpm/http-cache-semantics@* \
   node_modules/.pnpm/tinyglobby@* \
   node_modules/.pnpm/fdir@* \
   node_modules/.pnpm/picomatch@* \
@@ -71,7 +70,7 @@ RUN \
   'linux/arm64' | 'linux/arm/v7') \
   apk update && \
   apk add --no-cache python3 make g++ gcc libc6-compat bash && \
-  npm install --global --ignore-scripts node-gyp@12.2.0 \
+  npm install --global --ignore-scripts node-gyp@12.4.0 \
   ;; \
   esac
 

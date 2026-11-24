@@ -590,12 +590,13 @@ export const chat = async (
   // for slasher films.
   const results = resolved.filter((result) => fitsGenres(result, answer.g));
   /**
-   * Suggestions they have not watched yet, back to the usual 6. A title
+   * Suggestions they have not watched yet, cut to the usual 6 when the model
+   * stayed within the 10 it was allowed. A title
    * named in their own words stays: that is one they asked about.
    */
   const unwatched = async () => {
     if (!answer.suggesting) {
-      return results.slice(0, 6);
+      return results;
     }
     const watched = await awaitWithin(
       watchedRead ?? Promise.resolve(undefined),
@@ -604,15 +605,16 @@ export const chat = async (
     const theirs = ` ${nameKey(
       [message, ...turns.map((turn) => turn.ask)].join(' ')
     )} `;
-    return results
-      .filter((result) => {
-        const key = nameKey(resultName(result));
-        return (
-          (key && theirs.includes(` ${key} `)) ||
-          !watched?.keys.has(watchedKey(result.mediaType, result.id))
-        );
-      })
-      .slice(0, 6);
+    const fresh = results.filter((result) => {
+      const key = nameKey(resultName(result));
+      return (
+        (key && theirs.includes(` ${key} `)) ||
+        !watched?.keys.has(watchedKey(result.mediaType, result.id))
+      );
+    });
+    // Within the "up to 10" allowance, 6 is plenty; past it they asked for
+    // more, so the length stays.
+    return answer.titles.length <= 10 ? fresh.slice(0, 6) : fresh;
   };
   if (resolved.length && !results.length && !anyMusic) {
     logger.info('AI chat offered no titles of the genre asked for', {

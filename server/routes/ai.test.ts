@@ -1543,8 +1543,8 @@ describe('AI Search suggestions they have watched', () => {
   beforeEach(async () => {
     historyFails = false;
     stub('searchMovies', async ({ query }: { query: string }) => {
-      // "Film 1" to "Film 9", none watched.
-      const numbered = /^Film (\d)$/.exec(query);
+      // "Film 1" to "Film 20", none watched.
+      const numbered = /^Film (\d+)$/.exec(query);
       const found = numbered
         ? film(7510 + Number(numbered[1]), query)
         : FILMS[query];
@@ -1749,6 +1749,24 @@ describe('AI Search suggestions they have watched', () => {
     );
     assert.deepEqual(ids, [7511, 7512, 7513, 7514, 7515, 7516]);
     assert.match(calls[0].system, /give up to 10/);
+  });
+
+  it('keeps every title when more than 10 were asked for', async () => {
+    await warm();
+    const fifteen = Array.from({ length: 15 }, (_, i) => `Film ${i + 1}`);
+    const expected = fifteen.map((_, i) => 7511 + i);
+    for (const marked of ['"s":true,', '']) {
+      const { ids } = await ask(
+        `{"r":"Fifteen.",${marked}"titles":[${titles(...fifteen)}]}`,
+        'give me 15 heist films'
+      );
+      assert.deepEqual(ids, expected, marked);
+    }
+    // Watched ones still leave a suggestion that went past the allowance.
+    const { ids } = await ask(
+      `{"r":"Fifteen.","s":true,"titles":[${titles('Glasswing', ...fifteen)}]}`
+    );
+    assert.deepEqual(ids, expected);
   });
 
   it('says so when every suggestion was watched', async () => {

@@ -194,6 +194,7 @@ describe('database maintenance', () => {
       libraryItems: 0,
       qualityApplies: 0,
       discordMessages: 0,
+      siloEpisodes: 0,
     });
     assert.deepEqual(
       (

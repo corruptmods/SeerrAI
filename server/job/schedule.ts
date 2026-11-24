@@ -29,6 +29,7 @@ import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
 import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
+import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -77,8 +78,14 @@ export const runJob =
     }
   };
 
+/** The full and recently added scanners of Jellyfin, Emby or Silo. */
+const scannersOf = (kind: Exclude<MediaServerKind, 'plex'>) =>
+  kind === 'silo'
+    ? { full: siloFullScanner, recent: siloRecentScanner }
+    : jellyfinScanners(kind);
+
 const recentScanner = (kind: MediaServerKind) =>
-  kind === 'plex' ? plexRecentScanner : jellyfinScanners(kind).recent;
+  kind === 'plex' ? plexRecentScanner : scannersOf(kind).recent;
 
 /** Jobs for one media server, registered while it's connected. */
 const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
@@ -164,7 +171,7 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
   }
 
   const name = serverName(kind);
-  const scanners = jellyfinScanners(kind);
+  const scanners = scannersOf(kind);
   const recentId = `${kind}-recently-added-scan` as const;
   const fullId = `${kind}-full-scan` as const;
 

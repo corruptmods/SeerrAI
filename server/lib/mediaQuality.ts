@@ -279,6 +279,44 @@ export const jellyfinSourceQuality = (source: {
     : { resolutions: [resolution] };
 };
 
+/** The frame height in a Silo resolution label ('2160p', '4k', 'uhd'). */
+export const siloResolutionHeight = (label?: string | null): number => {
+  const text = (label ?? '').trim().toLowerCase();
+  if (text === '4k' || text === 'uhd') return 2160;
+  const height = Number(text.replace(/p$/, ''));
+  return Number.isFinite(height) && height > 0 ? height : 0;
+};
+
+/** Silo's dynamic_range values, as HDR formats. */
+const SILO_RANGES: Record<string, DynamicRange[]> = {
+  sdr: [],
+  hdr10: ['HDR10'],
+  hdr10_plus: ['HDR10+'],
+  hlg: ['HLG'],
+  dolby_vision: ['DV'],
+};
+
+/**
+ * One Silo version (a file). hdr_unknown, an absent range or one Silo adds
+ * later says nothing, so no HDR badge comes from it.
+ */
+export const siloVersionQuality = (version: {
+  resolution?: string | null;
+  dynamic_range?: string | null;
+}): SeenQuality | undefined => {
+  const resolution = resolutionOf(
+    undefined,
+    siloResolutionHeight(version.resolution)
+  );
+  if (!resolution) {
+    return undefined;
+  }
+  const ranges = SILO_RANGES[version.dynamic_range ?? ''];
+  return ranges
+    ? { resolutions: [resolution], ranges: [...ranges] }
+    : { resolutions: [resolution] };
+};
+
 /** A Radarr movie file: Radarr reads every file's media info on import. */
 export const radarrFileQuality = (file?: {
   mediaInfo?: {

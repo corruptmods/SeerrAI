@@ -8,6 +8,11 @@ export interface MediaServerSummary {
   connected: boolean;
   primary: boolean;
   signIn: boolean;
+  /**
+   * Whether people can sign in with this server at all; false for Silo,
+   * which also can't be made primary yet.
+   */
+  signInOffered: boolean;
   libraries: number;
   enabledLibraries: number;
   /** Last scan of an enabled library, epoch ms. */

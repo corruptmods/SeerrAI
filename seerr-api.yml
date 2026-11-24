@@ -1041,7 +1041,7 @@ components:
           description: The media servers this person has an account linked from.
           items:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
         plexToken:
           type: string
           readOnly: true
@@ -1302,6 +1302,7 @@ components:
         mediaServerType:
           type: number
           example: 1
+          description: 1 Plex, 2 Jellyfin, 3 Emby, 4 not set up yet, 5 Silo.
         newPlexLogin:
           type: boolean
           example: true
@@ -1615,6 +1616,87 @@ components:
         - id
         - name
         - enabled
+    SiloLibrary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: Films
+        enabled:
+          type: boolean
+          example: false
+        type:
+          type: string
+          enum: [movie, show, mixed]
+          description: mixed holds both films and series.
+        lastScan:
+          type: number
+      required:
+        - id
+        - name
+        - enabled
+    SiloSettings:
+      type: object
+      properties:
+        name:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+        port:
+          type: number
+          example: 8090
+        useSsl:
+          type: boolean
+        urlBase:
+          type: string
+        externalHostname:
+          type: string
+        forgotPasswordUrl:
+          type: string
+        libraries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiloLibrary'
+        serverId:
+          type: string
+          readOnly: true
+        apiKey:
+          type: string
+          description: Always empty in answers.
+        hasApiKey:
+          type: boolean
+          readOnly: true
+        connected:
+          type: boolean
+          readOnly: true
+        serverVersion:
+          type: string
+          readOnly: true
+        optionalScopes:
+          type: array
+          readOnly: true
+          description: Optional scopes the key was found to hold.
+          items:
+            type: string
+            enum: ['admin:users', 'admin:catalog:paths']
+    SiloSyncStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        progress:
+          type: number
+        total:
+          type: number
+        currentLibrary:
+          $ref: '#/components/schemas/SiloLibrary'
+        libraries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiloLibrary'
     JellyfinSettings:
       type: object
       properties:
@@ -2433,7 +2515,7 @@ components:
             properties:
               kind:
                 type: string
-                enum: [plex, jellyfin, emby]
+                enum: [plex, jellyfin, emby, silo]
               name:
                 type: string
               primary:
@@ -2502,7 +2584,7 @@ components:
           type: integer
         kind:
           type: string
-          enum: [plex, jellyfin, emby]
+          enum: [plex, jellyfin, emby, silo]
         action:
           type: string
           enum: [remove, add, person]
@@ -2544,7 +2626,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [plex, jellyfin, emby]
+          enum: [plex, jellyfin, emby, silo]
         name:
           type: string
           description: The server's own name, once Seerr has been connected to it.
@@ -2555,6 +2637,9 @@ components:
         signIn:
           type: boolean
           description: People may sign in with their account on this server.
+        signInOffered:
+          type: boolean
+          description: Whether people can sign in with this server at all. False for Silo, which can't be made primary yet either.
         libraries:
           type: number
         enabledLibraries:
@@ -3699,7 +3784,7 @@ components:
           type: object
           nullable: true
           readOnly: true
-          description: What each media server (plex, jellyfin, emby) and Radarr saw of the title at its last scan, by side (standard, 4k). Shown as availableQuality.
+          description: What each media server (plex, jellyfin, emby, silo) and Radarr saw of the title at its last scan, by side (standard, 4k). Shown as availableQuality.
         availableQuality:
           $ref: '#/components/schemas/AvailableQuality'
         availableQuality4k:
@@ -3720,6 +3805,15 @@ components:
           type: string
           nullable: true
           readOnly: true
+        siloMediaId:
+          type: string
+          nullable: true
+          readOnly: true
+          description: Silo's content id for the title.
+        siloMediaId4k:
+          type: string
+          nullable: true
+          readOnly: true
         mediaUrl:
           type: string
           readOnly: true
@@ -3733,7 +3827,7 @@ components:
             properties:
               server:
                 type: string
-                enum: [plex, jellyfin, emby]
+                enum: [plex, jellyfin, emby, silo]
               name:
                 type: string
                 example: Plex
@@ -5711,6 +5805,155 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/JellyfinLibrary'
+  /settings/silo:
+    get:
+      summary: Get Silo settings
+      description: Retrieves the Silo settings. The saved API key is never sent; hasApiKey says whether one is saved.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSettings'
+    post:
+      summary: Update Silo settings
+      description: Tries Silo at the given address with the given API key (a blank key keeps the saved one for the same address), then saves them and reads its film and series libraries again. Connecting and removing Silo is under /settings/media-servers.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: number
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+                externalHostname:
+                  type: string
+                forgotPasswordUrl:
+                  type: string
+                apiKey:
+                  type: string
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSettings'
+        '400':
+          description: Silo speaks an API version Seerr AI doesn't support, or the form is incomplete
+        '403':
+          description: The API key lacks a scope Seerr AI needs
+        '502':
+          description: Silo could not be reached
+  /settings/silo/library:
+    get:
+      summary: Get Silo libraries
+      description: Silo's film and series libraries as Seerr AI keeps them. Book, podcast and manga libraries are left out.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Silo libraries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SiloLibrary'
+  /settings/silo/library/{libraryId}:
+    put:
+      summary: Turn a Silo library on or off
+      description: Whether Seerr AI scans this Silo library.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: The library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloLibrary'
+        '404':
+          description: No such library
+  /settings/silo/library/sync:
+    post:
+      summary: Read Silo's libraries again
+      description: Reads Silo's film and series libraries again. Whether each is on is kept.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Silo libraries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SiloLibrary'
+  /settings/silo/sync:
+    get:
+      summary: Get the status of Silo's full scan
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Status of the Silo full scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSyncStatus'
+    post:
+      summary: Start or cancel Silo's full scan
+      tags:
+        - settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancel:
+                  type: boolean
+                  example: false
+                start:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Status of the Silo full scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSyncStatus'
   /settings/plex:
     get:
       summary: Get Plex settings
@@ -6035,7 +6278,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6137,7 +6380,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Counts of people
@@ -6163,7 +6406,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Removed; every media server
@@ -6184,7 +6427,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Every media server
@@ -6206,7 +6449,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6239,7 +6482,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Changes
@@ -6292,7 +6535,7 @@ paths:
                   properties:
                     kind:
                       type: string
-                      enum: [plex, jellyfin, emby]
+                      enum: [plex, jellyfin, emby, silo]
                     libraries:
                       type: array
                       items:
@@ -6323,7 +6566,7 @@ paths:
               properties:
                 kind:
                   type: string
-                  enum: [plex, jellyfin, emby]
+                  enum: [plex, jellyfin, emby, silo]
                 all:
                   type: boolean
                 libraries:
@@ -6352,7 +6595,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Libraries and people
@@ -6388,7 +6631,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6435,7 +6678,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:

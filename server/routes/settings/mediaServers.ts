@@ -32,8 +32,10 @@ import {
   jellyfinAccountColumns,
   primaryServer,
   serverName,
+  signInOffered,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import { storeSilo, trySilo } from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import { ApiError } from '@server/types/error';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
@@ -41,10 +43,10 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 
 /*
- * Settings → Media Servers: connecting and removing Plex, Jellyfin and Emby,
- * choosing the primary, and whether users may sign in with each. Editing a
- * connected server is at /settings/plex, /settings/jellyfin and
- * /settings/emby.
+ * Settings → Media Servers: connecting and removing Plex, Jellyfin, Emby and
+ * Silo, choosing the primary, and whether users may sign in with each.
+ * Editing a connected server is at /settings/plex, /settings/jellyfin,
+ * /settings/emby and /settings/silo.
  */
 
 /** Seerr's device id on a Jellyfin or Emby server, as used at setup. */
@@ -68,13 +70,15 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
     const scans = enabled
       .map((library) => library.lastScan)
       .filter((scan): scan is number => !!scan);
-    const family = isJellyfinFamily(kind) ? settings[kind] : undefined;
+    const family =
+      isJellyfinFamily(kind) || kind === 'silo' ? settings[kind] : undefined;
     return {
       kind,
       name: server.name ?? '',
       connected: connected.includes(kind),
       primary: kind === primary,
-      signIn: server.signIn !== false,
+      signIn: signInOffered(kind) && server.signIn !== false,
+      signInOffered: signInOffered(kind),
       libraries: libraries.length,
       enabledLibraries: enabled.length,
       lastScan: scans.length ? Math.max(...scans) : undefined,
@@ -317,6 +321,23 @@ const apiKeyAdmin = async (
   };
 };
 
+/*
+ * Connecting Silo: with an administrator's API key, or by signing in as an
+ * administrator once so Seerr AI creates its own key. Libraries are read at
+ * once and chosen at /settings/silo/library.
+ */
+const connectSilo = async (body: ConnectBody): Promise<void> => {
+  // Silo can't be the primary server yet.
+  if (!primaryServer()) {
+    throw new MediaServerChangeError(
+      400,
+      'Set up Seerr AI with Plex, Jellyfin or Emby first, then connect Silo.'
+    );
+  }
+  const connection = await trySilo(body);
+  await storeSilo(body, connection, { connect: true });
+};
+
 /** A Jellyfin or Emby server's address from the form. */
 const familyAddress = (body: ConnectBody) => ({
   ip: body.hostname ?? '',
@@ -443,11 +464,15 @@ mediaServerRoutes.post<{ kind: string }>(
     }
     try {
       const body = req.body as ConnectBody;
-      const done =
-        kind === 'plex'
-          ? await connectPlex(req, body, next)
-          : await connectJellyfinFamily(req, kind, body, next);
-      if (!done) return;
+      if (kind === 'silo') {
+        await connectSilo(body);
+      } else {
+        const done =
+          kind === 'plex'
+            ? await connectPlex(req, body, next)
+            : await connectJellyfinFamily(req, kind, body, next);
+        if (!done) return;
+      }
       await connected(kind);
       return await listed(res);
     } catch (e) {

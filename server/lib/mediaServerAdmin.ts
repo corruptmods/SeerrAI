@@ -4,11 +4,13 @@ import {
   MUSIC_ALBUM_ID,
   USER_ID,
   isJellyfinFamily,
+  isMusicServerKind,
   typeOfKind,
 } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import SiloEpisode from '@server/entity/SiloEpisode';
 import { User } from '@server/entity/User';
 import type { MediaServerRemovalImpact } from '@server/interfaces/api/mediaServerInterfaces';
 import { refreshMediaServerJobs } from '@server/job/schedule';
@@ -19,6 +21,7 @@ import {
   linkedServers,
   primaryServer,
   serverName,
+  signInOffered,
 } from '@server/lib/mediaServers';
 import { usableProviderLinks } from '@server/lib/oidc';
 import type { MediaServerName } from '@server/lib/plexMatchCheck';
@@ -45,7 +48,9 @@ export class MediaServerChangeError extends Error {
 /** Whether any connected server allows sign-in. */
 const anyServerAllowsSignIn = (): boolean => {
   const settings = getSettings();
-  return connectedServers().some((kind) => settings[kind].signIn !== false);
+  return connectedServers().some(
+    (kind) => signInOffered(kind) && settings[kind].signIn !== false
+  );
 };
 
 /**
@@ -67,7 +72,7 @@ export const applyMediaServerLogin = (wanted: boolean | undefined): void => {
   if (typeof wanted === 'boolean' && connectedServers().length) {
     if (wanted !== anyServerAllowsSignIn()) {
       const settings = getSettings();
-      for (const kind of connectedServers()) {
+      for (const kind of connectedServers().filter(signInOffered)) {
         settings[kind].signIn = wanted;
       }
     }
@@ -87,12 +92,21 @@ export const setSignIn = async (
       `${serverName(kind)} is not connected.`
     );
   }
+  if (kind === 'silo' && signIn) {
+    throw new MediaServerChangeError(
+      400,
+      "Signing in with a Silo account isn't available yet."
+    );
+  }
   // Someone must still be able to sign in: by password or another server.
   if (
     !signIn &&
     settings.main.localLogin === false &&
     !connectedServers().some(
-      (other) => other !== kind && settings[other].signIn !== false
+      (other) =>
+        other !== kind &&
+        signInOffered(other) &&
+        settings[other].signIn !== false
     )
   ) {
     throw new MediaServerChangeError(
@@ -114,6 +128,14 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
       `${serverName(kind)} is not connected.`
     );
   }
+  // The primary server is also the one people sign in with at setup; Silo
+  // sign-in isn't available yet.
+  if (kind === 'silo') {
+    throw new MediaServerChangeError(
+      400,
+      "Silo can't be the primary server yet."
+    );
+  }
   settings.main.mediaServerType = typeOfKind(kind);
   await settings.save();
   logger.info(`${serverName(kind)} is now the primary media server`, {
@@ -132,7 +154,8 @@ export const removalImpact = async (
 ): Promise<MediaServerRemovalImpact> => {
   const settings = getSettings();
   const remaining = connectedServers().filter(
-    (other) => other !== kind && settings[other].signIn !== false
+    (other) =>
+      other !== kind && signInOffered(other) && settings[other].signIn !== false
   );
   const users = await getRepository(User)
     .createQueryBuilder('user')
@@ -141,6 +164,7 @@ export const removalImpact = async (
       'user.plexId',
       'user.jellyfinUserId',
       'user.embyUserId',
+      'user.siloUserId',
     ])
     .addSelect('user.password')
     .where(`user.${USER_ID[kind]} IS NOT NULL`)
@@ -197,7 +221,7 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
     settings.main.mediaServerType = typeOfKind(next);
   }
   settings[kind].connected = false;
-  if (isJellyfinFamily(kind)) {
+  if (isJellyfinFamily(kind) || kind === 'silo') {
     settings[kind].apiKey = '';
   }
   deriveMediaServerLogin();
@@ -212,10 +236,16 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   for (const column of MEDIA_ID[kind]) {
     await media.update({ [column]: Not(IsNull()) }, { [column]: null });
   }
-  await getRepository(MusicAlbum).update(
-    { [MUSIC_ALBUM_ID[kind]]: Not(IsNull()) },
-    { [MUSIC_ALBUM_ID[kind]]: null }
-  );
+  if (isMusicServerKind(kind)) {
+    await getRepository(MusicAlbum).update(
+      { [MUSIC_ALBUM_ID[kind]]: Not(IsNull()) },
+      { [MUSIC_ALBUM_ID[kind]]: null }
+    );
+  }
+  // Silo's episode list is rebuilt by its next full scan.
+  if (kind === 'silo') {
+    await getRepository(SiloEpisode).clear();
+  }
 
   await plexMatchCheck.dropServer(serverName(kind) as MediaServerName);
   await matchWatch.dropServer(serverName(kind) as MediaServerName);

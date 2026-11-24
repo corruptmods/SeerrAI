@@ -329,6 +329,30 @@ describe('the nightly full re-read', () => {
     assert.equal((await stored()).get('s-2')?.completed, true);
   });
 
+  it('moves old plays with an episode Silo filed under another series', async () => {
+    silo.plays = [play('s-1', 'series-garden-1-1', 1)];
+    await syncSiloHistory();
+    assert.equal((await stored()).get('s-1')?.titleId, 'series-garden');
+    // Silo merged the series: the scans now list the episode under another.
+    await getRepository(SiloEpisode).save(
+      new SiloEpisode({
+        contentId: 'series-garden-1-1',
+        seriesId: 'series-garden-merged',
+        libraryIds: ['2'],
+        season: 1,
+        episode: 1,
+      })
+    );
+    await syncSiloHistory();
+    assert.equal(
+      (await stored()).get('s-1')?.titleId,
+      'series-garden',
+      'the five-minute read leaves it'
+    );
+    await syncSiloHistory({ full: true });
+    assert.equal((await stored()).get('s-1')?.titleId, 'series-garden-merged');
+  });
+
   it('keeps a play Silo moved on while the long read ran', async () => {
     silo.plays = Array.from({ length: 201 }, (_, i) =>
       play(`s-${String(i).padStart(3, '0')}`, 'movie-glasswing', i)

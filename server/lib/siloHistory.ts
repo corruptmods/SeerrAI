@@ -202,6 +202,27 @@ const storePage = async (
   const placements = fresh.length
     ? await placementsFor(client, fresh)
     : new Map<string, Placement>();
+  // The nightly re-read places every episode by the scans' list again, so a
+  // series Silo re-identified or merged takes its old plays with it.
+  const listed = retry
+    ? new Map(
+        (
+          await getRepository(SiloEpisode).find({
+            select: {
+              contentId: true,
+              seriesId: true,
+              season: true,
+              episode: true,
+            },
+            where: {
+              contentId: In([
+                ...new Set(entries.map((entry) => entry.media_item_id)),
+              ]),
+            },
+          })
+        ).map((row) => [row.contentId, row])
+      )
+    : undefined;
 
   const rows = entries.map((entry) => {
     const row = existing.get(entry.session_id);
@@ -216,12 +237,15 @@ const storePage = async (
           }
         : undefined;
     const found = placements.get(entry.media_item_id);
+    const kind = found?.kind || kept?.kind || '';
+    const episode =
+      kind === 'episode' ? listed?.get(entry.media_item_id) : undefined;
     const place: Placement = {
-      kind: found?.kind || kept?.kind || '',
-      titleId: found?.titleId ?? kept?.titleId ?? null,
+      kind,
+      titleId: episode?.seriesId || found?.titleId || kept?.titleId || null,
       title: found?.title || kept?.title || '',
-      season: found?.season ?? kept?.season ?? null,
-      episode: found?.episode ?? kept?.episode ?? null,
+      season: found?.season ?? kept?.season ?? episode?.season ?? null,
+      episode: found?.episode ?? kept?.episode ?? episode?.episode ?? null,
     };
     return {
       sessionId: entry.session_id,

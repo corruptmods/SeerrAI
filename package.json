@@ -75,9 +75,9 @@
     "mime": "^4.1.0",
     "nanoid": "^6.0.1",
     "next": "16.4.6",
-    "node-gyp": "12.2.0",
+    "node-gyp": "12.4.0",
     "node-schedule": "2.1.1",
-    "nodemailer": "10.2.1",
+    "nodemailer": "10.6.0",
     "openid-client": "^6.8.8",
     "openpgp": "6.3.0",
     "pg": "8.23.0",
@@ -210,7 +210,6 @@
   "pnpm": {
     "auditConfig": {
       "ignoreGhsas": [
-        "GHSA-ch52-4w7c-c8xp",
         "GHSA-gcqx-w48m-w2h4",
         "GHSA-jmr9-qjv8-65gv",
         "GHSA-7pqw-9j4j-h8q3",
@@ -231,7 +230,7 @@
       "@types/react-dom": "19.2.3",
       "handlebars": ">=4.7.10",
       "tar": ">=7.5.21",
-      "nodemailer": "10.2.1",
+      "nodemailer": "10.6.0",
       "ip-address": ">=10.7.4",
       "commitizen>lodash": "4.18.1",
       "external-editor>tmp": ">=0.2.6",
@@ -243,10 +242,10 @@
       "multer": ">=2.5.0",
       "fast-uri": ">=3.1.9 <4",
       "cheerio>undici": ">=6.29.1 <7",
+      "node-gyp>undici": ">=6.29.1 <7",
       "postcss-selector-parser": ">=6.1.5 <7",
       "@cypress/request>uuid": ">=11.1.1",
-      "typeorm>glob": ">=14.0.2 <15",
-      "cacache>glob": ">=14.0.2 <15"
+      "typeorm>glob": ">=14.0.2 <15"
     },
     "patchedDependencies": {
       "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",

@@ -5,7 +5,11 @@ import SiloEpisode from '@server/entity/SiloEpisode';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
-import { connectedServers, signInAllowed } from '@server/lib/mediaServers';
+import {
+  connectedServers,
+  signInAllowed,
+  signInOffered,
+} from '@server/lib/mediaServers';
 import { getSettings, siloDefaults } from '@server/lib/settings';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
@@ -347,5 +351,17 @@ describe('a connected Silo', () => {
     const media = await getRepository(Media).findOneByOrFail({ tmdbId: 9100 });
     assert.equal(media.siloMediaId, null);
     assert.equal(await getRepository(SiloEpisode).count(), 0);
+  });
+
+  it('becomes primary on removing Plex only if it offers sign-in', async () => {
+    const res = await api('/media-servers/plex', { method: 'DELETE' });
+    if (signInOffered('silo')) {
+      assert.equal(res.status, 200);
+      assert.equal(getSettings().main.mediaServerType, MediaServerType.SILO);
+    } else {
+      assert.equal(res.status, 400);
+      assert.equal(getSettings().main.mediaServerType, MediaServerType.PLEX);
+      assert.equal(getSettings().plex.connected, true);
+    }
   });
 });

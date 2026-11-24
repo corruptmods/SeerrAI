@@ -216,9 +216,20 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
       'Seerr needs at least one media server. Connect another before removing this one.'
     );
   }
+  // The primary server is the one people sign in with at setup, so only a
+  // server that offers sign-in can take its place.
+  const nextPrimary = servers.find(
+    (other) => other !== kind && signInOffered(other)
+  );
+  if (primaryServer() === kind && !nextPrimary) {
+    throw new MediaServerChangeError(
+      400,
+      `${serverName(kind)} is the primary server, and no other connected server can take its place. Connect Plex, Jellyfin or Emby before removing it.`
+    );
+  }
 
-  if (primaryServer() === kind) {
-    settings.main.mediaServerType = typeOfKind(next);
+  if (primaryServer() === kind && nextPrimary) {
+    settings.main.mediaServerType = typeOfKind(nextPrimary);
   }
   settings[kind].connected = false;
   if (isJellyfinFamily(kind) || kind === 'silo') {
@@ -261,6 +272,6 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
 
   logger.info(`Disconnected from ${serverName(kind)}`, {
     label: 'Media Servers',
-    primary: serverName(primaryServer() ?? next),
+    primary: serverName(primaryServer() ?? nextPrimary ?? next),
   });
 };

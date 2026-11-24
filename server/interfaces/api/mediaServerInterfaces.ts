@@ -28,6 +28,8 @@ export interface MediaServerSummary {
   };
   /** The owner's (user 1) linked account, if any. */
   ownerAccount?: string;
+  /** Something connecting just changed that the admin should know. */
+  notice?: string;
 }
 
 /** Users who would lose sign-in methods if the server were removed. */

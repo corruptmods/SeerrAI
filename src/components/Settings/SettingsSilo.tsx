@@ -319,7 +319,7 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
             validationSchema={schema}
             onSubmit={async (values) => {
               try {
-                await axios.post(ENDPOINT, {
+                const saved = await axios.post<{ notice?: string }>(ENDPOINT, {
                   hostname: values.hostname,
                   port: Number(values.port),
                   useSsl: values.useSsl,
@@ -332,6 +332,10 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
                   autoDismiss: true,
                   appearance: 'success',
                 });
+                // A different Silo: links to the old one were removed.
+                if (saved.data?.notice) {
+                  addToast(saved.data.notice, { appearance: 'info' });
+                }
               } catch (e) {
                 addToast(
                   messageOf(e, intl.formatMessage(messages.saveFailed)),

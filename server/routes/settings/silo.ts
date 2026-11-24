@@ -103,9 +103,11 @@ siloRoutes.post('/', async (req, res, next) => {
   }
   try {
     const connection = await trySilo(input);
-    await storeSilo(input, connection, { connect: false });
+    const { reset } = await storeSilo(input, connection, { connect: false });
     await settings.save();
-    return res.status(200).json(shown(settings.silo));
+    return res
+      .status(200)
+      .json({ ...shown(settings.silo), ...(reset ? { notice: reset } : {}) });
   } catch (e) {
     return failed(next, e, 'saving the settings');
   }

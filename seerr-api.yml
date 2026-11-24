@@ -1686,6 +1686,10 @@ components:
           items:
             type: string
             enum: ['admin:users', 'admin:catalog:paths']
+        notice:
+          type: string
+          readOnly: true
+          description: Only in the answer to saving, when the address now leads to a different Silo and every link to the old one was removed.
     SiloSyncStatus:
       type: object
       properties:
@@ -2695,6 +2699,9 @@ components:
         ownerAccount:
           type: string
           description: The owner's account on the server, when one is linked.
+        notice:
+          type: string
+          description: Only in the answer to connecting, when connecting changed something the admin should know (a different Silo than before removes every link to the old one).
       required:
         - kind
         - name

@@ -10,6 +10,7 @@ import {
 } from '@app/components/Settings/MusicLibraries';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
 import usePlexLogin from '@app/hooks/usePlexLogin';
+import useToasts from '@app/hooks/useToasts';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import type {
@@ -115,6 +116,7 @@ type Step = 'account' | 'server' | 'libraries';
 
 const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const intl = useIntl();
+  const { addToast } = useToasts();
   const kind = server.kind;
   const name = SERVER_NAMES[kind];
   const isPlex = kind === 'plex';
@@ -293,28 +295,34 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     setError(undefined);
     setBusy(true);
     try {
-      await axios.post(`/api/v1/settings/media-servers/${kind}/connect`, {
-        hostname,
-        port: Number(port),
-        useSsl,
-        signIn,
-        ...(isPlex
-          ? {}
-          : isSilo
-            ? {
-                urlBase,
-                externalHostname: externalUrl,
-                ...(method === 'login' ? { username, password } : { apiKey }),
-              }
-            : {
-                urlBase,
-                externalHostname: externalUrl,
-                linkOwner: isOwner && linkOwner,
-                ...(method === 'login'
-                  ? { username, password }
-                  : { apiKey, adminUserId }),
-              }),
-      });
+      const res = await axios.post<MediaServerSummary[]>(
+        `/api/v1/settings/media-servers/${kind}/connect`,
+        {
+          hostname,
+          port: Number(port),
+          useSsl,
+          signIn,
+          ...(isPlex
+            ? {}
+            : isSilo
+              ? {
+                  urlBase,
+                  externalHostname: externalUrl,
+                  ...(method === 'login' ? { username, password } : { apiKey }),
+                }
+              : {
+                  urlBase,
+                  externalHostname: externalUrl,
+                  linkOwner: isOwner && linkOwner,
+                  ...(method === 'login'
+                    ? { username, password }
+                    : { apiKey, adminUserId }),
+                }),
+        }
+      );
+      // Connecting a different Silo than before removes the old one's links.
+      const notice = res.data?.find?.((entry) => entry.kind === kind)?.notice;
+      if (notice) addToast(notice, { appearance: 'info' });
       setStep('libraries');
       syncLibraries();
     } catch (e) {

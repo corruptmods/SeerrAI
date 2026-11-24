@@ -4,11 +4,21 @@ import SiloAPI, {
 } from '@server/api/silo/client';
 import { SiloIncompatibleError } from '@server/api/silo/compat';
 import type { SiloAccount, SiloSystemInfo } from '@server/api/silo/types';
+import { MEDIA_ID } from '@server/constants/server';
+import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
+import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
+import { User } from '@server/entity/User';
 import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { endSessions } from '@server/lib/signIn';
 import { siloDeviceId, siloLibraries } from '@server/lib/silo';
+import logger from '@server/logger';
+import { In, IsNull, Not } from 'typeorm';
 
 /*
  * Connecting Silo: with an administrator's API key pasted in, or by signing
@@ -218,10 +228,48 @@ export const trySilo = async (
   };
 };
 
+/** Said when connecting a different Silo than before reset its links. */
+export const SILO_LINKS_RESET =
+  'This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People link their Silo accounts again under Linked Accounts.';
+
+/**
+ * Forgets everything that belonged to the Silo connected before: Silo's
+ * account ids are small numbers, so on another Silo account "2" is someone
+ * else, and must never sign in as the person linked to the old one. Each
+ * user's Silo link goes, and their sessions end if Silo was how they signed
+ * in; the old Silo's title ids, episode list, play copy and library places
+ * go too. Returns how many users were unlinked.
+ */
+export const forgetPreviousSilo = async (): Promise<number> => {
+  const users = getRepository(User);
+  const linked = await users.find({
+    select: { id: true },
+    where: { siloUserId: Not(IsNull()) },
+  });
+  if (linked.length) {
+    await users.update(
+      { id: In(linked.map((user) => user.id)) },
+      { siloUserId: null, siloUsername: null, siloProfileId: null }
+    );
+    for (const user of linked) {
+      await endSessions(user.id);
+    }
+  }
+  const media = getRepository(Media);
+  for (const column of MEDIA_ID.silo) {
+    await media.update({ [column]: Not(IsNull()) }, { [column]: null });
+  }
+  await getRepository(MediaLibraryItem).delete({ server: 'silo' });
+  await getRepository(SiloEpisode).clear();
+  await getRepository(SiloPlay).clear();
+  return linked.length;
+};
+
 /**
  * Stores a working connection in the Silo settings (the caller saves), and
  * reads Silo's film and series libraries. A different Silo than before
- * starts with no libraries chosen.
+ * starts with no libraries chosen and with every link to the old one
+ * forgotten (forgetPreviousSilo); `reset` then says so.
  */
 export const storeSilo = async (
   input: SiloConnectInput & {
@@ -230,10 +278,17 @@ export const storeSilo = async (
   },
   connection: SiloConnection,
   { connect }: { connect: boolean }
-): Promise<SiloSettings> => {
+): Promise<{ silo: SiloSettings; reset?: string }> => {
   const silo = getSettings().silo;
+  let reset: string | undefined;
   if (silo.serverId && silo.serverId !== connection.serverId) {
     silo.libraries = [];
+    const unlinked = await forgetPreviousSilo();
+    reset = SILO_LINKS_RESET;
+    logger.warn(
+      'Connected a different Silo than before; links to the old one were removed',
+      { label: 'Silo', unlinked }
+    );
   }
   Object.assign(silo, siloAddressOf(input), {
     externalHostname: (
@@ -267,5 +322,5 @@ export const storeSilo = async (
   } catch {
     // Libraries can be read again from Settings → Silo.
   }
-  return silo;
+  return { silo, reset };
 };

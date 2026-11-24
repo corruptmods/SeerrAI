@@ -98,7 +98,23 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
   });
 };
 
-const listed = async (res: Response) => res.status(200).json(await summaries());
+/**
+ * The servers as listed; `notice` is something connecting changed that the
+ * admin should know, said on that server's entry.
+ */
+const listed = async (
+  res: Response,
+  notice?: { kind: MediaServerKind; text: string }
+) =>
+  res
+    .status(200)
+    .json(
+      (await summaries()).map((summary) =>
+        notice && summary.kind === notice.kind
+          ? { ...summary, notice: notice.text }
+          : summary
+      )
+    );
 
 /** Forwards a refused change with its status, anything else as a 500. */
 const failed = (next: NextFunction, e: unknown) => {
@@ -326,7 +342,7 @@ const apiKeyAdmin = async (
  * administrator once so Seerr AI creates its own key. Libraries are read at
  * once and chosen at /settings/silo/library.
  */
-const connectSilo = async (body: ConnectBody): Promise<void> => {
+const connectSilo = async (body: ConnectBody): Promise<string | undefined> => {
   // Before setup, Silo is set up as the primary server from the setup page.
   if (!primaryServer()) {
     throw new MediaServerChangeError(
@@ -335,8 +351,11 @@ const connectSilo = async (body: ConnectBody): Promise<void> => {
     );
   }
   const connection = await trySilo(body);
-  const silo = await storeSilo(body, connection, { connect: true });
+  const { silo, reset } = await storeSilo(body, connection, {
+    connect: true,
+  });
   silo.signIn = body.signIn ?? silo.signIn !== false;
+  return reset;
 };
 
 /** A Jellyfin or Emby server's address from the form. */
@@ -465,8 +484,9 @@ mediaServerRoutes.post<{ kind: string }>(
     }
     try {
       const body = req.body as ConnectBody;
+      let notice: string | undefined;
       if (kind === 'silo') {
-        await connectSilo(body);
+        notice = await connectSilo(body);
       } else {
         const done =
           kind === 'plex'
@@ -475,7 +495,7 @@ mediaServerRoutes.post<{ kind: string }>(
         if (!done) return;
       }
       await connected(kind);
-      return await listed(res);
+      return await listed(res, notice ? { kind, text: notice } : undefined);
     } catch (e) {
       return failed(next, e);
     }

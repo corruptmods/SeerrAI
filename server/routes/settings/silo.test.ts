@@ -2,6 +2,7 @@ import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
@@ -11,6 +12,7 @@ import {
   signInOffered,
 } from '@server/lib/mediaServers';
 import { getSettings, siloDefaults } from '@server/lib/settings';
+import { SILO_LINKS_RESET } from '@server/lib/siloConnect';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
 import { createFakeSilo } from '@server/test/fakeSilo';
@@ -185,6 +187,89 @@ describe('connecting Silo', () => {
     assert.deepEqual(getSettings().silo.optionalScopes, []);
     assert.ok(silo.calls.some((c) => c.path === '/auth/logout'));
     assert.deepEqual(silo.openSessions(), []);
+  });
+
+  it('forgets every link to a different Silo connected at the same place', async () => {
+    const users = getRepository(User);
+    const linked = await users.save(
+      new User({
+        email: 'lantern@test.local',
+        siloUserId: '2',
+        siloUsername: 'lantern',
+        siloProfileId: '7',
+        avatar: '',
+      })
+    );
+    await getRepository(Media).save(
+      new Media({
+        tmdbId: 9101,
+        mediaType: 'movie' as never,
+        siloMediaId: 'movie-old',
+      })
+    );
+    await getRepository(SiloEpisode).save(
+      new SiloEpisode({
+        contentId: 'old-episode',
+        seriesId: 'old-series',
+        libraryIds: ['2'],
+        season: 1,
+        episode: 1,
+      })
+    );
+    await getRepository(SiloPlay).save(
+      new SiloPlay({
+        sessionId: 'old-play',
+        userId: '2',
+        itemId: 'movie-old',
+        kind: 'movie',
+        endedAt: new Date(),
+      })
+    );
+    // The same address, now answered by a rebuilt Silo.
+    getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    const listed = (await res.json()) as { kind: string; notice?: string }[];
+    assert.equal(
+      listed.find((s) => s.kind === 'silo')?.notice,
+      SILO_LINKS_RESET
+    );
+    assert.equal(listed.find((s) => s.kind === 'plex')?.notice, undefined);
+    const after = await users.findOneByOrFail({ id: linked.id });
+    assert.equal(after.siloUserId, null);
+    assert.equal(after.siloUsername, null);
+    assert.equal(after.siloProfileId, null);
+    const media = await getRepository(Media).findOneByOrFail({ tmdbId: 9101 });
+    assert.equal(media.siloMediaId, null);
+    assert.equal(await getRepository(SiloEpisode).count(), 0);
+    assert.equal(await getRepository(SiloPlay).count(), 0);
+    assert.equal(getSettings().silo.serverId, silo.serverId);
+  });
+
+  it('keeps links when the same Silo is connected again', async () => {
+    const linked = await getRepository(User).save(
+      new User({
+        email: 'harbour@test.local',
+        siloUserId: '3',
+        siloUsername: 'harbour',
+        avatar: '',
+      })
+    );
+    getSettings().silo = { ...siloDefaults(), serverId: silo.serverId };
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    const listed = (await res.json()) as { kind: string; notice?: string }[];
+    assert.equal(listed.find((s) => s.kind === 'silo')?.notice, undefined);
+    assert.equal(
+      (await getRepository(User).findOneByOrFail({ id: linked.id })).siloUserId,
+      '3'
+    );
   });
 
   it('deletes the key it made when that key then fails', async () => {

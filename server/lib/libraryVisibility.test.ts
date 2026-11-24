@@ -21,7 +21,11 @@ import {
   viewerReach,
 } from '@server/lib/libraryVisibility';
 import { Permission } from '@server/lib/permissions';
-import { getSettings, jellyfinDefaults } from '@server/lib/settings';
+import {
+  getSettings,
+  jellyfinDefaults,
+  siloDefaults,
+} from '@server/lib/settings';
 import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
@@ -350,6 +354,26 @@ describe('whose libraries limit what they see', () => {
       plex: 'all',
       jellyfin: new Set(),
     });
+  });
+
+  it('lets Silo limit nothing while its libraries are not read per person', async () => {
+    getSettings().silo = {
+      ...siloDefaults(),
+      connected: true,
+      apiKey: 'sa_key',
+      ip: '127.0.0.1',
+    };
+    try {
+      // Unlinked to Silo, and everything on Plex: nothing is limited.
+      shared['501'] = { all: true, libraries: ['9001', '9002'] };
+      assert.equal(await viewerReach(viewer()), undefined);
+      // Limited on Plex: Silo still limits nothing.
+      shared['501'] = { all: false, libraries: ['9001'] };
+      cacheManager.getCache('libraryaccess').flush();
+      assert.deepEqual(await viewerReach(viewer()), { plex: new Set(['1']) });
+    } finally {
+      getSettings().silo = siloDefaults();
+    }
   });
 
   it('shows everything, and logs it, when the server cannot be read', async () => {

@@ -139,6 +139,14 @@ export const accountReach = async (
   return pending;
 };
 
+/**
+ * Servers whose per-person libraries Seerr AI can't read yet. Like a server
+ * that couldn't be read, they limit nothing, linked account or not, so no
+ * title is hidden only because Seerr AI can't tell.
+ */
+// Silo's per-person libraries are read with library visibility (phase 3).
+const UNREAD_SERVERS: readonly MediaServerKind[] = ['silo'];
+
 /** Whether someone sees every title whatever their libraries. */
 const seesEverything = (user: User): boolean =>
   user.hasPermission([Permission.MANAGE_REQUESTS, Permission.MANAGE_USERS], {
@@ -157,7 +165,9 @@ export const viewerReach = async (
   if (!getSettings().main.limitToLibraries || !user || seesEverything(user)) {
     return undefined;
   }
-  const servers = connectedServers();
+  const servers = connectedServers().filter(
+    (kind) => !UNREAD_SERVERS.includes(kind)
+  );
   const reach: ViewerReach = {};
   await Promise.all(
     servers.map(async (kind) => {

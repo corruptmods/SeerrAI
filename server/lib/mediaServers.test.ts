@@ -80,7 +80,9 @@ describe('which servers are connected', () => {
     assert.equal(serverName('plex'), 'Plex');
     assert.equal(serverName('jellyfin'), 'Jellyfin');
     assert.equal(serverName('emby'), 'Emby');
+    assert.equal(serverName('silo'), 'Silo');
     assert.equal(kindOfUserType(UserType.EMBY), 'emby');
+    assert.equal(kindOfUserType(UserType.SILO), 'silo');
     assert.equal(kindOfUserType(UserType.JELLYFIN), 'jellyfin');
     assert.equal(kindOfUserType(UserType.PLEX), 'plex');
     assert.equal(kindOfUserType(UserType.LOCAL), undefined);

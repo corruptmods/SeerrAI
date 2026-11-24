@@ -19,6 +19,7 @@ import {
   pictureProfile,
   pictureVersion,
   siloProfiles,
+  siloProfilesForPicture,
 } from '@server/lib/siloAccounts';
 import logger from '@server/logger';
 import axios from 'axios';
@@ -265,8 +266,9 @@ const SILO_ACCOUNT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 /**
  * A Silo account's picture: its chosen (else primary) profile's, read with
  * the server key. Silo may name a signed address that expires, so where the
- * picture lives is read again each time it is fetched; the cache keeps it by
- * the picture, not by that address. The key goes only to Silo itself. Only
+ * picture lives is read again every couple of minutes (once however many ask
+ * meanwhile, never waiting out a rate limit); the cache keeps it by the
+ * picture, not by that address. The key goes only to Silo itself. Only
  * accounts someone here has; others get the stand-in.
  */
 router.get('/silo/:accountId', async (req, res, next) => {
@@ -294,7 +296,7 @@ router.get('/silo/:accountId', async (req, res, next) => {
     let profile;
     try {
       profile = pictureProfile(
-        await siloProfiles(accountId),
+        await siloProfilesForPicture(accountId),
         user.siloProfileId
       );
     } catch (e) {

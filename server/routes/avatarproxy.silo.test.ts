@@ -133,7 +133,7 @@ describe('Silo account pictures', () => {
     assert.equal(fetched[0].auth, 'sa_test');
   });
 
-  it('serves the chosen profile’s, from a signed address without the key, read again each time', async () => {
+  it('serves the chosen profile’s, from a signed address without the key', async () => {
     await getRepository(User).update(2, { siloProfileId: 'p-2' });
     let res = await request(app).get(`/avatarproxy/silo/${accountId}`);
     assert.equal(res.status, 200);
@@ -148,9 +148,36 @@ describe('Silo account pictures', () => {
     assert.equal(pictureCalls().length, 1, 'served from the cache');
     assert.equal(
       silo.calls.filter((c) => c.path.endsWith('/profiles')).length,
-      2,
-      'profiles read each time'
+      1,
+      'profiles read once for a while'
     );
+  });
+
+  it('reads an account’s profiles once for many requests at once', async () => {
+    const answers = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app).get(`/avatarproxy/silo/${accountId}`)
+      )
+    );
+    assert.ok(answers.every((res) => res.status === 200));
+    assert.equal(
+      silo.calls.filter((c) => c.path.endsWith('/profiles')).length,
+      1
+    );
+  });
+
+  it('gives the stand-in at once while Silo limits requests, and asks again next time', async () => {
+    silo.rateLimited = 1;
+    let res = await request(app).get(`/avatarproxy/silo/${accountId}`);
+    assert.equal(res.status, 200);
+    assert.equal(pictureCalls().length, 0, 'no picture fetched');
+    assert.equal(
+      silo.calls.filter((c) => c.path.endsWith('/profiles')).length,
+      1,
+      'no retry while the picture waits'
+    );
+    res = await request(app).get(`/avatarproxy/silo/${accountId}`);
+    assert.equal(res.headers['content-type'], 'image/svg+xml');
   });
 
   it('notices a new picture, not a new signed address', async () => {

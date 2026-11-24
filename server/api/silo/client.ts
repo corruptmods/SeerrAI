@@ -498,14 +498,19 @@ class SiloAPI extends ExternalAPI {
     return this.listAll<SiloAdminUser>('/admin/users');
   }
 
-  /** An account's household profiles. */
+  /**
+   * An account's household profiles. `wait: false` answers a rate limit at
+   * once with an error instead of waiting it out.
+   */
   public async getAccountProfiles(
-    accountId: string
+    accountId: string,
+    { wait = true }: { wait?: boolean } = {}
   ): Promise<SiloAccountProfile[]> {
     // A complete, unpaged collection.
-    const profiles = await this.patient<SiloCollection<SiloAccountProfile>>(
-      `/admin/users/${encodeURIComponent(accountId)}/profiles`
-    );
+    const endpoint = `/admin/users/${encodeURIComponent(accountId)}/profiles`;
+    const profiles = await (wait
+      ? this.patient<SiloCollection<SiloAccountProfile>>(endpoint)
+      : this.call<SiloCollection<SiloAccountProfile>>(endpoint));
     return profiles.items ?? [];
   }
 

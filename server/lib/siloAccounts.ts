@@ -289,6 +289,41 @@ export const siloProfiles = (
 ): Promise<SiloAccountProfile[]> =>
   siloClient({ timeout: 10_000 }).getAccountProfiles(accountId);
 
+/** How long a picture lookup's profiles are reused. */
+const PICTURE_PROFILES_TTL = 2 * 60 * 1000;
+
+const pictureLookups = new Map<
+  string,
+  { at: number; profiles: Promise<SiloAccountProfile[]> }
+>();
+
+/**
+ * An account's profiles for its picture: read once every couple of minutes
+ * however often the picture is asked for, one read at a time per account,
+ * and never waiting out a rate limit (a picture request mustn't hang). A
+ * failed read isn't kept.
+ */
+export const siloProfilesForPicture = (
+  accountId: string
+): Promise<SiloAccountProfile[]> => {
+  const now = Date.now();
+  const known = pictureLookups.get(accountId);
+  if (known && now - known.at < PICTURE_PROFILES_TTL) return known.profiles;
+  for (const [id, entry] of pictureLookups) {
+    if (now - entry.at >= PICTURE_PROFILES_TTL) pictureLookups.delete(id);
+  }
+  const profiles = siloClient({ timeout: 10_000 })
+    .getAccountProfiles(accountId, { wait: false })
+    .catch((e) => {
+      if (pictureLookups.get(accountId)?.profiles === profiles) {
+        pictureLookups.delete(accountId);
+      }
+      throw e;
+    });
+  pictureLookups.set(accountId, { at: now, profiles });
+  return profiles;
+};
+
 /**
  * The profile a person's picture comes from: the one they chose, else the
  * household's primary profile, else the first.

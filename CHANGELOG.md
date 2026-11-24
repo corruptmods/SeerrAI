@@ -6,7 +6,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
-- **Hide What You've Watched** (on to start; each person can turn it off, and an admin for everyone): Suggested for You, Pick for the Room and AI Search's suggestions leave out what you've already watched, on Plex, Jellyfin or Emby: a film finished or played past a fifth, or a series with any such episode. A title you name or describe is still found.
+- **Silo** (new; Silo itself is pre-release): connect it beside Plex, Jellyfin and Emby, or set up with it. Titles, 4K and quality, Play, sign-in (with a password or a code approved in Silo), linked accounts with your household profile, watch history, library sharing and Match Check work as on the others; Silo has no music. See [Plex, Jellyfin, Emby and Silo together](./docs/seerr-ai/media-servers.md).
+- **Hide What You've Watched** (on to start; each person can turn it off, and an admin for everyone): Suggested for You, Pick for the Room and AI Search's suggestions leave out what you've already watched, on Plex, Jellyfin, Emby or Silo: a film finished or played past a fifth, or a series with any such episode. A title you name or describe is still found.
 - **Use What People Watched on Trakt** (Settings → Services → Trakt, off to start): what each person watched on their public Trakt profile counts as watched, and their recent Trakt titles join their recent watching for AI features. Their Trakt username is never sent to the AI provider.
 
 ### Changed
@@ -16,6 +17,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- Deleting a user with **Also disable their Emby account** ticked switches their Emby account off again, instead of saying they have none.
 - **Remove Users Who Lose Access** now removes people deleted from Emby: Emby accounts were checked by the wrong id, so none was ever found missing.
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.
 

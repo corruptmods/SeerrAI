@@ -51,7 +51,7 @@ docker run -d --name seerr-ai --init \
 
 The container runs as user and group 1000, so the `config` folder must be writable by them.
 
-Open port 5055 and follow the setup: sign in with Plex, Jellyfin or Emby, then connect Radarr and Sonarr. Seerr's own [getting started](https://docs.seerr.dev/getting-started/) describes the setup screens, which are the same.
+Open port 5055 and follow the setup: sign in with Plex, Jellyfin, Emby or Silo, then connect Radarr and Sonarr. For Silo, enter its address (port 8090 by default) and sign in as a Silo administrator, or paste an API key with the `admin:monitor:read` and `libraries:read` scopes (see [Connecting Silo](./media-servers.md#connecting-silo)). Seerr's own [getting started](https://docs.seerr.dev/getting-started/) describes the setup screens, which are the same.
 
 Sonarr v4 and the Sonarr v5 beta both work. On v5, a series you set to another language in Sonarr shows there under its translated title; Backfill also searches under its original title, which is what most releases use. If you switch a series to another episode order in Sonarr v5 (DVD order, say), its season numbers no longer match TMDB's, so requests for single seasons of that series may pick the wrong season.
 
@@ -155,8 +155,8 @@ None of these is required; each feature finds what it needs once it's connected.
 
 | Connect | For |
 |---|---|
-| **Other media servers** (Settings → Media Servers) | Plex, Jellyfin and Emby together. See [the guide](./media-servers.md) |
-| **Tautulli** (Settings → Services, Plex only) | Suggested for You, "up next", Who Watched, Pick for the Room, Catch Me Up. Jellyfin and Emby need nothing |
+| **Other media servers** (Settings → Media Servers) | Plex, Jellyfin, Emby and Silo together. See [the guide](./media-servers.md) |
+| **Tautulli** (Settings → Services, Plex only) | Suggested for You, "up next", Who Watched, Pick for the Room, Catch Me Up. Jellyfin, Emby and Silo need nothing |
 | **Lidarr** (Settings → Services) | [Music](./music.md) |
 | **Download clients** (Settings → Services → Download Clients) | Live progress, and Backfill |
 | **Prowlarr** (Settings → Services) | Backfill, and songs taken from albums |

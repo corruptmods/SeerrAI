@@ -9,7 +9,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Requests and downloads](./requests-and-downloads.md)**: when a request should arrive, what each status means, failed requests, single episodes, anime.
 - **[Discover and lists](./discover-and-lists.md)**: your home page and menu, the Anime page, leaving out streaming services, coming back where you were, sorting search results and your watchlist, watch lists and playlists, the calendar.
 - **[Music](./music.md)**: finding and requesting albums and songs, and the charts.
-- **[Plex, Jellyfin and Emby together](./media-servers.md)**: Play on each server, linking your accounts.
+- **[Plex, Jellyfin, Emby and Silo together](./media-servers.md)**: Play on each server, linking your accounts. Silo support is new.
 - **[Single sign-on](./single-sign-on.md)**: signing in with Authentik, Google and the like.
 - **[AI](./ai.md)**: AI Search, Pick for the Room, Catch Me Up.
 - **[Subtitles and fixing problems](./subtitles-and-autofix.md)**: subtitles from Bazarr, and problems fixed from a report.
@@ -18,7 +18,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For admins
 
 - **[Installing and updating](./install.md)**: the image, updates, backups, trying a beta.
-- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, library sharing, showing people only what their libraries hold, removing one.
+- **[Plex, Jellyfin, Emby and Silo together](./media-servers.md#for-admins)**: connecting servers (Silo's API key and its scopes), the primary one, library sharing, showing people only what their libraries hold, removing one.
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.
@@ -39,7 +39,7 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | | |
 |---|---|
 | **Themes** | Light or dark, accent colours, dark backgrounds, seasonal themes, theme files, custom CSS. |
-| **Several media servers** | Plex, Jellyfin and Emby at once: available on any, sign in with any, Play on each; who has each library, changed for everyone at once. |
+| **Several media servers** | Plex, Jellyfin, Emby and Silo (new) at once: available on any, sign in with any, Play on each; who has each library, changed for everyone at once. |
 | **Music** | Albums, whole discographies or single songs through Lidarr, a song taken from its album when it was never a single; playlists brought in from Spotify or Apple Music; Top Songs, Trending, Top Albums and Top Artists from Apple Music's charts; rows of your own. |
 | **Single sign-on** | Authentik, Authelia, Keycloak, Pocket ID, Google or any OpenID Connect provider. |
 | **Passkeys and API keys** | Sign in without a password; personal keys for apps and scripts. |

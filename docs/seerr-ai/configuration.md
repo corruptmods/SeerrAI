@@ -15,10 +15,10 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | **Settings → Appearance → Theme file** | A [theme file](./themes.md#theme-files) as the default look, for everyone who hasn't chosen their own and the sign-in page. | None |
 | **Settings → Appearance → Server CSS** | Styles for everyone, the sign-in page included; may `@import` a stylesheet from elsewhere, such as theme.park. At most 64 KB. See [Custom CSS](./themes.md#custom-css). | Empty |
 | **Settings → Appearance → Let people add their own CSS** | Shows **Personal CSS** in everyone's Appearance settings; theirs only changes their own screens. | Off |
-| **Settings → Media Servers** | Connect, edit and remove Plex, Jellyfin and Emby, choose the primary one, and whether people may sign in with each. See [Plex, Jellyfin and Emby together](./media-servers.md). | The server chosen at setup, as primary |
+| **Settings → Media Servers** | Connect, edit and remove Plex, Jellyfin, Emby and Silo, choose the primary one, and whether people may sign in with each. See [Plex, Jellyfin, Emby and Silo together](./media-servers.md). | The server chosen at setup, as primary |
 | **Settings → Network** | **Enable Proxy Support** trusts proxies on this machine, your network and Tailscale; **Trust Cloudflare** and **Also Trust These Proxies** add public ones. See [Network](../using-seerr/settings/network.md#enable-proxy-support). | Off; off; none |
 | **Settings → Network → Allow Browser Apps** | Web apps on other sites, such as Pluet in the browser, can use Seerr AI once each person links them. **Allowed Sites** lists the exact addresses; turning it on starts with `https://watch.pluet.app`. See [Browser apps](#browser-apps). | Off |
-| **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; existing accounts are left as they are, and someone deleted isn't brought back. **Requests for Removed Titles**: requests for a title removed from the library before wait for an admin or are refused, after the number of removals chosen; never for admins or request managers. **Remove Users Who Lose Access**: hourly, deletes the accounts and requests of people no longer shared on Plex or deleted from Jellyfin or Emby, once missing on two checks in a row; never the owner or admins. See [Your account](./account.md). **Watchlist sync for new people**: new accounts start with their Plex or Trakt watchlist requested, for movies, series or both; existing people keep their own choice, and anyone can change theirs in their profile. | Off; off (once removed); off; off |
+| **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; existing accounts are left as they are, and someone deleted isn't brought back. **Requests for Removed Titles**: requests for a title removed from the library before wait for an admin or are refused, after the number of removals chosen; never for admins or request managers. **Remove Users Who Lose Access**: hourly, deletes the accounts and requests of people no longer shared on Plex, deleted from Jellyfin or Emby, or deleted or switched off in Silo, once missing on two checks in a row; never the owner or admins. See [Your account](./account.md). **Watchlist sync for new people**: new accounts start with their Plex or Trakt watchlist requested, for movies, series or both; existing people keep their own choice, and anyone can change theirs in their profile. | Off; off (once removed); off; off |
 | **Settings → Users → Let People Make Their Own API Keys** | Personal API keys for apps and scripts, each acting as the person who made it with exactly their permissions. **Who Can Make Them**: admins and people who can manage users, or everyone. Turning it off stops every personal key until it's turned back on. See [API](#api). | Off; admins and user managers once on |
 | **Settings → Users → Single Sign-On** | Providers people can sign in with (Authentik, Authelia, Keycloak, Pocket ID, Google…): name, issuer URL, client ID and secret (never sent back to the browser), button logo, scopes, **Enabled**, **Let New People Sign Up**, **Who Can Sign In** (rules on the provider's claims, such as a group), **Test**, and the redirect URL to give the provider. Needs the Application URL. See [Single sign-on](./single-sign-on.md). | None; scopes `openid profile email`; enabled; sign-up off; no rules (anyone with an account at the provider) |
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
@@ -27,7 +27,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | **Settings → Services → Prowlarr** | Searched directly for songs taken from albums, which don't run without it, and by Backfill when **Search with** includes Prowlarr. Added and edited from its tile, like the other services; tested before it is saved. Delete disconnects it, unless Backfill is on and searches with it. Its API key is never sent back to the browser. | None |
 | **Settings → Services → Soulseek** | slskd's address, API key (ReadWrite role) and downloads folder as Lidarr sees it, for songs taken from albums that no indexer has. Added and edited from its tile; saved once slskd answers and Lidarr sees the folder. Its API key is never sent back to the browser. Shown once music is set up. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
-| **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; Jellyfin and Emby need nothing. Its API key is never sent back to the browser. | Port 8181 |
+| **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; Jellyfin, Emby and Silo need nothing. Its API key is never sent back to the browser. | Port 8181 |
 | **Settings → Services → Trakt** | The Client ID of your own Trakt app, so people can import public Trakt lists and have their public Trakt watchlist requested. Make the app at [developer.trakt.tv/apps](https://developer.trakt.tv/apps) (Trakt asks for a verified GitHub account); nobody signs in to Trakt. Trakt deletes apps unused for 30 days, which regular watchlist syncing prevents. Never sent back to the browser. **Use What People Watched on Trakt**: each person's public Trakt watch history counts as watched (see **Hide What You've Watched**) and joins their recent watching for AI features; it can be switched without entering the Client ID again. | Use What People Watched on Trakt off |
 | **Settings → Services → Maintainerr** | One or more servers (Maintainerr needs no API key). Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone signed in (the button sits where Request would), days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
 | **Settings → Music** | The **Music** switch for everyone. **Include Music in All Search Results**. **Where Music Comes From**: **MusicBrainz Address**, **Contact Email**, **New and Popular Music** (ListenBrainz and Apple Music's charts), **Match Songs with Deezer**, **TheAudioDB API Key**, **Most Albums in One Request**. Links to music's other settings. See [Music](./music.md#setting-it-up-admins). | On; on once Lidarr is set up; public MusicBrainz; none; on; on; none; 100 |
@@ -76,21 +76,23 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | *Advanced:* days to keep finished agent conversations | 30 (0 forever) |
 | Step down a quality preset (titles on Seerr AI's presets) | Off (30 days) |
 
-## Plex, Jellyfin and Emby
+## Plex, Jellyfin, Emby and Silo
 
-Seerr AI works with all three, as Seerr does, and with more than one at once (see [Plex, Jellyfin and Emby together](./media-servers.md)). Its own features work with all three too, with a few exceptions:
+Seerr AI works with Plex, Jellyfin and Emby, as Seerr does, and with Silo (new; Silo itself is pre-release), and with more than one at once (see [Plex, Jellyfin, Emby and Silo together](./media-servers.md), which also has the full table of what each server does). Its own features work with all of them, with a few exceptions:
 
-| Feature | Plex | Jellyfin and Emby |
-|---|---|---|
-| Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" and watch sync on lists, AI Search knowing what you watched | Needs Tautulli | Read from the server itself; nothing to set up |
-| Match Check (wrong matches on Health and title pages) | Yes; Seerr AI's **Fix match** on Health puts it right, or Plex's **Fix Match** | Yes, fixed with **Identify** |
-| Health: the media server answering, and its version | Yes | Yes |
-| Passkeys | Refused once the server owner stops sharing with the account (and no other linked account still lets them in) | Refused once the account is deleted or switched off on the server (likewise) |
-| Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title |
-| Plex watchlist sync, Plex user import, expired Plex sign-ins on Health | Yes | Not applicable |
-| Trakt watchlist sync and Trakt list import | Yes | Yes |
+| Feature | Plex | Jellyfin and Emby | Silo |
+|---|---|---|---|
+| Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" and watch sync on lists, AI Search knowing what you watched | Needs Tautulli | Read from the server itself; nothing to set up | Seerr AI's own copy of Silo's history (the **Silo Watch History Sync** job); nothing to set up |
+| Match Check (wrong matches on Health and title pages) | Yes; Seerr AI's **Fix match** on Health puts it right, or Plex's **Fix Match** | Yes, fixed with **Identify** | With the `admin:catalog:paths` scope on Seerr AI's key; fixed with **Match Item** |
+| Library sharing | Yes | Yes | With the `admin:users` scope on Seerr AI's key |
+| Health: the media server answering, and its version | Yes | Yes | Yes, with Silo's API version, a restart it needs, and its database or cache down |
+| Passkeys | Refused once the server owner stops sharing with the account (and no other linked account still lets them in) | Refused once the account is deleted or switched off on the server (likewise) | Likewise |
+| Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title | No, likewise |
+| Music | Yes | Yes | No: Silo has no music libraries |
+| Plex watchlist sync, Plex user import, expired Plex sign-ins on Health | Yes | Not applicable | Not applicable |
+| Trakt watchlist sync and Trakt list import | Yes | Yes | Yes |
 
-Jellyfin and Emby keep the latest play of each film or episode rather than a log of every play, so a rewatch moves a title forward instead of adding another play.
+Jellyfin and Emby keep the latest play of each film or episode rather than a log of every play, so a rewatch moves a title forward instead of adding another play. Silo keeps every play, as Tautulli does for Plex; titles marked watched by hand in Silo aren't in it.
 
 ## Jobs
 
@@ -102,17 +104,18 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Episode Sync | every 5 minutes | Reads which episodes Sonarr has, for per-episode availability. |
 | Future Season Requests | every 6 hours | Requests new seasons for series people follow, once announced (and known to Sonarr) or at the latest as they premiere, and tells the followers. |
 | Plex User Import | hourly | With Auto-Import Plex Users on. Plex only. |
-| User Access Check | hourly, at :35 | With Remove Users Who Lose Access on. Plex, Jellyfin and Emby. |
+| User Access Check | hourly, at :35 | With Remove Users Who Lose Access on. Plex, Jellyfin, Emby and Silo. |
+| Silo Watch History Sync | every 5 minutes | Copies Silo's new plays into Seerr AI's own copy; the first run copies everything. Only while Silo is connected. |
 | Backfill Scan | every 6 hours | Finds stuck titles and searches a few. Only with Backfill on. |
 | Backfill Downloads | every minute | Moves approved Backfill downloads along: picks files, imports, cleans up. |
 | Download Check | every 30 seconds | Checks what Sonarr and Radarr grabbed, and imports that got stuck. Only with Download Check on or on Report only. |
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
 | Quality Profiles Check | hourly, at :20 | For servers in Settings → Quality: checks TRaSH Guides for changes once every 24 hours if a preset uses it, notes changes made in Radarr or Sonarr (shown on Health), applies TRaSH Guides updates only with **Apply updates automatically** on, and every 6 hours steps titles down or back. Only does anything for managed servers. |
-| Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin or Emby) matched to another title. |
+| Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin, Emby, or Silo with the `admin:catalog:paths` scope) matched to another title. |
 | Music Sync | every 5 minutes (at :03, :08…) | Reads what each server's music libraries added recently, follows Lidarr's work on requests (counting its files, adding albums it didn't have yet), completes requests whose albums are all here, and says so. Also runs a minute after Lidarr imports something. Only while music is set up and on. |
 | Music Full Scan | daily, 03:40 | Reads every music library and all of Lidarr; with **Enable Scan** on, brings in what Lidarr has; marks albums gone from everywhere as deleted (or not here, if nobody asked for them), unless a server, Lidarr or MusicBrainz didn't answer. Only while music is set up and on. |
-| Database Maintenance | daily, 03:45 | Clears rows nothing reads any more (and MusicBrainz answers nobody has looked at in a month), then compacts the database. |
+| Database Maintenance | daily, 03:45 | Clears rows nothing reads any more (and MusicBrainz answers nobody has looked at in a month), reads Silo's history again to drop plays Silo no longer has and forgets episodes Silo no longer lists, then compacts the database. Silo's plays are never dropped for their age. |
 
 ## Feature switches
 
@@ -180,7 +183,7 @@ How they're kept safe:
 
 - Only a hash of each key is stored. A key is shown once, when it's made, and never again, to anyone.
 - Each key has a name, and expires after 30 days, 90 days, a year, or never. Up to 10 per person.
-- A key stops working when it expires or is revoked, while personal keys are off, when its owner is no longer allowed them, and when its owner could no longer sign in (checked every few minutes against Plex, Jellyfin or Emby). Deleting a person deletes their keys.
+- A key stops working when it expires or is revoked, while personal keys are off, when its owner is no longer allowed them, and when its owner could no longer sign in (checked every few minutes against Plex, Jellyfin, Emby or Silo). Deleting a person deletes their keys.
 - A personal key can't make more keys: making one needs a signed-in session.
 - A refused key gets a 401 with a plain message, such as "This API key expired on 2026-12-01". Wrong keys count toward the same limit as wrong passwords (10 in 15 minutes from one address, then a 429 with `Retry-After`). Someone guessing doesn't hold up the real keys used from the same address, and an expired key an old app keeps sending doesn't count.
 - Keys made, revoked and refused are logged with their id and name (label `API Key`), never the key itself.

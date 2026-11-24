@@ -6,7 +6,7 @@
 
 **Settings → Health** (admins) checks everything Seerr AI depends on and lists what has quietly gone wrong, each with a link to fix it.
 
-- **Services**: whether each connected service answers (media servers with their version, Radarr, Sonarr, Lidarr, Prowlarr, download clients, Bazarr, the AI provider, Tautulli, Maintainerr, the PostgreSQL pool), plus their own warnings: low disks, paused indexers or subtitle providers, an AI account out of credit. The download client Backfill uses also lists what it's missing (Deluge's Label plugin, rTorrent commands, Transmission 3.0+, NZBGet 16+).
+- **Services**: whether each connected service answers (media servers with their version; Silo also with its API version, a restart it needs, its database or cache down, and a different Silo answering at its address, Radarr, Sonarr, Lidarr, Prowlarr, download clients, Bazarr, the AI provider, Tautulli, Maintainerr, the PostgreSQL pool), plus their own warnings: low disks, paused indexers or subtitle providers, an AI account out of credit. The download client Backfill uses also lists what it's missing (Deluge's Label plugin, rTorrent commands, Transmission 3.0+, NZBGet 16+).
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week, Download Check findings and admin agent conversations waiting for you, and what Download Check and the agent did this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**, which searches a season missing entirely as one), series requests with no TVDB id, folders a server matched to the wrong title, collections partly in the library.
@@ -22,7 +22,7 @@ Every 10 minutes (the **Health Alerts** job) the service checks run, and admins 
 
 Media servers match files to titles by name; Sonarr, Radarr and Lidarr by id. When they disagree, the wrong title shows as available and the right one shows nothing. A new show called "Wrenna" might be matched to "The Wrenna Diaries".
 
-**Every night** (04:20, the **Match Check** job), Seerr AI reads each library on each connected server, finds each item's folder in Sonarr or Radarr, and compares ids. Problems are listed on Health, and the title's page tells admins what the server matched it to and how to fix it: **Fix Match** in Plex, or **Identify** in Jellyfin and Emby (open the title there), with the id to enter. Until it's fixed, episodes and subtitles can be wrong too. The next check, nightly or after an import, clears it once they agree. **Run now** in Settings → Jobs & Cache runs it straight away.
+**Every night** (04:20, the **Match Check** job), Seerr AI reads each library on each connected server, finds each item's folder in Sonarr or Radarr, and compares ids. Problems are listed on Health, and the title's page tells admins what the server matched it to and how to fix it: **Fix Match** in Plex, **Identify** in Jellyfin and Emby, or **Match Item** in Silo (open the title there), with the id to enter. Silo is checked only when Seerr AI's Silo key has the `admin:catalog:paths` scope, which shows each title's folder; without it the Match Check line on Health says Silo was left out. Until it's fixed, episodes and subtitles can be wrong too. The next check, nightly or after an import, clears it once they agree. **Run now** in Settings → Jobs & Cache runs it straight away.
 
 **As requests arrive**, too: a few minutes after Radarr, Sonarr or Lidarr imports a requested film, episodes or album, Seerr AI checks each server's match the same way.
 
@@ -35,7 +35,7 @@ To see them, open **Settings → Health** and, under **Titles**, **Folders match
 
 ### Fixing them from here (Plex)
 
-- **Fix matches from here** (on to start): each film or series on Plex that Seerr AI can put right gets a **Fix match** button. It looks the title up in Plex's Fix Match by the id Radarr or Sonarr has (`tmdb-846213`, then the IMDb id), never by name, matches it, and reads Plex back. If Plex then has it as another title, the old match is put back. It doesn't offer to fix music, Jellyfin or Emby, or a film whose file is far off the film's length (replace that one in Radarr instead).
+- **Fix matches from here** (on to start): each film or series on Plex that Seerr AI can put right gets a **Fix match** button. It looks the title up in Plex's Fix Match by the id Radarr or Sonarr has (`tmdb-846213`, then the IMDb id), never by name, matches it, and reads Plex back. If Plex then has it as another title, the old match is put back. It doesn't offer to fix music, Jellyfin, Emby or Silo, or a film whose file is far off the film's length (replace that one in Radarr instead).
 - **Fix automatically** (off to start): new problems are fixed as they're found, and up to 20 from the nightly check each night, without asking. Admins still get the Wrong Match notification, saying it was fixed. One that didn't work isn't tried again for a week.
 - **Fixed lately** lists the last fixes, by whom or "By itself", each with **Undo**, which puts the item back as Plex had it.
 
@@ -45,7 +45,7 @@ What a row can say:
 
 | It says | Meaning | Fix |
 |---|---|---|
-| Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024) | The server picked another title. | **Fix match** on the row (Plex), or Plex's own **Fix Match** or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-846213`. |
+| Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024) | The server picked another title. | **Fix match** on the row (Plex), or Plex's own **Fix Match**, **Identify** (Jellyfin, Emby) or **Match Item** (Silo) with the id shown, such as `tmdb-846213`. |
 | …to a different film named Quillmore (2025) | Two titles share a name and year. | The same. |
 | Plex and Radarr use different entries for… | Same title, but different TMDB or TVDB entries, usually because one was replaced. | Fix the match with the id shown; if nothing is found, Radarr's entry may be outdated. |
 | Plex has not matched "…" | No match for the folder. | Fix the match. |

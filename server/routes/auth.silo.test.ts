@@ -283,6 +283,58 @@ describe('setting up with Silo as the primary server', () => {
     assert.deepEqual(silo.openSessions(), []);
   });
 
+  it('refuses before making a key when the owner’s email is taken', async () => {
+    await users().save([
+      new User({ email: 'first@test.local', avatar: '' }),
+      new User({ email: 'harbour', avatar: '' }),
+    ]);
+    const res = await request(app).post('/auth/silo').send({
+      username: 'harbour',
+      password: 'lights',
+      hostname: '127.0.0.1',
+      port: silo.port(),
+    });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.message, ApiErrorCode.ExistingAccount);
+    assert.ok(
+      !silo.calls.some(
+        (c) => c.method === 'POST' && c.path === '/admin/api-keys'
+      ),
+      'no key made'
+    );
+    assert.deepEqual([...silo.keys.keys()], ['sa_test']);
+    assert.deepEqual(silo.openSessions(), []);
+    assert.equal(
+      getSettings().main.mediaServerType,
+      MediaServerType.NOT_CONFIGURED
+    );
+  });
+
+  it('puts the settings back when saving the owner fails', async () => {
+    const settings = getSettings();
+    const save = settings.save;
+    settings.save = async () => {
+      throw new Error('disk full');
+    };
+    try {
+      const res = await request(app).post('/auth/silo').send({
+        username: 'harbour',
+        password: 'lights',
+        hostname: '127.0.0.1',
+        port: silo.port(),
+      });
+      assert.equal(res.status, 500);
+    } finally {
+      settings.save = save;
+    }
+    assert.equal(
+      getSettings().main.mediaServerType,
+      MediaServerType.NOT_CONFIGURED
+    );
+    assert.equal(getSettings().silo.connected, false);
+    assert.equal(getSettings().silo.apiKey, '');
+  });
+
   it('only lets a Silo administrator set up', async () => {
     const res = await request(app).post('/auth/silo').send({
       username: 'lantern',

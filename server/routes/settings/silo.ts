@@ -35,11 +35,10 @@ const settingsBody = z.object({
 });
 
 /** The settings as the page sees them: never the saved key. */
-const shown = (silo: SiloSettings) => ({
-  ...silo,
-  apiKey: '',
-  hasApiKey: !!silo.apiKey,
-});
+const shown = (silo: SiloSettings) => {
+  const { keyId: _keyId, ...rest } = silo;
+  return { ...rest, apiKey: '', hasApiKey: !!silo.apiKey };
+};
 
 const failed = (next: NextFunction, e: unknown, what: string) => {
   if (e instanceof MediaServerChangeError) {

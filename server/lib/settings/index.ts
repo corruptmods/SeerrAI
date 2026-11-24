@@ -136,6 +136,11 @@ export interface SiloSettings {
   serverVersion?: string;
   /** Digest of the API contract Silo last reported; logged when it changes. */
   contractDigest?: string;
+  /**
+   * Silo's id for a key Seerr AI made by signing in, kept after removal so
+   * the next sign-in can delete it (a key can't delete itself).
+   */
+  keyId?: string;
   /** Optional scopes the key was found to hold at connect. */
   optionalScopes?: SiloOptionalScope[];
 }
@@ -157,6 +162,7 @@ export const siloDefaults = (): SiloSettings => ({
   signIn: true,
   serverVersion: '',
   contractDigest: '',
+  keyId: '',
   optionalScopes: [],
 });
 

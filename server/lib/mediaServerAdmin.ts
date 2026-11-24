@@ -242,6 +242,13 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   // Silo's episode list is rebuilt by its next full scan.
   if (kind === 'silo') {
     await getRepository(SiloEpisode).clear();
+    // A key can't delete itself; the next sign-in to connect deletes it.
+    if (settings.silo.keyId) {
+      logger.info(
+        "Seerr AI's key stays in Silo until it is deleted there, or Seerr AI connects to this Silo again by signing in",
+        { label: 'Media Servers' }
+      );
+    }
   }
 
   await plexMatchCheck.dropServer(serverName(kind) as MediaServerName);

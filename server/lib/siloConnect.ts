@@ -50,6 +50,8 @@ export interface SiloConnection {
   optionalScopes: SiloOptionalScope[];
   /** The administrator who signed in to create the key, when one did. */
   admin?: SiloAccount;
+  /** Silo's id for the key, when Seerr AI made it. */
+  keyId?: string;
 }
 
 const KEY_LABEL = 'Seerr AI';
@@ -91,14 +93,23 @@ const refusal = (e: unknown, fallback?: string): MediaServerChangeError => {
  * Signs in as an administrator once and creates Seerr AI's own key, with the
  * required scopes only (the optional ones come with a pasted key that has
  * them). `check` tries the new key while still signed in; if it fails, the
- * key is deleted again so no unused "Seerr AI" key is left behind.
+ * key is deleted again so no unused "Seerr AI" key is left behind. `vet`
+ * refuses an administrator before any key is made; `previousKeyId`, a key
+ * Seerr AI made on this Silo before, is deleted once the new one works.
  */
 const createKey = async <T>(
   client: SiloAPI,
   username: string,
   password: string,
-  check: (key: string) => Promise<T>
-): Promise<{ key: string; admin: SiloAccount; checked: T }> => {
+  check: (key: string) => Promise<T>,
+  {
+    vet,
+    previousKeyId,
+  }: {
+    vet?: (admin: SiloAccount) => Promise<void>;
+    previousKeyId?: string;
+  } = {}
+): Promise<{ key: string; keyId: string; admin: SiloAccount; checked: T }> => {
   let tokens;
   try {
     tokens = await client.login(username, password, siloDeviceId());
@@ -112,6 +123,7 @@ const createKey = async <T>(
     if (tokens.user.role !== 'admin') {
       throw new MediaServerChangeError(403, SILO_NOT_ADMIN);
     }
+    await vet?.(tokens.user);
     let created;
     try {
       created = await client.createApiKey(tokens.access_token, {
@@ -121,16 +133,18 @@ const createKey = async <T>(
     } catch (e) {
       throw keyRefusal(e);
     }
+    let checked: T;
     try {
-      return {
-        key: created.key,
-        admin: tokens.user,
-        checked: await check(created.key),
-      };
+      checked = await check(created.key);
     } catch (e) {
       await client.deleteApiKey(tokens.access_token, created.id);
       throw e;
     }
+    // The key it replaces would otherwise stay in Silo unused.
+    if (previousKeyId && previousKeyId !== created.id) {
+      await client.deleteApiKey(tokens.access_token, previousKeyId);
+    }
+    return { key: created.key, keyId: created.id, admin: tokens.user, checked };
   } finally {
     await client.logout(tokens.access_token);
   }
@@ -179,7 +193,16 @@ const probeKey = async (hostname: string, apiKey: string) => {
  * Throws MediaServerChangeError with a message people can act on.
  */
 export const trySilo = async (
-  input: SiloConnectInput
+  input: SiloConnectInput,
+  {
+    vet,
+  }: {
+    /**
+     * Refuses the administrator signing in before a key is made (or, with a
+     * pasted key, the caller checks first).
+     */
+    vet?: (admin: SiloAccount) => Promise<void>;
+  } = {}
 ): Promise<SiloConnection> => {
   const address = siloAddressOf(input);
   if (!address.ip) {
@@ -212,14 +235,22 @@ export const trySilo = async (
     const { probe, name } = await probeKey(hostname, apiKey);
     return { apiKey, serverId, name, info, optionalScopes: probe.optional };
   }
+  const saved = getSettings().silo;
   const made = await createKey(
     open,
     input.username ?? '',
     input.password ?? '',
-    (key) => probeKey(hostname, key)
+    (key) => probeKey(hostname, key),
+    {
+      vet,
+      // Only a key Seerr AI made on this same Silo.
+      previousKeyId:
+        saved.serverId === serverId && saved.keyId ? saved.keyId : undefined,
+    }
   );
   return {
     apiKey: made.key,
+    keyId: made.keyId,
     serverId,
     name: made.checked.name,
     info,
@@ -283,6 +314,7 @@ export const storeSilo = async (
   let reset: string | undefined;
   if (silo.serverId && silo.serverId !== connection.serverId) {
     silo.libraries = [];
+    silo.keyId = '';
     const unlinked = await forgetPreviousSilo();
     reset = SILO_LINKS_RESET;
     logger.warn(
@@ -302,6 +334,9 @@ export const storeSilo = async (
       ''
     ).trim(),
     apiKey: connection.apiKey,
+    // A pasted key keeps the record of one Seerr AI made, to delete it on
+    // the next sign-in.
+    ...(connection.keyId ? { keyId: connection.keyId } : {}),
     serverId: connection.serverId,
     name: connection.name,
     serverVersion: connection.info.server_version,

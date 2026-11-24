@@ -272,6 +272,38 @@ describe('connecting Silo', () => {
     );
   });
 
+  it('deletes the key it made before when signing in to connect again', async () => {
+    silo.accounts = [
+      { id: '1', username: 'owner', password: 'pw', role: 'admin' },
+    ];
+    const signIn = () =>
+      post('/media-servers/silo/connect', {
+        ...at(),
+        username: 'owner',
+        password: 'pw',
+      });
+    let res = await signIn();
+    assert.equal(res.status, 200, await res.clone().text());
+    const first = getSettings().silo.apiKey;
+    assert.ok(getSettings().silo.keyId, 'the key it made is recorded');
+    // Not shown with the settings.
+    assert.equal(
+      ((await (await api('/silo')).json()) as { keyId?: string }).keyId,
+      undefined
+    );
+
+    // Removing Silo can't delete it (a key can't delete itself), so the
+    // next sign-in does.
+    res = await api('/media-servers/silo', { method: 'DELETE' });
+    assert.equal(res.status, 200);
+    assert.ok(silo.keys.has(first));
+    res = await signIn();
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.notEqual(getSettings().silo.apiKey, first);
+    assert.equal(silo.keys.has(first), false, 'the old key is gone');
+    assert.ok(silo.keys.has(getSettings().silo.apiKey));
+  });
+
   it('deletes the key it made when that key then fails', async () => {
     silo.accounts = [
       { id: '1', username: 'owner', password: 'pw', role: 'admin' },

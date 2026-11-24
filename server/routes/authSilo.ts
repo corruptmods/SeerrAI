@@ -221,6 +221,43 @@ const setUpWithSilo = async (
     throw new Refused(400, "Enter Silo's address.");
   }
 
+  // Who may become the owner, checked before Seerr AI makes a key in Silo,
+  // so a refusal never leaves one behind. With accounts but no primary
+  // server (fresh settings), only the owner's own Silo account, or one they
+  // lack, may set up the owner, and the email they take must be free.
+  const missingAdminUser = !(await userRepository.count());
+  const owner = missingAdminUser
+    ? null
+    : await userRepository.findOne({ where: { id: 1 } });
+  const vet = async (admin: SiloAccount): Promise<void> => {
+    if (admin.role !== 'admin') {
+      throw new SiloSignInError(403, 'notAdmin', 'Not an administrator.');
+    }
+    if (admin.password_change_required) {
+      throw new SiloSignInError(403, 'passwordChange', 'Temporary password.');
+    }
+    const holder = await userRepository.findOne({
+      where: { siloUserId: admin.id },
+    });
+    const email = (body.email || admin.username).toLowerCase();
+    const emailHolder = await userRepository.findOne({
+      select: { id: true },
+      where: { email },
+    });
+    if (
+      (owner &&
+        ((owner.siloUserId && owner.siloUserId !== admin.id) ||
+          (holder && holder.id !== owner.id))) ||
+      (emailHolder && emailHolder.id !== owner?.id)
+    ) {
+      logger.warn(
+        'Silo sign-in refused: this account may not set up the owner',
+        { label: 'API', ip: req.ip, siloUsername: admin.username }
+      );
+      throw new Refused(403, ApiErrorCode.ExistingAccount);
+    }
+  };
+
   let admin: SiloAccount | undefined;
   if (body.apiKey) {
     admin = await siloPasswordSignIn(
@@ -228,19 +265,20 @@ const setUpWithSilo = async (
       body.password,
       hostnameOf(address)
     );
-  }
-  if (admin && admin.role !== 'admin') {
-    throw new SiloSignInError(403, 'notAdmin', 'Not an administrator.');
+    await vet(admin);
   }
   let connection;
   try {
-    connection = await trySilo({
-      ...address,
-      hostname: address.ip,
-      ...(body.apiKey
-        ? { apiKey: body.apiKey }
-        : { username: body.username, password: body.password }),
-    });
+    connection = await trySilo(
+      {
+        ...address,
+        hostname: address.ip,
+        ...(body.apiKey
+          ? { apiKey: body.apiKey }
+          : { username: body.username, password: body.password }),
+      },
+      { vet }
+    );
   } catch (e) {
     // Silo's own words for a wrong password or a non-administrator.
     if (e instanceof MediaServerChangeError && e.message === SILO_NOT_ADMIN) {
@@ -258,53 +296,39 @@ const setUpWithSilo = async (
   if (!admin) {
     throw new Refused(500, 'Something went wrong.');
   }
-  if (admin.password_change_required) {
-    throw new SiloSignInError(403, 'passwordChange', 'Temporary password.');
-  }
 
-  // With accounts but no primary server (fresh settings), only the owner's
-  // own Silo account, or one they lack, may set up the owner.
-  const missingAdminUser = !(await userRepository.count());
-  const owner = missingAdminUser
-    ? null
-    : await userRepository.findOne({ where: { id: 1 } });
-  const holder = await userRepository.findOne({
-    where: { siloUserId: admin.id },
-  });
-  if (
-    owner &&
-    ((owner.siloUserId && owner.siloUserId !== admin.id) ||
-      (holder && holder.id !== owner.id))
-  ) {
-    logger.warn('Silo sign-in refused: this account may not set up the owner', {
-      label: 'API',
-      ip: req.ip,
-      siloUsername: admin.username,
-    });
-    throw new Refused(403, ApiErrorCode.ExistingAccount);
-  }
-
-  await storeSilo({ ...address, hostname: address.ip }, connection, {
-    connect: true,
-  });
-  connectAsPrimary('silo');
-
-  const columns = {
-    email: body.email || admin.username,
-    siloUserId: admin.id,
-    siloUsername: admin.username,
-    permissions: Permission.ADMIN,
-    userType: UserType.SILO,
-    avatar: siloAvatarPath(admin.id),
+  // Until the owner and settings are saved, a failure puts the settings
+  // back as they were.
+  const before = {
+    silo: { ...settings.silo },
+    mediaServerType: settings.main.mediaServerType,
   };
   let user: User;
-  if (owner) {
-    Object.assign(owner, columns);
-    user = await userRepository.save(owner);
-  } else {
-    user = await saveFirstOwner(withNewUserDefaults(new User(columns)));
+  try {
+    await storeSilo({ ...address, hostname: address.ip }, connection, {
+      connect: true,
+    });
+    connectAsPrimary('silo');
+    const columns = {
+      email: body.email || admin.username,
+      siloUserId: admin.id,
+      siloUsername: admin.username,
+      permissions: Permission.ADMIN,
+      userType: UserType.SILO,
+      avatar: siloAvatarPath(admin.id),
+    };
+    if (owner) {
+      Object.assign(owner, columns);
+      user = await userRepository.save(owner);
+    } else {
+      user = await saveFirstOwner(withNewUserDefaults(new User(columns)));
+    }
+    await settings.save();
+  } catch (e) {
+    settings.silo = before.silo;
+    settings.main.mediaServerType = before.mediaServerType;
+    throw e;
   }
-  await settings.save();
   startJobs();
   logger.info('Set up Seerr AI with Silo as the primary server', {
     label: 'API',

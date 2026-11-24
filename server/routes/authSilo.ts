@@ -124,17 +124,13 @@ const refreshPicture = async (user: User): Promise<void> => {
 
 /**
  * Signs in someone Silo vouched for, outside setup: their account here, made
- * when new users may sign in and nobody else has their name. `profileId` is
- * the profile they approved a code as, kept as their chosen profile.
+ * when new users may sign in and nobody else has their name. Their Silo
+ * profile is chosen under Linked Accounts.
  */
 const signInAccount = async (
   req: Request,
   account: SiloAccount,
-  {
-    profileId,
-    email,
-    password,
-  }: { profileId?: string | null; email?: string; password?: string } = {}
+  { email, password }: { email?: string; password?: string } = {}
 ): Promise<User> => {
   const settings = getSettings();
   const userRepository = getRepository(User);
@@ -144,7 +140,6 @@ const signInAccount = async (
 
   if (user) {
     const changes: Partial<User> = { siloUsername: account.username };
-    if (profileId) changes.siloProfileId = profileId;
     if (mainAccountOn(user, 'silo') && user.username === account.username) {
       changes.username = '';
     }
@@ -179,7 +174,6 @@ const signInAccount = async (
         email: loginName,
         siloUserId: account.id,
         siloUsername: account.username,
-        siloProfileId: profileId ?? null,
         permissions: settings.main.defaultPermissions,
         userType: UserType.SILO,
         emailVerified: vouched,
@@ -465,9 +459,7 @@ siloAuthRoutes.post('/device/check', async (req, res, next) => {
     if (check.status !== 'approved') {
       return res.status(200).json(check);
     }
-    const user = await signInAccount(req, check.account, {
-      profileId: check.profileId,
-    });
+    const user = await signInAccount(req, check.account);
     await startSession(req, user.id);
     const fresh = await getRepository(User).findOneOrFail({
       where: { id: user.id },

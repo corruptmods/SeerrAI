@@ -11778,7 +11778,7 @@ paths:
   /auth/silo/device/check:
     post:
       summary: Check a Silo sign-in code
-      description: While the code waits, `pending` (`opened` once someone looked it up in Silo). Once approved the person is signed in here, the profile they approved it as kept as their Silo profile, and their account returned; the code can't be used again. `denied` and `expired` end it.
+      description: While the code waits, `pending` (`opened` once someone looked it up in Silo). Once approved the person is signed in here and their account returned (their Silo profile is chosen later under Linked Accounts); the code can't be used again. `denied` and `expired` end it.
       security: []
       tags:
         - auth
@@ -15643,7 +15643,7 @@ paths:
   /user/{userId}/settings/linked-accounts/silo/device/check:
     post:
       summary: Check a code for linking Silo
-      description: Once approved, the Silo account is linked and the profile it was approved as becomes their chosen profile.
+      description: Once approved, the Silo account is linked; their profile is then chosen with My profile.
       tags:
         - users
       parameters:

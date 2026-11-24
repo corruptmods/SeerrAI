@@ -197,7 +197,7 @@ describe('signing in to Silo with a code', () => {
     return { agent, code: res.body };
   };
 
-  it('shows the code and Silo’s page, and signs in once approved as a profile', async () => {
+  it('shows the code and Silo’s page, and signs in once approved', async () => {
     const { agent, code } = await start();
     assert.match(code.userCode, /^\d{4}-\d{4}$/);
     assert.match(code.verificationUrl, /\/activate\?code=\d{8}$/);
@@ -216,7 +216,8 @@ describe('signing in to Silo with a code', () => {
     assert.equal(res.body.status, 'approved');
     const user = await users().findOneByOrFail({ siloUserId: 'acct-guest' });
     assert.equal(res.body.user.id, user.id);
-    assert.equal(user.siloProfileId, 'p-kid', 'the approved profile is kept');
+    // Silo names no profile for a full sign-in; it is chosen later.
+    assert.equal(user.siloProfileId, null);
     assert.deepEqual(silo.openSessions(), []);
     assert.equal((await agent.get('/auth/me')).body.id, user.id);
 

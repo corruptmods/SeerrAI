@@ -179,7 +179,10 @@ export interface SiloDevicePoll {
   opened?: boolean;
   poll_after?: number;
   expires_at?: string;
-  /** The profile the approver chose; empty for a full sign-in. */
+  /**
+   * Only for a temporary (profile) session, which Seerr AI never starts;
+   * empty for the full sign-ins it asks for.
+   */
   profile_id?: string;
   /** Only when approved, once. */
   tokens?: SiloTokenPair;

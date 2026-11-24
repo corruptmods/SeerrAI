@@ -172,7 +172,8 @@ describe('linking a Silo account', () => {
     assert.deepEqual(res.body, { status: 'approved' });
     const user = await friend();
     assert.equal(user.siloUserId, 'acct-friend');
-    assert.equal(user.siloProfileId, 'p-2');
+    // Silo names no profile for a full sign-in; it is chosen with My profile.
+    assert.equal(user.siloProfileId, null);
   });
 
   it('unlinks, forgetting the chosen profile', async () => {

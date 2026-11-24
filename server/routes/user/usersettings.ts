@@ -882,15 +882,14 @@ userSettingsRoutes.delete<{ id: string }>(
 
 /*
  * Linking a Silo account: by signing in to Silo (name and password), or with
- * a code approved in Silo, whose profile becomes their chosen one. Seerr AI
- * signs out of Silo again at once either way.
+ * a code approved in Silo. Seerr AI signs out of Silo again at once either
+ * way. Their profile is then chosen with My profile (none: every profile).
  */
 
 /** Links the Silo account the user just proved is theirs. */
 const linkSiloAccount = async (
   user: User,
-  account: SiloAccount,
-  profileId: string | null
+  account: SiloAccount
 ): Promise<{ status: number; body?: unknown }> => {
   const userRepository = getRepository(User);
   if (await userRepository.exist({ where: { siloUserId: account.id } })) {
@@ -905,7 +904,7 @@ const linkSiloAccount = async (
   await userRepository.update(user.id, {
     siloUserId: account.id,
     siloUsername: account.username,
-    siloProfileId: profileId,
+    siloProfileId: null,
     // Only a password account takes Silo's account type, and its picture.
     ...(local
       ? { userType: UserType.SILO, avatar: siloAvatarPath(account.id) }
@@ -963,7 +962,7 @@ userSettingsRoutes.post<{ id: string }>(
         parsed.data.username,
         parsed.data.password
       );
-      const { status, body } = await linkSiloAccount(user, account, null);
+      const { status, body } = await linkSiloAccount(user, account);
       return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       return siloLinkFailure(res, e);
@@ -1008,11 +1007,7 @@ userSettingsRoutes.post<{ id: string }>(
       if (check.status !== 'approved') {
         return res.status(200).json(check);
       }
-      const { status, body } = await linkSiloAccount(
-        user,
-        check.account,
-        check.profileId
-      );
+      const { status, body } = await linkSiloAccount(user, check.account);
       return status === 204
         ? res.status(200).json({ status: 'approved' })
         : res.status(status).json(body);

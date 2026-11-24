@@ -122,7 +122,11 @@ export interface FakeSilo {
   lockedNames: Set<string>;
   /** Sign-in sessions still open, by access token. */
   openSessions: () => string[];
-  /** Approves a device code as an account (and a profile), as /activate does. */
+  /**
+   * Approves a device code as an account (and a profile), as /activate does.
+   * The poll names no profile, as Silo names one only for a temporary
+   * session.
+   */
   approveDevice: (
     userCode: string,
     accountId: string,
@@ -514,7 +518,8 @@ export const createFakeSilo = (): FakeSilo => {
       return json(res, 200, {
         ...answer,
         status: 'approved',
-        profile_id: device.profileId ?? '',
+        // Silo names a profile only for temporary sessions.
+        profile_id: '',
         tokens: openSession(account),
       });
     }

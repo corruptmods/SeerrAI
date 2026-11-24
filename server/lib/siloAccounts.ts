@@ -199,7 +199,7 @@ export const startSiloDevice = async (
 /** Where a device sign-in stands. */
 export type SiloDeviceCheck =
   | { status: 'pending'; opened: boolean }
-  | { status: 'approved'; account: SiloAccount; profileId: string | null }
+  | { status: 'approved'; account: SiloAccount }
   | { status: 'denied' | 'expired' };
 
 /**
@@ -239,11 +239,9 @@ export const checkSiloDevice = async (
   pending.delete(handle);
   if (poll.status === 'approved' && poll.tokens) {
     const account = await closeAndCheck(client, poll.tokens);
-    return {
-      status: 'approved',
-      account,
-      profileId: poll.profile_id || null,
-    };
+    // Silo names a profile only for temporary sessions; the person picks
+    // theirs under Linked Accounts.
+    return { status: 'approved', account };
   }
   return { status: poll.status === 'denied' ? 'denied' : 'expired' };
 };

@@ -39,12 +39,20 @@ export interface Activity {
   /** Watch history, or requests when there is none. */
   source: 'watched' | 'requested' | 'none';
   /** Newest first. */
-  items: {
-    name: string;
-    at?: number;
-    /** Seerr's own media server (or requests), or the person's Trakt. */
-    from: 'server' | 'trakt';
-  }[];
+  items: ActivityItem[];
+  /**
+   * Just the server's own (or requests), in its own order: Trakt never
+   * crowds these out.
+   */
+  server: ActivityItem[];
+}
+
+interface ActivityItem {
+  name: string;
+  /** Unset when the server does not say when. */
+  at?: number;
+  /** Seerr's own media server (or requests), or the person's Trakt. */
+  from: 'server' | 'trakt';
 }
 
 /** Titles of recent watching kept. */
@@ -121,22 +129,25 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     }
   }
 
-  const items: Activity['items'] = [...watched].map(([name, { at }]) => ({
+  const serverItems: Activity['items'] = [...watched].map(([name, { at }]) => ({
     name,
-    at,
-    from: 'server',
+    // A play with no date (Emby) is undated, not the oldest.
+    ...(at ? { at } : {}),
+    from: 'server' as const,
   }));
+  let items = serverItems;
   // Trakt as last read; nothing read yet means asking again next time.
   const trakt = traktName ? watchedCached(user) : undefined;
   if (trakt?.traktRecent.length) {
-    items.push(...(await traktNotOnServer(source, watched, trakt.traktRecent)));
-    items.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-    items.splice(RECENT_TITLES);
+    items = mergeNewestFirst(
+      serverItems,
+      await traktNotOnServer(source, watched, trakt.traktRecent)
+    ).slice(0, RECENT_TITLES);
   }
 
   let value: Activity;
   if (items.length) {
-    value = { source: 'watched', items };
+    value = { source: 'watched', items, server: serverItems };
   } else {
     const requests = await getRepository(MediaRequest).find({
       where: { requestedBy: { id: user.id }, type: In(VIDEO_MEDIA_TYPES) },
@@ -155,9 +166,14 @@ export const recentActivity = async (user: User): Promise<Activity> => {
       }
     });
     const names = [...new Set(found.filter((name): name is string => !!name))];
+    const requested = names.map((name) => ({
+      name,
+      from: 'server' as const,
+    }));
     value = {
       source: names.length ? 'requested' : 'none',
-      items: names.map((name) => ({ name, from: 'server' as const })),
+      items: requested,
+      server: requested,
     };
   }
 
@@ -165,6 +181,33 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     recent.set(key, { at: Date.now(), value });
   }
   return value;
+};
+
+/**
+ * The server's titles and Trakt's, newest first. The server's keep their own
+ * order, and one with no date stays where the server put it rather than
+ * sorting as the oldest.
+ */
+export const mergeNewestFirst = (
+  server: Activity['items'],
+  trakt: Activity['items']
+): Activity['items'] => {
+  const byDate = [...trakt].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  const merged: Activity['items'] = [];
+  let s = 0;
+  let t = 0;
+  while (s < server.length || t < byDate.length) {
+    const own = server[s];
+    const theirs = byDate[t];
+    if (own && (!theirs || !own.at || own.at >= (theirs.at ?? 0))) {
+      merged.push(own);
+      s++;
+    } else {
+      merged.push(theirs);
+      t++;
+    }
+  }
+  return merged;
 };
 
 /**
@@ -223,8 +266,7 @@ export const recentWatching = async (
   limit = 10,
   { serverOnly = false }: { serverOnly?: boolean } = {}
 ): Promise<string[]> =>
-  (await recentActivity(user)).items
-    .filter((item) => !serverOnly || item.from === 'server')
+  (await recentActivity(user))[serverOnly ? 'server' : 'items']
     .slice(0, limit)
     .map((item) => item.name);
 

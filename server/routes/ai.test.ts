@@ -1975,6 +1975,23 @@ describe('what they watched on Trakt, in AI Search', () => {
     );
   });
 
+  it('never lets it crowd the server out of the reasons', async () => {
+    traktMovies = Array.from({ length: 25 }, (_, i) => ({
+      type: 'movie' as const,
+      title: `Glasswing ${i + 1}`,
+      year: 2010,
+      tmdbId: 7800 + i,
+      lastWatchedAt: now - 60 * (i + 1),
+    }));
+    const sent = await ask();
+    const line = /Watch history.*$/m.exec(sent.prompt)?.[0] ?? '';
+    assert.doesNotMatch(line, /Static Garden/);
+    assert.deepEqual(await recentWatching(member, 10, { serverOnly: true }), [
+      'Static Garden (2001)',
+      'Hedgehog Morning (1993)',
+    ]);
+  });
+
   it('does not explain suggestions by it', async () => {
     await ask();
     assert.deepEqual(await recentWatching(member, 10, { serverOnly: true }), [

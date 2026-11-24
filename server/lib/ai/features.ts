@@ -43,6 +43,9 @@ import { getSeriesProgress } from '@server/lib/seriesProgress';
 import { getSuggestions } from '@server/lib/suggestions';
 import {
   WATCHED_WAIT_MS,
+  awaitWithin,
+  watchedCached,
+  watchedFor,
   watchedKey,
   watchedWithin,
 } from '@server/lib/watched';
@@ -192,6 +195,11 @@ const chatReply = z
     g: genres,
     /** Albums and artists, for users with music. */
     music: musicReply,
+    /**
+     * The titles are suggestions of something to watch, not what they are
+     * looking for or asking about.
+     */
+    s: z.boolean().nullish().catch(null),
   })
   .passthrough()
   .transform(
@@ -209,6 +217,7 @@ const chatReply = z
       lang,
       all,
       redo,
+      s,
       ...rest
     }) => ({
       r,
@@ -224,6 +233,7 @@ const chatReply = z
       lang: lang?.toLowerCase(),
       all: all ?? undefined,
       redo: redo ?? undefined,
+      suggesting: s === true,
       /** A whole set of titles to read from TMDB instead of naming them. */
       src: readSet(rest),
     })
@@ -239,6 +249,10 @@ const nameKey = (name: string) =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
+
+/** A resolved title's name, film or series. */
+const resultName = (result: { title?: string; name?: string }) =>
+  result.title ?? result.name ?? '';
 
 /** A title from the media server or TMDB, as one plain line. */
 const nameOf = (name: string) => clip(name, 200);
@@ -370,6 +384,9 @@ export const chat = async (
   // answer comes from the cache or the provider fails; an unreadable
   // picture keeps it.
   const paid = sent ? await reserveUse(user) : undefined;
+  // What they watched is read alongside the model's answer, never before it.
+  const hiding = featureEnabled('hideWatched', user);
+  const watchedRead = hiding ? watchedFor(user) : undefined;
   let image: CompletionImage | undefined;
   let history: string;
   try {
@@ -423,6 +440,9 @@ export const chat = async (
 
   const admin = user.hasPermission(Permission.ADMIN);
   const music = musicFor(user);
+  // Asked to mark suggestions only when watched titles would be left out of
+  // them: not for a picture, which is about what it shows.
+  const markSuggestions = hiding && !image && !!watchedCached(user)?.keys.size;
   const answer = await askAiJson(chatReply, {
     feature: 'aiChat',
     user,
@@ -447,14 +467,18 @@ export const chat = async (
       'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality), "wrongEpisode" (an episode is the wrong one, or episodes are mixed up) or "replaceSeason" (a whole season is bad, messed up or wrong, or they want all of it replaced or downloaded again); the one title in "titles"; "se" and "ep" as numbers for the season and episode when given, also when said earlier in the conversation; "lang" as a two-letter code for a subtitle language; for "subtitles" or "transcribe", "all":true when they want it done for everything they name even where subtitles already exist (fix, replace or redo the subtitles of a whole series, a season or a movie; transcribe it regardless), and "redo":true when they ask for a transcription made again. A whole series ("all of Glasswing") has no "se" or "ep". "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
       `Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of", "m" and "g"${
         music ? ' and "music"' : ''
-      } when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.`,
+      } when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.` +
+      (markSuggestions
+        ? ' When the titles are your suggestions of something to watch, not a title they are looking for or asking about, add "s":true and give up to 10.'
+        : ''),
     prompt,
     maxTokens: 700,
     cache: {
       key: cacheKey(
         user.id,
-        // The prompt differs with music.
+        // The prompt differs with music, and when marking suggestions.
         music ? 'music' : '',
+        markSuggestions ? 'seen' : '',
         history,
         earlier,
         offered,
@@ -555,7 +579,7 @@ export const chat = async (
   // A title already offered is not shown again, however the model answers,
   // unless it is being listed or requested, when naming it again is
   // deliberate. (Watched titles stay findable: "that island show I was
-  // watching" should find it.)
+  // watching" should find it. Only suggestions leave them out, below.)
   const hidden = new Set(action ? [] : offered.map(nameKey));
   const resolved = (
     await resolveTitles(
@@ -564,19 +588,35 @@ export const chat = async (
         (title) => !hidden.has(nameKey(title.t))
       )
     )
-  ).filter(
-    (result) =>
-      !hidden.has(
-        nameKey(
-          ('title' in result ? result.title : undefined) ??
-            ('name' in result ? result.name : undefined) ??
-            ''
-        )
-      )
-  );
+  ).filter((result) => !hidden.has(nameKey(resultName(result))));
   // Only titles of the genre asked for: a cheap model can offer an anime
   // for slasher films.
   const results = resolved.filter((result) => fitsGenres(result, answer.g));
+  /**
+   * Suggestions they have not watched yet, back to the usual 6. A title
+   * named in their own words stays: that is one they asked about.
+   */
+  const unwatched = async () => {
+    if (!answer.suggesting) {
+      return results.slice(0, 6);
+    }
+    const watched = await awaitWithin(
+      watchedRead ?? Promise.resolve(undefined),
+      WATCHED_WAIT_MS
+    );
+    const theirs = ` ${nameKey(
+      [message, ...turns.map((turn) => turn.ask)].join(' ')
+    )} `;
+    return results
+      .filter((result) => {
+        const key = nameKey(resultName(result));
+        return (
+          (key && theirs.includes(` ${key} `)) ||
+          !watched?.keys.has(watchedKey(result.mediaType, result.id))
+        );
+      })
+      .slice(0, 6);
+  };
   if (resolved.length && !results.length && !anyMusic) {
     logger.info('AI chat offered no titles of the genre asked for', {
       label: 'AI',
@@ -591,11 +631,13 @@ export const chat = async (
     };
   }
 
-  // Only repeats or unknown titles: say so rather than leave "here are some
-  // more" with nothing under it.
+  const shown = markSuggestions && !action ? await unwatched() : results;
+
+  // Only repeats, unknown or watched titles: say so rather than leave "here
+  // are some more" with nothing under it.
   const reply =
     (answer.titles.length || answer.music.length) &&
-    !results.length &&
+    !shown.length &&
     !anyMusic &&
     !action
       ? 'Nothing new turned up for that. Try describing it another way.'
@@ -603,7 +645,7 @@ export const chat = async (
 
   return {
     reply,
-    results,
+    results: shown,
     ...(anyMusic && { music: found }),
     ...(action && {
       action: {

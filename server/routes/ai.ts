@@ -15,7 +15,9 @@ import {
 import type { CompletionImage } from '@server/lib/ai/providers';
 import { AiProviderError, IMAGE_TYPES } from '@server/lib/ai/providers';
 import { confirmFix } from '@server/lib/autofix/chat';
+import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
+import { watchedCached } from '@server/lib/watched';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import type { NextFunction, Request, Response } from 'express';
@@ -95,12 +97,18 @@ const need =
 /** This person's AI features and answers left today. */
 aiRoutes.get(
   '/status',
-  handle(async (req) => ({
-    features: Object.fromEntries(
-      AI_FEATURES.map((feature) => [feature, aiFeatureOn(feature, req.user)])
-    ),
-    remaining: req.user ? await remainingToday(req.user) : 0,
-  }))
+  handle(async (req) => {
+    // Read ahead what they watched, so AI Search has it to hand.
+    if (req.user && featureEnabled('hideWatched', req.user)) {
+      watchedCached(req.user);
+    }
+    return {
+      features: Object.fromEntries(
+        AI_FEATURES.map((feature) => [feature, aiFeatureOn(feature, req.user)])
+      ),
+      remaining: req.user ? await remainingToday(req.user) : 0,
+    };
+  })
 );
 
 /** Larger than any phone photo the app sends, which it shrinks first. */

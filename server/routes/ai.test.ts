@@ -20,6 +20,7 @@ import * as deletingSoon from '@server/lib/deletingSoon';
 import ImageProxy from '@server/lib/imageproxy';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { watchedFor } from '@server/lib/watched';
 import * as watchedBy from '@server/lib/watchedBy';
 import aiRoutes from '@server/routes/ai';
 import aiSettingsRoutes from '@server/routes/settings/ai';
@@ -1455,15 +1456,16 @@ describe('the AI chat', () => {
     });
 
     it('reads the watch history again once their media server account changes', async () => {
+      // Which account each read was for.
       const read: unknown[] = [];
       Object.defineProperty(TautulliAPI.prototype, 'getUserHistory', {
         configurable: true,
-        value: async (...args: unknown[]) => {
-          read.push(args);
+        value: async (user: User) => {
+          read.push(user.plexId);
           return [
             play({
               media_type: 'movie',
-              title: read.length === 1 ? 'Glasswing' : 'Harbour Lights',
+              title: user.plexId === 42 ? 'Glasswing' : 'Harbour Lights',
               date: now - 600,
             }),
           ];
@@ -1471,10 +1473,12 @@ describe('the AI chat', () => {
       });
       answers = ['{"r":"a","titles":[]}', '{"r":"b","titles":[]}'];
       await call('POST', '/api/v1/ai/chat', { message: 'what did I watch?' });
+      const before = read.length;
       member.plexId = 43;
       await getRepository(User).save(member);
       await call('POST', '/api/v1/ai/chat', { message: 'and before that?' });
-      assert.equal(read.length, 2);
+      assert.ok(read.length > before);
+      assert.deepEqual(new Set(read.slice(before)), new Set([43]));
       assert.match(calls[1].prompt, /Harbour Lights/);
       assert.doesNotMatch(calls[1].prompt, /Glasswing/);
     });
@@ -1493,6 +1497,282 @@ describe('the AI chat', () => {
         [137]
       );
     });
+  });
+});
+
+describe('AI Search suggestions they have watched', () => {
+  // Their own Plex account and titles: suggestions and what was watched are
+  // cached per account.
+  const film = (id: number, title: string) => ({
+    id,
+    title,
+    release_date: '2001-01-01',
+    media_type: 'movie',
+    genre_ids: [],
+    overview: '',
+    popularity: 1,
+    vote_average: 7,
+    vote_count: 1,
+    adult: false,
+    original_language: 'en',
+    original_title: title,
+    video: false,
+  });
+  const FILMS: Record<string, ReturnType<typeof film>> = {
+    Glasswing: film(7501, 'Glasswing'),
+    'Static Garden': film(7502, 'Static Garden'),
+    'Lantern Song': film(7503, 'Lantern Song'),
+  };
+  const searches = ['searchMovies', 'searchTvShows'] as const;
+  const before_ = searches.map((name) =>
+    Object.getOwnPropertyDescriptor(TheMovieDb.prototype, name)
+  );
+  let historyFails = false;
+
+  const make = (format: 'jpeg', colour: string) =>
+    sharp({
+      create: { width: 64, height: 48, channels: 3, background: colour },
+    })
+      [format]()
+      .toBuffer()
+      .then((buffer) => buffer.toString('base64'));
+
+  beforeEach(async () => {
+    historyFails = false;
+    stub('searchMovies', async ({ query }: { query: string }) => {
+      // "Film 1" to "Film 9", none watched.
+      const numbered = /^Film (\d)$/.exec(query);
+      const found = numbered
+        ? film(7510 + Number(numbered[1]), query)
+        : FILMS[query];
+      return {
+        page: 1,
+        total_pages: 1,
+        total_results: found ? 1 : 0,
+        results: found ? [found] : [],
+      };
+    });
+    stub('searchTvShows', async ({ query }: { query: string }) => ({
+      page: 1,
+      total_pages: 1,
+      total_results: query === 'Harbour Lights' ? 1 : 0,
+      results:
+        query === 'Harbour Lights'
+          ? [
+              {
+                id: 7504,
+                name: 'Harbour Lights',
+                first_air_date: '1999-01-01',
+                media_type: 'tv',
+                genre_ids: [],
+                origin_country: ['GB'],
+                original_language: 'en',
+                original_name: 'Harbour Lights',
+                overview: '',
+                popularity: 1,
+                vote_average: 7,
+                vote_count: 1,
+              },
+            ]
+          : [],
+    }));
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: 'tautulli.test',
+      apiKey: 'k',
+    };
+    member.plexId = 7401;
+    await getRepository(User).save(member);
+    await getRepository(Media).save([
+      new Media({
+        tmdbId: 7501,
+        mediaType: MediaType.MOVIE,
+        ratingKey: 'seen-glass',
+      }),
+      new Media({
+        tmdbId: 7502,
+        mediaType: MediaType.MOVIE,
+        ratingKey: 'seen-static',
+      }),
+      new Media({
+        tmdbId: 7504,
+        mediaType: MediaType.TV,
+        ratingKey: 'seen-harbour',
+      }),
+    ]);
+    const now = Math.floor(Date.now() / 1000);
+    Object.defineProperty(TautulliAPI.prototype, 'getUserHistory', {
+      configurable: true,
+      value: async () => {
+        if (historyFails) throw new Error('Tautulli is down');
+        return [
+          {
+            media_type: 'movie',
+            rating_key: 'seen-glass',
+            title: 'Glasswing',
+            year: 2001,
+            date: now - 600,
+            watched_status: 1,
+            percent_complete: 100,
+          },
+          // A third of an episode: the series counts.
+          {
+            media_type: 'episode',
+            rating_key: 'seen-harbour-1',
+            grandparent_rating_key: 'seen-harbour',
+            grandparent_title: 'Harbour Lights',
+            date: now - 900,
+            watched_status: 0,
+            percent_complete: 30,
+          },
+          // A glance: not watched.
+          {
+            media_type: 'movie',
+            rating_key: 'seen-static',
+            title: 'Static Garden',
+            year: 2001,
+            date: now - 1200,
+            watched_status: 0,
+            percent_complete: 5,
+          },
+        ];
+      },
+    });
+  });
+
+  after(() => {
+    getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: '',
+      apiKey: '',
+    };
+    searches.forEach((name, i) => {
+      const descriptor = before_[i];
+      if (descriptor) {
+        Object.defineProperty(TheMovieDb.prototype, name, descriptor);
+      }
+    });
+  });
+
+  /** Opens the app, which reads what they watched ahead. */
+  const warm = async () => {
+    await call('GET', '/api/v1/ai/status');
+    await watchedFor(member);
+  };
+
+  const titles = (...names: string[]) =>
+    names
+      .map((name) =>
+        name === 'Harbour Lights'
+          ? `{"t":"${name}","k":"tv"}`
+          : `{"t":"${name}","k":"movie"}`
+      )
+      .join(',');
+
+  const ask = async (
+    answer: string,
+    message = 'something new for tonight',
+    extra: Record<string, unknown> = {}
+  ) => {
+    answers = [answer];
+    const { body } = await call<{
+      reply: string;
+      results: { id: number }[];
+    }>('POST', '/api/v1/ai/chat', { message, ...extra });
+    return { reply: body.reply, ids: body.results.map((r) => r.id) };
+  };
+
+  const ALL = titles(
+    'Glasswing',
+    'Static Garden',
+    'Harbour Lights',
+    'Lantern Song'
+  );
+
+  it('leaves what they watched out of the model’s suggestions', async () => {
+    await warm();
+    const { ids } = await ask(`{"r":"Try these.","s":true,"titles":[${ALL}]}`);
+    assert.deepEqual(ids, [7502, 7503]);
+    assert.match(calls[0].system, /"s":true/);
+  });
+
+  it('keeps them when the titles are not suggestions', async () => {
+    await warm();
+    const { ids } = await ask(
+      `{"r":"Those are the ones.","titles":[${ALL}]}`,
+      'the films I watched last week'
+    );
+    assert.deepEqual(ids, [7501, 7502, 7504, 7503]);
+  });
+
+  it('keeps a watched title named in their own words', async () => {
+    await warm();
+    const { ids } = await ask(
+      `{"r":"Glasswing again, or these.","s":true,"titles":[${ALL}]}`,
+      'is Glasswing worth seeing again, or something else?'
+    );
+    assert.deepEqual(ids, [7501, 7502, 7503]);
+  });
+
+  it('keeps everything put on a list or requested', async () => {
+    await warm();
+    for (const action of ['list', 'request']) {
+      const { ids } = await ask(
+        `{"r":"Done.","s":true,"do":"${action}","n":"Mine","titles":[${ALL}]}`,
+        `${action} these`
+      );
+      assert.deepEqual(ids, [7501, 7502, 7504, 7503], action);
+    }
+  });
+
+  it('leaves a picture alone', async () => {
+    await warm();
+    const { ids } = await ask(
+      `{"r":"That is Glasswing.","s":true,"titles":[${titles('Glasswing')}]}`,
+      '',
+      { image: { type: 'image/jpeg', data: await make('jpeg', '#30c030') } }
+    );
+    assert.deepEqual(ids, [7501]);
+    assert.doesNotMatch(calls[0].system, /"s":true/);
+  });
+
+  it('asks for up to 10, and shows 6 once the watched are out', async () => {
+    await warm();
+    const numbered = Array.from({ length: 9 }, (_, i) => `Film ${i + 1}`);
+    const { ids } = await ask(
+      `{"r":"Plenty.","s":true,"titles":[${titles('Glasswing', ...numbered)}]}`
+    );
+    assert.deepEqual(ids, [7511, 7512, 7513, 7514, 7515, 7516]);
+    assert.match(calls[0].system, /give up to 10/);
+  });
+
+  it('says so when every suggestion was watched', async () => {
+    await warm();
+    const { reply, ids } = await ask(
+      `{"r":"Try these.","s":true,"titles":[${titles('Glasswing', 'Harbour Lights')}]}`
+    );
+    assert.deepEqual(ids, []);
+    assert.match(reply, /Nothing new turned up/);
+  });
+
+  it('changes nothing for someone who turned it off', async () => {
+    member.settings = await getRepository(UserSettings).save(
+      new UserSettings({ user: member, disabledFeatures: ['hideWatched'] })
+    );
+    await warm();
+    const { ids } = await ask(`{"r":"Try these.","s":true,"titles":[${ALL}]}`);
+    assert.deepEqual(ids, [7501, 7502, 7504, 7503]);
+    assert.doesNotMatch(calls[0].system, /"s"/);
+  });
+
+  it('still answers when the watch history cannot be read', async () => {
+    historyFails = true;
+    await warm();
+    const { ids } = await ask(`{"r":"Try these.","s":true,"titles":[${ALL}]}`);
+    assert.deepEqual(ids, [7501, 7502, 7504, 7503]);
+    assert.doesNotMatch(calls[0].system, /"s"/);
   });
 });
 

@@ -63,12 +63,35 @@ describe('webhook media server variables', () => {
     assert.equal(value('requestedBy_embyUserId', user), 'emby-user');
   });
 
+  it('give Silo’s ids', () => {
+    assert.equal(
+      value('media_siloMediaId', withMedia({ siloMediaId: 'movie-glasswing' })),
+      'movie-glasswing'
+    );
+    assert.equal(
+      value('media_siloMediaId', withMedia({ siloMediaId4k: 'movie-4k' })),
+      'movie-4k'
+    );
+    assert.equal(value('media_siloMediaId', withMedia({})), '');
+    assert.equal(
+      value('requestedBy_siloUserId', requestedBy({ siloUserId: '2' })),
+      '2'
+    );
+    // Silo's ids never stand in for Jellyfin's.
+    assert.equal(
+      value('media_jellyfinMediaId', withMedia({ siloMediaId: 'movie-1' })),
+      ''
+    );
+  });
+
   it('are empty without a title or a requester', () => {
     for (const key of [
       'media_jellyfinMediaId',
       'media_embyMediaId',
+      'media_siloMediaId',
       'requestedBy_jellyfinUserId',
       'requestedBy_embyUserId',
+      'requestedBy_siloUserId',
     ]) {
       assert.equal(value(key, {}), '', key);
     }

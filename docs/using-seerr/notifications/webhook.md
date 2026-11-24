@@ -112,6 +112,7 @@ These following special variables are only included in media-related notificatio
 | `{{media_status4k}}`        | The media's 4K availability status (`UNKNOWN`, `PENDING`, `PROCESSING`, `PARTIALLY_AVAILABLE`, or `AVAILABLE`) |
 | `{{media_jellyfinMediaId}}` | The media's Jellyfin Media ID (its Emby one when only Emby has it)                                             |
 | `{{media_embyMediaId}}`     | The media's Emby Media ID                                                                                      |
+| `{{media_siloMediaId}}`     | The media's Silo content ID (its 4K one when only that is in Silo)                                             |
 | `{{media_plexRatingKey}}`   | The media's Plex ratingKey, if available (for standard library match)                                          |
 | `{{media_plexRatingKey4k}}` | The media's Plex ratingKey for 4K match, if available                                                          |
 
@@ -129,6 +130,7 @@ The following special variables are only included in request-related notificatio
 | `{{requestedBy_avatar}}`                  | The requesting user's avatar URL                                               |
 | `{{requestedBy_jellyfinUserId}}`          | The requesting user's Jellyfin User ID (else their Emby one)                   |
 | `{{requestedBy_embyUserId}}`              | The requesting user's Emby User ID                                             |
+| `{{requestedBy_siloUserId}}`              | The requesting user's Silo account ID                                          |
 | `{{requestedBy_settings_discordIds}}`     | The requesting user's Discord ID(s) as a JSON array (if set)                   |
 | `{{requestedBy_settings_telegramChatId}}` | The requesting user's Telegram Chat ID (if set)                                |
 | `{{decline_reason}}`                      | Why the request was declined, if a reason was given (declined requests only)   |

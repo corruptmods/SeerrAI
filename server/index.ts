@@ -232,7 +232,7 @@ app
       );
     } else {
       logger.info(
-        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
+        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby/Silo servers setup yet`,
         {
           label: 'Server',
         }

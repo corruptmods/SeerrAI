@@ -16,7 +16,7 @@ export interface WatchedBy {
 
 /**
  * Who has watched a title, from watch history (Tautulli for Plex, the server
- * itself for Jellyfin and Emby): completed film plays or finished episodes,
+ * itself for Jellyfin and Emby, Seerr AI's copy for Silo): completed film plays or finished episodes,
  * with when last, most recent first. Regular and 4K copies both count.
  * Undefined when there is no watch history source.
  */

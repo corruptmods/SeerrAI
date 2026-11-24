@@ -29,7 +29,7 @@ export interface AccessPerson extends AccessSet {
   name: string;
   /** Linked Seerr AI user, if any. */
   userId?: number;
-  /** Jellyfin/Emby administrator: sees everything, never changed. */
+  /** Jellyfin, Emby or Silo administrator: sees everything, never changed. */
   admin?: boolean;
   /** Disabled on the server. */
   disabled?: boolean;
@@ -98,7 +98,7 @@ export interface AccessResult {
 export interface UserLibraryAccess {
   kind: MediaServerKind;
   libraries: AccessLibrary[];
-  /** "Every library" can be granted (Jellyfin and Emby). */
+  /** "Every library" can be granted (Jellyfin, Emby and Silo). */
   canGiveAll: boolean;
   /** Missing when the server doesn't list them (not shared, or gone). */
   person?: AccessPerson;

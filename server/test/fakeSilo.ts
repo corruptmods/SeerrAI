@@ -97,6 +97,8 @@ export interface FakeSilo {
   denyDevice: (userCode: string) => void;
   /** Silo refuses to create keys (a household PIN rule, say). */
   refuseKeyCreation: boolean;
+  /** Keys Silo mints can't read admin routes (so probes fail). */
+  mintNonAdminKeys: boolean;
   /** Answers every call with a 429 this many times first. */
   rateLimited: number;
   /** While set, every call gets a server error. */
@@ -200,6 +202,8 @@ export const createFakeSilo = (): FakeSilo => {
   let sessions = new Map<string, FakeSiloAccount>();
   let nextKey = 1;
   let nextCode = 1;
+  /** Keys Silo minted, by their id. */
+  const keyIds = new Map<string, string>();
 
   const deviceByUserCode = (userCode: string) =>
     [...fake.devices.values()].find(
@@ -268,6 +272,7 @@ export const createFakeSilo = (): FakeSilo => {
       },
     },
     refuseKeyCreation: false,
+    mintNonAdminKeys: false,
     rateLimited: 0,
     down: false,
     settings: (overrides = {}) => ({
@@ -293,6 +298,7 @@ export const createFakeSilo = (): FakeSilo => {
       fake.libraries = [];
       fake.items = [];
       fake.refuseKeyCreation = false;
+      fake.mintNonAdminKeys = false;
       fake.rateLimited = 0;
       fake.down = false;
       sessions = new Map();
@@ -491,13 +497,15 @@ export const createFakeSilo = (): FakeSilo => {
       if (account.role !== 'admin' || fake.refuseKeyCreation) {
         return problem(res, 403, 'permission_denied', 'Not allowed.');
       }
+      const id = String(nextKey);
       const key = `sa_made_${nextKey++}`;
       const scopes = Array.isArray(body?.scopes)
         ? (body?.scopes as string[])
         : [];
-      fake.keys.set(key, { scopes, admin: true });
+      fake.keys.set(key, { scopes, admin: !fake.mintNonAdminKeys });
+      keyIds.set(id, key);
       return json(res, 201, {
-        id: String(nextKey),
+        id,
         user_id: account.id,
         label: body?.label,
         key,
@@ -505,6 +513,20 @@ export const createFakeSilo = (): FakeSilo => {
         scopes,
         created_at: '2026-11-24T00:00:00.000Z',
       });
+    }
+
+    const keyRoute = /^\/admin\/api-keys\/([^/]+)$/.exec(path);
+    if (req.method === 'DELETE' && keyRoute) {
+      const account = auth ? sessions.get(auth) : undefined;
+      if (!account || account.role !== 'admin') {
+        return problem(res, 401, 'authentication_required', 'Sign in.');
+      }
+      const made = keyIds.get(keyRoute[1]);
+      if (!made) return problem(res, 404, 'not_found', 'No such key.');
+      fake.keys.delete(made);
+      keyIds.delete(keyRoute[1]);
+      res.writeHead(204);
+      return res.end();
     }
 
     // Everything else needs a key.

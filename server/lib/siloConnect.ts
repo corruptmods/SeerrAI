@@ -1,5 +1,4 @@
 import SiloAPI, {
-  SILO_OPTIONAL_SCOPES,
   SILO_REQUIRED_SCOPES,
   SiloError,
 } from '@server/api/silo/client';
@@ -73,12 +72,18 @@ const refusal = (e: unknown, fallback?: string): MediaServerChangeError => {
   );
 };
 
-/** Signs in as an administrator once, and creates Seerr AI's own key. */
-const createKey = async (
+/**
+ * Signs in as an administrator once and creates Seerr AI's own key, with the
+ * required scopes only (the optional ones come with a pasted key that has
+ * them). `check` tries the new key while still signed in; if it fails, the
+ * key is deleted again so no unused "Seerr AI" key is left behind.
+ */
+const createKey = async <T>(
   client: SiloAPI,
   username: string,
-  password: string
-): Promise<{ key: string; admin: SiloAccount }> => {
+  password: string,
+  check: (key: string) => Promise<T>
+): Promise<{ key: string; admin: SiloAccount; checked: T }> => {
   let tokens;
   try {
     tokens = await client.login(username, password, siloDeviceId());
@@ -97,24 +102,66 @@ const createKey = async (
         'Sign in with a Silo administrator account.'
       );
     }
-    const created = await client.createApiKey(tokens.access_token, {
-      label: KEY_LABEL,
-      scopes: [...SILO_REQUIRED_SCOPES, ...SILO_OPTIONAL_SCOPES],
-    });
-    return { key: created.key, admin: tokens.user };
-  } catch (e) {
-    if (e instanceof SiloError && e.status === 403) {
-      throw new MediaServerChangeError(
-        403,
-        e.code === 'password_change_required'
-          ? e.message
-          : "Silo didn't let this sign-in create an API key. In Silo, create a key with the admin:monitor:read and libraries:read scopes and paste it here instead."
-      );
+    let created;
+    try {
+      created = await client.createApiKey(tokens.access_token, {
+        label: KEY_LABEL,
+        scopes: [...SILO_REQUIRED_SCOPES],
+      });
+    } catch (e) {
+      throw keyRefusal(e);
     }
-    throw refusal(e);
+    try {
+      return {
+        key: created.key,
+        admin: tokens.user,
+        checked: await check(created.key),
+      };
+    } catch (e) {
+      await client.deleteApiKey(tokens.access_token, created.id);
+      throw e;
+    }
   } finally {
     await client.logout(tokens.access_token);
   }
+};
+
+/** Why Silo wouldn't create a key. */
+const keyRefusal = (e: unknown): MediaServerChangeError => {
+  if (e instanceof SiloError && e.status === 403) {
+    return new MediaServerChangeError(
+      403,
+      e.code === 'password_change_required'
+        ? e.message
+        : "Silo didn't let this sign-in create an API key. In Silo, create a key with the admin:monitor:read and libraries:read scopes and paste it here instead."
+    );
+  }
+  return refusal(e);
+};
+
+/** What Seerr AI can do with a key; throws a plain refusal if not enough. */
+const probeKey = async (hostname: string, apiKey: string) => {
+  const keyed = new SiloAPI(hostname, apiKey, { timeout: 15_000 });
+  let probe;
+  try {
+    probe = await keyed.probeScopes();
+  } catch (e) {
+    throw refusal(
+      e,
+      e instanceof SiloError && e.status === 401
+        ? "Silo didn't accept this API key."
+        : undefined
+    );
+  }
+  if (probe.missing.length) {
+    throw new MediaServerChangeError(
+      403,
+      `This API key can't read what Seerr AI needs. It needs the ${probe.missing.join(
+        ' and '
+      )} scope${probe.missing.length > 1 ? 's' : ''}, and must belong to a Silo administrator.`
+    );
+  }
+  return { probe, name: (await keyed.getServerName()) || 'Silo' };
 };
 
 /**
@@ -150,39 +197,24 @@ export const trySilo = async (
     );
   }
 
-  const made = input.apiKey
-    ? undefined
-    : await createKey(open, input.username ?? '', input.password ?? '');
-  const apiKey = made?.key ?? (input.apiKey ?? '').trim();
-
-  const keyed = new SiloAPI(hostname, apiKey, { timeout: 15_000 });
-  let probe;
-  try {
-    probe = await keyed.probeScopes();
-  } catch (e) {
-    throw refusal(
-      e,
-      e instanceof SiloError && e.status === 401
-        ? "Silo didn't accept this API key."
-        : undefined
-    );
+  if (input.apiKey) {
+    const apiKey = input.apiKey.trim();
+    const { probe, name } = await probeKey(hostname, apiKey);
+    return { apiKey, serverId, name, info, optionalScopes: probe.optional };
   }
-  if (probe.missing.length) {
-    throw new MediaServerChangeError(
-      403,
-      `This API key can't read what Seerr AI needs. It needs the ${probe.missing.join(
-        ' and '
-      )} scope${probe.missing.length > 1 ? 's' : ''}, and must belong to a Silo administrator.`
-    );
-  }
-
+  const made = await createKey(
+    open,
+    input.username ?? '',
+    input.password ?? '',
+    (key) => probeKey(hostname, key)
+  );
   return {
-    apiKey,
+    apiKey: made.key,
     serverId,
-    name: (await keyed.getServerName()) || 'Silo',
+    name: made.checked.name,
     info,
-    optionalScopes: probe.optional,
-    ...(made ? { admin: made.admin } : {}),
+    optionalScopes: made.checked.probe.optional,
+    admin: made.admin,
   };
 };
 

@@ -172,16 +172,36 @@ describe('connecting Silo', () => {
     assert.equal(res.status, 200, await res.clone().text());
     assert.match(getSettings().silo.apiKey, /^sa_made_/);
     const created = silo.calls.find((c) => c.path === '/admin/api-keys');
+    // Only the required scopes; the optional ones come with a pasted key.
     assert.deepEqual(created?.body, {
       label: 'Seerr AI',
-      scopes: [
-        'admin:monitor:read',
-        'libraries:read',
-        'admin:users',
-        'admin:catalog:paths',
-      ],
+      scopes: ['admin:monitor:read', 'libraries:read'],
     });
+    assert.deepEqual(getSettings().silo.optionalScopes, []);
     assert.ok(silo.calls.some((c) => c.path === '/auth/logout'));
+    assert.deepEqual(silo.openSessions(), []);
+  });
+
+  it('deletes the key it made when that key then fails', async () => {
+    silo.accounts = [
+      { id: '1', username: 'owner', password: 'pw', role: 'admin' },
+    ];
+    silo.mintNonAdminKeys = true;
+    const before = [...silo.keys.keys()];
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      username: 'owner',
+      password: 'pw',
+    });
+    assert.equal(res.status, 403);
+    assert.ok(
+      silo.calls.some(
+        (c) => c.method === 'DELETE' && c.path.startsWith('/admin/api-keys/')
+      )
+    );
+    assert.deepEqual([...silo.keys.keys()], before, 'no key left behind');
+    assert.deepEqual(silo.openSessions(), []);
+    assert.equal(getSettings().silo.connected, false);
   });
 
   it('says plainly why it could not connect', async () => {

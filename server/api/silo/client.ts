@@ -508,6 +508,17 @@ class SiloAPI extends ExternalAPI {
     }
   }
 
+  /** Deletes a key with an administrator's sign-in; failures are ignored. */
+  public async deleteApiKey(accessToken: string, keyId: string): Promise<void> {
+    try {
+      await this.axios.delete(`/admin/api-keys/${encodeURIComponent(keyId)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      // Left for the administrator to remove in Silo.
+    }
+  }
+
   /** Creates an API key for the signed-in administrator. */
   public createApiKey(
     accessToken: string,

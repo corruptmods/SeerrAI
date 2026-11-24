@@ -4,6 +4,16 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Coming next
 
+### New
+
+- **Hide What You've Watched** (on to start; each person can turn it off, and an admin for everyone): Suggested for You, Pick for the Room and AI Search's suggestions leave out what you've already watched, on Plex, Jellyfin or Emby: a film finished or played past a fifth, or a series with any such episode. A title you name or describe is still found.
+- **Use What People Watched on Trakt** (Settings → Services → Trakt, off to start): what each person watched on their public Trakt profile counts as watched, and their recent Trakt titles join their recent watching for AI features. Their Trakt username is never sent to the AI provider.
+
+### Changed
+
+- AI features are told your 12 most recent titles instead of 8.
+- Trakt requests share a limit of 2 a second.
+
 ### Fixed
 
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.

@@ -397,6 +397,7 @@ handled. Drop the patch and that line once deepmerge releases a fix. The Node.js
 | `server/lib/list*.ts` | access rules, activity notifications, watch sync |
 | `server/lib/notificationReconciler.ts` | dedup and catch-up delivery |
 | `server/lib/requestDispatch.ts` | marking undispatchable requests failed |
+| `server/lib/watched.ts` | what each person has watched (media server history plus optional public Trakt history), cached in memory for 30 minutes, served stale while it refreshes, never throws; used by Suggested for You, Pick for the Room and AI Search |
 | `server/lib/requestServers.ts` | which Radarr, Sonarr or Lidarr a request goes to, and why it has none (`serverIssue` on a pending or failed request) |
 | `server/constants/lists.ts`, `src/constants/lists.ts` | tuning knobs |
 | `src/components/MediaLists/` | list UI |

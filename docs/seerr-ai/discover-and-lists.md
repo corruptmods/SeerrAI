@@ -16,7 +16,7 @@ Save keeps it all; leaving drops it. Discover and Settings can't be hidden. Item
 ### Rows Seerr AI adds
 
 - **Deleting Soon** (first by default): what Maintainerr is about to delete, each with **Keep**. Hidden when nothing is due. Switch: `deletingSoon`.
-- **Suggested for You**: from what you finished watching recently and TMDB's recommendations. Leaves out what you've started or is blocklisted. Hidden when there's nothing to go on. Switch: `suggestedForYou`.
+- **Suggested for You**: from what you finished watching recently and TMDB's recommendations. Leaves out what you've started or is blocklisted, and with **Hide What You've Watched** on, anything you've watched since (on Trakt too, when that's on). Hidden when there's nothing to go on. Switch: `suggestedForYou`.
 - **Anime This Season**: anime series airing now. Open it for the **Anime** page: **This Season**, **Next Season**, **Last Season**, **Popular Series** and **Films**, narrowed with **Made in** (Japan, South Korea, China, the United States or anywhere else). Anime is what Seerr AI counts as anime everywhere (see [Anime](./requests-and-downloads.md#anime)), whatever your Discover language.
 - **Music** rows, once music is set up. See [Music](./music.md).
 
@@ -53,7 +53,7 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 ## Your Watchlist
 
-**Your Watchlist** (and someone's watchlist on their profile) can be sorted: **Default order**, **Newest added**, **Oldest added** or **Title A–Z** ("The" and "A" left out, as Plex files them). Default order is the one it always had: Plex's own order for a Plex watchlist, the order added for one kept here (Jellyfin, Emby and local accounts). Plex sorts a Plex watchlist itself. The order stays in the address. A Trakt watchlist isn't shown here; it only has its titles requested (see [Trakt watchlist](./account.md#trakt-watchlist)).
+**Your Watchlist** (and someone's watchlist on their profile) can be sorted: **Default order**, **Newest added**, **Oldest added** or **Title A–Z** ("The" and "A" left out, as Plex files them). Default order is the one it always had: Plex's own order for a Plex watchlist, the order added for one kept here (Jellyfin, Emby and local accounts). Plex sorts a Plex watchlist itself. The order stays in the address. A Trakt watchlist isn't shown here; it only has its titles requested (see [Trakt](./account.md#trakt)).
 
 ## Request several at once
 

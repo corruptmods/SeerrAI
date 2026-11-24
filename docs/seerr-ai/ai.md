@@ -15,7 +15,7 @@ AI in Seerr AI suggests and explains. **It never acts on its own**: when AI Sear
 - **Daily Limit per Person:** answers each person gets a day (default 20; 0 is no limit). Admins aren't limited. Answers from memory, and failed or empty ones, don't count.
 - **Test** checks the model answers.
 
-Each feature sends only what it needs, and keeps the answer short. Titles go as "Name (year)", never account names or emails. What people watched is sent for AI Search, suggestions and picks; issue comments are sent as written. Answers are remembered for a while (an hour for searches, up to 30 days for recaps), and a repeat costs nothing and doesn't count towards the limit.
+Each feature sends only what it needs, and keeps the answer short. Titles go as "Name (year)", never account names or emails. What people watched is sent for AI Search, suggestions and picks: at most 12 recent titles each, as names with a rough date, including recent Trakt titles when an admin has turned on **Use What People Watched on Trakt**; never a Trakt username, a whole history or any ids. With **Hide What You've Watched** on, titles you've watched are taken out of AI Search's suggestions and Pick for the Room's picks on the server, without being sent; issue comments are sent as written. Answers are remembered for a while (an hour for searches, up to 30 days for recaps), and a repeat costs nothing and doesn't count towards the limit.
 
 ### Choosing a model
 

@@ -87,9 +87,15 @@ Admins set up the services themselves in Settings → Notifications; see [Notifi
 
 The pencil button on Discover. See [Discover and lists](./discover-and-lists.md#your-own-home-page).
 
-## Trakt watchlist
+## Trakt
 
 Once an admin has set up Trakt, anyone allowed to auto-request can enter their Trakt username in **Profile → Settings → General**. Titles added to your public Trakt watchlist are then requested for you every few minutes, with **Auto-Request Movies** and **Auto-Request Series**, on any media server. Only the 20 most recently added are looked at. Removing a title and adding it back requests it again; something deleted isn't requested again just because it's still listed.
+
+If an admin has turned on **Use What People Watched on Trakt**, your username is also used to count what you've watched on Trakt as watched, and your recent Trakt titles join your recent watching for AI features. Your Trakt profile must be public; nobody signs in to Trakt. If your profile is private or the name is wrong, Seerr AI tries again every six hours.
+
+## Hide What You've Watched
+
+On to start, and in your settings with the other feature switches (an admin can turn it off for everyone). Suggested for You, Pick for the Room and AI Search's suggestions leave out what you've already watched: a film finished or played past a fifth, or a series with any such episode, on any of the media servers, plus what you watched on Trakt when that's on. You can still find a title you've watched by describing it or naming it, and lists, requests, whole sets and pictures are never filtered.
 
 ## Plex sign-in
 

@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Fixed
+
+- A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.
+
 ## 2.5.0 (24 November 2026)
 
 An Effort setting for AI and AI Search that keeps to the genre you ask for, one switch for anime, subtitles fixed or transcribed for a whole title, wrong episodes re-numbered, TV films and Approve anyway in Backfill, and fixes from upstream.

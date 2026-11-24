@@ -3,6 +3,7 @@ import PersonCard from '@app/components/PersonCard';
 import Slider from '@app/components/Slider';
 import TitleCard from '@app/components/TitleCard';
 import { useNearObserver } from '@app/hooks/useNearScreen';
+import useOnItsWayRefresh from '@app/hooks/useOnItsWayRefresh';
 import useSettings from '@app/hooks/useSettings';
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import { useUser } from '@app/hooks/useUser';
@@ -76,6 +77,8 @@ const MediaSlider = ({
       mutate(undefined, { revalidate: (page) => pageHolds(page, title) });
     }
   });
+
+  useOnItsWayRefresh(data, mutate);
 
   // Skip pages without results (a damaged cached copy) instead of breaking the row.
   let titles = (data ?? []).reduce(

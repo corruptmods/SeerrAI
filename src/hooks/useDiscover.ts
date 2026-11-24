@@ -1,3 +1,4 @@
+import useOnItsWayRefresh from '@app/hooks/useOnItsWayRefresh';
 import usePageReturn from '@app/hooks/usePageReturn';
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import useToasts from '@app/hooks/useToasts';
@@ -22,7 +23,10 @@ interface BaseMedia {
   mediaType: string;
   mediaInfo?: {
     status: MediaStatus;
+    status4k?: MediaStatus;
     hasActiveRequest?: boolean;
+    downloadStatus?: unknown[];
+    downloadStatus4k?: unknown[];
   };
 }
 
@@ -116,6 +120,8 @@ const useDiscover = <
       mutate(undefined, { revalidate: (page) => pageHolds(page, title) });
     }
   });
+
+  useOnItsWayRefresh(data, mutate);
 
   // A film and a series can share a TMDB id; keep both.
   const resultIds = new Set<string>();

@@ -42,7 +42,7 @@ const messages = defineMessages('components.Login', {
   siloAccessDenied:
     'This Silo account has no account here yet. Ask the owner to import it.',
   siloDifferentServer:
-    'The Silo at this address is not the one this server was connected to. Ask an administrator to connect Silo again.',
+    'The Silo at this address is not the one Seerr AI was connected to. Ask an administrator to connect Silo again.',
 });
 
 interface SiloLoginProps {

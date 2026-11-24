@@ -560,6 +560,9 @@ export const createFakeSilo = (): FakeSilo => {
       if (!account || account.role !== 'admin') {
         return problem(res, 401, 'authentication_required', 'Sign in.');
       }
+      if (!req.headers['if-match']) {
+        return problem(res, 428, 'precondition_required', 'Send If-Match.');
+      }
       const made = keyIds.get(keyRoute[1]);
       if (!made) return problem(res, 404, 'not_found', 'No such key.');
       fake.keys.delete(made);

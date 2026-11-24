@@ -10,9 +10,12 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
 import { getSettings } from '@server/lib/settings';
+import type { TraktRecent } from '@server/lib/watched';
+import { traktNameOf, watchedCached, watchedKey } from '@server/lib/watched';
+import type { WatchSource } from '@server/lib/watchHistory';
 import {
-  STARTED_PERCENT,
   isCompletedPlay,
+  STARTED_PERCENT,
   watchSource,
 } from '@server/lib/watchHistory';
 import logger from '@server/logger';
@@ -36,25 +39,54 @@ export interface Activity {
   /** Watch history, or requests when there is none. */
   source: 'watched' | 'requested' | 'none';
   /** Newest first. */
-  items: { name: string; at?: number }[];
+  items: {
+    name: string;
+    at?: number;
+    /** Seerr's own media server (or requests), or the person's Trakt. */
+    from: 'server' | 'trakt';
+  }[];
 }
+
+/** Titles of recent watching kept. */
+const RECENT_TITLES = 20;
+
+/**
+ * A comparison key ignoring a trailing year or "(series)", case and
+ * punctuation: "Harbour Lights (2005)" and "harbour lights (series)" match.
+ */
+export const nameKey = (name: string) =>
+  name
+    .replace(/\s*\((?:series|\d{4})\)\s*$/i, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/** "Title (year)" for a film, "Title (series)" for a series. */
+const named = (kind: 'movie' | 'tv', title: string, year?: number) =>
+  kind === 'movie'
+    ? `${title}${year ? ` (${year})` : ''}`
+    : `${title} (series)`;
 
 /**
  * Recent watching, newest first, as "Title (year)" or "Title (series)", from
  * watch history (Tautulli for Plex, the server itself for Jellyfin and Emby),
- * including shows part-way through. Falls back to requests, marked so they
- * are never passed off as watched. Only names leave the server.
+ * including shows part-way through, and, once an admin turns it on, what
+ * they watched on Trakt as last read (never waited for). Falls back to
+ * requests, marked so they are never passed off as watched. Only names
+ * leave the server.
  */
 export const recentActivity = async (user: User): Promise<Activity> => {
   const source = watchSource();
   const viewer = source?.viewerOf(user);
-  const key = `${user.id}:${viewer ?? ''}`;
+  const traktName = traktNameOf(user);
+  const key = `${user.id}:${viewer ?? ''}:${traktName ?? ''}`;
   const hit = recent.get(key);
   if (hit && Date.now() - hit.at < RECENT_MS) {
     return hit.value;
   }
 
-  const watched = new Map<string, number>();
+  // By name: its latest play and the server's id for the title.
+  const watched = new Map<string, { at: number; titleId: string }>();
   if (source && viewer) {
     try {
       const history = await source.history(user, 300);
@@ -67,15 +99,16 @@ export const recentActivity = async (user: User): Promise<Activity> => {
         if (!title) {
           continue;
         }
-        const name =
-          play.kind === 'movie'
-            ? `${title}${play.year ? ` (${play.year})` : ''}`
-            : `${title} (series)`;
+        const name = named(
+          play.kind === 'movie' ? 'movie' : 'tv',
+          title,
+          play.year
+        );
         // History is newest first, so a title's first play is its latest.
         if (!watched.has(name)) {
-          watched.set(name, play.at);
+          watched.set(name, { at: play.at, titleId: play.titleId });
         }
-        if (watched.size >= 20) {
+        if (watched.size >= RECENT_TITLES) {
           break;
         }
       }
@@ -88,12 +121,22 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     }
   }
 
+  const items: Activity['items'] = [...watched].map(([name, { at }]) => ({
+    name,
+    at,
+    from: 'server',
+  }));
+  // Trakt as last read; nothing read yet means asking again next time.
+  const trakt = traktName ? watchedCached(user) : undefined;
+  if (trakt?.traktRecent.length) {
+    items.push(...(await traktNotOnServer(source, watched, trakt.traktRecent)));
+    items.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+    items.splice(RECENT_TITLES);
+  }
+
   let value: Activity;
-  if (watched.size) {
-    value = {
-      source: 'watched',
-      items: [...watched].map(([name, at]) => ({ name, at })),
-    };
+  if (items.length) {
+    value = { source: 'watched', items };
   } else {
     const requests = await getRepository(MediaRequest).find({
       where: { requestedBy: { id: user.id }, type: In(VIDEO_MEDIA_TYPES) },
@@ -114,23 +157,76 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     const names = [...new Set(found.filter((name): name is string => !!name))];
     value = {
       source: names.length ? 'requested' : 'none',
-      items: names.map((name) => ({ name })),
+      items: names.map((name) => ({ name, from: 'server' as const })),
     };
   }
 
-  recent.set(key, { at: Date.now(), value });
+  if (!traktName || trakt) {
+    recent.set(key, { at: Date.now(), value });
+  }
   return value;
+};
+
+/**
+ * Trakt's recent titles not already in the server's: the same TMDB title,
+ * else the same name. One library lookup for the server's titles.
+ */
+const traktNotOnServer = async (
+  source: WatchSource | undefined,
+  server: Map<string, { titleId: string }>,
+  recentOnTrakt: readonly TraktRecent[]
+): Promise<Activity['items']> => {
+  const serverKeys = new Set<string>();
+  if (source && server.size) {
+    try {
+      const media = await source.mediaFor(
+        [...server.values()].map(({ titleId }) => titleId)
+      );
+      for (const item of media.values()) {
+        serverKeys.add(watchedKey(item.mediaType, item.tmdbId));
+      }
+    } catch {
+      // Names alone still catch most.
+    }
+  }
+  const names = new Set([...server.keys()].map(nameKey));
+  const items: Activity['items'] = [];
+  for (const title of recentOnTrakt) {
+    // Trakt text, kept to one plain line.
+    const clean = clip(title.title, MAX_PLAYED_TITLE);
+    const name = clean && named(title.kind, clean, title.year);
+    if (
+      !name ||
+      (title.key && serverKeys.has(title.key)) ||
+      names.has(nameKey(name))
+    ) {
+      continue;
+    }
+    names.add(nameKey(name));
+    if (title.key) {
+      serverKeys.add(title.key);
+    }
+    items.push({ name, at: title.at, from: 'trakt' });
+  }
+  return items;
 };
 
 /** Clears the cache so the next answer refetches. */
 export const forgetRecentActivity = () => recent.clear();
 
-/** Just the names, for features that only need someone's taste. */
+/**
+ * Just the names, for features that only need someone's taste; with
+ * `serverOnly`, leaving out what was watched on Trakt.
+ */
 export const recentWatching = async (
   user: User,
-  limit = 10
+  limit = 10,
+  { serverOnly = false }: { serverOnly?: boolean } = {}
 ): Promise<string[]> =>
-  (await recentActivity(user)).items.slice(0, limit).map((item) => item.name);
+  (await recentActivity(user)).items
+    .filter((item) => !serverOnly || item.from === 'server')
+    .slice(0, limit)
+    .map((item) => item.name);
 
 /** "today", "yesterday", "3 days ago", "5 weeks ago", roughly. */
 export const ago = (at: number, now = Date.now()) => {

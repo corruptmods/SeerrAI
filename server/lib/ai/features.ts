@@ -24,6 +24,7 @@ import {
   ago,
   clip,
   label,
+  nameKey,
   recentActivity,
   recentWatching,
   resolveTitles,
@@ -239,17 +240,6 @@ const chatReply = z
     })
   );
 
-/**
- * A comparison key ignoring a trailing year or "(series)", case and
- * punctuation: "Harbour Lights (2005)" and "harbour lights (series)" match.
- */
-const nameKey = (name: string) =>
-  name
-    .replace(/\s*\((?:series|\d{4})\)\s*$/i, '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-
 /** A resolved title's name, film or series. */
 const resultName = (result: { title?: string; name?: string }) =>
   result.title ?? result.name ?? '';
@@ -257,15 +247,22 @@ const resultName = (result: { title?: string; name?: string }) =>
 /** A title from the media server or TMDB, as one plain line. */
 const nameOf = (name: string) => clip(name, 200);
 
+/** Recent titles told to the model. */
+const HISTORY_TITLES = 12;
+
 /**
  * What the model is told about the user's watching. The names come from
- * the media server, so they are given as names only.
+ * the media server or Trakt, so they are given as names only.
  */
 const historyNote = (activity: Activity) => {
+  const shown = activity.items.slice(0, HISTORY_TITLES);
   switch (activity.source) {
     case 'watched':
-      return `Watch history (titles only, as the media server names them), newest first: ${activity.items
-        .slice(0, 8)
+      return `Watch history (titles only${
+        shown.some((item) => item.from === 'trakt')
+          ? ''
+          : ', as the media server names them'
+      }), newest first: ${shown
         .map((item) => {
           const name = nameOf(item.name);
           return item.at === undefined
@@ -676,7 +673,8 @@ export const suggestionReasons = async (
   if (!items.length) {
     return [];
   }
-  const watching = await recentWatching(user, 10);
+  // Suggestions are made from the server's history, so explained by it.
+  const watching = await recentWatching(user, 10, { serverOnly: true });
   if (!watching.length) {
     throw new AiError(
       'There is no watch history to explain these by.',

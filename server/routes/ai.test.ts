@@ -1,6 +1,8 @@
 import { MusicBrainz } from '@server/api/musicbrainz';
 import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
+import type { TraktWatched } from '@server/api/trakt';
+import TraktAPI, { TraktError } from '@server/api/trakt';
 import { MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
@@ -13,6 +15,7 @@ import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import agent from '@server/lib/agent';
 import { clearAiCache, today } from '@server/lib/ai';
+import { recentWatching } from '@server/lib/ai/context';
 import { creditReport, forgetSpendReports } from '@server/lib/ai/credit';
 import { redact, reviewDeletions } from '@server/lib/ai/features';
 import { resetProviderMemoryForTests } from '@server/lib/ai/providers';
@@ -1773,6 +1776,193 @@ describe('AI Search suggestions they have watched', () => {
     const { ids } = await ask(`{"r":"Try these.","s":true,"titles":[${ALL}]}`);
     assert.deepEqual(ids, [7501, 7502, 7504, 7503]);
     assert.doesNotMatch(calls[0].system, /"s"/);
+  });
+});
+
+describe('what they watched on Trakt, in AI Search', () => {
+  const NAME = 'harbour-watcher';
+  const day = 86_400;
+  const now = Math.floor(Date.now() / 1000);
+  let traktMovies: TraktWatched[] | Error = [];
+  let traktShows: TraktWatched[] = [];
+  let traktAsked = 0;
+
+  beforeEach(async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: 'tautulli.test',
+      apiKey: 'k',
+    };
+    getSettings().trakt = { clientId: 'c'.repeat(64), watchHistory: true };
+    member.plexId = 7601;
+    member.settings = await getRepository(UserSettings).save(
+      new UserSettings({ user: member, traktUsername: NAME })
+    );
+    await getRepository(User).save(member);
+    await getRepository(Media).save(
+      new Media({
+        tmdbId: 137,
+        mediaType: MediaType.MOVIE,
+        ratingKey: 'trakt-hedgehog',
+      })
+    );
+    Object.defineProperty(TautulliAPI.prototype, 'getUserHistory', {
+      configurable: true,
+      value: async (user: User) =>
+        user.plexId === 7601
+          ? [
+              {
+                media_type: 'movie',
+                rating_key: 'trakt-static',
+                title: 'Static Garden',
+                year: 2001,
+                date: now - day - 60,
+                watched_status: 1,
+                percent_complete: 100,
+              },
+              {
+                media_type: 'movie',
+                rating_key: 'trakt-hedgehog',
+                title: 'Hedgehog Morning',
+                year: 1993,
+                date: now - 3 * day - 60,
+                watched_status: 1,
+                percent_complete: 100,
+              },
+            ]
+          : [],
+    });
+    traktAsked = 0;
+    traktMovies = [
+      // The same film as on the server, by its TMDB id.
+      {
+        type: 'movie',
+        title: 'Hedgehog Morning!',
+        year: 1993,
+        tmdbId: 137,
+        lastWatchedAt: now - 3600,
+      },
+      {
+        type: 'movie',
+        title: 'Lantern Song',
+        year: 2004,
+        tmdbId: 7704,
+        lastWatchedAt: now - 7200,
+      },
+      // The same film as on the server, by its name.
+      {
+        type: 'movie',
+        title: 'static garden',
+        year: 2001,
+        tmdbId: 7705,
+        lastWatchedAt: now - 100,
+      },
+    ];
+    traktShows = [
+      {
+        type: 'show',
+        title: 'Harbour Lights',
+        year: 1999,
+        tmdbId: 7703,
+        lastWatchedAt: now - 2 * day - 60,
+      },
+    ];
+    Object.defineProperty(TraktAPI.prototype, 'watchedMovies', {
+      configurable: true,
+      value: async () => {
+        traktAsked++;
+        if (traktMovies instanceof Error) throw traktMovies;
+        return traktMovies;
+      },
+    });
+    Object.defineProperty(TraktAPI.prototype, 'watchedShows', {
+      configurable: true,
+      value: async () => traktShows,
+    });
+  });
+
+  after(() => {
+    getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    getSettings().tautulli = {
+      ...getSettings().tautulli,
+      hostname: '',
+      apiKey: '',
+    };
+    getSettings().trakt = {};
+  });
+
+  const ask = async (message = 'what have I been watching?') => {
+    await call('GET', '/api/v1/ai/status');
+    await watchedFor(member);
+    answers = ['{"r":"This and that.","titles":[]}'];
+    const { status } = await call('POST', '/api/v1/ai/chat', { message });
+    assert.equal(status, 200);
+    return calls[0];
+  };
+
+  it('joins the server’s history, newest first, each title once', async () => {
+    const sent = await ask();
+    assert.match(
+      sent.prompt,
+      /Watch history \(titles only\), newest first: Lantern Song \(2004, today\); Static Garden \(2001, yesterday\); Harbour Lights \(series, 2 days ago\); Hedgehog Morning \(1993, 3 days ago\)$/m
+    );
+    assert.doesNotMatch(sent.prompt, /Hedgehog Morning!|static garden/);
+  });
+
+  it('never sends their Trakt name', async () => {
+    const sent = await ask();
+    assert.doesNotMatch(JSON.stringify(calls), new RegExp(NAME));
+    assert.doesNotMatch(sent.system, /Trakt/);
+  });
+
+  it('gives at most 12 titles', async () => {
+    traktMovies = Array.from({ length: 15 }, (_, i) => ({
+      type: 'movie' as const,
+      title: `Glasswing ${i + 1}`,
+      year: 2010,
+      tmdbId: 7800 + i,
+      lastWatchedAt: now - 60 * (i + 1),
+    }));
+    const sent = await ask();
+    const line = /Watch history.*$/m.exec(sent.prompt)?.[0] ?? '';
+    assert.equal(line.split('; ').length, 12);
+  });
+
+  it('is enough on its own, with no server history', async () => {
+    member.plexId = 7602;
+    await getRepository(User).save(member);
+    const sent = await ask();
+    assert.match(
+      sent.prompt,
+      /Watch history \(titles only\), newest first: static garden \(2001, today\); Hedgehog Morning! \(1993, today\); Lantern Song/
+    );
+    assert.doesNotMatch(sent.prompt, /No watch history/);
+  });
+
+  it('is left out until an admin turns it on', async () => {
+    getSettings().trakt = { clientId: 'c'.repeat(64) };
+    const sent = await ask();
+    assert.doesNotMatch(sent.prompt, /Lantern Song/);
+    assert.match(sent.prompt, /as the media server names them/);
+    assert.equal(traktAsked, 0);
+  });
+
+  it('still answers from the server when Trakt fails', async () => {
+    traktMovies = new TraktError('unreachable', 'Could not reach Trakt.');
+    const sent = await ask();
+    assert.match(
+      sent.prompt,
+      /as the media server names them\), newest first: Static Garden/
+    );
+  });
+
+  it('does not explain suggestions by it', async () => {
+    await ask();
+    assert.deepEqual(await recentWatching(member, 10, { serverOnly: true }), [
+      'Static Garden (2001)',
+      'Hedgehog Morning (1993)',
+    ]);
   });
 });
 

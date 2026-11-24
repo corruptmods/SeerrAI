@@ -443,7 +443,7 @@ export const createFakeSilo = (): FakeSilo => {
         match_code: 'lantern harbour',
         verification_uri: activate,
         verification_uri_complete: `${activate}?code=${code}`,
-        expires_at: '2026-11-24T00:15:00.000Z',
+        expires_at: new Date(Date.now() + 900_000).toISOString(),
         expires_in: 900,
         interval: 5,
         device_name: String(body?.device_name ?? ''),

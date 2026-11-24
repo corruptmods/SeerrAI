@@ -44,6 +44,11 @@ export interface SiloConnection {
 
 const KEY_LABEL = 'Seerr AI';
 
+/** Refusals sign-in at setup tells apart. */
+export const SILO_NOT_ADMIN = 'Sign in with a Silo administrator account.';
+export const SILO_BAD_PASSWORD =
+  "Silo didn't accept that username and password.";
+
 export const siloAddressOf = (input: SiloAddress) => ({
   ip: (input.hostname ?? '').trim(),
   port: Number(input.port || 8090),
@@ -90,17 +95,12 @@ const createKey = async <T>(
   } catch (e) {
     throw refusal(
       e,
-      e instanceof SiloError && e.status === 401
-        ? "Silo didn't accept that username and password."
-        : undefined
+      e instanceof SiloError && e.status === 401 ? SILO_BAD_PASSWORD : undefined
     );
   }
   try {
     if (tokens.user.role !== 'admin') {
-      throw new MediaServerChangeError(
-        403,
-        'Sign in with a Silo administrator account.'
-      );
+      throw new MediaServerChangeError(403, SILO_NOT_ADMIN);
     }
     let created;
     try {

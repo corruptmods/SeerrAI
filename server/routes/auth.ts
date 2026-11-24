@@ -45,6 +45,7 @@ import { endSessions, maySignIn, startSession } from '@server/lib/signIn';
 import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import siloAuthRoutes from '@server/routes/authSilo';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import oidcRoutes, { clearOidcInProgress } from '@server/routes/oidc';
 import passkeyRoutes from '@server/routes/passkey';
@@ -67,6 +68,9 @@ authRoutes.use('/passkey', passkeyRoutes);
 
 // Sign-in and account linking via single sign-on.
 authRoutes.use('/oidc', oidcRoutes);
+
+// Sign-in with a Silo account: a password, or a code approved in Silo.
+authRoutes.use('/silo', siloAuthRoutes);
 
 export const quickConnectSecret = z.object({
   secret: z
@@ -1139,6 +1143,7 @@ authRoutes.post('/local', async (req, res, next) => {
         'user.userType',
         'user.jellyfinUserId',
         'user.embyUserId',
+        'user.siloUserId',
       ])
       .where('user.email = :email', { email: body.email.toLowerCase() })
       .getOne();

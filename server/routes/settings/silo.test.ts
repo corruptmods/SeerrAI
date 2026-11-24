@@ -120,11 +120,12 @@ const post = (route: string, body?: unknown) =>
 const at = () => ({ hostname: '127.0.0.1', port: silo.port(), useSsl: false });
 
 describe('connecting Silo', () => {
-  it('connects with a pasted key, reads its libraries and keeps sign-in off', async () => {
+  it('connects with a pasted key, reads its libraries and keeps sign-in off when asked', async () => {
     const res = await post('/media-servers/silo/connect', {
       ...at(),
       apiKey: 'sa_test',
       externalHostname: 'https://silo.example.test',
+      signIn: false,
     });
     assert.equal(res.status, 200, await res.clone().text());
     const silo = getSettings().silo;
@@ -155,7 +156,7 @@ describe('connecting Silo', () => {
     const listed = (await res.json()) as { kind: string; signIn: boolean }[];
     assert.equal(listed.find((s) => s.kind === 'silo')?.signIn, false);
     assert.ok(!JSON.stringify(listed).includes('sa_test'), 'no API key');
-    // The public settings don't offer Silo sign-in.
+    // The public settings don't offer Silo sign-in while it is off.
     assert.equal(
       getSettings().fullPublicSettings.mediaServers.find(
         (s) => s.kind === 'silo'
@@ -272,13 +273,33 @@ describe('a connected Silo', () => {
     });
   });
 
-  it("can't be primary or used for sign-in yet", async () => {
-    let res = await post('/media-servers/silo/primary');
-    assert.equal(res.status, 400);
-    assert.equal(getSettings().main.mediaServerType, MediaServerType.PLEX);
-    res = await post('/media-servers/silo/sign-in', { signIn: true });
-    assert.equal(res.status, 400);
+  it('can be made primary, and its sign-in turned on and off', async () => {
+    let res = await post('/media-servers/silo/sign-in', { signIn: false });
+    assert.equal(res.status, 200);
     assert.equal(signInAllowed('silo'), false);
+    res = await post('/media-servers/silo/sign-in', { signIn: true });
+    assert.equal(res.status, 200);
+    assert.equal(signInAllowed('silo'), true);
+    assert.equal(
+      getSettings().fullPublicSettings.mediaServers.find(
+        (s) => s.kind === 'silo'
+      )?.signIn,
+      true
+    );
+    res = await post('/media-servers/silo/primary');
+    assert.equal(res.status, 200);
+    assert.equal(getSettings().main.mediaServerType, MediaServerType.SILO);
+    assert.deepEqual(connectedServers(), ['silo', 'plex']);
+  });
+
+  it('connects with sign-in on by default', async () => {
+    getSettings().silo = siloDefaults();
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(res.status, 200);
+    assert.equal(signInAllowed('silo'), true);
   });
 
   it('shows its settings without the key, and keeps the key on save', async () => {

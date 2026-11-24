@@ -290,7 +290,7 @@ describe('the media servers list', () => {
         ['silo', false, false],
       ]
     );
-    assert.equal(byKind(list, 'silo').signInOffered, false);
+    assert.equal(byKind(list, 'silo').signInOffered, true);
     assert.equal(byKind(list, 'jellyfin').signInOffered, true);
     const plex = byKind(list, 'plex');
     assert.equal(plex.name, 'Den Plex');

@@ -11,16 +11,17 @@ import {
 } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { enabledSiloAccounts } from '@server/lib/siloAccounts';
 import { removeSeerrUser } from '@server/lib/userRemoval';
 import logger from '@server/logger';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 
 /*
  * With Remove Users Who Lose Access on, deletes the accounts of people the
- * media server no longer has: no longer shared on the Plex server, or deleted
- * from Jellyfin or Emby. Someone must be missing on two checks in a row, so
- * one odd reply can't remove anyone, and a check that would remove every
- * account of a server removes none. The owner and admins are never removed.
+ * media server no longer has: no longer shared on the Plex server, deleted
+ * from Jellyfin or Emby, or deleted or switched off in Silo. Someone must be
+ * missing on two checks in a row, so one odd reply can't remove anyone, and a
+ * check that would remove every account of a server removes none. The owner and admins are never removed.
  */
 
 const TYPES: Record<MediaServerKind, UserType> = {
@@ -67,7 +68,16 @@ const presentOn = async (kind: MediaServerKind): Promise<Set<string>> => {
   }
 
   if (kind === 'silo') {
-    throw new Error("Silo accounts aren't checked yet.");
+    if (!getSettings().silo.apiKey) {
+      throw new Error('Silo has no API key in Seerr AI.');
+    }
+    // A switched-off account counts as gone, as it can't sign in.
+    const accounts = await enabledSiloAccounts();
+    // Silo always has its owner, so none means a bad reply.
+    if (!accounts.length) {
+      throw new Error('Silo sent no accounts.');
+    }
+    return new Set(accounts.map((account) => account.id));
   }
   if (!getSettings()[kind].apiKey) {
     throw new Error(`${serverName(kind)} has no API key in Seerr AI.`);
@@ -103,8 +113,7 @@ class UserAccessCheck {
     try {
       const missingNow = new Set<number>();
 
-      // Nobody signs in with a Silo account yet, so there is none to check.
-      for (const kind of connectedServers().filter((k) => k !== 'silo')) {
+      for (const kind of connectedServers()) {
         let present: Set<string>;
         try {
           present = await presentOn(kind);
@@ -127,6 +136,7 @@ class UserAccessCheck {
               plexId: true,
               jellyfinUserId: true,
               embyUserId: true,
+              siloUserId: true,
               permissions: true,
               userType: true,
             },

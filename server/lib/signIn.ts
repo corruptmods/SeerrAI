@@ -15,6 +15,7 @@ import {
   signInAllowed,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import { siloAccountAllowed } from '@server/lib/siloAccounts';
 import type { Request } from 'express';
 import { In, Like } from 'typeorm';
 
@@ -58,6 +59,8 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * With accounts on several connected servers, any one still allowing them is
  * enough. Disconnected servers have no say: a user whose only accounts are
  * there signs in like a password account.
+ *
+ * The same goes for a Silo account deleted or switched off there.
  *
  * A passkey stands in for media server sign-in, so it follows each server's
  * sign-in switch. Passwords have their own switch, checked where typed, and
@@ -125,8 +128,7 @@ export const maySignIn = async (
         kind === 'plex'
           ? await plexLetsIn(user, how)
           : kind === 'silo'
-            ? // Signing in with a Silo account isn't offered yet.
-              false
+            ? await siloLetsIn(user, how)
             : await jellyfinLetsIn(user, kind, how);
       if (answer) {
         return true;
@@ -202,6 +204,23 @@ const jellyfinLetsIn = async (
     kind
   ).getAccount(accountId);
   return !!account && !account.Policy?.IsDisabled;
+};
+
+/**
+ * Whether their Silo account still exists and is switched on. Throws when
+ * Silo is unreachable.
+ */
+const siloLetsIn = async (
+  user: Pick<User, 'siloUserId'>,
+  how: 'passkey' | 'password' | 'signedIn'
+): Promise<boolean | undefined> => {
+  if (!user.siloUserId) {
+    return false;
+  }
+  if (!getSettings().silo.apiKey) {
+    return how === 'signedIn' ? undefined : false;
+  }
+  return siloAccountAllowed(user.siloUserId);
 };
 
 /** How long the owner's Plex share list is reused across users. */
@@ -291,7 +310,12 @@ export const resetSignInMemoryForTests = (): void => {
 export const stillMaySignIn = (
   user: Pick<
     User,
-    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+    | 'id'
+    | 'userType'
+    | 'plexId'
+    | 'jellyfinUserId'
+    | 'embyUserId'
+    | 'siloUserId'
   >
 ): Promise<boolean> => {
   const known = stillAllowed.get(user.id);

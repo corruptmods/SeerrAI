@@ -92,12 +92,6 @@ export const setSignIn = async (
       `${serverName(kind)} is not connected.`
     );
   }
-  if (kind === 'silo' && signIn) {
-    throw new MediaServerChangeError(
-      400,
-      "Signing in with a Silo account isn't available yet."
-    );
-  }
   // Someone must still be able to sign in: by password or another server.
   if (
     !signIn &&
@@ -126,14 +120,6 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
     throw new MediaServerChangeError(
       404,
       `${serverName(kind)} is not connected.`
-    );
-  }
-  // The primary server is also the one people sign in with at setup; Silo
-  // sign-in isn't available yet.
-  if (kind === 'silo') {
-    throw new MediaServerChangeError(
-      400,
-      "Silo can't be the primary server yet."
     );
   }
   settings.main.mediaServerType = typeOfKind(kind);
@@ -224,7 +210,7 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   if (primaryServer() === kind && !nextPrimary) {
     throw new MediaServerChangeError(
       400,
-      `${serverName(kind)} is the primary server, and no other connected server can take its place. Connect Plex, Jellyfin or Emby before removing it.`
+      `${serverName(kind)} is the primary server, and no other connected server can take its place. Connect another server before removing it.`
     );
   }
 

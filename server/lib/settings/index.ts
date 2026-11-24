@@ -154,7 +154,7 @@ export const siloDefaults = (): SiloSettings => ({
   serverId: '',
   apiKey: '',
   connected: false,
-  signIn: false,
+  signIn: true,
   serverVersion: '',
   contractDigest: '',
   optionalScopes: [],
@@ -2050,8 +2050,7 @@ class Settings {
         kind,
         name: this.data[kind]?.name ?? '',
         primary: index === 0 && kind === kindOfType(this.main.mediaServerType),
-        // Signing in with a Silo account isn't offered yet.
-        signIn: kind !== 'silo' && this.data[kind]?.signIn !== false,
+        signIn: this.data[kind]?.signIn !== false,
       })),
       oidcProviders: oidcApplicationUrl(this.data.main.applicationUrl)
         ? this.oidc.providers

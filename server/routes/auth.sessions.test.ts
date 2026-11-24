@@ -279,7 +279,7 @@ describe('a media server that stops letting someone in', () => {
     connected: MEDIA_SERVER_KINDS.map((kind) => settings[kind].connected),
   };
 
-  // The servers people sign in with; Silo sign-in isn't offered yet.
+  // Plex, Jellyfin and Emby here; Silo in auth.silo.test.ts.
   const SERVER_NAME: Record<Exclude<MediaServerKind, 'silo'>, string> = {
     plex: 'Plex',
     jellyfin: 'Jellyfin',

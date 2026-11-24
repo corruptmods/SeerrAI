@@ -1,0 +1,469 @@
+import type { SiloAccount } from '@server/api/silo/types';
+import { ApiErrorCode } from '@server/constants/error';
+import { UserType } from '@server/constants/user';
+import { getRepository } from '@server/datasource';
+import { User } from '@server/entity/User';
+import { startJobs } from '@server/job/schedule';
+import { saveFirstOwner } from '@server/lib/firstOwner';
+import { mainAccountOn, takeEmail } from '@server/lib/manageUser';
+import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
+import {
+  connectAsPrimary,
+  hostnameOf,
+  primaryServer,
+  signInAllowed,
+} from '@server/lib/mediaServers';
+import { withNewUserDefaults } from '@server/lib/newUserDefaults';
+import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
+import { startSession } from '@server/lib/signIn';
+import { SignInLimiter } from '@server/lib/signInLimiter';
+import {
+  SiloSignInError,
+  cancelSiloDevice,
+  checkSiloDevice,
+  siloAvatarPath,
+  siloPasswordSignIn,
+  startSiloDevice,
+} from '@server/lib/siloAccounts';
+import {
+  SILO_BAD_PASSWORD,
+  SILO_NOT_ADMIN,
+  siloAddressOf,
+  storeSilo,
+  trySilo,
+} from '@server/lib/siloConnect';
+import logger from '@server/logger';
+import { checkAvatarChanged } from '@server/routes/avatarproxy';
+import type { NextFunction, Request, Response } from 'express';
+import { Router } from 'express';
+import { z } from 'zod';
+
+/*
+ * Signing in with a Silo account (/auth/silo): with a name and password, or
+ * with a code approved in Silo (its Quick Connect). At first-run setup, the
+ * Silo administrator who signs in becomes the owner and Silo the primary
+ * server. The same rules as Jellyfin and Emby decide who gets an account:
+ * someone new whose name is already another account's is refused and told to
+ * sign in with that account and link Silo instead.
+ */
+
+const siloAuthRoutes = Router();
+
+const siloLimiter = new SignInLimiter('silo', { capAccount: true });
+
+const passwordBody = z.object({
+  username: z.string().min(1).max(256),
+  password: z.string().max(1024).optional().default(''),
+  email: z.string().max(256).optional(),
+  // Setup only: Silo's address, and optionally an API key to use.
+  hostname: z.string().max(256).optional(),
+  port: z.coerce.number().int().min(1).max(65535).optional(),
+  useSsl: z.boolean().optional(),
+  urlBase: z.string().max(256).optional(),
+  apiKey: z.string().max(512).optional(),
+});
+
+const handleBody = z.object({ handle: z.string().regex(/^[a-f0-9]{48}$/) });
+
+/** Answers a failed sign-in: Silo's reason, or the shared error codes. */
+const refuse = (next: NextFunction, e: unknown) => {
+  if (e instanceof SiloSignInError) {
+    switch (e.reason) {
+      case 'credentials':
+        return next({ status: 401, message: ApiErrorCode.InvalidCredentials });
+      case 'notAdmin':
+        return next({ status: 403, message: ApiErrorCode.NotAdmin });
+      case 'unreachable':
+        return next({ status: 502, message: ApiErrorCode.ConnectionError });
+      case 'passwordChange':
+        return next({
+          status: 403,
+          message: ApiErrorCode.PasswordChangeRequired,
+        });
+      default:
+        return next({ status: e.status, message: e.message });
+    }
+  }
+  if (e instanceof MediaServerChangeError) {
+    return next({ status: e.status, message: e.message });
+  }
+  logger.error('Silo sign-in failed', {
+    label: 'Auth',
+    errorMessage: e instanceof Error ? e.message : String(e),
+  });
+  return next({ status: 500, message: 'Something went wrong.' });
+};
+
+/** A refusal with a status and a message (an error code or plain text). */
+class Refused extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+/** The picture follows Silo when Silo holds their main account. */
+const refreshPicture = async (user: User): Promise<void> => {
+  if (!user.siloUserId || !mainAccountOn(user, 'silo')) return;
+  try {
+    const { changed } = await checkAvatarChanged(user, 'silo');
+    if (changed || !user.avatar.startsWith('/avatarproxy/silo/')) {
+      user.avatar = siloAvatarPath(user.siloUserId, user.avatarVersion);
+      await getRepository(User).update(user.id, { avatar: user.avatar });
+    }
+  } catch (e) {
+    logger.error('Could not refresh a Silo picture at sign-in', {
+      label: 'Auth',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+  }
+};
+
+/**
+ * Signs in someone Silo vouched for, outside setup: their account here, made
+ * when new users may sign in and nobody else has their name. `profileId` is
+ * the profile they approved a code as, kept as their chosen profile.
+ */
+const signInAccount = async (
+  req: Request,
+  account: SiloAccount,
+  {
+    profileId,
+    email,
+    password,
+  }: { profileId?: string | null; email?: string; password?: string } = {}
+): Promise<User> => {
+  const settings = getSettings();
+  const userRepository = getRepository(User);
+  let user = await userRepository.findOne({
+    where: { siloUserId: account.id },
+  });
+
+  if (user) {
+    const changes: Partial<User> = { siloUsername: account.username };
+    if (profileId) changes.siloProfileId = profileId;
+    if (mainAccountOn(user, 'silo') && user.username === account.username) {
+      changes.username = '';
+    }
+    await userRepository.update(user.id, changes);
+    Object.assign(user, changes);
+  } else if (!settings.main.newPlexLogin) {
+    logger.warn('Silo sign-in refused: this account was not imported', {
+      label: 'API',
+      ip: req.ip,
+      siloUsername: account.username,
+    });
+    throw new Refused(403, 'Access denied.');
+  } else {
+    // Their email, else their Silo name, is their password-login name; never
+    // one another account already has. Silo vouches only for the name.
+    const loginName = email || account.username;
+    const vouched = loginName.toLowerCase() === account.username.toLowerCase();
+    const free = vouched
+      ? await takeEmail(loginName)
+      : !(await userRepository.exists({
+          where: { email: loginName.toLowerCase() },
+        }));
+    if (!free) {
+      logger.warn(
+        'Silo sign-in refused: another account already has this email or name',
+        { label: 'API', ip: req.ip, siloUsername: account.username }
+      );
+      throw new Refused(403, ApiErrorCode.ExistingAccount);
+    }
+    user = withNewUserDefaults(
+      new User({
+        email: loginName,
+        siloUserId: account.id,
+        siloUsername: account.username,
+        siloProfileId: profileId ?? null,
+        permissions: settings.main.defaultPermissions,
+        userType: UserType.SILO,
+        emailVerified: vouched,
+      })
+    );
+    user.avatar = siloAvatarPath(account.id);
+    // A password typed here also signs them in here, as with Jellyfin.
+    if (password) {
+      await user.setPassword(password);
+    }
+    await userRepository.save(user);
+    logger.info('Created a user for a Silo account', {
+      label: 'API',
+      ip: req.ip,
+      siloUsername: account.username,
+    });
+  }
+
+  await refreshPicture(user);
+  return user;
+};
+
+/**
+ * Setup with Silo as the primary server: Silo is checked and its key made
+ * (or the given one tried), then the administrator who signed in becomes the
+ * owner. Everything Silo must answer comes first, so a failure leaves
+ * settings as they were.
+ */
+const setUpWithSilo = async (
+  req: Request,
+  body: z.infer<typeof passwordBody>
+): Promise<User> => {
+  const settings = getSettings();
+  const userRepository = getRepository(User);
+  const address = body.hostname
+    ? siloAddressOf(body)
+    : siloAddressOf({ ...settings.silo, hostname: settings.silo.ip });
+  if (!address.ip) {
+    throw new Refused(400, "Enter Silo's address.");
+  }
+
+  let admin: SiloAccount | undefined;
+  if (body.apiKey) {
+    admin = await siloPasswordSignIn(
+      body.username,
+      body.password,
+      hostnameOf(address)
+    );
+  }
+  if (admin && admin.role !== 'admin') {
+    throw new SiloSignInError(403, 'notAdmin', 'Not an administrator.');
+  }
+  let connection;
+  try {
+    connection = await trySilo({
+      ...address,
+      hostname: address.ip,
+      ...(body.apiKey
+        ? { apiKey: body.apiKey }
+        : { username: body.username, password: body.password }),
+    });
+  } catch (e) {
+    // Silo's own words for a wrong password or a non-administrator.
+    if (e instanceof MediaServerChangeError && e.message === SILO_NOT_ADMIN) {
+      throw new SiloSignInError(403, 'notAdmin', e.message);
+    }
+    if (
+      e instanceof MediaServerChangeError &&
+      e.message === SILO_BAD_PASSWORD
+    ) {
+      throw new SiloSignInError(401, 'credentials', e.message);
+    }
+    throw e;
+  }
+  admin ??= connection.admin;
+  if (!admin) {
+    throw new Refused(500, 'Something went wrong.');
+  }
+  if (admin.password_change_required) {
+    throw new SiloSignInError(403, 'passwordChange', 'Temporary password.');
+  }
+
+  // With accounts but no primary server (fresh settings), only the owner's
+  // own Silo account, or one they lack, may set up the owner.
+  const missingAdminUser = !(await userRepository.count());
+  const owner = missingAdminUser
+    ? null
+    : await userRepository.findOne({ where: { id: 1 } });
+  const holder = await userRepository.findOne({
+    where: { siloUserId: admin.id },
+  });
+  if (
+    owner &&
+    ((owner.siloUserId && owner.siloUserId !== admin.id) ||
+      (holder && holder.id !== owner.id))
+  ) {
+    logger.warn('Silo sign-in refused: this account may not set up the owner', {
+      label: 'API',
+      ip: req.ip,
+      siloUsername: admin.username,
+    });
+    throw new Refused(403, ApiErrorCode.ExistingAccount);
+  }
+
+  await storeSilo({ ...address, hostname: address.ip }, connection, {
+    connect: true,
+  });
+  connectAsPrimary('silo');
+
+  const columns = {
+    email: body.email || admin.username,
+    siloUserId: admin.id,
+    siloUsername: admin.username,
+    permissions: Permission.ADMIN,
+    userType: UserType.SILO,
+    avatar: siloAvatarPath(admin.id),
+  };
+  let user: User;
+  if (owner) {
+    Object.assign(owner, columns);
+    user = await userRepository.save(owner);
+  } else {
+    user = await saveFirstOwner(withNewUserDefaults(new User(columns)));
+  }
+  await settings.save();
+  startJobs();
+  logger.info('Set up Seerr AI with Silo as the primary server', {
+    label: 'API',
+    ip: req.ip,
+    siloUsername: admin.username,
+  });
+  await refreshPicture(user);
+  return user;
+};
+
+const respondSignedIn = async (req: Request, res: Response, user: User) => {
+  await startSession(req, user.id);
+  const fresh = await getRepository(User).findOneOrFail({
+    where: { id: user.id },
+  });
+  return res.status(200).json(fresh.filter());
+};
+
+siloAuthRoutes.post('/', async (req, res, next) => {
+  const parsed = passwordBody.safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Enter a username.' });
+  }
+  const body = parsed.data;
+  const settingUp = !primaryServer();
+  const noOwner = !settingUp && !(await getRepository(User).count());
+
+  if (!settingUp) {
+    if (!signInAllowed('silo')) {
+      return next({ status: 403, message: 'Silo sign-in is turned off.' });
+    }
+    if (body.hostname || body.apiKey) {
+      return next({
+        status: 400,
+        message: "Silo's address is already set up.",
+      });
+    }
+    // With no accounts, only the primary server sets up the owner.
+    if (noOwner && primaryServer() !== 'silo') {
+      return next({ status: 403, message: ApiErrorCode.ExistingAccount });
+    }
+  }
+
+  if (!siloLimiter.take(req, res, body.username)) {
+    return;
+  }
+  try {
+    let user: User;
+    if (settingUp) {
+      user = await setUpWithSilo(req, body);
+    } else {
+      const account = await siloPasswordSignIn(body.username, body.password);
+      siloLimiter.clear(req, body.username);
+      if (noOwner) {
+        if (account.role !== 'admin') {
+          throw new SiloSignInError(403, 'notAdmin', 'Not an administrator.');
+        }
+        user = await saveFirstOwner(
+          withNewUserDefaults(
+            new User({
+              email: body.email || account.username,
+              siloUserId: account.id,
+              siloUsername: account.username,
+              permissions: Permission.ADMIN,
+              userType: UserType.SILO,
+              avatar: siloAvatarPath(account.id),
+            })
+          )
+        );
+      } else {
+        user = await signInAccount(req, account, {
+          email: body.email,
+          password: body.password,
+        });
+      }
+    }
+    siloLimiter.clear(req, body.username);
+    return await respondSignedIn(req, res, user);
+  } catch (e) {
+    // Only a wrong password counts against the name.
+    if (!(e instanceof SiloSignInError && e.reason === 'credentials')) {
+      siloLimiter.refund(req, body.username);
+    }
+    if (e instanceof Refused) {
+      return next({ status: e.status, message: e.message });
+    }
+    if (e instanceof SiloSignInError && e.reason === 'credentials') {
+      logger.warn('Failed sign-in attempt with incorrect Silo credentials', {
+        label: 'Auth',
+        ip: req.ip,
+      });
+    }
+    return refuse(next, e);
+  }
+});
+
+/** Device sign-in needs Silo connected, set up and its sign-in on. */
+const deviceSignInOpen = async (next: NextFunction): Promise<boolean> => {
+  if (!primaryServer() || !(await getRepository(User).count())) {
+    next({
+      status: 403,
+      message: 'Signing in with a code is not available during setup.',
+    });
+    return false;
+  }
+  if (!signInAllowed('silo')) {
+    next({ status: 403, message: 'Silo sign-in is turned off.' });
+    return false;
+  }
+  return true;
+};
+
+siloAuthRoutes.post('/device/start', async (_req, res, next) => {
+  if (!(await deviceSignInOpen(next))) return;
+  try {
+    return res.status(200).json(await startSiloDevice());
+  } catch (e) {
+    return refuse(next, e);
+  }
+});
+
+/*
+ * Whether the code was approved yet. On approval the person is signed in
+ * here and their account returned; the code can't be used again.
+ */
+siloAuthRoutes.post('/device/check', async (req, res, next) => {
+  const parsed = handleBody.safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Invalid request body.' });
+  }
+  if (!(await deviceSignInOpen(next))) return;
+  try {
+    const check = await checkSiloDevice(parsed.data.handle);
+    if (check.status !== 'approved') {
+      return res.status(200).json(check);
+    }
+    const user = await signInAccount(req, check.account, {
+      profileId: check.profileId,
+    });
+    await startSession(req, user.id);
+    const fresh = await getRepository(User).findOneOrFail({
+      where: { id: user.id },
+    });
+    return res.status(200).json({ status: 'approved', user: fresh.filter() });
+  } catch (e) {
+    if (e instanceof Refused) {
+      return next({ status: e.status, message: e.message });
+    }
+    return refuse(next, e);
+  }
+});
+
+siloAuthRoutes.post('/device/cancel', async (req, res, next) => {
+  const parsed = handleBody.safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Invalid request body.' });
+  }
+  await cancelSiloDevice(parsed.data.handle);
+  return res.status(204).send();
+});
+
+export default siloAuthRoutes;

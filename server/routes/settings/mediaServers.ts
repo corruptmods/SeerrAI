@@ -327,15 +327,16 @@ const apiKeyAdmin = async (
  * once and chosen at /settings/silo/library.
  */
 const connectSilo = async (body: ConnectBody): Promise<void> => {
-  // Silo can't be the primary server yet.
+  // Before setup, Silo is set up as the primary server from the setup page.
   if (!primaryServer()) {
     throw new MediaServerChangeError(
       400,
-      'Set up Seerr AI with Plex, Jellyfin or Emby first, then connect Silo.'
+      'Set up Seerr AI first; Silo can be chosen there as the primary server.'
     );
   }
   const connection = await trySilo(body);
-  await storeSilo(body, connection, { connect: true });
+  const silo = await storeSilo(body, connection, { connect: true });
+  silo.signIn = body.signIn ?? silo.signIn !== false;
 };
 
 /** A Jellyfin or Emby server's address from the form. */

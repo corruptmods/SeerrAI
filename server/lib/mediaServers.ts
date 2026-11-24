@@ -184,12 +184,9 @@ export const albumPlayLinks = (
     ];
   });
 
-/**
- * Whether Seerr AI offers signing in with this server at all. Signing in with
- * a Silo account isn't offered yet.
- */
+/** Whether Seerr AI offers signing in with this server at all; every kind does. */
 export const signInOffered = (kind: MediaServerKind): boolean =>
-  kind !== 'silo';
+  MEDIA_SERVER_KINDS.includes(kind);
 
 /**
  * Whether users may sign in with this server: connected and its own switch

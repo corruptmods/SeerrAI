@@ -35,7 +35,12 @@ import {
   signInOffered,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
-import { storeSilo, trySilo } from '@server/lib/siloConnect';
+import {
+  SiloResetNeeded,
+  resetToNewSilo,
+  storeSilo,
+  trySilo,
+} from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import { ApiError } from '@server/types/error';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
@@ -118,6 +123,14 @@ const listed = async (
 
 /** Forwards a refused change with its status, anything else as a 500. */
 const failed = (next: NextFunction, e: unknown) => {
+  // A different Silo than before: the page asks, then sends confirmReset.
+  if (e instanceof SiloResetNeeded) {
+    return next({
+      status: e.status,
+      message: e.message,
+      errors: ['confirmReset'],
+    });
+  }
   if (e instanceof MediaServerChangeError) {
     return next({ status: e.status, message: e.message });
   }
@@ -218,6 +231,8 @@ interface ConnectBody {
   adminUserId?: string;
   linkOwner?: boolean;
   signIn?: boolean;
+  /** Silo: connect a different Silo than before, resetting the old one's. */
+  confirmReset?: boolean;
 }
 
 /*
@@ -342,7 +357,10 @@ const apiKeyAdmin = async (
  * administrator once so Seerr AI creates its own key. Libraries are read at
  * once and chosen at /settings/silo/library.
  */
-const connectSilo = async (body: ConnectBody): Promise<string | undefined> => {
+const connectSilo = async (
+  req: Request,
+  body: ConnectBody
+): Promise<string | undefined> => {
   // Before setup, Silo is set up as the primary server from the setup page.
   if (!primaryServer()) {
     throw new MediaServerChangeError(
@@ -350,11 +368,21 @@ const connectSilo = async (body: ConnectBody): Promise<string | undefined> => {
       'Set up Seerr AI first; Silo can be chosen there as the primary server.'
     );
   }
-  const connection = await trySilo(body);
+  const connection = await trySilo(body, {
+    confirmReset: body.confirmReset === true,
+    actingUserId: req.user?.id ?? 0,
+  });
   const { silo, reset } = await storeSilo(body, connection, {
     connect: true,
   });
   silo.signIn = body.signIn ?? silo.signIn !== false;
+  if (reset) {
+    await getSettings().save();
+    await resetToNewSilo(connection, {
+      userId: req.user?.id,
+      sessionId: req.sessionID,
+    });
+  }
   return reset;
 };
 
@@ -486,7 +514,7 @@ mediaServerRoutes.post<{ kind: string }>(
       const body = req.body as ConnectBody;
       let notice: string | undefined;
       if (kind === 'silo') {
-        notice = await connectSilo(body);
+        notice = await connectSilo(req, body);
       } else {
         const done =
           kind === 'plex'

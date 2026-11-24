@@ -27,9 +27,11 @@ import {
   siloPasswordSignIn,
   startSiloDevice,
 } from '@server/lib/siloAccounts';
+import type { SiloConnection } from '@server/lib/siloConnect';
 import {
   SILO_BAD_PASSWORD,
   SILO_NOT_ADMIN,
+  resetToNewSilo,
   siloAddressOf,
   storeSilo,
   trySilo,
@@ -269,9 +271,58 @@ const setUpWithSilo = async (
     );
     await vet(admin);
   }
-  let connection;
+  // Until the owner and settings are saved, a failure puts the settings
+  // back as they were; with a sign-in, it runs while still signed in to
+  // Silo, so the key just made is deleted again.
+  const before = {
+    silo: { ...settings.silo },
+    mediaServerType: settings.main.mediaServerType,
+  };
+  let user: User | undefined;
+  let who: SiloAccount | undefined;
+  const save = async (connection: SiloConnection): Promise<void> => {
+    who = admin ?? connection.admin;
+    if (!who) {
+      throw new Refused(500, 'Something went wrong.');
+    }
+    let reset: string | undefined;
+    let saved: User;
+    try {
+      reset = (
+        await storeSilo({ ...address, hostname: address.ip }, connection, {
+          connect: true,
+        })
+      ).reset;
+      connectAsPrimary('silo');
+      const columns = {
+        email: body.email || who.username,
+        siloUserId: who.id,
+        siloUsername: who.username,
+        permissions: Permission.ADMIN,
+        userType: UserType.SILO,
+        avatar: siloAvatarPath(who.id),
+      };
+      if (owner) {
+        Object.assign(owner, columns);
+        saved = await userRepository.save(owner);
+      } else {
+        saved = await saveFirstOwner(withNewUserDefaults(new User(columns)));
+      }
+      await settings.save();
+    } catch (e) {
+      settings.silo = before.silo;
+      settings.main.mediaServerType = before.mediaServerType;
+      throw e;
+    }
+    user = saved;
+    // Only once everything is saved: a different Silo than before forgets
+    // the old one's links, keeping the owner linked to this one.
+    if (reset) {
+      await resetToNewSilo(connection, { userId: saved.id, account: who });
+    }
+  };
   try {
-    connection = await trySilo(
+    await trySilo(
       {
         ...address,
         hostname: address.ip,
@@ -279,7 +330,7 @@ const setUpWithSilo = async (
           ? { apiKey: body.apiKey }
           : { username: body.username, password: body.password }),
       },
-      { vet }
+      { vet, confirmReset: true, whileSignedIn: save }
     );
   } catch (e) {
     // Silo's own words for a wrong password or a non-administrator.
@@ -294,48 +345,14 @@ const setUpWithSilo = async (
     }
     throw e;
   }
-  admin ??= connection.admin;
-  if (!admin) {
+  if (!user || !who) {
     throw new Refused(500, 'Something went wrong.');
-  }
-
-  // Until the owner and settings are saved, a failure puts the settings
-  // back as they were.
-  const before = {
-    silo: { ...settings.silo },
-    mediaServerType: settings.main.mediaServerType,
-  };
-  let user: User;
-  try {
-    await storeSilo({ ...address, hostname: address.ip }, connection, {
-      connect: true,
-    });
-    connectAsPrimary('silo');
-    const columns = {
-      email: body.email || admin.username,
-      siloUserId: admin.id,
-      siloUsername: admin.username,
-      permissions: Permission.ADMIN,
-      userType: UserType.SILO,
-      avatar: siloAvatarPath(admin.id),
-    };
-    if (owner) {
-      Object.assign(owner, columns);
-      user = await userRepository.save(owner);
-    } else {
-      user = await saveFirstOwner(withNewUserDefaults(new User(columns)));
-    }
-    await settings.save();
-  } catch (e) {
-    settings.silo = before.silo;
-    settings.main.mediaServerType = before.mediaServerType;
-    throw e;
   }
   startJobs();
   logger.info('Set up Seerr AI with Silo as the primary server', {
     label: 'API',
     ip: req.ip,
-    siloUsername: admin.username,
+    siloUsername: who.username,
   });
   await refreshPicture(user);
   return user;

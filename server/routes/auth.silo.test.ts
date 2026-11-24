@@ -438,6 +438,60 @@ describe('setting up with Silo as the primary server', () => {
     );
     assert.equal(getSettings().silo.connected, false);
     assert.equal(getSettings().silo.apiKey, '');
+    // The key it made was deleted again before signing out of Silo.
+    assert.deepEqual(
+      [...silo.keys.keys()].filter((key) => key.startsWith('sa_made_')),
+      []
+    );
+    assert.deepEqual(silo.openSessions(), []);
+  });
+
+  it('forgets an older Silo only once the owner is saved', async () => {
+    const linked = await users().save(
+      new User({
+        email: 'old-silo@example.invalid',
+        siloUserId: 'acct-guest',
+        siloUsername: 'lantern',
+        userType: UserType.LOCAL,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+    const settings = getSettings();
+    const save = settings.save;
+    settings.save = async () => {
+      throw new Error('disk full');
+    };
+    const setUp = () =>
+      request(app).post('/auth/silo').send({
+        username: 'harbour',
+        password: 'lights',
+        hostname: '127.0.0.1',
+        port: silo.port(),
+      });
+    try {
+      assert.equal((await setUp()).status, 500);
+    } finally {
+      settings.save = save;
+    }
+    // Nothing of the reset happened.
+    assert.equal(
+      (await users().findOneByOrFail({ id: linked.id })).siloUserId,
+      'acct-guest'
+    );
+
+    const res = await setUp();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(
+      (await users().findOneByOrFail({ id: linked.id })).siloUserId,
+      null
+    );
+    // The owner stays linked to the Silo they set up with.
+    assert.equal(
+      (await users().findOneByOrFail({ id: res.body.id })).siloUserId,
+      'acct-owner'
+    );
   });
 
   it('only lets a Silo administrator set up', async () => {

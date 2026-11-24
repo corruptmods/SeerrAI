@@ -36,6 +36,7 @@ const messages = defineMessages(
   'components.Settings.SettingsMediaServers.ConnectModal',
   {
     connectTitle: 'Connect {server}',
+    connectAnyway: 'Connect Anyway',
     plexOwnerOnly:
       'Only the owner can connect Plex, as Seerr AI reaches Plex through their account.',
     plexSignInDescription:
@@ -124,6 +125,8 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
 
   const [step, setStep] = useState<Step>(isPlex ? 'account' : 'server');
   const [error, setError] = useState<string>();
+  // A different Silo than before: what connecting it removes, to confirm.
+  const [resetQuestion, setResetQuestion] = useState<string>();
   const [busy, setBusy] = useState(false);
 
   // Plex
@@ -291,8 +294,9 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     }
   };
 
-  const connect = async () => {
+  const connect = async (confirmReset = false) => {
     setError(undefined);
+    setResetQuestion(undefined);
     setBusy(true);
     try {
       const res = await axios.post<MediaServerSummary[]>(
@@ -309,6 +313,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                   urlBase,
                   externalHostname: externalUrl,
                   ...(method === 'login' ? { username, password } : { apiKey }),
+                  ...(confirmReset ? { confirmReset: true } : {}),
                 }
               : {
                   urlBase,
@@ -326,7 +331,14 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
       setStep('libraries');
       syncLibraries();
     } catch (e) {
-      setError(errorFor(e));
+      const response = (
+        e as { response?: { data?: { message?: string; errors?: string[] } } }
+      )?.response;
+      if (isSilo && response?.data?.errors?.includes('confirmReset')) {
+        setResetQuestion(response.data.message);
+      } else {
+        setError(errorFor(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -531,6 +543,20 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
       {error && (
         <div className="mb-4">
           <Alert type="error" title={error} />
+        </div>
+      )}
+      {resetQuestion && (
+        <div className="mb-4">
+          <Alert type="warning" title={resetQuestion}>
+            <Button
+              buttonType="danger"
+              buttonSize="sm"
+              disabled={busy}
+              onClick={() => connect(true)}
+            >
+              {intl.formatMessage(messages.connectAnyway)}
+            </Button>
+          </Alert>
         </div>
       )}
       {isPlex && (

@@ -5,6 +5,7 @@ import SiloAPI, {
 import { SiloIncompatibleError } from '@server/api/silo/compat';
 import type { SiloAccount, SiloSystemInfo } from '@server/api/silo/types';
 import { MEDIA_ID } from '@server/constants/server';
+import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaLibraryItem from '@server/entity/MediaLibraryItem';
@@ -101,7 +102,7 @@ const createKey = async <T>(
   client: SiloAPI,
   username: string,
   password: string,
-  check: (key: string) => Promise<T>,
+  check: (key: string, keyId: string, admin: SiloAccount) => Promise<T>,
   {
     vet,
     previousKeyId,
@@ -135,7 +136,7 @@ const createKey = async <T>(
     }
     let checked: T;
     try {
-      checked = await check(created.key);
+      checked = await check(created.key, created.id, tokens.user);
     } catch (e) {
       await client.deleteApiKey(tokens.access_token, created.id);
       throw e;
@@ -196,12 +197,27 @@ export const trySilo = async (
   input: SiloConnectInput,
   {
     vet,
+    confirmReset,
+    actingUserId,
+    whileSignedIn,
   }: {
     /**
      * Refuses the administrator signing in before a key is made (or, with a
      * pasted key, the caller checks first).
      */
     vet?: (admin: SiloAccount) => Promise<void>;
+    /**
+     * The admin agreed that a different Silo than before resets everything
+     * of the old one; without it, SiloResetNeeded is thrown first.
+     */
+    confirmReset?: boolean;
+    /** The Seerr AI admin connecting, checked against owner lock-out. */
+    actingUserId?: number;
+    /**
+     * Saves the connection. With a sign-in it runs while still signed in,
+     * so a failure deletes the key just made before signing out.
+     */
+    whileSignedIn?: (connection: SiloConnection) => Promise<void>;
   } = {}
 ): Promise<SiloConnection> => {
   const address = siloAddressOf(input);
@@ -230,17 +246,47 @@ export const trySilo = async (
     );
   }
 
+  // A different Silo than before: asked first, before any key is made.
+  const previous = getSettings().silo.serverId;
+  if (previous && previous !== serverId && actingUserId !== undefined) {
+    await refuseOwnerLockOut(actingUserId, !input.apiKey);
+    if (!confirmReset) {
+      throw new SiloResetNeeded(await resetImpact());
+    }
+  }
+
   if (input.apiKey) {
     const apiKey = input.apiKey.trim();
     const { probe, name } = await probeKey(hostname, apiKey);
-    return { apiKey, serverId, name, info, optionalScopes: probe.optional };
+    const connection: SiloConnection = {
+      apiKey,
+      serverId,
+      name,
+      info,
+      optionalScopes: probe.optional,
+    };
+    await whileSignedIn?.(connection);
+    return connection;
   }
   const saved = getSettings().silo;
   const made = await createKey(
     open,
     input.username ?? '',
     input.password ?? '',
-    (key) => probeKey(hostname, key),
+    async (key, keyId, admin) => {
+      const { probe, name } = await probeKey(hostname, key);
+      const connection: SiloConnection = {
+        apiKey: key,
+        keyId,
+        serverId,
+        name,
+        info,
+        optionalScopes: probe.optional,
+        admin,
+      };
+      await whileSignedIn?.(connection);
+      return connection;
+    },
     {
       vet,
       // Only a key Seerr AI made on this same Silo.
@@ -248,33 +294,109 @@ export const trySilo = async (
         saved.serverId === serverId && saved.keyId ? saved.keyId : undefined,
     }
   );
-  return {
-    apiKey: made.key,
-    keyId: made.keyId,
-    serverId,
-    name: made.checked.name,
-    info,
-    optionalScopes: made.checked.probe.optional,
-    admin: made.admin,
-  };
+  return made.checked;
 };
 
 /** Said when connecting a different Silo than before reset its links. */
 export const SILO_LINKS_RESET =
   'This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People link their Silo accounts again under Linked Accounts.';
 
+/** What connecting a different Silo would remove. */
+export interface SiloResetImpact {
+  /** Users linked to a Silo account. */
+  links: number;
+  /** Plays in Seerr AI's copy of the old Silo's history. */
+  plays: number;
+  /** Titles with an id on the old Silo. */
+  titles: number;
+}
+
+/**
+ * Connecting a different Silo would reset everything of the old one; the
+ * admin confirms first (confirmReset). The message says what goes.
+ */
+export class SiloResetNeeded extends MediaServerChangeError {
+  constructor(public readonly impact: SiloResetImpact) {
+    super(
+      409,
+      `This is a different Silo from the one connected before. Connecting it removes every link to a Silo account (${impact.links}), Seerr AI's copy of the old Silo's watch history (${impact.plays} plays) and the old Silo's ids for ${impact.titles} titles. People then link their Silo accounts again. Connect anyway?`
+    );
+  }
+}
+
+const resetImpact = async (): Promise<SiloResetImpact> => {
+  const media = getRepository(Media)
+    .createQueryBuilder('media')
+    .where(
+      MEDIA_ID.silo.map((column) => `media.${column} IS NOT NULL`).join(' OR ')
+    );
+  return {
+    links: await getRepository(User).count({
+      where: { siloUserId: Not(IsNull()) },
+    }),
+    plays: await getRepository(SiloPlay).count(),
+    titles: await media.getCount(),
+  };
+};
+
+/**
+ * Refuses a reset that would leave the owner unable to sign in: an owner
+ * who signs in only with the old Silo (no password, no other server), unless
+ * they are the one connecting by signing in to the new Silo, which links
+ * them to it again.
+ */
+const refuseOwnerLockOut = async (
+  actingUserId: number,
+  signingIn: boolean
+): Promise<void> => {
+  if (actingUserId === 1 && signingIn) return;
+  const owner = await getRepository(User)
+    .createQueryBuilder('user')
+    .addSelect('user.password')
+    .where('user.id = 1')
+    .getOne();
+  if (
+    owner?.siloUserId &&
+    owner.userType === UserType.SILO &&
+    !owner.password &&
+    !owner.plexId &&
+    !owner.jellyfinUserId &&
+    !owner.embyUserId
+  ) {
+    throw new MediaServerChangeError(
+      409,
+      actingUserId === 1
+        ? 'Connecting a different Silo would leave you unable to sign in: your account signs in only with the old Silo. Connect by signing in with your new Silo administrator account instead of a key, or set a password for your account first.'
+        : 'Connecting a different Silo would leave the owner unable to sign in: their account signs in only with the old Silo. The owner can connect it by signing in to the new Silo, or set a password for their account first.'
+    );
+  }
+};
+
+/** Who is connecting, kept signed in and linked through a reset. */
+export interface SiloResetActor {
+  userId: number;
+  /** Their session, which stays. */
+  sessionId?: string;
+  /** The new Silo's administrator they signed in as, linked to them. */
+  account?: SiloAccount;
+}
+
 /**
  * Forgets everything that belonged to the Silo connected before: Silo's
  * account ids are small numbers, so on another Silo account "2" is someone
  * else, and must never sign in as the person linked to the old one. Each
- * user's Silo link goes, and their sessions end if Silo was how they signed
- * in; the old Silo's title ids, episode list, play copy and library places
- * go too. Returns how many users were unlinked.
+ * user's Silo link goes, and sessions end for those whose account came from
+ * Silo (keeping the connecting admin's own session); the old Silo's title
+ * ids, episode list, play copy and library places go too. The connecting
+ * admin is linked to the new Silo's administrator they signed in as.
+ * Returns how many users were unlinked.
  */
-export const forgetPreviousSilo = async (): Promise<number> => {
+export const forgetPreviousSilo = async (
+  actor?: SiloResetActor
+): Promise<number> => {
   const users = getRepository(User);
   const linked = await users.find({
-    select: { id: true },
+    select: { id: true, userType: true },
     where: { siloUserId: Not(IsNull()) },
   });
   if (linked.length) {
@@ -283,8 +405,19 @@ export const forgetPreviousSilo = async (): Promise<number> => {
       { siloUserId: null, siloUsername: null, siloProfileId: null }
     );
     for (const user of linked) {
-      await endSessions(user.id);
+      if (user.userType !== UserType.SILO) continue;
+      await endSessions(
+        user.id,
+        user.id === actor?.userId ? actor.sessionId : undefined
+      );
     }
+  }
+  if (actor?.account) {
+    await users.update(actor.userId, {
+      siloUserId: actor.account.id,
+      siloUsername: actor.account.username,
+      siloProfileId: null,
+    });
   }
   const media = getRepository(Media);
   for (const column of MEDIA_ID.silo) {
@@ -297,10 +430,35 @@ export const forgetPreviousSilo = async (): Promise<number> => {
 };
 
 /**
+ * After a different Silo's settings are saved: forgets the old one, keeping
+ * the connecting admin signed in and linking them to the administrator they
+ * signed in to the new Silo as, if they did.
+ */
+export const resetToNewSilo = async (
+  connection: SiloConnection,
+  by?: { userId?: number; sessionId?: string; account?: SiloAccount }
+): Promise<void> => {
+  const unlinked = await forgetPreviousSilo(
+    by?.userId
+      ? {
+          userId: by.userId,
+          sessionId: by.sessionId,
+          account: by.account ?? connection.admin,
+        }
+      : undefined
+  );
+  logger.warn(
+    'Connected a different Silo than before; links to the old one were removed',
+    { label: 'Silo', unlinked }
+  );
+};
+
+/**
  * Stores a working connection in the Silo settings (the caller saves), and
  * reads Silo's film and series libraries. A different Silo than before
- * starts with no libraries chosen and with every link to the old one
- * forgotten (forgetPreviousSilo); `reset` then says so.
+ * starts with no libraries chosen; `reset` then says so, and the caller,
+ * once everything is saved, forgets the old one (forgetPreviousSilo), so a
+ * failure on the way leaves nothing half done.
  */
 export const storeSilo = async (
   input: SiloConnectInput & {
@@ -315,12 +473,7 @@ export const storeSilo = async (
   if (silo.serverId && silo.serverId !== connection.serverId) {
     silo.libraries = [];
     silo.keyId = '';
-    const unlinked = await forgetPreviousSilo();
     reset = SILO_LINKS_RESET;
-    logger.warn(
-      'Connected a different Silo than before; links to the old one were removed',
-      { label: 'Silo', unlinked }
-    );
   }
   Object.assign(silo, siloAddressOf(input), {
     externalHostname: (

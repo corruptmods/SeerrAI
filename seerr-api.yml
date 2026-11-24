@@ -5880,6 +5880,9 @@ paths:
                   type: string
                 apiKey:
                   type: string
+                confirmReset:
+                  type: boolean
+                  description: A different Silo than before is connected only with this set; it removes every link to the old Silo, its watch history copy and its title ids.
       responses:
         '200':
           description: Saved
@@ -5887,6 +5890,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SiloSettings'
+        '409':
+          description: A different Silo than before answers at this address. The message says what connecting it removes; send again with confirmReset to go ahead. Also refused when it would leave the owner unable to sign in.
         '400':
           description: Silo speaks an API version Seerr AI doesn't support, or the form is incomplete
         '403':
@@ -6371,9 +6376,14 @@ paths:
                   type: boolean
                 signIn:
                   type: boolean
+                confirmReset:
+                  type: boolean
+                  description: Silo only. A different Silo than before is connected only with this set; it removes every link to the old Silo, its watch history copy and its title ids.
               required:
                 - hostname
       responses:
+        '409':
+          description: Silo only. A different Silo than before answers at this address; the message says what connecting it removes. Send again with confirmReset to go ahead.
         '200':
           description: Connected; every media server
           content:

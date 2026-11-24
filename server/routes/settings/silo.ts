@@ -6,7 +6,13 @@ import type { SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { siloClient, siloLibraries } from '@server/lib/silo';
 import type { SiloConnectInput } from '@server/lib/siloConnect';
-import { siloAddressOf, storeSilo, trySilo } from '@server/lib/siloConnect';
+import {
+  SiloResetNeeded,
+  resetToNewSilo,
+  siloAddressOf,
+  storeSilo,
+  trySilo,
+} from '@server/lib/siloConnect';
 import { siloUsersToImport } from '@server/lib/siloUserImport';
 import logger from '@server/logger';
 import type { NextFunction } from 'express';
@@ -32,6 +38,7 @@ const settingsBody = z.object({
   externalHostname: z.string().optional(),
   forgotPasswordUrl: z.string().optional(),
   apiKey: z.string().optional(),
+  confirmReset: z.boolean().optional(),
 });
 
 /** The settings as the page sees them: never the saved key. */
@@ -43,6 +50,14 @@ const shown = (silo: SiloSettings) => {
 };
 
 const failed = (next: NextFunction, e: unknown, what: string) => {
+  // A different Silo than before: the page asks, then sends confirmReset.
+  if (e instanceof SiloResetNeeded) {
+    return next({
+      status: e.status,
+      message: e.message,
+      errors: ['confirmReset'],
+    });
+  }
   if (e instanceof MediaServerChangeError) {
     return next({ status: e.status, message: e.message });
   }
@@ -103,9 +118,18 @@ siloRoutes.post('/', async (req, res, next) => {
     });
   }
   try {
-    const connection = await trySilo(input);
+    const connection = await trySilo(input, {
+      confirmReset: parsed.data.confirmReset === true,
+      actingUserId: req.user?.id ?? 0,
+    });
     const { reset } = await storeSilo(input, connection, { connect: false });
     await settings.save();
+    if (reset) {
+      await resetToNewSilo(connection, {
+        userId: req.user?.id,
+        sessionId: req.sessionID,
+      });
+    }
     return res
       .status(200)
       .json({ ...shown(settings.silo), ...(reset ? { notice: reset } : {}) });

@@ -30,6 +30,7 @@ import * as Yup from 'yup';
  */
 
 const messages = defineMessages('components.Settings.SettingsSilo', {
+  saveAnyway: 'Save Anyway',
   libraries: 'Silo Libraries',
   librariesDescription:
     'The film and series libraries Seerr AI scans. Book, podcast and manga libraries aren’t listed. None listed? Use the button below.',
@@ -104,6 +105,12 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [reading, setReading] = useState(false);
+  // A different Silo than before: what saving removes, and the form to send
+  // again once confirmed.
+  const [resetQuestion, setResetQuestion] = useState<{
+    message: string;
+    body: Record<string, unknown>;
+  }>();
   const { data, error, mutate } = useSWR<SiloSettingsResponse>(ENDPOINT);
   const { data: sync, mutate: revalidateSync } = useSWR<SyncStatus>(
     `${ENDPOINT}/sync`,
@@ -184,6 +191,37 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
     return <LoadingSpinner />;
   }
 
+  const save = async (body: Record<string, unknown>) => {
+    setResetQuestion(undefined);
+    try {
+      const saved = await axios.post<{ notice?: string }>(ENDPOINT, body);
+      addToast(intl.formatMessage(messages.saved), {
+        autoDismiss: true,
+        appearance: 'success',
+      });
+      // A different Silo: links to the old one were removed.
+      if (saved.data?.notice) {
+        addToast(saved.data.notice, { appearance: 'info' });
+      }
+    } catch (e) {
+      const response = (
+        e as { response?: { data?: { message?: string; errors?: string[] } } }
+      )?.response;
+      if (response?.data?.errors?.includes('confirmReset')) {
+        setResetQuestion({
+          message: response.data.message ?? '',
+          body: { ...body, confirmReset: true },
+        });
+      } else {
+        addToast(messageOf(e, intl.formatMessage(messages.saveFailed)), {
+          autoDismiss: true,
+          appearance: 'error',
+        });
+      }
+    } finally {
+      mutate();
+    }
+  };
   return (
     <>
       {data?.connected === false && (
@@ -305,6 +343,19 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
               )}
             </p>
           </div>
+          {resetQuestion && (
+            <div className="mb-6">
+              <Alert type="warning" title={resetQuestion.message}>
+                <Button
+                  buttonType="danger"
+                  buttonSize="sm"
+                  onClick={() => save(resetQuestion.body)}
+                >
+                  {intl.formatMessage(messages.saveAnyway)}
+                </Button>
+              </Alert>
+            </div>
+          )}
           <Formik
             initialValues={{
               hostname: data?.ip ?? '',
@@ -317,37 +368,17 @@ const SettingsSilo = ({ isSetupSettings }: SettingsSiloProps) => {
             }}
             enableReinitialize
             validationSchema={schema}
-            onSubmit={async (values) => {
-              try {
-                const saved = await axios.post<{ notice?: string }>(ENDPOINT, {
-                  hostname: values.hostname,
-                  port: Number(values.port),
-                  useSsl: values.useSsl,
-                  urlBase: values.urlBase,
-                  externalHostname: values.externalUrl,
-                  forgotPasswordUrl: values.forgotPasswordUrl,
-                  ...(values.apiKey ? { apiKey: values.apiKey } : {}),
-                });
-                addToast(intl.formatMessage(messages.saved), {
-                  autoDismiss: true,
-                  appearance: 'success',
-                });
-                // A different Silo: links to the old one were removed.
-                if (saved.data?.notice) {
-                  addToast(saved.data.notice, { appearance: 'info' });
-                }
-              } catch (e) {
-                addToast(
-                  messageOf(e, intl.formatMessage(messages.saveFailed)),
-                  {
-                    autoDismiss: true,
-                    appearance: 'error',
-                  }
-                );
-              } finally {
-                mutate();
-              }
-            }}
+            onSubmit={(values) =>
+              save({
+                hostname: values.hostname,
+                port: Number(values.port),
+                useSsl: values.useSsl,
+                urlBase: values.urlBase,
+                externalHostname: values.externalUrl,
+                forgotPasswordUrl: values.forgotPasswordUrl,
+                ...(values.apiKey ? { apiKey: values.apiKey } : {}),
+              })
+            }
           >
             {({
               errors,

@@ -1,6 +1,8 @@
 import { MediaServerType } from '@server/constants/server';
+import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import { Session } from '@server/entity/Session';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
@@ -12,7 +14,7 @@ import {
   signInOffered,
 } from '@server/lib/mediaServers';
 import { getSettings, siloDefaults } from '@server/lib/settings';
-import { SILO_LINKS_RESET } from '@server/lib/siloConnect';
+import { SILO_LINKS_RESET, forgetPreviousSilo } from '@server/lib/siloConnect';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
 import { createFakeSilo } from '@server/test/fakeSilo';
@@ -227,9 +229,25 @@ describe('connecting Silo', () => {
     );
     // The same address, now answered by a rebuilt Silo.
     getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+    // Asked first: nothing changes until the admin confirms.
+    const asked = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(asked.status, 409);
+    assert.match(
+      ((await asked.json()) as { message: string }).message,
+      /removes every link to a Silo account \(1\).*\(1 plays\).*1 titles/
+    );
+    assert.equal(
+      (await users.findOneByOrFail({ id: linked.id })).siloUserId,
+      '2'
+    );
+    assert.equal(getSettings().silo.serverId, 'an-older-silo');
     const res = await post('/media-servers/silo/connect', {
       ...at(),
       apiKey: 'sa_test',
+      confirmReset: true,
     });
     assert.equal(res.status, 200, await res.clone().text());
     const listed = (await res.json()) as { kind: string; notice?: string }[];
@@ -247,6 +265,103 @@ describe('connecting Silo', () => {
     assert.equal(await getRepository(SiloEpisode).count(), 0);
     assert.equal(await getRepository(SiloPlay).count(), 0);
     assert.equal(getSettings().silo.serverId, silo.serverId);
+  });
+
+  it('never leaves the owner unable to sign in, and relinks whoever signs in', async () => {
+    const users = getRepository(User);
+    // The owner signs in only with the old Silo.
+    await users
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        siloUserId: '9',
+        siloUsername: 'old-owner',
+        userType: UserType.SILO,
+        plexId: null,
+        jellyfinUserId: null,
+        embyUserId: null,
+        password: () => 'NULL',
+      })
+      .where('id = 1')
+      .execute();
+    const silent = await users.save(
+      new User({
+        email: 'silo-only@test.local',
+        siloUserId: '4',
+        siloUsername: 'garden',
+        userType: UserType.SILO,
+        avatar: '',
+      })
+    );
+    getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+
+    // With a pasted key nothing proves who the owner is on the new Silo.
+    let res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 409);
+    assert.match(
+      ((await res.json()) as { message: string }).message,
+      /leave you unable to sign in/
+    );
+    assert.equal((await users.findOneByOrFail({ id: 1 })).siloUserId, '9');
+
+    // Signing in to the new Silo links the owner to that account.
+    silo.accounts = [
+      { id: '1', username: 'lantern', password: 'pw', role: 'admin' },
+    ];
+    res = await post('/media-servers/silo/connect', {
+      ...at(),
+      username: 'lantern',
+      password: 'pw',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    const owner = await users.findOneByOrFail({ id: 1 });
+    assert.equal(owner.siloUserId, '1');
+    assert.equal(owner.siloUsername, 'lantern');
+    assert.equal(
+      (await users.findOneByOrFail({ id: silent.id })).siloUserId,
+      null
+    );
+  });
+
+  it('ends only sessions that came from Silo, keeping the admin’s own', async () => {
+    const users = getRepository(User);
+    const fromSilo = await users.save(
+      new User({
+        email: 'from-silo@test.local',
+        siloUserId: '5',
+        userType: UserType.SILO,
+        avatar: '',
+      })
+    );
+    const withPassword = await users.save(
+      new User({
+        email: 'password@test.local',
+        siloUserId: '6',
+        userType: UserType.LOCAL,
+        avatar: '',
+      })
+    );
+    const sessions = getRepository(Session);
+    const open = (id: string, userId: number) =>
+      sessions.save(
+        Object.assign(new Session(), {
+          id,
+          expiredAt: Date.now() + 60_000,
+          json: JSON.stringify({ userId }),
+        })
+      );
+    await open('silo-1', fromSilo.id);
+    await open('silo-2', fromSilo.id);
+    await open('local-1', withPassword.id);
+
+    await forgetPreviousSilo({ userId: fromSilo.id, sessionId: 'silo-2' });
+    const left = (await sessions.find()).map((session) => session.id).sort();
+    assert.deepEqual(left, ['local-1', 'silo-2']);
   });
 
   it('keeps links when the same Silo is connected again', async () => {

@@ -135,11 +135,12 @@ const UserGeneralSettings = () => {
         intl.formatMessage(messages.validationtraktusername)
       ),
     email:
-      // Optional for non-owner Jellyfin/Emby users and for stand-in emails
-      // from providers that gave none.
+      // Optional for non-owner Jellyfin, Emby and Silo users and for
+      // stand-in emails from providers that gave none.
       user?.id === 1 ||
       (user?.userType !== UserType.JELLYFIN &&
         user?.userType !== UserType.EMBY &&
+        user?.userType !== UserType.SILO &&
         !isStandInEmail(user?.email))
         ? emailSchema.required(
             intl.formatMessage(messages.validationemailrequired)
@@ -235,6 +236,7 @@ const UserGeneralSettings = () => {
                 values.email ||
                 user?.jellyfinUsername ||
                 user?.embyUsername ||
+                user?.siloUsername ||
                 user?.plexUsername,
               locale: values.locale,
               discoverRegion: values.discoverRegion,
@@ -351,6 +353,7 @@ const UserGeneralSettings = () => {
                       placeholder={
                         user?.jellyfinUsername ||
                         user?.embyUsername ||
+                        user?.siloUsername ||
                         user?.plexUsername ||
                         user?.email
                       }

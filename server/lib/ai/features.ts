@@ -1182,7 +1182,7 @@ export const triageIssue = async (user: User, issueId: number) => {
     feature: 'aiIssueTriage',
     user,
     system:
-      'You help the admin of a Plex or Jellyfin server with Radarr and Sonarr fix a reported playback problem. ' +
+      'You help the admin of a media server (Plex, Jellyfin, Emby or Silo) with Radarr and Sonarr fix a reported playback problem. ' +
       'Give the most likely cause in one sentence, then up to 3 short numbered steps to fix it (for example: search for a different release, check the audio track or subtitle file, check the client). Under 110 words, plain text.',
     prompt,
     maxTokens: 260,
@@ -1199,7 +1199,7 @@ const SECRET_KEY =
 
 /**
  * Nor anything identifying someone or where they are: IP address, name on
- * Seerr, Plex, Jellyfin or Emby, email.
+ * Seerr, Plex, Jellyfin, Emby or Silo, email.
  */
 const PERSONAL_KEY =
   /^(?:ip|ips|ipv[46]|\w*ip_?address(?:es)?|(?:client|remote|real|user)_?ip|remote_?address|x-forwarded-for|x-real-ip|\w*user_?name|display_?name|e-?mail(?:_?address)?|name)$/i;
@@ -1313,7 +1313,7 @@ export const explainLog = async (
     feature: 'aiLogs',
     user,
     system:
-      'Explain this log entry from Seerr (a media request app working with Plex or Jellyfin, Radarr, Sonarr and TMDB) to its admin: what happened in one or two plain sentences, and the most likely thing to check or change. Under 90 words. Say so if it is harmless.',
+      'Explain this log entry from Seerr (a media request app working with Plex, Jellyfin, Emby or Silo, Radarr, Sonarr and TMDB) to its admin: what happened in one or two plain sentences, and the most likely thing to check or change. Under 90 words. Say so if it is harmless.',
     prompt,
     maxTokens: 200,
     cache: { key: cacheKey(prompt), ms: 7 * DAY },

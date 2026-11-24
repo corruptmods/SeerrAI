@@ -228,8 +228,8 @@ userSettingsRoutes.post<
       user.emailVerified =
         user.id === 1 ||
         req.user?.id !== user.id ||
-        [user.jellyfinUsername, user.embyUsername].some((name) =>
-          sameEmail(name ?? undefined, user.email)
+        [user.jellyfinUsername, user.embyUsername, user.siloUsername].some(
+          (name) => sameEmail(name ?? undefined, user.email)
         );
     }
 

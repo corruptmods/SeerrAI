@@ -1,0 +1,395 @@
+import ExternalAPI from '@server/api/externalapi';
+import { assertCompatible } from '@server/api/silo/compat';
+import type {
+  SiloAccount,
+  SiloApiKeyCreated,
+  SiloBranding,
+  SiloCatalogCapabilities,
+  SiloCatalogItem,
+  SiloCollection,
+  SiloIdentity,
+  SiloItemType,
+  SiloProblemBody,
+  SiloServerStatus,
+  SiloSystemInfo,
+  SiloTokenPair,
+  SiloUserLibrary,
+} from '@server/api/silo/types';
+import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
+
+/*
+ * Silo's native API (/api/v2), reached with an administrator's API key
+ * (Bearer sa_…). The only place that builds Silo URLs or reads Silo's JSON.
+ */
+
+/** Silo's largest page. */
+export const SILO_PAGE_LIMIT = 200;
+
+/** Most content_ids one catalog request takes, unless Silo says otherwise. */
+export const SILO_MAX_CONTENT_IDS = 200;
+
+/** The scopes Seerr AI needs on its key. */
+export const SILO_REQUIRED_SCOPES = [
+  'admin:monitor:read',
+  'libraries:read',
+] as const;
+
+/** Scopes that turn on more, when the key has them. */
+export const SILO_OPTIONAL_SCOPES = [
+  'admin:users',
+  'admin:catalog:paths',
+] as const;
+
+export type SiloOptionalScopeName = (typeof SILO_OPTIONAL_SCOPES)[number];
+
+/** Times a page is retried after Silo asks to slow down. */
+const RATE_LIMIT_RETRIES = 2;
+/** Longest wait Seerr AI honours from Retry-After, in seconds. */
+const MAX_RETRY_AFTER = 30;
+
+/** A refused or failed Silo request, with a message people can act on. */
+export class SiloError extends Error {
+  constructor(
+    /** HTTP status; 0 when Silo couldn't be reached. */
+    public readonly status: number,
+    /** Silo's problem identifier (e.g. permission_denied), when it sent one. */
+    public readonly code: string | undefined,
+    message: string,
+    /** Seconds Silo asked to wait, on a 429. */
+    public readonly retryAfter?: number
+  ) {
+    super(message);
+    this.name = 'SiloError';
+  }
+}
+
+const problemCode = (body: SiloProblemBody | undefined): string | undefined => {
+  if (!body || typeof body !== 'object') return undefined;
+  if (typeof body.type === 'string' && body.type) {
+    return body.type.split('/').filter(Boolean).pop();
+  }
+  return typeof body.error === 'string' ? body.error : undefined;
+};
+
+const messageFor = (status: number, code?: string): string => {
+  if (status === 0) {
+    return "Seerr AI couldn't reach Silo at that address.";
+  }
+  if (code === 'password_change_required') {
+    return 'This Silo account has a temporary password. Sign in to Silo and change it first.';
+  }
+  switch (status) {
+    case 401:
+      return "Silo didn't accept these credentials.";
+    case 403:
+      return "Silo didn't allow this request.";
+    case 404:
+      return 'Silo has nothing at this address. Check the address and URL base.';
+    case 429:
+      return 'Silo is limiting requests. Try again in a moment.';
+    default:
+      return status >= 500
+        ? `Silo had a problem answering (error ${status}).`
+        : `Silo refused the request (error ${status}).`;
+  }
+};
+
+/** Turns any request failure into a SiloError. */
+export const toSiloError = (e: unknown): SiloError => {
+  if (e instanceof SiloError) return e;
+  if (axios.isAxiosError(e)) {
+    const error = e as AxiosError<SiloProblemBody>;
+    const status = error.response?.status ?? 0;
+    const code = problemCode(error.response?.data);
+    const retryHeader = Number(error.response?.headers?.['retry-after']);
+    return new SiloError(
+      status,
+      code,
+      messageFor(status, code),
+      Number.isFinite(retryHeader) ? retryHeader : undefined
+    );
+  }
+  return new SiloError(0, undefined, messageFor(0));
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export interface CatalogQuery {
+  libraryId?: string;
+  type?: SiloItemType;
+  /** Only items Silo first saw at or after this time. */
+  addedAfter?: Date;
+}
+
+/** What connecting with a key found it may do. */
+export interface SiloScopeProbe {
+  /** Required scopes the key lacks; empty when it has both. */
+  missing: string[];
+  /** Optional scopes it holds. */
+  optional: SiloOptionalScopeName[];
+}
+
+class SiloAPI extends ExternalAPI {
+  /**
+   * @param hostname Silo's address, scheme to URL base (no /api/v2).
+   * @param apiKey An API key; leave out for public calls and sign-in.
+   */
+  constructor(
+    hostname: string,
+    apiKey?: string,
+    { timeout = 30_000 }: { timeout?: number } = {}
+  ) {
+    super(
+      `${hostname.replace(/\/+$/, '')}/api/v2`,
+      {},
+      {
+        timeout,
+        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      }
+    );
+  }
+
+  private async call<T>(
+    endpoint: string,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    try {
+      return await this.get<T>(endpoint, config, 0);
+    } catch (e) {
+      throw toSiloError(e);
+    }
+  }
+
+  /** A GET that waits out Silo's rate limit a couple of times. */
+  private async patient<T>(
+    endpoint: string,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.call<T>(endpoint, config);
+      } catch (e) {
+        const error = e as SiloError;
+        if (error.status !== 429 || attempt >= RATE_LIMIT_RETRIES) throw e;
+        const wait = Math.min(error.retryAfter ?? 2, MAX_RETRY_AFTER);
+        await sleep(Math.max(wait, 0) * 1000);
+      }
+    }
+  }
+
+  private async send<T>(
+    endpoint: string,
+    data?: Record<string, unknown>,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    try {
+      return await this.post<T>(endpoint, data, config);
+    } catch (e) {
+      throw toSiloError(e);
+    }
+  }
+
+  /** Every page of a cursor-paged collection. */
+  public async listAll<T>(
+    endpoint: string,
+    params: Record<string, string | number | boolean | undefined> = {}
+  ): Promise<T[]> {
+    const items: T[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.patient<SiloCollection<T>>(endpoint, {
+        params: { ...params, limit: SILO_PAGE_LIMIT, cursor },
+      });
+      items.push(...(page.items ?? []));
+      cursor = page.page?.has_more ? page.page.next_cursor : undefined;
+      if (!cursor) return items;
+    }
+  }
+
+  public getSystemInfo(): Promise<SiloSystemInfo> {
+    return this.call<SiloSystemInfo>('/system/info');
+  }
+
+  /** System info, after checking Silo speaks the supported API major. */
+  public async getCompatibleInfo(): Promise<SiloSystemInfo> {
+    const info = await this.getSystemInfo();
+    assertCompatible(info);
+    return info;
+  }
+
+  public getIdentity(): Promise<SiloIdentity> {
+    return this.call<SiloIdentity>('/system/identity');
+  }
+
+  /** The server's display name; empty when Silo doesn't say. */
+  public async getServerName(): Promise<string> {
+    try {
+      const branding = await this.call<SiloBranding>('/theme/branding');
+      return branding.server_name?.trim() ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  public getServerStatus(): Promise<SiloServerStatus> {
+    return this.call<SiloServerStatus>('/admin/server/status');
+  }
+
+  public getCatalogCapabilities(): Promise<SiloCatalogCapabilities> {
+    return this.call<SiloCatalogCapabilities>('/admin/catalog/capabilities');
+  }
+
+  /** Libraries the key's account may see (all enabled ones for an admin). */
+  public async getUserLibraries(): Promise<SiloUserLibrary[]> {
+    // One unpaged collection; the route takes no paging parameters.
+    const libraries =
+      await this.patient<SiloCollection<SiloUserLibrary>>('/user/libraries');
+    return libraries.items ?? [];
+  }
+
+  /** Every catalog item matching the query. */
+  public listCatalogItems(
+    query: CatalogQuery = {}
+  ): Promise<SiloCatalogItem[]> {
+    return this.listAll<SiloCatalogItem>('/admin/catalog/items', {
+      library_id: query.libraryId,
+      type: query.type,
+      added_after: query.addedAfter?.toISOString(),
+    });
+  }
+
+  /**
+   * The items Silo still has among these content ids, in batches it accepts.
+   * An id missing from the answer is gone from Silo.
+   */
+  public async getCatalogItems(
+    contentIds: string[],
+    batchSize = SILO_MAX_CONTENT_IDS
+  ): Promise<SiloCatalogItem[]> {
+    const ids = [...new Set(contentIds.filter(Boolean))];
+    const size = Math.max(1, Math.min(batchSize, SILO_MAX_CONTENT_IDS));
+    const found: SiloCatalogItem[] = [];
+    for (let start = 0; start < ids.length; start += size) {
+      found.push(
+        ...(await this.listAll<SiloCatalogItem>('/admin/catalog/items', {
+          content_ids: ids.slice(start, start + size).join(','),
+        }))
+      );
+    }
+    return found;
+  }
+
+  /**
+   * Whether a GET is allowed: true on success, false on 403. Anything else
+   * (a wrong key, an unreachable server) is thrown.
+   */
+  private async allows(
+    endpoint: string,
+    params: Record<string, string | number | boolean> = {}
+  ): Promise<boolean> {
+    try {
+      await this.call(endpoint, { params: { limit: 1, ...params } });
+      return true;
+    } catch (e) {
+      if ((e as SiloError).status === 403) return false;
+      throw e;
+    }
+  }
+
+  /**
+   * Finds which scopes the key holds by trying one small read each. Scopes
+   * never bypass Silo's roles, so a success on an admin route also shows the
+   * key belongs to an administrator.
+   */
+  public async probeScopes(): Promise<SiloScopeProbe> {
+    const monitorRoutes = [
+      '/admin/catalog/items',
+      '/admin/playback-history',
+      '/admin/users',
+      '/admin/sessions',
+    ];
+    const missing: string[] = [];
+    for (const route of monitorRoutes) {
+      if (!(await this.allows(route))) {
+        missing.push('admin:monitor:read');
+        break;
+      }
+    }
+    // Has no limit parameter.
+    try {
+      await this.call('/admin/server/status');
+    } catch (e) {
+      if ((e as SiloError).status !== 403) throw e;
+      if (!missing.includes('admin:monitor:read')) {
+        missing.push('admin:monitor:read');
+      }
+    }
+    try {
+      await this.call('/user/libraries');
+    } catch (e) {
+      if ((e as SiloError).status !== 403) throw e;
+      missing.push('libraries:read');
+    }
+    const optional: SiloOptionalScopeName[] = [];
+    if (!missing.length) {
+      try {
+        await this.call('/admin/users/policy-defaults');
+        optional.push('admin:users');
+      } catch (e) {
+        const status = (e as SiloError).status;
+        if (status !== 403 && status !== 404) throw e;
+      }
+      if (
+        await this.allows('/admin/catalog/items', { include_file_paths: true })
+      ) {
+        optional.push('admin:catalog:paths');
+      }
+    }
+    return { missing, optional };
+  }
+
+  /** Signs in with a Silo account. */
+  public login(
+    username: string,
+    password: string,
+    deviceId: string
+  ): Promise<SiloTokenPair> {
+    return this.send<SiloTokenPair>(
+      '/auth/login',
+      { username, password },
+      {
+        headers: {
+          'X-Silo-Device-Id': deviceId,
+          'X-Silo-Device-Name': 'Seerr AI',
+          'X-Silo-Device-Platform': 'server',
+        },
+      }
+    );
+  }
+
+  /** Ends a sign-in session; failures are ignored. */
+  public async logout(accessToken: string): Promise<void> {
+    try {
+      await this.send('/auth/logout', undefined, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      // The session expires on its own.
+    }
+  }
+
+  /** Creates an API key for the signed-in administrator. */
+  public createApiKey(
+    accessToken: string,
+    { label, scopes }: { label: string; scopes: string[] }
+  ): Promise<SiloApiKeyCreated> {
+    return this.send<SiloApiKeyCreated>(
+      '/admin/api-keys',
+      { label, scopes },
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+  }
+}
+
+export type { SiloAccount };
+export default SiloAPI;

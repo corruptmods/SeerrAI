@@ -1,6 +1,7 @@
 import type { JellyfinLoginResponse } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import type { SiloAccount } from '@server/api/silo/types';
 import type {
   ApiKeyCreatedResponse,
   ApiKeyLifetime,
@@ -70,10 +71,19 @@ import {
 import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
+import {
+  SiloSignInError,
+  checkSiloDevice,
+  siloAvatarPath,
+  siloPasswordSignIn,
+  siloProfiles,
+  startSiloDevice,
+} from '@server/lib/siloAccounts';
 import { forgetWatched } from '@server/lib/watched';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { quickConnectSecret } from '@server/routes/auth';
+import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { ApiError } from '@server/types/error';
 import {
   isOwnProfile,
@@ -84,6 +94,7 @@ import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import net from 'net';
 import { In, IsNull, LessThan, MoreThan, Not, Or } from 'typeorm';
+import { z } from 'zod';
 import { canMakePermissionsChange } from '.';
 import personalCssRoutes from './customCss';
 
@@ -630,6 +641,8 @@ const unlinkAccount = async (
     changes.userType = next ? USER_TYPE[next] : UserType.LOCAL;
     if (next && isJellyfinFamily(next)) {
       changes.avatar = `/avatarproxy/${user[USER_ID[next]]}`;
+    } else if (next === 'silo' && user.siloUserId) {
+      changes.avatar = siloAvatarPath(user.siloUserId);
     } else if (!next && user.avatar.startsWith('/avatarproxy/')) {
       // The avatar came from the account being unlinked.
       changes.avatar = gravatarUrl(user.email || 'none', {
@@ -864,6 +877,266 @@ userSettingsRoutes.delete<{ id: string }>(
     } catch (e) {
       return res.status(500).json({ message: e.message });
     }
+  }
+);
+
+/*
+ * Linking a Silo account: by signing in to Silo (name and password), or with
+ * a code approved in Silo, whose profile becomes their chosen one. Seerr AI
+ * signs out of Silo again at once either way.
+ */
+
+/** Links the Silo account the user just proved is theirs. */
+const linkSiloAccount = async (
+  user: User,
+  account: SiloAccount,
+  profileId: string | null
+): Promise<{ status: number; body?: unknown }> => {
+  const userRepository = getRepository(User);
+  if (await userRepository.exist({ where: { siloUserId: account.id } })) {
+    return {
+      status: 422,
+      body: {
+        message: 'The specified account is already linked to a Seerr user',
+      },
+    };
+  }
+  const local = user.userType === UserType.LOCAL;
+  await userRepository.update(user.id, {
+    siloUserId: account.id,
+    siloUsername: account.username,
+    siloProfileId: profileId,
+    // Only a password account takes Silo's account type, and its picture.
+    ...(local
+      ? { userType: UserType.SILO, avatar: siloAvatarPath(account.id) }
+      : {}),
+  });
+  return { status: 204 };
+};
+
+/** A failed Silo sign-in while linking, as the page shows it. */
+const siloLinkFailure = (res: Response, e: unknown) => {
+  if (e instanceof SiloSignInError) {
+    return res
+      .status(e.status)
+      .json(
+        e.reason === 'credentials'
+          ? { code: ApiErrorCode.InvalidCredentials, message: e.message }
+          : e.reason === 'passwordChange'
+            ? { code: ApiErrorCode.PasswordChangeRequired, message: e.message }
+            : { message: e.message }
+      );
+  }
+  logger.error('Failed to link a Silo account', {
+    label: 'API',
+    errorMessage: e instanceof Error ? e.message : String(e),
+  });
+  return res.status(500).json({ message: 'Silo could not be linked.' });
+};
+
+const siloLinkBody = z.object({
+  username: z.string().min(1).max(256),
+  password: z.string().max(1024).optional().default(''),
+});
+const siloHandleBody = z.object({
+  handle: z.string().regex(/^[a-f0-9]{48}$/),
+});
+
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/silo',
+  isOwnProfile(),
+  signedInOnly,
+  async (req, res) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ code: ApiErrorCode.Unauthorized });
+    }
+    if (!isConnected('silo')) {
+      return res.status(400).json({ message: 'Silo is not connected.' });
+    }
+    const parsed = siloLinkBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Enter a username.' });
+    }
+    try {
+      const account = await siloPasswordSignIn(
+        parsed.data.username,
+        parsed.data.password
+      );
+      const { status, body } = await linkSiloAccount(user, account, null);
+      return body ? res.status(status).json(body) : res.status(status).send();
+    } catch (e) {
+      return siloLinkFailure(res, e);
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/silo/device/start',
+  isOwnProfile(),
+  signedInOnly,
+  async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ code: ApiErrorCode.Unauthorized });
+    }
+    if (!isConnected('silo')) {
+      return res.status(400).json({ message: 'Silo is not connected.' });
+    }
+    try {
+      return res.status(200).json(await startSiloDevice(req.user.id));
+    } catch (e) {
+      return siloLinkFailure(res, e);
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/silo/device/check',
+  isOwnProfile(),
+  signedInOnly,
+  async (req, res) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ code: ApiErrorCode.Unauthorized });
+    }
+    const parsed = siloHandleBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Invalid request body.' });
+    }
+    try {
+      const check = await checkSiloDevice(parsed.data.handle, user.id);
+      if (check.status !== 'approved') {
+        return res.status(200).json(check);
+      }
+      const { status, body } = await linkSiloAccount(
+        user,
+        check.account,
+        check.profileId
+      );
+      return status === 204
+        ? res.status(200).json({ status: 'approved' })
+        : res.status(status).json(body);
+    } catch (e) {
+      return siloLinkFailure(res, e);
+    }
+  }
+);
+
+userSettingsRoutes.delete<{ id: string }>(
+  '/linked-accounts/silo',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    try {
+      const { status, body } = await unlinkAccount(
+        req,
+        Number(req.params.id),
+        'silo'
+      );
+      return body ? res.status(status).json(body) : res.status(status).send();
+    } catch (e) {
+      return res.status(500).json({ message: e.message });
+    }
+  }
+);
+
+/** The user whose Silo profile is read or chosen, if the caller may. */
+const siloProfileOwner = async (
+  req: Request
+): Promise<{ status: number; message?: string; user?: User }> => {
+  const user = await getRepository(User).findOne({
+    where: { id: Number(req.params.id) },
+  });
+  if (!user) return { status: 404, message: 'User not found.' };
+  if (!mayEditUser(req.user, user)) {
+    return {
+      status: 403,
+      message: "You do not have permission to modify this user's settings.",
+    };
+  }
+  if (!user.siloUserId) {
+    return { status: 404, message: 'No Silo account is linked.' };
+  }
+  if (!isConnected('silo')) {
+    return { status: 400, message: 'Silo is not connected.' };
+  }
+  return { status: 200, user };
+};
+
+/*
+ * "My profile": the household profile on their Silo account that is theirs.
+ * None chosen counts every profile on the account.
+ */
+userSettingsRoutes.get<{ id: string }>(
+  '/linked-accounts/silo/profiles',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    const { status, message, user } = await siloProfileOwner(req);
+    if (!user) return res.status(status).json({ message });
+    try {
+      const profiles = await siloProfiles(user.siloUserId ?? '');
+      return res.status(200).json({
+        profileId: user.siloProfileId ?? null,
+        profiles: profiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+          primary: profile.is_primary,
+          child: !!profile.is_child,
+        })),
+      });
+    } catch (e) {
+      logger.warn("Could not read a Silo account's profiles", {
+        label: 'API',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return res
+        .status(502)
+        .json({ message: "Silo's profiles could not be read." });
+    }
+  }
+);
+
+userSettingsRoutes.put<{ id: string }>(
+  '/linked-accounts/silo/profile',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    const parsed = z
+      .object({ profileId: z.string().min(1).max(128).nullable() })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Invalid request body.' });
+    }
+    const { status, message, user } = await siloProfileOwner(req);
+    if (!user) return res.status(status).json({ message });
+    const { profileId } = parsed.data;
+    if (profileId) {
+      let profiles;
+      try {
+        profiles = await siloProfiles(user.siloUserId ?? '');
+      } catch {
+        return res
+          .status(502)
+          .json({ message: "Silo's profiles could not be read." });
+      }
+      if (!profiles.some((profile) => profile.id === profileId)) {
+        return res
+          .status(400)
+          .json({ message: 'That profile is not on their Silo account.' });
+      }
+    }
+    await getRepository(User).update(user.id, { siloProfileId: profileId });
+    // Their picture follows the chosen profile.
+    const fresh = await getRepository(User).findOneOrFail({
+      where: { id: user.id },
+    });
+    if (fresh.avatar.startsWith('/avatarproxy/silo/')) {
+      const { changed } = await checkAvatarChanged(fresh, 'silo');
+      if (changed) {
+        await getRepository(User).update(user.id, {
+          avatar: siloAvatarPath(user.siloUserId ?? '', fresh.avatarVersion),
+        });
+      }
+    }
+    return res.status(200).json({ profileId });
   }
 );
 

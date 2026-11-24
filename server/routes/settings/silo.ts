@@ -7,6 +7,7 @@ import { getSettings } from '@server/lib/settings';
 import { siloClient, siloLibraries } from '@server/lib/silo';
 import type { SiloConnectInput } from '@server/lib/siloConnect';
 import { siloAddressOf, storeSilo, trySilo } from '@server/lib/siloConnect';
+import { siloUsersToImport } from '@server/lib/siloUserImport';
 import logger from '@server/logger';
 import type { NextFunction } from 'express';
 import { Router } from 'express';
@@ -107,6 +108,15 @@ siloRoutes.post('/', async (req, res, next) => {
     return res.status(200).json(shown(settings.silo));
   } catch (e) {
     return failed(next, e, 'saving the settings');
+  }
+});
+
+/** Silo's switched-on accounts not imported yet (Import Silo Users). */
+siloRoutes.get('/users', async (_req, res, next) => {
+  try {
+    return res.status(200).json(await siloUsersToImport());
+  } catch (e) {
+    return failed(next, e, 'reading its accounts');
   }
 });
 

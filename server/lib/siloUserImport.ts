@@ -1,0 +1,113 @@
+import { ApiErrorCode } from '@server/constants/error';
+import { UserType } from '@server/constants/user';
+import { getRepository } from '@server/datasource';
+import { User } from '@server/entity/User';
+import { withNewUserDefaults } from '@server/lib/newUserDefaults';
+import { getSettings } from '@server/lib/settings';
+import { enabledSiloAccounts, siloAvatarPath } from '@server/lib/siloAccounts';
+import logger from '@server/logger';
+import { checkAvatarChanged } from '@server/routes/avatarproxy';
+import { In } from 'typeorm';
+
+/*
+ * Import Silo Users: Silo's switched-on accounts, as Import Jellyfin Users
+ * does. New ones (all, or those chosen) get an account; ones imported before
+ * get their name and picture refreshed. Someone whose name is already another
+ * account's is skipped with the reason: they sign in with that account and
+ * link Silo.
+ */
+
+/** Accounts here holding these Silo accounts, by Silo id. */
+const holders = async (ids: string[]): Promise<Map<string, User>> => {
+  const found = ids.length
+    ? await getRepository(User).find({ where: { siloUserId: In(ids) } })
+    : [];
+  return new Map(found.map((user) => [user.siloUserId ?? '', user]));
+};
+
+/** Silo accounts not imported yet, for choosing whom to import. */
+export const siloUsersToImport = async (): Promise<
+  { id: string; username: string; email: string; thumb: string }[]
+> => {
+  const accounts = await enabledSiloAccounts();
+  const linked = await holders(accounts.map((account) => account.id));
+  return accounts
+    .filter((account) => !linked.has(account.id))
+    .map((account) => ({
+      id: account.id,
+      username: account.username,
+      email: account.username,
+      thumb: siloAvatarPath(account.id),
+    }))
+    .sort((a, b) => a.username.localeCompare(b.username));
+};
+
+export const importSiloUsers = async (chosenIds: string[] | undefined) => {
+  const settings = getSettings();
+  const userRepository = getRepository(User);
+  const accounts = await enabledSiloAccounts();
+  const linked = await holders(accounts.map((account) => account.id));
+  // No list imports everyone new, as on Import Plex Users.
+  const chosen = chosenIds ? new Set(chosenIds) : null;
+
+  const createdUsers: User[] = [];
+  const skippedUsers: { id: string; name: string; reason: string }[] = [];
+  let refreshedUsers = 0;
+
+  for (const account of accounts) {
+    const user = linked.get(account.id);
+    if (user) {
+      // Imported before: name, and the picture when Silo is their main
+      // account. Settings and permissions are untouched.
+      const { changed } =
+        user.userType === UserType.SILO
+          ? await checkAvatarChanged(user, 'silo')
+          : { changed: false };
+      await userRepository.update(user.id, {
+        siloUsername: account.username,
+        ...(changed
+          ? { avatar: siloAvatarPath(account.id, user.avatarVersion) }
+          : {}),
+      });
+      refreshedUsers += 1;
+      continue;
+    }
+    if (chosen && !chosen.has(account.id)) continue;
+
+    const taken = await userRepository
+      .createQueryBuilder('user')
+      .where('user.email = :email', { email: account.username.toLowerCase() })
+      .getExists();
+    if (taken) {
+      logger.info(
+        'Silo user not imported: another account already has their name as its email',
+        { label: 'API', siloUserId: account.id }
+      );
+      skippedUsers.push({
+        id: account.id,
+        name: account.username,
+        reason: ApiErrorCode.ExistingAccount,
+      });
+      continue;
+    }
+
+    const newUser = withNewUserDefaults(
+      new User({
+        email: account.username,
+        siloUserId: account.id,
+        siloUsername: account.username,
+        permissions: settings.main.defaultPermissions,
+        avatar: siloAvatarPath(account.id),
+        userType: UserType.SILO,
+      })
+    );
+    await userRepository.save(newUser);
+    createdUsers.push(newUser);
+  }
+
+  return {
+    createdUsers: User.filterMany(createdUsers),
+    refreshedUsers,
+    skippedUsers,
+  };
+};

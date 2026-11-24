@@ -5886,6 +5886,31 @@ paths:
           description: The API key lacks a scope Seerr AI needs
         '502':
           description: Silo could not be reached
+  /settings/silo/users:
+    get:
+      summary: Silo accounts not yet imported
+      description: Silo's switched-on accounts not imported yet, sorted by name.
+      tags:
+        - settings
+        - users
+      responses:
+        '200':
+          description: Silo accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    thumb:
+                      type: string
   /settings/silo/library:
     get:
       summary: Get Silo libraries
@@ -12897,6 +12922,52 @@ paths:
                         reason:
                           type: string
                           example: EXISTING_ACCOUNT
+  /user/import-from-silo:
+    post:
+      summary: Import users from Silo
+      description: |
+        Imports Silo's switched-on accounts. People already imported are refreshed (their name, and their picture when Silo is their main account). With a list of Silo account ids, only those of them not yet imported are created; otherwise everyone not yet imported is. Someone whose name another account already has is skipped with `EXISTING_ACCOUNT`.
+
+        Requires the `MANAGE_USERS` permission.
+      tags:
+        - users
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                siloUserIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: The newly created users, how many people already imported were refreshed, and who was left out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  createdUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  refreshedUsers:
+                    type: number
+                  skippedUsers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        reason:
+                          type: string
+                          example: EXISTING_ACCOUNT
   /user/registerPushSubscription:
     post:
       summary: Register a web push /user/registerPushSubscription
@@ -15492,6 +15563,189 @@ paths:
           description: Unlink request invalid
         '404':
           description: User does not exist
+  /user/{userId}/settings/linked-accounts/silo:
+    post:
+      summary: Link a Silo account to the current user
+      description: Signs in to Silo with these credentials (and out again at once), then links that Silo account. Users can only link accounts to their own account; the account must not be linked to anyone else. A password account becomes a Silo account; any other keeps its kind. `PASSWORD_CHANGE_REQUIRED` when the Silo account holds a temporary password.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+      responses:
+        '204':
+          description: Linked
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Silo refused the sign-in
+        '422':
+          description: Account already linked to a user
+    delete:
+      summary: Remove the linked Silo account for a user
+      description: The same rules as unlinking Plex apply. Their chosen Silo profile is forgotten too.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Unlinked
+        '400':
+          description: Unlink request invalid
+        '404':
+          description: User does not exist
+  /user/{userId}/settings/linked-accounts/silo/device/start:
+    post:
+      summary: Start linking Silo with a code approved in Silo
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: The code to approve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloDeviceCode'
+  /user/{userId}/settings/linked-accounts/silo/device/check:
+    post:
+      summary: Check a code for linking Silo
+      description: Once approved, the Silo account is linked and the profile it was approved as becomes their chosen profile.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '200':
+          description: Where linking stands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, approved, denied, expired]
+                  opened:
+                    type: boolean
+                required:
+                  - status
+        '422':
+          description: Account already linked to a user
+  /user/{userId}/settings/linked-accounts/silo/profiles:
+    get:
+      summary: A user's Silo profiles, and the one chosen as theirs
+      description: The household profiles on their linked Silo account. `profileId` is the one chosen as theirs; null counts every profile on the account.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profileId:
+                    type: string
+                    nullable: true
+                  profiles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        primary:
+                          type: boolean
+                        child:
+                          type: boolean
+  /user/{userId}/settings/linked-accounts/silo/profile:
+    put:
+      summary: Choose a user's Silo profile
+      description: One of the profiles on their linked Silo account, or null for all of them.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profileId:
+                  type: string
+                  nullable: true
+              required:
+                - profileId
+      responses:
+        '200':
+          description: Chosen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profileId:
+                    type: string
+                    nullable: true
+        '400':
+          description: Not one of their profiles
   /user/{userId}/settings/linked-accounts/oidc:
     get:
       summary: Someone's single sign-on links

@@ -42,6 +42,7 @@ import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
+import { importSiloUsers } from '@server/lib/siloUserImport';
 import {
   MediaServerRemovalError,
   removeFromMediaServer,
@@ -1075,6 +1076,22 @@ router.post(
       return res
         .status(201)
         .json(await importJellyfinUsers('emby', body?.embyUserIds));
+    } catch (e) {
+      next({ status: 500, message: e.message });
+    }
+  }
+);
+
+router.post(
+  '/import-from-silo',
+  isAuthenticated(Permission.MANAGE_USERS),
+  async (req, res, next) => {
+    try {
+      const body = req.body as { siloUserIds?: string[] } | undefined;
+      if (!isConnected('silo')) {
+        return next({ status: 400, message: 'Silo is not connected.' });
+      }
+      return res.status(201).json(await importSiloUsers(body?.siloUserIds));
     } catch (e) {
       next({ status: 500, message: e.message });
     }

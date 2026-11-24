@@ -4,7 +4,7 @@ import SiloEpisode from '@server/entity/SiloEpisode';
 import type { SeenQuality } from '@server/lib/mediaQuality';
 import { combineQuality, siloVersionQuality } from '@server/lib/mediaQuality';
 import { isSilo4k } from '@server/lib/silo';
-import { In } from 'typeorm';
+import { In, LessThan } from 'typeorm';
 
 /*
  * Silo's episodes as the scans last listed them (silo_episode). Silo can't
@@ -53,21 +53,28 @@ export const episodeRowOf = (
   });
 };
 
-/** Saves these episodes, replacing what was stored for each. */
+/** Saves these episodes, replacing what was stored for each, as seen now. */
 export const saveEpisodes = async (rows: SiloEpisode[]): Promise<void> => {
   const repository = getRepository(SiloEpisode);
+  const seenAt = Date.now();
+  for (const row of rows) row.seenAt = seenAt;
   for (let i = 0; i < rows.length; i += CHUNK) {
     await repository.save(rows.slice(i, i + CHUNK));
   }
 };
 
-/** Forgets every stored episode not in `keep` (after a full listing). */
-export const keepOnlyEpisodes = async (keep: Set<string>): Promise<number> => {
+/**
+ * After a full listing that started at `since`: forgets every stored episode
+ * no scan has listed since then. Episodes a recently added scan stored while
+ * the full scan ran are kept.
+ */
+export const forgetUnseenSince = async (since: number): Promise<number> => {
   const repository = getRepository(SiloEpisode);
-  const stored = await repository.find({ select: { contentId: true } });
-  const gone = stored
-    .map((row) => row.contentId)
-    .filter((contentId) => !keep.has(contentId));
+  const stored = await repository.find({
+    select: { contentId: true },
+    where: { seenAt: LessThan(since) },
+  });
+  const gone = stored.map((row) => row.contentId);
   for (let i = 0; i < gone.length; i += CHUNK) {
     await repository.delete({ contentId: In(gone.slice(i, i + CHUNK)) });
   }

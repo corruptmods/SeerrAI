@@ -1,4 +1,5 @@
 import type { SeenQuality } from '@server/lib/mediaQuality';
+import { bigNumber } from '@server/utils/DbColumnHelper';
 import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 /**
@@ -38,6 +39,14 @@ export class SiloEpisode {
   /** What its files are in, standard and 4K. */
   @Column({ type: 'simple-json', nullable: true })
   public quality?: { standard?: SeenQuality; uhd?: SeenQuality } | null;
+
+  /**
+   * When a scan last listed it (ms since the epoch). A full scan forgets only
+   * rows not listed since it started, so episodes a recently added scan
+   * stored meanwhile stay.
+   */
+  @Column({ type: 'bigint', default: 0, transformer: bigNumber })
+  public seenAt: number;
 
   constructor(init?: Partial<SiloEpisode>) {
     Object.assign(this, init);

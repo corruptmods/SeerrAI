@@ -24,7 +24,7 @@ export class AddSilo1798700000000 implements MigrationInterface {
       `ALTER TABLE "media" ADD "siloMediaId4k" character varying`
     );
     await queryRunner.query(
-      `CREATE TABLE "silo_episode" ("contentId" character varying NOT NULL, "seriesId" character varying NOT NULL, "libraryIds" text NOT NULL, "season" integer NOT NULL, "episode" integer NOT NULL, "standard" boolean NOT NULL DEFAULT true, "uhd" boolean NOT NULL DEFAULT false, "quality" text, CONSTRAINT "PK_040c61364792b5ba62549dce7bd" PRIMARY KEY ("contentId"))`
+      `CREATE TABLE "silo_episode" ("contentId" character varying NOT NULL, "seriesId" character varying NOT NULL, "libraryIds" text NOT NULL, "season" integer NOT NULL, "episode" integer NOT NULL, "standard" boolean NOT NULL DEFAULT true, "uhd" boolean NOT NULL DEFAULT false, "quality" text, "seenAt" bigint NOT NULL DEFAULT '0', CONSTRAINT "PK_040c61364792b5ba62549dce7bd" PRIMARY KEY ("contentId"))`
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_e84c8bab1a4e8305ebb853320d" ON "silo_episode" ("seriesId") `

@@ -20,7 +20,7 @@ import {
   countSeasons,
   episodeRowOf,
   episodesOf,
-  keepOnlyEpisodes,
+  forgetUnseenSince,
   saveEpisodes,
 } from '@server/lib/scanners/silo/episodes';
 import type { ItemLabel } from '@server/lib/scanners/unidentified';
@@ -267,6 +267,7 @@ export class SiloScanner
   private async fullScan(sessionId: string): Promise<void> {
     // Episodes first, from every enabled library, so each series is counted
     // from all of them.
+    const startedAt = Date.now();
     const episodes: SiloCatalogItem[] = [];
     const titles = new Map<string, SiloCatalogItem[]>();
     for (const library of this.libraries) {
@@ -299,8 +300,8 @@ export class SiloScanner
       titles.set(library.id, listed);
       library.lastScan = askedAt;
     }
-    const stored = await this.storeEpisodes(episodes);
-    const forgotten = await keepOnlyEpisodes(new Set(stored));
+    await this.storeEpisodes(episodes);
+    const forgotten = await forgetUnseenSince(startedAt);
     if (forgotten) {
       this.log(`Silo no longer lists ${forgotten} episode(s)`, 'info');
     }

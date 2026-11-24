@@ -1,3 +1,5 @@
+import type { CatalogQuery } from '@server/api/silo/client';
+import SiloAPI from '@server/api/silo/client';
 import type {
   TmdbTvDetails,
   TmdbTvSeasonResult,
@@ -11,6 +13,7 @@ import SiloEpisode from '@server/entity/SiloEpisode';
 import availabilitySync from '@server/lib/availabilitySync';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { SiloScanner } from '@server/lib/scanners/silo';
+import { saveEpisodes } from '@server/lib/scanners/silo/episodes';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
@@ -21,7 +24,7 @@ import {
   siloSeries,
 } from '@server/test/fakeSilo';
 import assert from 'node:assert/strict';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 
 /*
  * Silo's full and recently added scans, availability sync and the nightly
@@ -300,6 +303,54 @@ describe('the Silo recently added scan', () => {
       MediaStatus.AVAILABLE,
       'season 1 kept'
     );
+  });
+
+  it('keeps episodes a recently added scan stored while a full scan ran', async () => {
+    shows.set(9321, fakeShow(9321, 'Harbour Lights', [season(1, 2)]));
+    await getRepository(SiloEpisode).save(
+      new SiloEpisode({
+        contentId: 'series-old-1-1',
+        seriesId: 'series-old',
+        libraryIds: ['2'],
+        season: 1,
+        episode: 1,
+        seenAt: 1,
+      })
+    );
+    silo.items = [
+      siloSeries('series-tmdb-9321', { tmdbId: 9321 }),
+      siloEpisode('series-tmdb-9321', 1, 1),
+    ];
+    const list = SiloAPI.prototype.listCatalogItems;
+    const listing = mock.method(
+      SiloAPI.prototype,
+      'listCatalogItems',
+      async function (this: SiloAPI, query?: CatalogQuery) {
+        const items = await list.call(this, query);
+        if (query?.type === 'episode' && query.libraryId === '2') {
+          // A recently added scan stores an episode the full listing missed.
+          await saveEpisodes([
+            new SiloEpisode({
+              contentId: 'series-tmdb-9321-1-2',
+              seriesId: 'series-tmdb-9321',
+              libraryIds: ['2'],
+              season: 1,
+              episode: 2,
+            }),
+          ]);
+        }
+        return items;
+      }
+    );
+    try {
+      await scanner().run();
+    } finally {
+      listing.mock.restore();
+    }
+    const ids = (await getRepository(SiloEpisode).find())
+      .map((row) => row.contentId)
+      .sort();
+    assert.deepEqual(ids, ['series-tmdb-9321-1-1', 'series-tmdb-9321-1-2']);
   });
 
   it('counts again every series new episodes arrived in', async () => {

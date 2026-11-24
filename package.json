@@ -209,8 +209,6 @@
     "auditConfig": {
       "ignoreGhsas": [
         "GHSA-gcqx-w48m-w2h4",
-        "GHSA-jmr9-qjv8-65gv",
-        "GHSA-7pqw-9j4j-h8q3",
         "GHSA-g3hv-75wg-m249",
         "GHSA-fc5q-39xc-vjpf"
       ]
@@ -243,7 +241,9 @@
       "node-gyp>undici": ">=6.29.1 <7",
       "postcss-selector-parser": ">=6.1.5 <7",
       "@cypress/request>uuid": ">=11.1.1",
-      "typeorm>glob": ">=14.0.2 <15"
+      "typeorm>glob": ">=14.0.2 <15",
+      "@typescript-eslint/typescript-estree>minimatch": ">=11.0.1 <12",
+      "glob@>=9.0.0 <14.0.2": ">=14.0.2 <15"
     },
     "patchedDependencies": {
       "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",

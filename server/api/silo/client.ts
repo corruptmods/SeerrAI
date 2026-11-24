@@ -215,7 +215,9 @@ class SiloAPI extends ExternalAPI {
   /** Every page of a cursor-paged collection. */
   /**
    * Every page of a cursor-paged collection. A list value is sent as one
-   * parameter per entry (content_ids=a&content_ids=b), as Silo reads them.
+   * parameter per entry (content_ids=a&content_ids=b), as Silo reads them. A
+   * page that isn't a collection, or says there is more without a cursor, is
+   * an error: it must never read as "nothing there".
    */
   public async listAll<T>(
     endpoint: string,
@@ -231,7 +233,21 @@ class SiloAPI extends ExternalAPI {
         params: { ...params, limit: SILO_PAGE_LIMIT, cursor },
         paramsSerializer: { indexes: null },
       });
-      items.push(...(page.items ?? []));
+      if (!page || typeof page !== 'object' || !Array.isArray(page.items)) {
+        throw new SiloError(
+          502,
+          'bad_page',
+          'Silo sent something that is not a list. Check the address and URL base.'
+        );
+      }
+      items.push(...page.items);
+      if (page.page?.has_more && !page.page.next_cursor) {
+        throw new SiloError(
+          502,
+          'bad_page',
+          'Silo said there was more to read but gave no way to read it.'
+        );
+      }
       cursor = page.page?.has_more ? page.page.next_cursor : undefined;
       if (!cursor) return items;
     }

@@ -50,6 +50,22 @@ describe('the Silo client', () => {
     );
   });
 
+  it('never reads a broken page as an empty list', async () => {
+    const broken = new SiloAPI(host(), 'sa_test');
+    // A proxy's HTML page instead of Silo's answer.
+    (broken as unknown as { patient: () => Promise<unknown> }).patient =
+      async () => '<html>Sign in to the proxy</html>';
+    await assert.rejects(
+      () => broken.getCatalogItems(['movie-1']),
+      (e: SiloError) => e.status === 502
+    );
+    (broken as unknown as { patient: () => Promise<unknown> }).patient =
+      async () => ({ items: [], page: { has_more: true } });
+    await assert.rejects(
+      () => broken.listCatalogItems(),
+      (e: SiloError) => e.status === 502
+    );
+  });
 
   it('stops at an API major it does not know', async () => {
     silo.apiMajor = 3;

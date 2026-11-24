@@ -114,6 +114,72 @@ export interface SiloAccount {
   password_change_required?: boolean;
 }
 
+/** A row of GET /admin/users, and GET /admin/users/{id}. */
+export interface SiloAdminUser {
+  id: string;
+  username: string;
+  /** Empty when none is set. */
+  email?: string;
+  role: 'admin' | 'user' | string;
+  enabled: boolean;
+  is_owner?: boolean;
+  /** Explicit library allowlist; null inherits the group's. */
+  library_ids?: string[] | null;
+}
+
+/** A row of GET /admin/users/{id}/profiles: one household profile. */
+export interface SiloAccountProfile {
+  id: string;
+  name: string;
+  /** Avatar reference; empty when none. Changes when the picture does. */
+  avatar?: string;
+  /**
+   * Where to fetch the picture: a path on Silo, or a signed address that
+   * expires. Absent when there is none.
+   */
+  avatar_url?: string;
+  avatar_source?: string;
+  has_pin?: boolean;
+  /** The household parent. */
+  is_primary: boolean;
+  is_child?: boolean;
+}
+
+/** POST /auth/device/start. */
+export interface SiloDeviceStart {
+  /** Secret Seerr AI polls with; never shown. */
+  device_code: string;
+  /** Eight digits, e.g. 4821-7730. */
+  user_code: string;
+  verification_uri: string;
+  verification_uri_complete: string;
+  expires_at: string;
+  expires_in: number;
+  /** Seconds between polls. */
+  interval: number;
+}
+
+export type SiloDeviceStatus =
+  | 'pending'
+  | 'approved'
+  | 'denied'
+  | 'consumed'
+  | 'canceled'
+  | 'expired';
+
+/** POST /auth/device/poll. */
+export interface SiloDevicePoll {
+  status: SiloDeviceStatus | string;
+  /** An approver has looked the code up. */
+  opened?: boolean;
+  poll_after?: number;
+  expires_at?: string;
+  /** The profile the approver chose; empty for a full sign-in. */
+  profile_id?: string;
+  /** Only when approved, once. */
+  tokens?: SiloTokenPair;
+}
+
 /** POST /auth/login. */
 export interface SiloTokenPair {
   access_token: string;

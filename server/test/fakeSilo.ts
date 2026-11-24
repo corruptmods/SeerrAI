@@ -1,4 +1,5 @@
 import type {
+  SiloAccountProfile,
   SiloCatalogItem,
   SiloServerStatus,
   SiloUserLibrary,
@@ -13,7 +14,10 @@ import type { AddressInfo } from 'node:net';
  * test-provided data. Like Silo it checks API key scopes (403), refuses
  * admin routes to a non-admin key, pages with cursors bound to the query's
  * filters, refuses a limit over 200 and parameters a route doesn't take, and
- * records every call.
+ * records every call. Sign-in follows Silo's: a password sign-in or a
+ * device code someone approves, a name locked after too many tries (429), a
+ * temporary password flagged on the account. Pictures are served outside
+ * /api/v2, some only with the key, as Silo's own and signed addresses are.
  */
 
 export interface FakeSiloCall {
@@ -35,6 +39,30 @@ export interface FakeSiloAccount {
   username: string;
   password: string;
   role: 'admin' | 'user';
+  email?: string;
+  /** Default true. A disabled account can't sign in. */
+  enabled?: boolean;
+  /** Holds a temporary password it must change first. */
+  passwordChangeRequired?: boolean;
+  profiles?: SiloAccountProfile[];
+}
+
+/** A device sign-in Seerr AI started. */
+export interface FakeSiloDevice {
+  deviceCode: string;
+  userCode: string;
+  status: 'pending' | 'approved' | 'denied' | 'consumed' | 'expired';
+  opened: boolean;
+  accountId?: string;
+  profileId?: string;
+}
+
+/** A picture served outside /api/v2. */
+export interface FakeSiloPicture {
+  contentType: string;
+  body: Buffer;
+  /** Only with a valid key, as Silo's own paths. */
+  needsKey?: boolean;
 }
 
 export interface FakeSilo {
@@ -49,6 +77,21 @@ export interface FakeSilo {
   libraries: SiloUserLibrary[];
   items: SiloCatalogItem[];
   status: SiloServerStatus;
+  /** Device sign-ins, by device code. */
+  devices: Map<string, FakeSiloDevice>;
+  /** Pictures by path (with its query, if any). */
+  pictures: Map<string, FakeSiloPicture>;
+  /** Names Silo locked after too many sign-in attempts (429). */
+  lockedNames: Set<string>;
+  /** Sign-in sessions still open, by access token. */
+  openSessions: () => string[];
+  /** Approves a device code as an account (and a profile), as /activate does. */
+  approveDevice: (
+    userCode: string,
+    accountId: string,
+    profileId?: string
+  ) => void;
+  denyDevice: (userCode: string) => void;
   /** Silo refuses to create keys (a household PIN rule, say). */
   refuseKeyCreation: boolean;
   /** Answers every call with a 429 this many times first. */
@@ -65,11 +108,24 @@ export interface FakeSilo {
 
 const MONITOR = 'admin:monitor:read';
 
+/** One account's routes, by their OpenAPI template. */
+const ACCOUNT_ROUTE = /^\/admin\/users\/([^/]+)(\/profiles)?$/;
+const templateOf = (path: string): string => {
+  const account = ACCOUNT_ROUTE.exec(path);
+  if (!account || account[1] === 'policy-defaults') return path;
+  return account[2] ? '/admin/users/{id}/profiles' : '/admin/users/{id}';
+};
+
 /** Which scope admits a GET route, as Silo's allowlist does. */
 const scopesFor = (path: string): string[] => {
   if (path === '/user/libraries') return ['libraries:read'];
   if (path === '/admin/users/policy-defaults') return ['admin:users'];
-  if (path === '/admin/users') return [MONITOR, 'admin:users'];
+  if (
+    path === '/admin/users' ||
+    path === '/admin/users/{id}' ||
+    path === '/admin/users/{id}/profiles'
+  )
+    return [MONITOR, 'admin:users'];
   if (path === '/admin/catalog/items' || path === '/admin/catalog/capabilities')
     return [MONITOR, 'admin:catalog:paths'];
   if (
@@ -140,6 +196,34 @@ export const createFakeSilo = (): FakeSilo => {
   let server: http.Server | undefined;
   let sessions = new Map<string, FakeSiloAccount>();
   let nextKey = 1;
+  let nextCode = 1;
+
+  const deviceByUserCode = (userCode: string) =>
+    [...fake.devices.values()].find(
+      (device) =>
+        device.userCode.replace(/\D/g, '') === userCode.replace(/\D/g, '')
+    );
+
+  const accountView = (account: FakeSiloAccount) => ({
+    id: account.id,
+    username: account.username,
+    email: account.email ?? '',
+    role: account.role,
+    permissions: [],
+    download_allowed: true,
+    password_change_required: !!account.passwordChangeRequired,
+  });
+
+  const openSession = (account: FakeSiloAccount) => {
+    const token = `session-${account.id}-${nextCode++}`;
+    sessions.set(token, account);
+    return {
+      access_token: token,
+      refresh_token: `refresh-${token}`,
+      expires_in: 3600,
+      user: accountView(account),
+    };
+  };
 
   const fake: FakeSilo = {
     calls: [],
@@ -150,6 +234,24 @@ export const createFakeSilo = (): FakeSilo => {
     serverName: 'Glasswing',
     keys: new Map(),
     accounts: [],
+    devices: new Map(),
+    pictures: new Map(),
+    lockedNames: new Set(),
+    openSessions: () => [...sessions.keys()],
+    approveDevice: (userCode, accountId, profileId) => {
+      const device = deviceByUserCode(userCode);
+      if (!device) throw new Error(`No device code ${userCode}`);
+      Object.assign(device, {
+        status: 'approved',
+        opened: true,
+        accountId,
+        profileId,
+      });
+    },
+    denyDevice: (userCode) => {
+      const device = deviceByUserCode(userCode);
+      if (device) device.status = 'denied';
+    },
     libraries: [],
     items: [],
     status: {
@@ -182,6 +284,9 @@ export const createFakeSilo = (): FakeSilo => {
       fake.contractDigest = 'a'.repeat(64);
       fake.keys = new Map([['sa_test', { scopes: [], admin: true }]]);
       fake.accounts = [];
+      fake.devices = new Map();
+      fake.pictures = new Map();
+      fake.lockedNames = new Set();
       fake.libraries = [];
       fake.items = [];
       fake.refuseKeyCreation = false;
@@ -224,7 +329,21 @@ export const createFakeSilo = (): FakeSilo => {
       return problem(res, 400, 'malformed_body', 'The body is not JSON.');
     }
     if (!url.pathname.startsWith('/api/v2/')) {
-      return problem(res, 404, 'not_found', 'No such route.');
+      const picture = fake.pictures.get(`${url.pathname}${url.search}`);
+      fake.calls.push({
+        method: req.method ?? 'GET',
+        path: url.pathname,
+        query,
+        auth,
+      });
+      if (!picture || (picture.needsKey && !(auth && fake.keys.has(auth)))) {
+        return problem(res, 404, 'not_found', 'No such picture.');
+      }
+      res.writeHead(200, {
+        'Content-Type': picture.contentType,
+        'Content-Length': picture.body.length,
+      });
+      return res.end(picture.body);
     }
     const path = url.pathname.slice('/api/v2'.length);
     fake.calls.push({ method: req.method ?? 'GET', path, query, auth, body });
@@ -263,28 +382,86 @@ export const createFakeSilo = (): FakeSilo => {
       });
     }
     if (req.method === 'POST' && path === '/auth/login') {
+      if (
+        typeof body?.username !== 'string' ||
+        typeof body?.password !== 'string' ||
+        Object.keys(body).some(
+          (name) => !['username', 'password', 'provider'].includes(name)
+        )
+      ) {
+        return problem(res, 422, 'validation_failed', 'Bad body.');
+      }
+      if (fake.lockedNames.has(body.username)) {
+        res.setHeader('Retry-After', '60');
+        return problem(res, 429, 'rate_limited', 'Too many tries.');
+      }
       const account = fake.accounts.find(
-        (a) => a.username === body?.username && a.password === body?.password
+        (a) =>
+          a.username === body.username &&
+          a.password === body.password &&
+          a.enabled !== false
       );
       if (!account) {
         return problem(res, 401, 'invalid_credentials', 'No.');
       }
-      const token = `session-${account.id}-${sessions.size + 1}`;
-      sessions.set(token, account);
-      return json(res, 200, {
-        access_token: token,
-        refresh_token: `refresh-${token}`,
-        expires_in: 3600,
-        user: {
-          id: account.id,
-          username: account.username,
-          email: '',
-          role: account.role,
-          permissions: [],
-          download_allowed: true,
-          password_change_required: false,
-        },
+      return json(res, 200, openSession(account));
+    }
+    if (req.method === 'POST' && path === '/auth/device/start') {
+      const code = String(48217730 + nextCode++);
+      const device: FakeSiloDevice = {
+        deviceCode: `device-${code}`,
+        userCode: `${code.slice(0, 4)}-${code.slice(4)}`,
+        status: 'pending',
+        opened: false,
+      };
+      fake.devices.set(device.deviceCode, device);
+      const activate = `http://127.0.0.1:${fake.port()}/activate`;
+      return json(res, 201, {
+        device_code: device.deviceCode,
+        user_code: device.userCode,
+        match_code: 'lantern harbour',
+        verification_uri: activate,
+        verification_uri_complete: `${activate}?code=${code}`,
+        expires_at: '2026-11-24T00:15:00.000Z',
+        expires_in: 900,
+        interval: 5,
+        device_name: String(body?.device_name ?? ''),
+        device_platform: String(body?.device_platform ?? ''),
+        client_purpose: 'device_login',
+        temporary: false,
       });
+    }
+    if (req.method === 'POST' && path === '/auth/device/poll') {
+      const device = fake.devices.get(String(body?.device_code ?? ''));
+      if (!device) {
+        return problem(res, 404, 'not_found', 'No such request.');
+      }
+      const answer = {
+        opened: device.opened,
+        poll_after: 5,
+        profile_id: '',
+        profile_token: '',
+        temporary: false,
+      };
+      if (device.status !== 'approved') {
+        return json(res, 200, { ...answer, status: device.status });
+      }
+      device.status = 'consumed';
+      const account = fake.accounts.find((a) => a.id === device.accountId);
+      if (!account) {
+        return problem(res, 404, 'not_found', 'No such account.');
+      }
+      return json(res, 200, {
+        ...answer,
+        status: 'approved',
+        profile_id: device.profileId ?? '',
+        tokens: openSession(account),
+      });
+    }
+    if (req.method === 'POST' && path === '/auth/device/cancel') {
+      const device = fake.devices.get(String(body?.device_code ?? ''));
+      if (device && device.status === 'pending') device.status = 'expired';
+      return json(res, 200, { status: 'canceled' });
     }
     if (req.method === 'POST' && path === '/auth/logout') {
       if (auth) sessions.delete(auth);
@@ -323,7 +500,8 @@ export const createFakeSilo = (): FakeSilo => {
     if (req.method !== 'GET') {
       return problem(res, 405, 'method_not_allowed', 'Read only here.');
     }
-    const admits = scopesFor(path);
+    const route = templateOf(path);
+    const admits = scopesFor(route);
     if (
       key.scopes.length &&
       !key.scopes.some((scope) => admits.includes(scope))
@@ -334,8 +512,8 @@ export const createFakeSilo = (): FakeSilo => {
       return problem(res, 403, 'permission_denied', 'Admins only.');
     }
     const allowed = new Set([
-      ...(PARAMS[path] ?? []),
-      ...(PAGED.has(path) ? ['limit', 'cursor'] : []),
+      ...(PARAMS[route] ?? []),
+      ...(PAGED.has(route) ? ['limit', 'cursor'] : []),
     ]);
     const unknown = Object.keys(query).find((name) => !allowed.has(name));
     if (unknown) {
@@ -382,7 +560,29 @@ export const createFakeSilo = (): FakeSilo => {
       });
     };
 
-    switch (path) {
+    const adminUser = (account: FakeSiloAccount) => ({
+      id: account.id,
+      username: account.username,
+      email: account.email ?? '',
+      role: account.role,
+      enabled: account.enabled !== false,
+      is_owner: account.id === fake.accounts[0]?.id,
+      library_ids: null,
+      password_change_required: !!account.passwordChangeRequired,
+    });
+
+    switch (route) {
+      case '/admin/users/{id}':
+      case '/admin/users/{id}/profiles': {
+        const id = decodeURIComponent(ACCOUNT_ROUTE.exec(path)?.[1] ?? '');
+        const account = fake.accounts.find((a) => a.id === id);
+        if (!account) {
+          return problem(res, 404, 'not_found', 'No such account.');
+        }
+        return route === '/admin/users/{id}'
+          ? json(res, 200, adminUser(account))
+          : json(res, 200, { items: account.profiles ?? [] });
+      }
       case '/user/libraries':
         return json(res, 200, { items: fake.libraries });
       case '/admin/server/status':
@@ -425,8 +625,9 @@ export const createFakeSilo = (): FakeSilo => {
           )
         );
       }
-      case '/admin/playback-history':
       case '/admin/users':
+        return page(fake.accounts.map(adminUser));
+      case '/admin/playback-history':
       case '/admin/sessions':
         return page([]);
       default:

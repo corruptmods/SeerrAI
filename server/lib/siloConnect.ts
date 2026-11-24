@@ -4,12 +4,12 @@ import SiloAPI, {
   SiloError,
 } from '@server/api/silo/client';
 import { SiloIncompatibleError } from '@server/api/silo/compat';
-import type { SiloSystemInfo } from '@server/api/silo/types';
+import type { SiloAccount, SiloSystemInfo } from '@server/api/silo/types';
 import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { siloLibraries } from '@server/lib/silo';
+import { siloDeviceId, siloLibraries } from '@server/lib/silo';
 
 /*
  * Connecting Silo: with an administrator's API key pasted in, or by signing
@@ -39,6 +39,8 @@ export interface SiloConnection {
   name: string;
   info: SiloSystemInfo;
   optionalScopes: SiloOptionalScope[];
+  /** The administrator who signed in to create the key, when one did. */
+  admin?: SiloAccount;
 }
 
 const KEY_LABEL = 'Seerr AI';
@@ -49,9 +51,6 @@ export const siloAddressOf = (input: SiloAddress) => ({
   useSsl: !!input.useSsl,
   urlBase: (input.urlBase ?? '').trim().replace(/\/+$/, ''),
 });
-
-/** The id Seerr AI signs in to Silo with, the same on every sign-in. */
-const deviceId = (): string => `seerr-ai-${getSettings().clientId}`;
 
 /** A Silo failure as a refusal with a status and a plain message. */
 const refusal = (e: unknown, fallback?: string): MediaServerChangeError => {
@@ -79,10 +78,10 @@ const createKey = async (
   client: SiloAPI,
   username: string,
   password: string
-): Promise<string> => {
+): Promise<{ key: string; admin: SiloAccount }> => {
   let tokens;
   try {
-    tokens = await client.login(username, password, deviceId());
+    tokens = await client.login(username, password, siloDeviceId());
   } catch (e) {
     throw refusal(
       e,
@@ -102,7 +101,7 @@ const createKey = async (
       label: KEY_LABEL,
       scopes: [...SILO_REQUIRED_SCOPES, ...SILO_OPTIONAL_SCOPES],
     });
-    return created.key;
+    return { key: created.key, admin: tokens.user };
   } catch (e) {
     if (e instanceof SiloError && e.status === 403) {
       throw new MediaServerChangeError(
@@ -151,9 +150,10 @@ export const trySilo = async (
     );
   }
 
-  const apiKey = input.apiKey
-    ? input.apiKey.trim()
+  const made = input.apiKey
+    ? undefined
     : await createKey(open, input.username ?? '', input.password ?? '');
+  const apiKey = made?.key ?? (input.apiKey ?? '').trim();
 
   const keyed = new SiloAPI(hostname, apiKey, { timeout: 15_000 });
   let probe;
@@ -182,6 +182,7 @@ export const trySilo = async (
     name: (await keyed.getServerName()) || 'Silo',
     info,
     optionalScopes: probe.optional,
+    ...(made ? { admin: made.admin } : {}),
   };
 };
 

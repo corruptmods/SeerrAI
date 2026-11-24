@@ -100,3 +100,9 @@ export const siloLibraries = (
 /** Whether a Silo file is 4K: 2160 lines or more. */
 export const isSilo4k = (version: Pick<SiloCatalogVersion, 'resolution'>) =>
   siloResolutionHeight(version.resolution) >= 2160;
+
+/**
+ * The device id Seerr AI signs in to Silo with: the same on every sign-in, so
+ * Silo lists one device for it.
+ */
+export const siloDeviceId = (): string => `seerr-ai-${getSettings().clientId}`;

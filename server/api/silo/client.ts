@@ -2,11 +2,15 @@ import ExternalAPI from '@server/api/externalapi';
 import { assertCompatible } from '@server/api/silo/compat';
 import type {
   SiloAccount,
+  SiloAccountProfile,
+  SiloAdminUser,
   SiloApiKeyCreated,
   SiloBranding,
   SiloCatalogCapabilities,
   SiloCatalogItem,
   SiloCollection,
+  SiloDevicePoll,
+  SiloDeviceStart,
   SiloIdentity,
   SiloItemType,
   SiloProblemBody,
@@ -129,7 +133,19 @@ export interface SiloScopeProbe {
   optional: SiloOptionalScopeName[];
 }
 
+/** How Seerr AI names itself on the sign-in sessions Silo records. */
+const DEVICE_NAME = 'Seerr AI';
+const DEVICE_PLATFORM = 'server';
+
+const deviceHeaders = (deviceId: string) => ({
+  'X-Silo-Device-Id': deviceId,
+  'X-Silo-Device-Name': DEVICE_NAME,
+  'X-Silo-Device-Platform': DEVICE_PLATFORM,
+});
+
 class SiloAPI extends ExternalAPI {
+  private readonly siloBase: string;
+
   /**
    * @param hostname Silo's address, scheme to URL base (no /api/v2).
    * @param apiKey An API key; leave out for public calls and sign-in.
@@ -147,6 +163,7 @@ class SiloAPI extends ExternalAPI {
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
       }
     );
+    this.siloBase = hostname.replace(/\/+$/, '');
   }
 
   private async call<T>(
@@ -348,23 +365,106 @@ class SiloAPI extends ExternalAPI {
     return { missing, optional };
   }
 
-  /** Signs in with a Silo account. */
+  /**
+   * Signs in with a Silo account. Without a provider Silo routes the name
+   * itself: a local password, else its directory (LDAP) provider.
+   */
   public login(
     username: string,
     password: string,
-    deviceId: string
+    deviceId: string,
+    provider?: string
   ): Promise<SiloTokenPair> {
     return this.send<SiloTokenPair>(
       '/auth/login',
-      { username, password },
-      {
-        headers: {
-          'X-Silo-Device-Id': deviceId,
-          'X-Silo-Device-Name': 'Seerr AI',
-          'X-Silo-Device-Platform': 'server',
-        },
-      }
+      { username, password, ...(provider ? { provider } : {}) },
+      { headers: deviceHeaders(deviceId) }
     );
+  }
+
+  /** Starts a device sign-in: a code someone approves in Silo. */
+  public startDeviceLogin(): Promise<SiloDeviceStart> {
+    return this.send<SiloDeviceStart>('/auth/device/start', {
+      device_name: DEVICE_NAME,
+      device_platform: DEVICE_PLATFORM,
+    });
+  }
+
+  /** Asks whether a device sign-in was approved; tokens come once. */
+  public pollDeviceLogin(
+    deviceCode: string,
+    deviceId: string
+  ): Promise<SiloDevicePoll> {
+    return this.send<SiloDevicePoll>(
+      '/auth/device/poll',
+      { device_code: deviceCode },
+      { headers: deviceHeaders(deviceId) }
+    );
+  }
+
+  /** Withdraws a device sign-in; failures are ignored. */
+  public async cancelDeviceLogin(deviceCode: string): Promise<void> {
+    try {
+      await this.send('/auth/device/cancel', { device_code: deviceCode });
+    } catch {
+      // It expires on its own.
+    }
+  }
+
+  /** One account; a SiloError with status 404 when Silo has no such one. */
+  public getAdminUser(accountId: string): Promise<SiloAdminUser> {
+    return this.patient<SiloAdminUser>(
+      `/admin/users/${encodeURIComponent(accountId)}`
+    );
+  }
+
+  /** Every account on Silo. */
+  public listAdminUsers(): Promise<SiloAdminUser[]> {
+    return this.listAll<SiloAdminUser>('/admin/users');
+  }
+
+  /** An account's household profiles. */
+  public async getAccountProfiles(
+    accountId: string
+  ): Promise<SiloAccountProfile[]> {
+    // A complete, unpaged collection.
+    const profiles = await this.patient<SiloCollection<SiloAccountProfile>>(
+      `/admin/users/${encodeURIComponent(accountId)}/profiles`
+    );
+    return profiles.items ?? [];
+  }
+
+  /**
+   * Where a picture Silo names lives: a path on Silo becomes a full address
+   * on it (fetched with the key); anything else is another host's, such as
+   * a signed storage address (fetched without it). Undefined for anything
+   * that isn't http(s).
+   */
+  public pictureAddress(
+    reference: string
+  ): { url: string; onSilo: boolean } | undefined {
+    let base: URL;
+    try {
+      base = new URL(`${this.siloBase}/`);
+    } catch {
+      return undefined;
+    }
+    let path = reference.trim();
+    // A path from the server root, under the URL base Silo is reached at.
+    const urlBase = base.pathname.replace(/\/+$/, '');
+    if (path.startsWith('/') && !path.startsWith('//') && urlBase) {
+      if (!path.startsWith(`${urlBase}/`)) path = `${urlBase}${path}`;
+    }
+    let url: URL;
+    try {
+      url = new URL(path, base);
+    } catch {
+      return undefined;
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return undefined;
+    }
+    return { url: url.toString(), onSilo: url.origin === base.origin };
   }
 
   /** Ends a sign-in session; failures are ignored. */

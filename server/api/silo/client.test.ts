@@ -139,3 +139,97 @@ describe('the Silo client', () => {
     assert.ok(silo.calls.some((c) => c.path === '/auth/logout'));
   });
 });
+
+describe('the Silo client, for people', () => {
+  beforeEach(() => {
+    silo.accounts = [
+      {
+        id: 'acct-1',
+        username: 'harbour',
+        password: 'lights',
+        role: 'admin',
+        email: 'harbour@example.invalid',
+        profiles: [
+          { id: 'p-1', name: 'Harbour', is_primary: true },
+          { id: 'p-2', name: 'Lantern', is_primary: false, is_child: true },
+        ],
+      },
+      { id: 'acct-2', username: 'garden', password: 'x', role: 'user' },
+    ];
+  });
+
+  it('signs in with the stable device id, and signs out', async () => {
+    const open = new SiloAPI(host());
+    const tokens = await open.login('harbour', 'lights', 'seerr-ai-test');
+    assert.equal(tokens.user.id, 'acct-1');
+    const call = silo.calls.find((c) => c.path === '/auth/login');
+    assert.deepEqual(call?.body, { username: 'harbour', password: 'lights' });
+    assert.equal(silo.openSessions().length, 1);
+    await open.logout(tokens.access_token);
+    assert.equal(silo.openSessions().length, 0);
+  });
+
+  it('reports a locked name as a rate limit', async () => {
+    silo.lockedNames.add('harbour');
+    await assert.rejects(
+      () => new SiloAPI(host()).login('harbour', 'lights', 'seerr-ai-test'),
+      (e: SiloError) => e.status === 429 && e.retryAfter === 60
+    );
+  });
+
+  it('runs a device sign-in to its single answer', async () => {
+    const open = new SiloAPI(host());
+    const start = await open.startDeviceLogin();
+    assert.match(start.user_code, /^\d{4}-\d{4}$/);
+    assert.equal(
+      (await open.pollDeviceLogin(start.device_code, 'seerr-ai-test')).status,
+      'pending'
+    );
+    silo.approveDevice(start.user_code, 'acct-1', 'p-2');
+    const approved = await open.pollDeviceLogin(
+      start.device_code,
+      'seerr-ai-test'
+    );
+    assert.equal(approved.status, 'approved');
+    assert.equal(approved.profile_id, 'p-2');
+    assert.equal(approved.tokens?.user.username, 'harbour');
+    assert.equal(
+      (await open.pollDeviceLogin(start.device_code, 'seerr-ai-test')).status,
+      'consumed'
+    );
+  });
+
+  it('reads accounts and profiles with the key', async () => {
+    const users = await client().listAdminUsers();
+    assert.deepEqual(
+      users.map((user) => [user.id, user.enabled]),
+      [
+        ['acct-1', true],
+        ['acct-2', true],
+      ]
+    );
+    assert.equal((await client().getAdminUser('acct-2')).role, 'user');
+    await assert.rejects(
+      () => client().getAdminUser('acct-gone'),
+      (e: SiloError) => e.status === 404
+    );
+    const profiles = await client().getAccountProfiles('acct-1');
+    assert.deepEqual(
+      profiles.map((profile) => profile.id),
+      ['p-1', 'p-2']
+    );
+  });
+
+  it('places pictures on Silo, under its URL base, or elsewhere', () => {
+    const atBase = new SiloAPI('http://127.0.0.1:8090/silo', 'sa_test');
+    assert.deepEqual(atBase.pictureAddress('/profile-avatars/fox.svg'), {
+      url: 'http://127.0.0.1:8090/silo/profile-avatars/fox.svg',
+      onSilo: true,
+    });
+    assert.deepEqual(
+      atBase.pictureAddress('https://storage.example.invalid/a.png?sig=1'),
+      { url: 'https://storage.example.invalid/a.png?sig=1', onSilo: false }
+    );
+    assert.equal(atBase.pictureAddress('javascript:alert(1)'), undefined);
+  });
+});

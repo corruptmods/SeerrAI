@@ -581,11 +581,17 @@ class ImageProxy {
     }
   }
 
+  /**
+   * The image at `path`, cached. `cacheAs` names it in the cache instead of
+   * its address, for an image whose address changes on every read (a signed
+   * address that expires).
+   */
   public async getImage(
     path: string,
-    fallbackPath?: string
+    fallbackPath?: string,
+    { cacheAs }: { cacheAs?: string } = {}
   ): Promise<ImageResponse> {
-    const cacheKey = this.getCacheKey(path);
+    const cacheKey = this.getCacheKey(cacheAs ?? path);
 
     const imageResponse = await this.cached(path, cacheKey);
 

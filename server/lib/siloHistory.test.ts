@@ -314,6 +314,21 @@ describe('the nightly full re-read', () => {
     assert.equal(rows.get('s-moved')?.episode, 2);
   });
 
+  it('writes only plays that changed', async () => {
+    silo.plays = [
+      play('s-1', 'movie-glasswing', 1),
+      play('s-2', 'movie-glasswing', 2),
+    ];
+    await syncSiloHistory();
+    let result = await syncSiloHistory({ full: true });
+    assert.equal(result.read, 2);
+    assert.equal(result.stored, 0, 'nothing changed');
+    silo.plays[1].completed = true;
+    result = await syncSiloHistory({ full: true });
+    assert.equal(result.stored, 1);
+    assert.equal((await stored()).get('s-2')?.completed, true);
+  });
+
   it('keeps a play Silo moved on while the long read ran', async () => {
     silo.plays = Array.from({ length: 201 }, (_, i) =>
       play(`s-${String(i).padStart(3, '0')}`, 'movie-glasswing', i)

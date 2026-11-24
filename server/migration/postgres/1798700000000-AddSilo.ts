@@ -38,9 +38,15 @@ export class AddSilo1798700000000 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "IDX_84e33930fec57bc9097dfd5a27" ON "silo_play" ("userId", "endedAt") `
     );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4a670247e90fb2e4e98a219b5f" ON "silo_play" ("titleId") `
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4a670247e90fb2e4e98a219b5f"`
+    );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_84e33930fec57bc9097dfd5a27"`
     );

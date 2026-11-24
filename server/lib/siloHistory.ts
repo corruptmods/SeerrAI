@@ -7,7 +7,7 @@ import { isConnected } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import { siloClient } from '@server/lib/silo';
 import logger from '@server/logger';
-import { In } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 
 /*
  * Seerr AI's copy of Silo's play history (silo_play), so watch history reads
@@ -235,10 +235,30 @@ const storePage = async (
       viewerName: viewerNameOf(entry) || row?.viewerName || '',
     };
   });
-  for (let i = 0; i < rows.length; i += WRITE_CHUNK) {
-    await repo.upsert(rows.slice(i, i + WRITE_CHUNK), ['sessionId']);
+  // A full re-read lists every play again: only those that changed are
+  // written.
+  const changed = rows.filter((row) => {
+    const was = existing.get(row.sessionId);
+    return (
+      !was ||
+      was.userId !== row.userId ||
+      (was.profileId ?? null) !== row.profileId ||
+      was.itemId !== row.itemId ||
+      was.kind !== row.kind ||
+      (was.titleId ?? null) !== row.titleId ||
+      was.title !== row.title ||
+      (was.season ?? null) !== row.season ||
+      (was.episode ?? null) !== row.episode ||
+      new Date(was.endedAt).getTime() !== row.endedAt.getTime() ||
+      was.completed !== row.completed ||
+      was.percent !== row.percent ||
+      was.viewerName !== row.viewerName
+    );
+  });
+  for (let i = 0; i < changed.length; i += WRITE_CHUNK) {
+    await repo.upsert(changed.slice(i, i + WRITE_CHUNK), ['sessionId']);
   }
-  return rows.length;
+  return changed.length;
 };
 
 /** Until when the copy is complete; undefined before a first full read. */
@@ -309,29 +329,42 @@ const readFrom = async (
   return { read, stored, newest };
 };
 
-/** Drops stored plays Silo didn't list; returns how many. */
+/**
+ * Drops stored plays Silo didn't list, reading the copy a chunk at a time;
+ * returns how many.
+ */
 const dropUnlisted = async (seen: Set<string>): Promise<number> => {
   const repo = getRepository(SiloPlay);
-  const stored = await repo.find({ select: { id: true, sessionId: true } });
-  if (!seen.size && stored.length > 1) {
-    // Silo answering with no plays at all is far more likely a wrong answer
-    // than every play deleted at once.
-    logger.warn(
-      "Silo listed no plays at all; keeping Seerr AI's copy as it is",
-      {
-        label: LABEL,
-        plays: stored.length,
-      }
-    );
-    return 0;
+  if (!seen.size) {
+    const count = await repo.count();
+    if (count > 1) {
+      // Silo answering with no plays at all is far more likely a wrong
+      // answer than every play deleted at once.
+      logger.warn(
+        "Silo listed no plays at all; keeping Seerr AI's copy as it is",
+        { label: LABEL, plays: count }
+      );
+      return 0;
+    }
   }
-  const gone = stored.filter((row) => !seen.has(row.sessionId));
-  for (let i = 0; i < gone.length; i += DELETE_CHUNK) {
-    await repo.delete({
-      id: In(gone.slice(i, i + DELETE_CHUNK).map((row) => row.id)),
+  let removed = 0;
+  let after = 0;
+  for (;;) {
+    const chunk = await repo.find({
+      select: { id: true, sessionId: true },
+      where: { id: MoreThan(after) },
+      order: { id: 'ASC' },
+      take: DELETE_CHUNK,
     });
+    if (!chunk.length) break;
+    after = chunk[chunk.length - 1].id;
+    const gone = chunk.filter((row) => !seen.has(row.sessionId));
+    if (gone.length) {
+      await repo.delete({ id: In(gone.map((row) => row.id)) });
+      removed += gone.length;
+    }
   }
-  return gone.length;
+  return removed;
 };
 
 const run = async (full: boolean): Promise<SiloHistoryResult> => {

@@ -33,6 +33,7 @@ export class SiloPlay {
    * the play was copied (Silo's history doesn't name the series). Null when
    * Silo no longer had the item by then.
    */
+  @Index()
   @Column({ type: 'varchar', nullable: true })
   public titleId?: string | null;
 

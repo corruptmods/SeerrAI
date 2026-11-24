@@ -30,7 +30,7 @@ export class AddSilo1798700000000 implements MigrationInterface {
       `CREATE INDEX "IDX_e84c8bab1a4e8305ebb853320d" ON "silo_episode" ("seriesId") `
     );
     await queryRunner.query(
-      `CREATE TABLE "silo_play" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "sessionId" varchar NOT NULL, "userId" varchar NOT NULL, "profileId" varchar, "itemId" varchar NOT NULL, "titleId" varchar, "kind" varchar NOT NULL, "season" integer, "episode" integer, "endedAt" datetime NOT NULL, "completed" boolean NOT NULL DEFAULT (0), "percent" integer NOT NULL DEFAULT (0), "title" varchar NOT NULL DEFAULT (''), CONSTRAINT "UQ_5707d411159aa75bdbdb2621d1c" UNIQUE ("sessionId"))`
+      `CREATE TABLE "silo_play" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "sessionId" varchar NOT NULL, "userId" varchar NOT NULL, "profileId" varchar, "itemId" varchar NOT NULL, "titleId" varchar, "kind" varchar NOT NULL, "season" integer, "episode" integer, "endedAt" datetime NOT NULL, "completed" boolean NOT NULL DEFAULT (0), "percent" integer NOT NULL DEFAULT (0), "title" varchar NOT NULL DEFAULT (''), "viewerName" varchar NOT NULL DEFAULT (''), CONSTRAINT "UQ_5707d411159aa75bdbdb2621d1c" UNIQUE ("sessionId"))`
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_1211a06b3453c55a497809d161" ON "silo_play" ("endedAt") `

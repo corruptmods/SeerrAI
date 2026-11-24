@@ -1321,6 +1321,7 @@ export type JobId =
   | 'emby-full-scan'
   | 'silo-recently-added-scan'
   | 'silo-full-scan'
+  | 'silo-history-sync'
   | 'image-cache-cleanup'
   | 'availability-sync'
   | 'process-blocklisted-tags'
@@ -1689,6 +1690,10 @@ class Settings {
         },
         'silo-full-scan': {
           schedule: '0 20 3 * * *',
+        },
+        // Copies Silo's new plays; off the scans' minutes.
+        'silo-history-sync': {
+          schedule: '30 1-59/5 * * * *',
         },
         'image-cache-cleanup': {
           schedule: '0 0 5 * * *',

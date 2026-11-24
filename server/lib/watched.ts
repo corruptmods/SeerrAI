@@ -12,7 +12,8 @@ import logger from '@server/logger';
  * What someone has already watched, so what is suggested to them can leave
  * it out. A film counts once finished or played past STARTED_PERCENT; a
  * series once any of its episodes does. Read from the media server's watch
- * history (Tautulli for Plex, the server itself for Jellyfin and Emby) and,
+ * history (Tautulli for Plex, the server itself for Jellyfin and Emby, Seerr
+ * AI's copy for Silo) and,
  * once an admin turns it on, from the person's public Trakt profile.
  *
  * Kept in memory per user and served stale while a fresh copy is read, so

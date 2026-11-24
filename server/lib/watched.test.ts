@@ -21,6 +21,7 @@ import {
   watchedWithin,
 } from '@server/lib/watched';
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
+import { SiloWatchSource } from '@server/lib/watchHistory/silo';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
 import type { Play } from '@server/lib/watchHistory/types';
 import logger from '@server/logger';
@@ -84,6 +85,8 @@ beforeEach(async () => {
   };
   settings.jellyfin = { ...settings.jellyfin, ip: 'jf.invalid', apiKey: 'jk' };
   settings.emby = { ...settings.emby, ip: 'emby.invalid', apiKey: 'ek' };
+  settings.silo = { ...settings.silo, ip: 'silo.invalid', apiKey: 'sk' };
+  mock.method(SiloWatchSource.prototype, 'history', answer('silo'));
   mock.method(TautulliWatchSource.prototype, 'history', answer('plex'));
   mock.method(
     JellyfinWatchSource.prototype,
@@ -99,6 +102,7 @@ beforeEach(async () => {
       plexId: 7001,
       jellyfinUserId: 'jf-viewer',
       embyUserId: 'emby-viewer',
+      siloUserId: 'silo-viewer',
       permissions: Permission.REQUEST,
       avatar: '',
     })
@@ -112,6 +116,7 @@ beforeEach(async () => {
       ratingKey: 'p-glass',
       jellyfinMediaId: 'j-glass',
       embyMediaId: 'e-glass',
+      siloMediaId: 's-glass',
     }),
     new Media({
       tmdbId: 7102,
@@ -119,6 +124,7 @@ beforeEach(async () => {
       ratingKey: 'p-static',
       jellyfinMediaId: 'j-static',
       embyMediaId: 'e-static',
+      siloMediaId: 's-static',
     }),
     new Media({
       tmdbId: 7103,
@@ -126,6 +132,7 @@ beforeEach(async () => {
       ratingKey: 'p-harbour',
       jellyfinMediaId: 'j-harbour',
       embyMediaId: 'e-harbour',
+      siloMediaId: 's-harbour',
     }),
   ]);
 });
@@ -142,12 +149,10 @@ afterEach(() => {
 const keys = async () => [...(await watchedFor(viewer)).keys].sort();
 
 describe('what counts as watched', () => {
-  // Silo's watch history isn't read yet.
-  for (const kind of ['plex', 'jellyfin', 'emby'] as const) {
+  for (const kind of MEDIA_SERVER_KINDS) {
     it(`reads ${kind}: finished, or played past a fifth`, async () => {
       connect(kind);
-      const id = (name: string) =>
-        `${kind === 'plex' ? 'p' : kind === 'jellyfin' ? 'j' : 'e'}-${name}`;
+      const id = (name: string) => `${kind[0]}-${name}`;
       plays[kind] = [
         play({ titleId: id('glass'), finished: true, percent: 100 }),
         // Sampled: not watched.

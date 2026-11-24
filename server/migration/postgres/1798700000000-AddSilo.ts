@@ -30,7 +30,7 @@ export class AddSilo1798700000000 implements MigrationInterface {
       `CREATE INDEX "IDX_e84c8bab1a4e8305ebb853320d" ON "silo_episode" ("seriesId") `
     );
     await queryRunner.query(
-      `CREATE TABLE "silo_play" ("id" SERIAL NOT NULL, "sessionId" character varying NOT NULL, "userId" character varying NOT NULL, "profileId" character varying, "itemId" character varying NOT NULL, "titleId" character varying, "kind" character varying NOT NULL, "season" integer, "episode" integer, "endedAt" TIMESTAMP WITH TIME ZONE NOT NULL, "completed" boolean NOT NULL DEFAULT false, "percent" integer NOT NULL DEFAULT '0', "title" character varying NOT NULL DEFAULT '', CONSTRAINT "UQ_5707d411159aa75bdbdb2621d1c" UNIQUE ("sessionId"), CONSTRAINT "PK_f4e97f779ae1d6b5c1f90f6481e" PRIMARY KEY ("id"))`
+      `CREATE TABLE "silo_play" ("id" SERIAL NOT NULL, "sessionId" character varying NOT NULL, "userId" character varying NOT NULL, "profileId" character varying, "itemId" character varying NOT NULL, "titleId" character varying, "kind" character varying NOT NULL, "season" integer, "episode" integer, "endedAt" TIMESTAMP WITH TIME ZONE NOT NULL, "completed" boolean NOT NULL DEFAULT false, "percent" integer NOT NULL DEFAULT '0', "title" character varying NOT NULL DEFAULT '', "viewerName" character varying NOT NULL DEFAULT '', CONSTRAINT "UQ_5707d411159aa75bdbdb2621d1c" UNIQUE ("sessionId"), CONSTRAINT "PK_f4e97f779ae1d6b5c1f90f6481e" PRIMARY KEY ("id"))`
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_1211a06b3453c55a497809d161" ON "silo_play" ("endedAt") `

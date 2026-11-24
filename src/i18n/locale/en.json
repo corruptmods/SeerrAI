@@ -3276,6 +3276,7 @@
   "components.Settings.SettingsJobsCache.radarr-scan": "Radarr Scan",
   "components.Settings.SettingsJobsCache.runnow": "Run Now",
   "components.Settings.SettingsJobsCache.silo-full-scan": "Silo Full Library Scan",
+  "components.Settings.SettingsJobsCache.silo-history-sync": "Silo Watch History Sync",
   "components.Settings.SettingsJobsCache.silo-recently-added-scan": "Silo Recently Added Scan",
   "components.Settings.SettingsJobsCache.size": "Size",
   "components.Settings.SettingsJobsCache.sonarr-scan": "Sonarr Scan",

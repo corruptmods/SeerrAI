@@ -13,6 +13,7 @@ import { connectedServers, MEDIA_SERVER_KINDS } from '@server/lib/mediaServers';
 import discordBot from '@server/lib/notifications/discordBot';
 import { getSettings } from '@server/lib/settings';
 import { siloClient } from '@server/lib/silo';
+import { pruneSiloPlays } from '@server/lib/siloHistory';
 import logger from '@server/logger';
 import { isPgsql } from '@server/utils/dbType';
 import { In, IsNull, LessThan, Not } from 'typeorm';
@@ -23,7 +24,8 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
  * conversations, long-expired music details, which library held a title on
  * a server or library that is gone, quality applies History no longer lists,
  * the Discord bot's messages for requests settled over a day ago, and Silo
- * episodes Silo no longer has.
+ * episodes and plays Silo no longer has (Silo's history is read again in
+ * full for that; plays are never dropped for their age).
  * Then vacuums (Postgres) or checkpoints and
  * compacts when worth it (SQLite).
  *
@@ -63,6 +65,7 @@ export interface MaintenanceReport {
     qualityApplies: number;
     discordMessages: number;
     siloEpisodes: number;
+    siloPlays: number;
   };
   /** Rows left in Seerr AI's copies of Silo's episodes and plays. */
   rows: { siloEpisodes: number; siloPlays: number };
@@ -295,6 +298,7 @@ export const runDbMaintenance = async (
     const qualityApplies = await pruneQualityApplies();
     const discordMessages = await discordBot.prune(now);
     const siloEpisodes = await pruneSiloEpisodes();
+    const siloPlays = await pruneSiloPlays();
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -320,6 +324,7 @@ export const runDbMaintenance = async (
         qualityApplies,
         discordMessages,
         siloEpisodes,
+        siloPlays,
       },
       rows: {
         siloEpisodes: await getRepository(SiloEpisode).count(),

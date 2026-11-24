@@ -278,7 +278,7 @@ describe('scheduled jobs', () => {
     );
   });
 
-  it('schedules Silo’s scans beside the primary server’s', () => {
+  it('schedules Silo’s scans and history sync beside the primary server’s', () => {
     connect('plex', 'silo');
     stubEveryJob();
     startJobs();
@@ -287,6 +287,11 @@ describe('scheduled jobs', () => {
     assert.equal(
       scheduledJobs.find((job) => job.id === 'silo-full-scan')?.name,
       'Silo Full Library Scan'
+    );
+    // Its watch history is copied every few minutes while it is connected.
+    assert.equal(
+      scheduledJobs.find((job) => job.id === 'silo-history-sync')?.name,
+      'Silo Watch History Sync'
     );
 
     connect('plex');

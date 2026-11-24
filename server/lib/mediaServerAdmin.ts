@@ -11,6 +11,7 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
 import type { MediaServerRemovalImpact } from '@server/interfaces/api/mediaServerInterfaces';
 import { refreshMediaServerJobs } from '@server/job/schedule';
@@ -239,9 +240,11 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
       { [MUSIC_ALBUM_ID[kind]]: null }
     );
   }
-  // Silo's episode list is rebuilt by its next full scan.
+  // Silo's episode list is rebuilt by its next full scan, and its play
+  // history copied again when it is connected again.
   if (kind === 'silo') {
     await getRepository(SiloEpisode).clear();
+    await getRepository(SiloPlay).clear();
     // A key can't delete itself; the next sign-in to connect deletes it.
     if (settings.silo.keyId) {
       logger.info(

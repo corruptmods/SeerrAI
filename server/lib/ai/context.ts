@@ -77,7 +77,8 @@ const named = (kind: 'movie' | 'tv', title: string, year?: number) =>
 
 /**
  * Recent watching, newest first, as "Title (year)" or "Title (series)", from
- * watch history (Tautulli for Plex, the server itself for Jellyfin and Emby),
+ * watch history (Tautulli for Plex, the server itself for Jellyfin and Emby,
+ * Seerr AI's copy for Silo),
  * including shows part-way through, and, once an admin turns it on, what
  * they watched on Trakt as last read (never waited for). Falls back to
  * requests, marked so they are never passed off as watched. Only names

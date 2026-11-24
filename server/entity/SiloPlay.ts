@@ -28,11 +28,15 @@ export class SiloPlay {
   @Column({ type: 'varchar' })
   public itemId: string;
 
-  /** The title it belongs to: the movie, or the episode's series. */
+  /**
+   * The title it belongs to: the movie, or the episode's series, found when
+   * the play was copied (Silo's history doesn't name the series). Null when
+   * Silo no longer had the item by then.
+   */
   @Column({ type: 'varchar', nullable: true })
   public titleId?: string | null;
 
-  /** 'movie' or 'episode', as Silo says. */
+  /** 'movie' or 'episode'; empty when Silo no longer knew which. */
   @Column({ type: 'varchar' })
   public kind: string;
 
@@ -53,9 +57,16 @@ export class SiloPlay {
   @Column({ type: 'integer', default: 0 })
   public percent: number;
 
-  /** The movie's or series' title, for logs and pages. */
+  /**
+   * The movie's or series' title, as Silo named it when the play was copied;
+   * kept once the item leaves Silo's catalog.
+   */
   @Column({ type: 'varchar', default: '' })
   public title: string;
+
+  /** Who played it as Silo named them: the profile, else the account. */
+  @Column({ type: 'varchar', default: '' })
+  public viewerName: string;
 
   constructor(init?: Partial<SiloPlay>) {
     Object.assign(this, init);

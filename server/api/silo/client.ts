@@ -225,13 +225,22 @@ class SiloAPI extends ExternalAPI {
   }
 
   /** A GET that waits out Silo's rate limit a couple of times. */
-  private async patient<T>(
+  private patient<T>(
     endpoint: string,
     config?: AxiosRequestConfig
   ): Promise<T> {
+    return this.waitingOutRateLimit(() => this.call<T>(endpoint, config));
+  }
+
+  /**
+   * Runs a request (which throws SiloError), again after Silo's
+   * Retry-After when Silo answers 429, a couple of times. Only for requests
+   * safe to repeat: a 429 means Silo did nothing.
+   */
+  private async waitingOutRateLimit<T>(request: () => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.call<T>(endpoint, config);
+        return await request();
       } catch (e) {
         const error = e as SiloError;
         if (error.status !== 429 || attempt >= RATE_LIMIT_RETRIES) throw e;
@@ -520,22 +529,22 @@ class SiloAPI extends ExternalAPI {
   public async getAdminUserForChange(
     accountId: string
   ): Promise<{ account: SiloAdminUser; tag: string }> {
-    try {
-      const response = await this.axios.get<SiloAdminUser>(
-        `/admin/users/${encodeURIComponent(accountId)}`
+    const response = await this.waitingOutRateLimit(() =>
+      this.axios
+        .get<SiloAdminUser>(`/admin/users/${encodeURIComponent(accountId)}`)
+        .catch((e) => {
+          throw toSiloError(e);
+        })
+    );
+    const tag = response.headers?.etag;
+    if (!response.data?.id || typeof tag !== 'string' || !tag) {
+      throw new SiloError(
+        502,
+        'bad_account',
+        'Silo sent an account Seerr AI could not change.'
       );
-      const tag = response.headers?.etag;
-      if (!response.data?.id || typeof tag !== 'string' || !tag) {
-        throw new SiloError(
-          502,
-          'bad_account',
-          'Silo sent an account Seerr AI could not change.'
-        );
-      }
-      return { account: response.data, tag };
-    } catch (e) {
-      throw toSiloError(e);
     }
+    return { account: response.data, tag };
   }
 
   /**
@@ -547,15 +556,17 @@ class SiloAPI extends ExternalAPI {
     tag: string,
     change: SiloAdminUserChange
   ): Promise<void> {
-    try {
-      await this.axios.put(
-        `/admin/users/${encodeURIComponent(accountId)}`,
-        change,
-        { headers: { 'If-Match': tag } }
-      );
-    } catch (e) {
-      throw toSiloError(e);
-    }
+    // Repeated with the same tag after a 429: Silo changed nothing, and a
+    // change made meanwhile still refuses it.
+    await this.waitingOutRateLimit(() =>
+      this.axios
+        .put(`/admin/users/${encodeURIComponent(accountId)}`, change, {
+          headers: { 'If-Match': tag },
+        })
+        .catch((e) => {
+          throw toSiloError(e);
+        })
+    );
   }
 
   /** Every account on Silo. */

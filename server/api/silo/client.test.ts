@@ -211,6 +211,22 @@ describe('the Silo client, for people', () => {
     assert.equal(silo.openSessions().length, 0);
   });
 
+  it('waits out a rate limit when changing an account, with the same tag', async () => {
+    const api = client();
+    silo.rateLimited = 1;
+    const { tag } = await api.getAdminUserForChange('acct-2');
+    silo.rateLimited = 1;
+    await api.updateAdminUser('acct-2', tag, { enabled: false });
+    assert.equal(silo.accounts[1].enabled, false);
+    const puts = silo.calls.filter((c) => c.method === 'PUT');
+    assert.equal(puts.length, 2, 'the change is sent again after the 429');
+    // A stale tag is still refused, not retried.
+    await assert.rejects(
+      () => api.updateAdminUser('acct-2', tag, { enabled: true }),
+      (e: Error) => e instanceof SiloError && e.status === 412
+    );
+  });
+
   it('reports a locked name as a rate limit', async () => {
     silo.lockedNames.add('harbour');
     await assert.rejects(

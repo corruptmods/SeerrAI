@@ -656,24 +656,20 @@ describe('connecting a different Silo, safely', () => {
     getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
   });
 
-  it('lets nobody sign in through the new Silo until the old links are gone', async () => {
+  it('lets nobody sign in through the new Silo until the old links are gone', async (t) => {
     const garden = await oldAccountTwo();
-    // Hold Silo's library list, read after the new connection is set.
+    // Hold forgetting the old Silo, once the new connection is saved.
     let release = () => undefined as void;
     const held = new Promise<void>((resolve) => (release = resolve));
     let reached = () => undefined as void;
     const holding = new Promise<void>((resolve) => (reached = resolve));
-    silo.beforeAnswer = async (_method, path) => {
-      // Once the new connection is set, while its libraries are read.
-      if (
-        path !== '/api/v2/user/libraries' ||
-        getSettings().silo.serverId !== silo.serverId
-      ) {
-        return;
-      }
+    const episodes = getRepository(SiloEpisode);
+    const clear = episodes.clear.bind(episodes);
+    t.mock.method(episodes, 'clear', async () => {
       reached();
       await held;
-    };
+      return clear();
+    });
     const connecting = post('/media-servers/silo/connect', {
       ...at(),
       apiKey: 'sa_test',
@@ -700,6 +696,42 @@ describe('connecting a different Silo, safely', () => {
     );
     // Now the new Silo is used, and account "2" is nobody's here.
     assert.equal((await siloPasswordSignIn('stranger', 'pw')).id, '2');
+  });
+
+  it('puts the old Silo back exactly when saving a different one fails', async (t) => {
+    const garden = await oldAccountTwo();
+    const settings = getSettings();
+    for (const route of ['/media-servers/silo/connect', '/silo']) {
+      settings.restore('silo', {
+        ...siloDefaults(),
+        name: 'Static Garden',
+        serverId: 'an-older-silo',
+        apiKey: 'sa_old',
+      });
+      const failing = t.mock.method(settings, 'save', async () => {
+        throw new Error('The disk is full.');
+      });
+      const res = await post(route, {
+        ...at(),
+        apiKey: 'sa_test',
+        confirmReset: true,
+      });
+      failing.mock.restore();
+      assert.notEqual(res.status, 200, route);
+      // No reset mark is left against the old Silo.
+      assert.equal(settings.silo.resetPending, undefined, route);
+      assert.equal(settings.silo.serverId, 'an-older-silo', route);
+      assert.equal(settings.silo.apiKey, 'sa_old', route);
+      assert.equal(settings.silo.name, 'Static Garden', route);
+      // So nothing forgets the old Silo's links.
+      assert.equal(await finishSiloReset(), true);
+      assert.equal(
+        (await getRepository(User).findOneByOrFail({ id: garden.id }))
+          .siloUserId,
+        '2',
+        route
+      );
+    }
   });
 
   it('stays closed when forgetting the old Silo fails or stops part-way, and finishes later', async (t) => {

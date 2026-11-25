@@ -391,20 +391,19 @@ const connectSilo = async (
     actingUserId: req.user?.id ?? 0,
   });
   const settings = getSettings();
-  const before = { ...settings.silo };
-  let reset: string | undefined;
+  const stored = await storeSilo(body, connection, {
+    connect: true,
+    by: { userId: req.user?.id },
+  });
+  stored.silo.signIn = body.signIn ?? stored.silo.signIn !== false;
+  const { reset } = stored;
   try {
-    const stored = await storeSilo(body, connection, {
-      connect: true,
-      by: { userId: req.user?.id },
-    });
-    stored.silo.signIn = body.signIn ?? stored.silo.signIn !== false;
-    reset = stored.reset;
     // Saved marked resetPending: nothing signs in through the new Silo
     // until the old one is forgotten below.
     if (reset) await settings.save();
   } catch (e) {
-    settings.silo = before;
+    // Exactly as before: the old Silo, with no reset mark.
+    settings.restore('silo', stored.previous);
     throw e;
   }
   if (reset) {

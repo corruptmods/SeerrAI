@@ -553,7 +553,15 @@ describe('setting up with Silo as the primary server', () => {
     } finally {
       settings.save = save;
     }
-    // Nothing of the reset happened.
+    // Nothing of the reset happened, and none is left to happen: the old
+    // Silo is back exactly, with no reset mark.
+    assert.equal(
+      (await users().findOneByOrFail({ id: linked.id })).siloUserId,
+      'acct-guest'
+    );
+    assert.equal(getSettings().silo.resetPending, undefined);
+    assert.equal(getSettings().silo.serverId, 'an-older-silo');
+    assert.equal(await finishSiloReset(), true);
     assert.equal(
       (await users().findOneByOrFail({ id: linked.id })).siloUserId,
       'acct-guest'

@@ -124,18 +124,18 @@ siloRoutes.post('/', async (req, res, next) => {
       confirmReset: parsed.data.confirmReset === true,
       actingUserId: req.user?.id ?? 0,
     });
-    const before = { ...saved };
-    let reset: string | undefined;
+    const stored = await storeSilo(input, connection, {
+      connect: false,
+      by: { userId: req.user?.id },
+    });
+    const { reset } = stored;
     try {
-      ({ reset } = await storeSilo(input, connection, {
-        connect: false,
-        by: { userId: req.user?.id },
-      }));
       // A different Silo is saved marked resetPending, so nothing signs in
       // through it until the old one is forgotten below.
       await settings.save();
     } catch (e) {
-      settings.silo = before;
+      // Exactly as before: the old Silo, with no reset mark.
+      settings.restore('silo', stored.previous);
       throw e;
     }
     if (reset) {

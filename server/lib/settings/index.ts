@@ -1845,6 +1845,18 @@ class Settings {
     this.data.silo = mergeSettings(this.data.silo, data);
   }
 
+  /**
+   * Puts a section back exactly as `snapshot` holds it, for undoing a change
+   * whose save failed. Assigning a section merges, which would keep keys
+   * the snapshot lacks (a reset mark, say); this replaces it.
+   */
+  public restore<K extends keyof AllSettings>(
+    section: K,
+    snapshot: AllSettings[K]
+  ): void {
+    this.data[section] = snapshot;
+  }
+
   get pendingEmbySplit(): boolean {
     return !!this.data.pendingEmbySplit;
   }

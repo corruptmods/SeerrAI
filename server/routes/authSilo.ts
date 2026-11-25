@@ -296,10 +296,7 @@ const setUpWithSilo = async (
   // Until the owner and settings are saved, a failure puts the settings
   // back as they were; with a sign-in, it runs while still signed in to
   // Silo, so the key just made is deleted again.
-  const before = {
-    silo: { ...settings.silo },
-    mediaServerType: settings.main.mediaServerType,
-  };
+  const mediaServerType = settings.main.mediaServerType;
   let user: User | undefined;
   let who: SiloAccount | undefined;
   const save = async (connection: SiloConnection): Promise<void> => {
@@ -308,12 +305,12 @@ const setUpWithSilo = async (
       throw new Refused(500, 'Something went wrong.');
     }
     let saved: User;
+    const { reset, previous } = await storeSilo(
+      { ...address, hostname: address.ip },
+      connection,
+      { connect: true }
+    );
     try {
-      const { reset } = await storeSilo(
-        { ...address, hostname: address.ip },
-        connection,
-        { connect: true }
-      );
       connectAsPrimary('silo');
       const columns = {
         email: body.email || who.username,
@@ -341,8 +338,9 @@ const setUpWithSilo = async (
       }
       await settings.save();
     } catch (e) {
-      settings.silo = before.silo;
-      settings.main.mediaServerType = before.mediaServerType;
+      // Exactly as before: the old Silo, with no reset mark.
+      settings.restore('silo', previous);
+      settings.main.mediaServerType = mediaServerType;
       throw e;
     }
     user = saved;

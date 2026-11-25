@@ -3,7 +3,11 @@ import SiloAPI, {
   SiloError,
 } from '@server/api/silo/client';
 import { SiloIncompatibleError } from '@server/api/silo/compat';
-import type { SiloAccount, SiloSystemInfo } from '@server/api/silo/types';
+import type {
+  SiloAccount,
+  SiloSystemInfo,
+  SiloUserLibrary,
+} from '@server/api/silo/types';
 import { MEDIA_ID } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -586,9 +590,14 @@ export const finishSiloReset = (
   }
   const promise = (async () => {
     const settings = getSettings();
-    const pending = settings.silo.resetPending;
-    if (!pending) return true;
+    if (!settings.silo.resetPending) return true;
     try {
+      // Only a mark that is saved: whoever set one whose save then failed
+      // puts the old Silo back (settings.restore), and the old Silo's links
+      // must not be forgotten meanwhile.
+      await settings.save();
+      const pending = settings.silo.resetPending;
+      if (!pending) return true;
       const unlinked = await forgetPreviousSilo(
         pending.userId
           ? {
@@ -637,6 +646,11 @@ export const finishSiloReset = (
  * finishSiloReset has forgotten the old one, nothing signs in or is read
  * through Silo. `reset` then says so, and the caller, once everything is
  * saved, calls finishSiloReset.
+ *
+ * The new settings replace the old in one step, after Silo is read; if
+ * saving them then fails, the caller puts `previous` back with
+ * settings.restore, so no part of the new connection (its reset mark above
+ * all) stays behind against the old Silo.
  */
 export const storeSilo = async (
   input: SiloConnectInput & {
@@ -652,8 +666,19 @@ export const storeSilo = async (
     /** Who is connecting; the account defaults to the one signed in as. */
     by?: { userId?: number; account?: Pick<SiloAccount, 'id' | 'username'> };
   }
-): Promise<{ silo: SiloSettings; reset?: string }> => {
-  const silo = getSettings().silo;
+): Promise<{ silo: SiloSettings; previous: SiloSettings; reset?: string }> => {
+  let found: SiloUserLibrary[] | undefined;
+  try {
+    found = await new SiloAPI(
+      hostnameOf(siloAddressOf(input)),
+      connection.apiKey
+    ).getUserLibraries();
+  } catch {
+    // Libraries can be read again from Settings → Silo.
+  }
+  const settings = getSettings();
+  const previous = settings.silo;
+  const silo: SiloSettings = structuredClone(previous);
   let reset: string | undefined;
   if (
     (silo.serverId && silo.serverId !== connection.serverId) ||
@@ -695,17 +720,9 @@ export const storeSilo = async (
     musicLibraries: [],
     ...(connect ? { connected: true } : {}),
   });
-  try {
-    const keyed = new SiloAPI(
-      hostnameOf(siloAddressOf(input)),
-      connection.apiKey
-    );
-    silo.libraries = siloLibraries(
-      await keyed.getUserLibraries(),
-      silo.libraries
-    );
-  } catch {
-    // Libraries can be read again from Settings → Silo.
+  if (found) {
+    silo.libraries = siloLibraries(found, silo.libraries);
   }
-  return { silo, reset };
+  settings.restore('silo', silo);
+  return { silo, previous, reset };
 };

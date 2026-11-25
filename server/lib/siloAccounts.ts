@@ -6,10 +6,14 @@ import type {
 } from '@server/api/silo/types';
 import { hostnameFor } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import type { SiloEpoch } from '@server/lib/silo';
 import {
   SILO_RESETTING,
+  SiloResettingError,
   siloClient,
   siloDeviceId,
+  siloEpoch,
+  siloEpochCurrent,
   siloResetPending,
 } from '@server/lib/silo';
 import { createHash, randomBytes } from 'node:crypto';
@@ -129,6 +133,17 @@ export const assertSameSilo = async (): Promise<void> => {
   }
 };
 
+/**
+ * Refuses, as the reset gate does, once a reset was marked since `epoch`
+ * was taken: the account Silo named belongs to the old Silo. Checked after
+ * Silo answers and before each read or write of what it said.
+ */
+export const assertSiloSignInEpoch = (epoch: SiloEpoch): void => {
+  if (!siloEpochCurrent(epoch)) {
+    throw new SiloSignInError(503, 'differentServer', SILO_RESETTING);
+  }
+};
+
 /** The account an approved sign-in belongs to, after closing its session. */
 const closeAndCheck = async (
   client: SiloAPI,
@@ -150,7 +165,9 @@ export const siloPasswordSignIn = async (
   password: string,
   hostname?: string
 ): Promise<SiloAccount> => {
-  // At the saved address, only the Silo Seerr AI connected to.
+  // At the saved address, only the Silo Seerr AI connected to, and only
+  // if it still is once Silo answers.
+  const epoch = hostname ? undefined : siloEpoch();
   if (!hostname) await assertSameSilo();
   const client = openClient(hostname);
   let tokens;
@@ -159,7 +176,9 @@ export const siloPasswordSignIn = async (
   } catch (e) {
     throw signInFailure(e);
   }
-  return closeAndCheck(client, tokens);
+  const account = await closeAndCheck(client, tokens);
+  if (epoch) assertSiloSignInEpoch(epoch);
+  return account;
 };
 
 /*
@@ -281,7 +300,12 @@ export const startSiloDevice = async (
 /** Where a device sign-in stands. */
 export type SiloDeviceCheck =
   | { status: 'pending'; opened: boolean }
-  | { status: 'approved'; account: SiloAccount }
+  | {
+      status: 'approved';
+      account: SiloAccount;
+      /** The Silo that approved it; checked before using the account. */
+      epoch: SiloEpoch;
+    }
   | { status: 'denied' | 'expired' };
 
 /**
@@ -301,6 +325,7 @@ export const checkSiloDevice = async (
     pending.delete(handle);
     return { status: 'expired' };
   }
+  const epoch = siloEpoch();
   await assertSameSilo();
   const client = openClient();
   let poll;
@@ -322,9 +347,10 @@ export const checkSiloDevice = async (
   pending.delete(handle);
   if (poll.status === 'approved' && poll.tokens) {
     const account = await closeAndCheck(client, poll.tokens);
+    assertSiloSignInEpoch(epoch);
     // Silo names a profile only for temporary sessions; the person picks
     // theirs under Linked Accounts.
-    return { status: 'approved', account };
+    return { status: 'approved', account, epoch };
   }
   return { status: poll.status === 'denied' ? 'denied' : 'expired' };
 };
@@ -358,13 +384,17 @@ export const siloAccountAllowed = async (
   }
 };
 
-/** Every account on Silo that may sign in (switched on). */
+/**
+ * Every account on Silo that may sign in (switched on). The caller takes a
+ * siloEpoch first and checks it before matching them to accounts here.
+ */
 export const enabledSiloAccounts = async (): Promise<SiloAdminUser[]> => {
   // Old links would be matched against the new Silo's accounts.
-  if (siloResetPending()) throw new Error(SILO_RESETTING);
-  return (await siloClient().listAdminUsers()).filter(
-    (account) => account.enabled !== false
-  );
+  if (siloResetPending()) throw new SiloResettingError();
+  const epoch = siloEpoch();
+  const accounts = await siloClient().listAdminUsers();
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
+  return accounts.filter((account) => account.enabled !== false);
 };
 
 /** An account's household profiles, read with the server key. */

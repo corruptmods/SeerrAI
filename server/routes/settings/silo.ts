@@ -4,7 +4,11 @@ import { keptSecret } from '@server/lib/savedSecret';
 import { siloFullScanner } from '@server/lib/scanners/silo';
 import type { SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { siloClient, siloLibraries } from '@server/lib/silo';
+import {
+  SiloResettingError,
+  siloClient,
+  siloLibraries,
+} from '@server/lib/silo';
 import type { SiloConnectInput } from '@server/lib/siloConnect';
 import {
   SiloResetNeeded,
@@ -60,7 +64,7 @@ const failed = (next: NextFunction, e: unknown, what: string) => {
       errors: ['confirmReset'],
     });
   }
-  if (e instanceof MediaServerChangeError) {
+  if (e instanceof MediaServerChangeError || e instanceof SiloResettingError) {
     return next({ status: e.status, message: e.message });
   }
   const error = toSiloError(e);

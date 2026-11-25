@@ -72,8 +72,11 @@ import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import { addressGroupOf } from '@server/lib/signInLimiter';
+import type { SiloEpoch } from '@server/lib/silo';
+import { siloEpoch } from '@server/lib/silo';
 import {
   SiloSignInError,
+  assertSiloSignInEpoch,
   cancelSiloDevice,
   checkSiloDevice,
   siloAvatarPath,
@@ -891,9 +894,13 @@ userSettingsRoutes.delete<{ id: string }>(
 /** Links the Silo account the user just proved is theirs. */
 const linkSiloAccount = async (
   user: User,
-  account: SiloAccount
+  account: SiloAccount,
+  epoch: SiloEpoch
 ): Promise<{ status: number; body?: unknown }> => {
   const userRepository = getRepository(User);
+  // The account is the Silo's that answered: refused if a reset was marked
+  // since, before anything here is read or written for it.
+  assertSiloSignInEpoch(epoch);
   if (await userRepository.exist({ where: { siloUserId: account.id } })) {
     return {
       status: 422,
@@ -903,6 +910,7 @@ const linkSiloAccount = async (
     };
   }
   const local = user.userType === UserType.LOCAL;
+  assertSiloSignInEpoch(epoch);
   await userRepository.update(user.id, {
     siloUserId: account.id,
     siloUsername: account.username,
@@ -960,11 +968,12 @@ userSettingsRoutes.post<{ id: string }>(
       return res.status(400).json({ message: 'Enter a username.' });
     }
     try {
+      const epoch = siloEpoch();
       const account = await siloPasswordSignIn(
         parsed.data.username,
         parsed.data.password
       );
-      const { status, body } = await linkSiloAccount(user, account);
+      const { status, body } = await linkSiloAccount(user, account, epoch);
       return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       return siloLinkFailure(res, e);
@@ -1011,7 +1020,11 @@ userSettingsRoutes.post<{ id: string }>(
       if (check.status !== 'approved') {
         return res.status(200).json(check);
       }
-      const { status, body } = await linkSiloAccount(user, check.account);
+      const { status, body } = await linkSiloAccount(
+        user,
+        check.account,
+        check.epoch
+      );
       return status === 204
         ? res.status(200).json({ status: 'approved' })
         : res.status(status).json(body);

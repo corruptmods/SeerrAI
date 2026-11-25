@@ -46,6 +46,51 @@ export const siloResetPending = (): boolean => !!siloSettings().resetPending;
 export const SILO_RESETTING =
   'A different Silo was just connected, and Seerr AI is still forgetting the old one. Try again in a moment.';
 
+/** Silo refused, or an answer from it dropped, while a reset is under way. */
+export class SiloResettingError extends Error {
+  public readonly status = 503;
+
+  constructor() {
+    super(SILO_RESETTING);
+    this.name = 'SiloResettingError';
+  }
+}
+
+/**
+ * Which Silo work began against: its id, and how many resets had been
+ * marked (lib/siloConnect's storeSilo notes each). Work that asks Silo
+ * something takes one first, and checks it (siloEpochCurrent) once Silo has
+ * answered and before each read or write of what it said, so an answer from
+ * the old Silo is never used after a reset was marked meanwhile.
+ */
+export interface SiloEpoch {
+  serverId: string;
+  resets: number;
+}
+
+let resetsMarked = 0;
+
+export const siloEpoch = (): SiloEpoch => ({
+  serverId: siloSettings().serverId,
+  resets: resetsMarked,
+});
+
+/** Notes that a reset was just marked, so work begun before can tell. */
+export const noteSiloResetMarked = (): void => {
+  resetsMarked += 1;
+};
+
+/** Whether no reset was marked since `epoch` was taken, and none is pending. */
+export const siloEpochCurrent = (epoch: SiloEpoch): boolean =>
+  !siloResetPending() &&
+  epoch.resets === resetsMarked &&
+  epoch.serverId === siloSettings().serverId;
+
+/** Throws SiloResettingError unless siloEpochCurrent. */
+export const assertSiloEpoch = (epoch: SiloEpoch): void => {
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
+};
+
 /** A client for the connected Silo, with its saved key. */
 export const siloClient = (options?: { timeout?: number }): SiloAPI =>
   new SiloAPI(hostnameFor('silo'), siloSettings().apiKey, options);

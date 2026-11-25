@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { getSettings } from '@server/lib/settings';
+import { assertSiloEpoch, siloEpoch } from '@server/lib/silo';
 import { enabledSiloAccounts, siloAvatarPath } from '@server/lib/siloAccounts';
 import { siloAccountToRelink } from '@server/lib/siloConnect';
 import logger from '@server/logger';
@@ -30,8 +31,11 @@ const holders = async (ids: string[]): Promise<Map<string, User>> => {
 export const siloUsersToImport = async (): Promise<
   { id: string; username: string; email: string; thumb: string }[]
 > => {
+  const epoch = siloEpoch();
   const accounts = await enabledSiloAccounts();
+  assertSiloEpoch(epoch);
   const linked = await holders(accounts.map((account) => account.id));
+  assertSiloEpoch(epoch);
   return accounts
     .filter((account) => !linked.has(account.id))
     .map((account) => ({
@@ -46,7 +50,11 @@ export const siloUsersToImport = async (): Promise<
 export const importSiloUsers = async (chosenIds: string[] | undefined) => {
   const settings = getSettings();
   const userRepository = getRepository(User);
+  // Silo's accounts are the old Silo's if a reset is marked meanwhile:
+  // checked before each read and write here (siloEpoch).
+  const epoch = siloEpoch();
   const accounts = await enabledSiloAccounts();
+  assertSiloEpoch(epoch);
   const linked = await holders(accounts.map((account) => account.id));
   // No list imports everyone new, as on Import Plex Users.
   const chosen = chosenIds ? new Set(chosenIds) : null;
@@ -64,6 +72,7 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
         user.userType === UserType.SILO
           ? await checkAvatarChanged(user, 'silo')
           : { changed: false };
+      assertSiloEpoch(epoch);
       await userRepository.update(user.id, {
         siloUsername: account.username,
         ...(changed
@@ -77,14 +86,24 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
 
     // An account a different Silo's reset unlinked, with this Silo name,
     // is linked again rather than left out for its name.
+    assertSiloEpoch(epoch);
     const unlinked = await siloAccountToRelink(account);
-    if (unlinked) {
-      await userRepository.update(unlinked.id, {
-        siloUserId: account.id,
-        siloUsername: account.username,
-        siloProfileId: null,
-        avatar: siloAvatarPath(account.id, unlinked.avatarVersion),
-      });
+    assertSiloEpoch(epoch);
+    // Only while still unlinked: someone linked it meanwhile keeps it.
+    const relinked = unlinked
+      ? await userRepository
+          .createQueryBuilder()
+          .update(User)
+          .set({
+            siloUserId: account.id,
+            siloUsername: account.username,
+            siloProfileId: null,
+            avatar: siloAvatarPath(account.id, unlinked.avatarVersion),
+          })
+          .where('id = :id AND siloUserId IS NULL', { id: unlinked.id })
+          .execute()
+      : undefined;
+    if (relinked?.affected) {
       logger.info('Silo user linked again after a different Silo', {
         label: 'API',
         siloUserId: account.id,
@@ -93,6 +112,7 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
       continue;
     }
 
+    assertSiloEpoch(epoch);
     const taken = await userRepository
       .createQueryBuilder('user')
       .where('user.email = :email', { email: account.username.toLowerCase() })
@@ -120,6 +140,7 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
         userType: UserType.SILO,
       })
     );
+    assertSiloEpoch(epoch);
     await userRepository.save(newUser);
     createdUsers.push(newUser);
   }

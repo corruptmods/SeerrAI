@@ -42,7 +42,11 @@ import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
-import { SILO_RESETTING, siloResetPending } from '@server/lib/silo';
+import {
+  SILO_RESETTING,
+  SiloResettingError,
+  siloResetPending,
+} from '@server/lib/silo';
 import { importSiloUsers } from '@server/lib/siloUserImport';
 import {
   MediaServerRemovalError,
@@ -1098,7 +1102,10 @@ router.post(
       }
       return res.status(201).json(await importSiloUsers(body?.siloUserIds));
     } catch (e) {
-      next({ status: 500, message: e.message });
+      next({
+        status: e instanceof SiloResettingError ? e.status : 500,
+        message: e.message,
+      });
     }
   }
 );

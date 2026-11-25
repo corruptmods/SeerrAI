@@ -11,6 +11,7 @@ import {
 } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { siloEpoch, siloEpochCurrent } from '@server/lib/silo';
 import { enabledSiloAccounts } from '@server/lib/siloAccounts';
 import { removeSeerrUser } from '@server/lib/userRemoval';
 import logger from '@server/logger';
@@ -112,11 +113,18 @@ class UserAccessCheck {
 
     try {
       const missingNow = new Set<number>();
+      // Silo's accounts are the old Silo's if a reset is marked meanwhile:
+      // then nobody counts as missing from it (siloEpoch).
+      const epoch = siloEpoch();
+      const fromSilo = new Set<number>();
 
       for (const kind of connectedServers()) {
         let present: Set<string>;
         try {
           present = await presentOn(kind);
+          if (kind === 'silo' && !siloEpochCurrent(epoch)) {
+            throw new Error('A different Silo is being connected.');
+          }
         } catch (e) {
           // Nobody counts as missing from a server that couldn't be read.
           logger.warn(
@@ -159,8 +167,10 @@ class UserAccessCheck {
           );
           continue;
         }
+        if (kind === 'silo' && !siloEpochCurrent(epoch)) continue;
         for (const user of gone) {
           missingNow.add(user.id);
+          if (kind === 'silo') fromSilo.add(user.id);
           if (!this.missing.has(user.id)) {
             logger.info(
               `A user no longer has ${serverName(kind)} access; removed at the next check unless that changes`,
@@ -170,6 +180,10 @@ class UserAccessCheck {
         }
       }
 
+      // A reset marked during the check: what Silo said no longer holds.
+      if (fromSilo.size && !siloEpochCurrent(epoch)) {
+        for (const id of fromSilo) missingNow.delete(id);
+      }
       const confirmed = [...missingNow].filter((id) => this.missing.has(id));
       this.missing = missingNow;
 
@@ -179,8 +193,13 @@ class UserAccessCheck {
           where: { id },
           relations: { requests: true },
         });
-        // Gone already, or made an admin since.
-        if (!user || user.hasPermission(Permission.ADMIN)) {
+        // Gone already, or made an admin since; or missing from a Silo a
+        // reset has replaced since.
+        if (
+          !user ||
+          user.hasPermission(Permission.ADMIN) ||
+          (fromSilo.has(id) && !siloEpochCurrent(epoch))
+        ) {
           continue;
         }
         try {

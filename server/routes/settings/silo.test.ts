@@ -719,7 +719,7 @@ describe('connecting a different Silo, safely', () => {
       failing.mock.restore();
       assert.notEqual(res.status, 200, route);
       // No reset mark is left against the old Silo.
-      assert.equal(settings.silo.resetPending, undefined, route);
+      assert.ok(!settings.silo.resetPending, route);
       assert.equal(settings.silo.serverId, 'an-older-silo', route);
       assert.equal(settings.silo.apiKey, 'sa_old', route);
       assert.equal(settings.silo.name, 'Static Garden', route);

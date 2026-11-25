@@ -31,7 +31,11 @@ import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
-import { siloDeviceId, siloLibraries } from '@server/lib/silo';
+import {
+  noteSiloResetMarked,
+  siloDeviceId,
+  siloLibraries,
+} from '@server/lib/silo';
 import { forgetSiloPictures } from '@server/lib/siloAccounts';
 import { stopSiloHistory } from '@server/lib/siloHistory';
 import logger from '@server/logger';
@@ -723,6 +727,8 @@ export const storeSilo = async (
   if (found) {
     silo.libraries = siloLibraries(found, silo.libraries);
   }
+  // Answers from the old Silo still on their way are dropped (siloEpoch).
+  if (reset) noteSiloResetMarked();
   settings.restore('silo', silo);
   return { silo, previous, reset };
 };

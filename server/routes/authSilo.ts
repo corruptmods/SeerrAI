@@ -19,8 +19,11 @@ import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { startSession } from '@server/lib/signIn';
 import { SignInLimiter, addressGroupOf } from '@server/lib/signInLimiter';
+import type { SiloEpoch } from '@server/lib/silo';
+import { siloEpoch } from '@server/lib/silo';
 import {
   SiloSignInError,
+  assertSiloSignInEpoch,
   cancelSiloDevice,
   checkSiloDevice,
   siloAvatarPath,
@@ -137,10 +140,14 @@ const refreshPicture = async (user: User): Promise<void> => {
 const signInAccount = async (
   req: Request,
   account: SiloAccount,
+  epoch: SiloEpoch,
   { email, password }: { email?: string; password?: string } = {}
 ): Promise<User> => {
   const settings = getSettings();
   const userRepository = getRepository(User);
+  // The account is the Silo's that answered: refused if a reset was marked
+  // since, before anything here is read or written for it.
+  assertSiloSignInEpoch(epoch);
   let user = await userRepository.findOne({
     where: { siloUserId: account.id },
   });
@@ -148,13 +155,23 @@ const signInAccount = async (
   // an account a different Silo's reset unlinked, with this Silo name, is
   // theirs again.
   if (!user) {
+    assertSiloSignInEpoch(epoch);
     const unlinked = await siloAccountToRelink(account);
-    if (unlinked) {
-      await userRepository.update(unlinked.id, {
-        siloUserId: account.id,
-        siloUsername: account.username,
-        siloProfileId: null,
-      });
+    assertSiloSignInEpoch(epoch);
+    // Only while still unlinked: someone linked it meanwhile keeps it.
+    const relinked = unlinked
+      ? await userRepository
+          .createQueryBuilder()
+          .update(User)
+          .set({
+            siloUserId: account.id,
+            siloUsername: account.username,
+            siloProfileId: null,
+          })
+          .where('id = :id AND siloUserId IS NULL', { id: unlinked.id })
+          .execute()
+      : undefined;
+    if (unlinked && relinked?.affected) {
       user = await userRepository.findOneOrFail({
         where: { id: unlinked.id },
       });
@@ -166,6 +183,7 @@ const signInAccount = async (
     }
   }
 
+  assertSiloSignInEpoch(epoch);
   if (user) {
     const changes: Partial<User> = { siloUsername: account.username };
     if (mainAccountOn(user, 'silo') && user.username === account.username) {
@@ -190,6 +208,7 @@ const signInAccount = async (
       : !(await userRepository.exists({
           where: { email: loginName.toLowerCase() },
         }));
+    assertSiloSignInEpoch(epoch);
     if (!free) {
       logger.warn(
         'Silo sign-in refused: another account already has this email or name',
@@ -212,6 +231,7 @@ const signInAccount = async (
     if (password) {
       await user.setPassword(password);
     }
+    assertSiloSignInEpoch(epoch);
     await userRepository.save(user);
     // An email Silo didn't vouch for is confirmed by mail, as with Jellyfin.
     if (!vouched) {
@@ -427,12 +447,14 @@ siloAuthRoutes.post('/', async (req, res, next) => {
     if (settingUp) {
       user = await setUpWithSilo(req, body);
     } else {
+      const epoch = siloEpoch();
       const account = await siloPasswordSignIn(body.username, body.password);
       siloLimiter.clear(req, body.username);
       if (noOwner) {
         if (account.role !== 'admin') {
           throw new SiloSignInError(403, 'notAdmin', 'Not an administrator.');
         }
+        assertSiloSignInEpoch(epoch);
         user = await saveFirstOwner(
           withNewUserDefaults(
             new User({
@@ -446,7 +468,7 @@ siloAuthRoutes.post('/', async (req, res, next) => {
           )
         );
       } else {
-        user = await signInAccount(req, account, {
+        user = await signInAccount(req, account, epoch, {
           email: body.email,
           password: body.password,
         });
@@ -515,7 +537,7 @@ siloAuthRoutes.post('/device/check', async (req, res, next) => {
     if (check.status !== 'approved') {
       return res.status(200).json(check);
     }
-    const user = await signInAccount(req, check.account);
+    const user = await signInAccount(req, check.account, check.epoch);
     await startSession(req, user.id);
     const fresh = await getRepository(User).findOneOrFail({
       where: { id: user.id },

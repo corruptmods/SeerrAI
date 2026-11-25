@@ -15,6 +15,7 @@ import {
   resetSignInMemoryForTests,
   stillMaySignIn,
 } from '@server/lib/signIn';
+import { SiloResettingError, noteSiloResetMarked } from '@server/lib/silo';
 import {
   checkSiloDevice,
   resetSiloDevicesForTests,
@@ -337,6 +338,75 @@ describe('after a different Silo was connected', () => {
   });
 });
 
+describe('a reset marked while Silo is answering', () => {
+  /** Holds Silo's answer at `path` until released. */
+  const hold = (path: string) => {
+    let release = () => undefined as void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let reached = () => undefined as void;
+    const holding = new Promise<void>((resolve) => (reached = resolve));
+    silo.beforeAnswer = async (_method, at) => {
+      if (at !== path) return;
+      silo.beforeAnswer = undefined;
+      reached();
+      await held;
+    };
+    return { holding, release };
+  };
+
+  /** A different Silo's reset, marked and finished while Silo answers. */
+  const resetMeanwhile = async () => {
+    getSettings().silo.resetPending = {};
+    noteSiloResetMarked();
+    assert.equal(await finishSiloReset(), true);
+  };
+
+  it('signs nobody in with what the old Silo said', async () => {
+    const { holding, release } = hold('/api/v2/auth/login');
+    const signingIn = request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    const answer = signingIn.then((res) => res);
+    await holding;
+    await resetMeanwhile();
+    release();
+    const res = await answer;
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    assert.equal(await users().countBy({ siloUsername: 'lantern' }), 0);
+  });
+
+  it('signs nobody in with a code the old Silo approved', async () => {
+    const agent = request.agent(app);
+    const code = (await agent.post('/auth/silo/device/start')).body;
+    silo.approveDevice(code.userCode, 'acct-guest');
+    const { holding, release } = hold('/api/v2/auth/device/poll');
+    const answer = agent
+      .post('/auth/silo/device/check')
+      .send({ handle: code.handle })
+      .then((res) => res);
+    await holding;
+    await resetMeanwhile();
+    release();
+    const res = await answer;
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    assert.equal(await users().countBy({ siloUserId: 'acct-guest' }), 0);
+    assert.equal((await agent.get('/auth/me')).body.id, undefined);
+  });
+
+  it('imports nobody from the old Silo’s list', async () => {
+    const { holding, release } = hold('/api/v2/admin/users');
+    const importing = importSiloUsers(undefined).then(
+      () => undefined,
+      (e: unknown) => e
+    );
+    await holding;
+    await resetMeanwhile();
+    release();
+    assert.ok((await importing) instanceof SiloResettingError);
+    assert.equal(await users().countBy({ email: 'lantern' }), 0);
+  });
+});
+
 describe('a new Silo user’s email', () => {
   it('is confirmed by mail when Silo didn’t vouch for it', async () => {
     const settings = getSettings();
@@ -559,7 +629,7 @@ describe('setting up with Silo as the primary server', () => {
       (await users().findOneByOrFail({ id: linked.id })).siloUserId,
       'acct-guest'
     );
-    assert.equal(getSettings().silo.resetPending, undefined);
+    assert.ok(!getSettings().silo.resetPending);
     assert.equal(getSettings().silo.serverId, 'an-older-silo');
     assert.equal(await finishSiloReset(), true);
     assert.equal(

@@ -16,7 +16,10 @@ import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import cacheManager from '@server/lib/cache';
 import matchWatch from '@server/lib/matchWatch';
-import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
+import {
+  MediaServerChangeError,
+  signInWithout,
+} from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
@@ -349,9 +352,10 @@ const resetImpact = async (): Promise<SiloResetImpact> => {
 
 /**
  * Refuses a reset that would leave the owner unable to sign in: an owner
- * who signs in only with the old Silo (no password, no other server), unless
- * they are the one connecting by signing in to the new Silo, which links
- * them to it again.
+ * linked to the old Silo with no other way in (another connected server
+ * that allows sign-in, single sign-on, or a password), unless they are the
+ * one connecting by signing in to the new Silo, which links them to it
+ * again.
  */
 const refuseOwnerLockOut = async (
   actingUserId: number,
@@ -360,24 +364,23 @@ const refuseOwnerLockOut = async (
   if (actingUserId === 1 && signingIn) return;
   const owner = await getRepository(User)
     .createQueryBuilder('user')
+    .select([
+      'user.id',
+      'user.plexId',
+      'user.jellyfinUserId',
+      'user.embyUserId',
+      'user.siloUserId',
+    ])
     .addSelect('user.password')
     .where('user.id = 1')
     .getOne();
-  if (
-    owner?.siloUserId &&
-    owner.userType === UserType.SILO &&
-    !owner.password &&
-    !owner.plexId &&
-    !owner.jellyfinUserId &&
-    !owner.embyUserId
-  ) {
-    throw new MediaServerChangeError(
-      409,
-      actingUserId === 1
-        ? 'Connecting a different Silo would leave you unable to sign in: your account signs in only with the old Silo. Connect by signing in with your new Silo administrator account instead of a key, or set a password for your account first.'
-        : 'Connecting a different Silo would leave the owner unable to sign in: their account signs in only with the old Silo. The owner can connect it by signing in to the new Silo, or set a password for their account first.'
-    );
-  }
+  if (!owner?.siloUserId || (await signInWithout('silo', owner))) return;
+  throw new MediaServerChangeError(
+    409,
+    actingUserId === 1
+      ? "Connecting a different Silo would leave you unable to sign in: you can sign in only with the old Silo. Set a password for your account first (your profile's Password settings), then connect again."
+      : "Connecting a different Silo would leave the owner unable to sign in: they can sign in only with the old Silo. The owner must set a password for their account first (their profile's Password settings)."
+  );
 };
 
 /** Who is connecting, kept signed in and linked through a reset. */

@@ -134,6 +134,37 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
 };
 
 /**
+ * How a user could still sign in without `kind`: with another connected
+ * server that allows sign-in, an enabled single sign-on provider ('other'),
+ * or a password they may use ('password'); undefined if not at all.
+ */
+export const signInWithout = async (
+  kind: MediaServerKind,
+  user: Pick<
+    User,
+    'id' | 'plexId' | 'jellyfinUserId' | 'embyUserId' | 'siloUserId'
+  > & { password?: string | null }
+): Promise<'other' | 'password' | undefined> => {
+  const settings = getSettings();
+  const remaining = connectedServers().filter(
+    (other) =>
+      other !== kind && signInOffered(other) && settings[other].signIn !== false
+  );
+  if (linkedServers(user).some((other) => remaining.includes(other))) {
+    return 'other';
+  }
+  if ((await usableProviderLinks(user.id)).length) {
+    return 'other';
+  }
+  // The owner can always use their password; others only while password
+  // sign-in is on.
+  if (user.password && (user.id === 1 || settings.main.localLogin !== false)) {
+    return 'password';
+  }
+  return undefined;
+};
+
+/**
  * Who removing this server would affect: users with an account on it and none
  * on another sign-in-enabled connected server or enabled SSO provider. Their
  * link stays but no longer signs them in; anyone with a usable password can
@@ -142,11 +173,6 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
 export const removalImpact = async (
   kind: MediaServerKind
 ): Promise<MediaServerRemovalImpact> => {
-  const settings = getSettings();
-  const remaining = connectedServers().filter(
-    (other) =>
-      other !== kind && signInOffered(other) && settings[other].signIn !== false
-  );
   const users = await getRepository(User)
     .createQueryBuilder('user')
     .select([
@@ -162,19 +188,10 @@ export const removalImpact = async (
 
   const impact: MediaServerRemovalImpact = { passwordOnly: 0, noSignIn: 0 };
   for (const user of users) {
-    if (linkedServers(user).some((other) => remaining.includes(other))) {
-      continue;
-    }
-    if ((await usableProviderLinks(user.id)).length) {
-      continue;
-    }
-    // The owner can always use their password; others only while password
-    // sign-in is on.
-    const mayUsePassword =
-      !!user.password && (user.id === 1 || settings.main.localLogin !== false);
-    if (mayUsePassword) {
+    const way = await signInWithout(kind, user);
+    if (way === 'password') {
       impact.passwordOnly += 1;
-    } else {
+    } else if (!way) {
       impact.noSignIn += 1;
     }
   }

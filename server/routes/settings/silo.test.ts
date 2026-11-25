@@ -802,4 +802,40 @@ describe('connecting a different Silo, safely', () => {
       ['Silo']
     );
   });
+
+  it('refuses when the owner’s only other server can’t sign them in, and says how to fix it', async () => {
+    const users = getRepository(User);
+    // Linked to Plex, but Plex sign-in is off.
+    await users
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        siloUserId: '9',
+        siloUsername: 'old-owner',
+        userType: UserType.SILO,
+        plexId: 4242,
+        password: () => 'NULL',
+      })
+      .where('id = 1')
+      .execute();
+    getSettings().plex.signIn = false;
+    let res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 409);
+    assert.match(
+      ((await res.json()) as { message: string }).message,
+      /Set a password for your account first/
+    );
+    // With Plex sign-in on, Plex still signs them in.
+    getSettings().plex.signIn = true;
+    res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+  });
 });

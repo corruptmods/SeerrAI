@@ -79,7 +79,14 @@ export const siloAccess = async (): Promise<AccessServer> => {
       const accounts = listed.filter((account) => !only || account.id === only);
       const people = accounts.map((account): ServerPerson => {
         const allowed = enforced(account);
-        const everything = allowed === null;
+        // Every library for an account its group limits is written as a
+        // list of them all (see write), and reads back as every library.
+        const everything =
+          allowed === null ||
+          (!!account.access_group_id &&
+            account.library_ids != null &&
+            all.length > 0 &&
+            all.every((id) => allowed.includes(id)));
         return {
           id: account.id,
           name: account.username,
@@ -115,7 +122,9 @@ export const siloAccess = async (): Promise<AccessServer> => {
           return;
         }
         // Every library: follow the access group, which for an account
-        // outside one is every library, including new ones.
+        // outside one is every library, including new ones. A group that
+        // limits it can't be overridden with "every library" in Silo, so
+        // today's libraries are listed instead (a later one isn't given).
         await client.updateAdminUser(person.ref, tag, { library_ids: null });
         const after = await client.getAdminUserForChange(person.ref);
         if (enforced(after.account) !== null) {

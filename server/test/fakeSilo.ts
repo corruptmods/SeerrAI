@@ -723,6 +723,8 @@ export const createFakeSilo = (): FakeSilo => {
       enabled: account.enabled !== false,
       is_owner: account.id === fake.accounts[0]?.id,
       library_ids: account.libraryIds ?? null,
+      // In a group when one sets its libraries.
+      access_group_id: account.groupLibraryIds !== undefined ? '7' : null,
       password_change_required: !!account.passwordChangeRequired,
       effective_policy: {
         // An admin sees every library; null inherits the group's (all here).

@@ -117,6 +117,29 @@ describe('library sharing on Silo', () => {
       [...(silo.accounts[3].libraryIds ?? [])].sort(),
       [FILMS, SERIES, '3', BOOKS].sort()
     );
+    // It reads back as every library, so saving it again changes nothing.
+    assert.equal((await person('4'))?.all, true);
+    const puts = silo.calls.filter((call) => call.method === 'PUT').length;
+    const again = await libraryAccess.setPerson(
+      'silo',
+      '4',
+      { all: true, libraries: [] },
+      1
+    );
+    assert.equal(
+      silo.calls.filter((call) => call.method === 'PUT').length,
+      puts,
+      JSON.stringify(again)
+    );
+  });
+
+  it('reads a list of every library as every library only for an account its group limits', async () => {
+    // Outside a group, a full list isn't "every library": saving that
+    // gives them new libraries too.
+    silo.accounts[2].libraryIds = [FILMS, SERIES, '3', BOOKS];
+    assert.equal((await person('3'))?.all, false);
+    silo.accounts[3].libraryIds = [FILMS, SERIES];
+    assert.equal((await person('4'))?.all, false);
   });
 
   it('is hidden, saying why, without the admin:users scope', async () => {

@@ -155,7 +155,7 @@ To change one person's libraries, open their settings: **Users → (person) → 
 
 Plex sharing goes through the owner's Plex account, so it needs the owner's Plex account linked.
 
-**Silo.** Silo accounts list their libraries, or follow their access group's list. **Every library** makes the account follow its group again, which for an account outside a group is every library, new ones too; when the group itself limits it, every library is listed for the account instead. Libraries Silo doesn't show here (books, say) are kept as they were. It needs the `admin:users` scope; without it Silo is left out with a note saying so.
+**Silo.** Silo accounts list their libraries, or follow their access group's list. **Every library** makes the account follow its group again, which for an account outside a group is every library, new ones too; when the group itself limits it, Silo can't be told "every library" for that account, so the libraries it has today are listed for the account instead: the box stays ticked, but a library added to Silo later isn't given to them until you share it with them. Libraries Silo doesn't show here (books, say) are kept as they were. It needs the `admin:users` scope; without it Silo is left out with a note saying so.
 
 ### Showing people only what their libraries hold
 

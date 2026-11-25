@@ -31,10 +31,14 @@ import {
 } from '@server/lib/scanners/unidentified';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import type { SiloEpoch } from '@server/lib/silo';
 import {
+  SiloResettingError,
   isSilo4k,
   recordSiloInfo,
   siloClient,
+  siloEpoch,
+  siloEpochCurrent,
   siloResetPending,
 } from '@server/lib/silo';
 
@@ -77,6 +81,8 @@ export class SiloScanner
   private unidentified: UnidentifiedTitles;
   /** Titles in the current library that failed for a real reason. */
   private failures = 0;
+  /** The Silo this scan began on (siloEpoch). */
+  private epoch?: SiloEpoch;
 
   constructor({
     isRecentOnly = false,
@@ -90,6 +96,17 @@ export class SiloScanner
       verb: 'matched',
       hint: 'use Match Item on the title',
     });
+  }
+
+  /**
+   * Stops the scan before it writes anything once a different Silo's reset
+   * was marked since it began: what it read is the old Silo's, and the
+   * reset clears it.
+   */
+  private sameSilo(): void {
+    if (!this.epoch || !siloEpochCurrent(this.epoch)) {
+      throw new SiloResettingError();
+    }
   }
 
   private failed(item: SiloCatalogItem, e: Error) {
@@ -142,6 +159,7 @@ export class SiloScanner
       title: item.title,
     };
 
+    this.sameSilo();
     if (hasStandard || !this.enable4kMovie) {
       await this.processMovie(tmdbId, {
         ...common,
@@ -150,6 +168,7 @@ export class SiloScanner
       });
     }
     if (has4k && this.enable4kMovie) {
+      this.sameSilo();
       await this.processMovie(tmdbId, {
         ...common,
         is4k: true,
@@ -228,6 +247,7 @@ export class SiloScanner
         episodes4k: counts.get(season.season_number)?.episodes4k ?? 0,
       }));
 
+    this.sameSilo();
     await this.processShow(tvShow.id, tvShow.external_ids?.tvdb_id, seasons, {
       mediaAddedAt: item.added_at ? new Date(item.added_at) : undefined,
       mediaServer: 'silo',
@@ -239,12 +259,15 @@ export class SiloScanner
 
   private async processItem(item: SiloCatalogItem): Promise<void> {
     try {
+      this.sameSilo();
       if (item.type === 'movie') {
         await this.processSiloMovie(item);
       } else if (item.type === 'series') {
         await this.processSiloShow(item);
       }
     } catch (e) {
+      // The whole scan stops.
+      if (e instanceof SiloResettingError) throw e;
       if (e instanceof NotIdentifiedError) {
         this.log(this.unidentified.add(e.kind, e.item), 'debug', {
           item: e.item,
@@ -265,6 +288,7 @@ export class SiloScanner
       const row = episodeRowOf(episode, this.enabled);
       if (row) rows.set(row.contentId, row);
     }
+    this.sameSilo();
     await saveEpisodes([...rows.values()]);
     return [...rows.keys()];
   }
@@ -306,6 +330,7 @@ export class SiloScanner
       library.lastScan = askedAt;
     }
     await this.storeEpisodes(episodes);
+    this.sameSilo();
     const forgotten = await forgetUnseenSince(startedAt);
     if (forgotten) {
       this.log(`Silo no longer lists ${forgotten} episode(s)`, 'info');
@@ -316,6 +341,7 @@ export class SiloScanner
       this.log(`Beginning to process library: ${library.name}`, 'info');
       this.items = titles.get(library.id) ?? [];
       this.failures = 0;
+      this.sameSilo();
       await this.libraryItems?.begin(library.id);
       await this.loop(this.processItem.bind(this), { sessionId });
       await this.settleLibraryItems(library);
@@ -373,6 +399,7 @@ export class SiloScanner
         );
       }
       this.items = items;
+      this.sameSilo();
       await this.libraryItems?.begin(library.id);
       await this.loop(this.processItem.bind(this), { sessionId });
       this.libraryItems?.end();
@@ -392,19 +419,23 @@ export class SiloScanner
 
   /**
    * Stops any scan under way and waits (up to `waitMs`) until it has, so
-   * nothing it read from the old Silo is written after a reset.
+   * nothing it read from the old Silo is written after a reset. Throws if
+   * it hasn't stopped by then, so the reset waits and is tried again.
    */
   public async stop(waitMs = 60_000): Promise<void> {
     this.cancel();
     if (!this.scans.size) return;
     let timer: NodeJS.Timeout | undefined;
-    await Promise.race([
-      Promise.allSettled([...this.scans]),
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, waitMs);
+    const stopped = await Promise.race([
+      Promise.allSettled([...this.scans]).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), waitMs);
       }),
     ]);
     clearTimeout(timer);
+    if (!stopped) {
+      throw new Error('A Silo scan under way did not stop in time.');
+    }
   }
 
   private async scan(): Promise<void> {
@@ -416,6 +447,7 @@ export class SiloScanner
     const sessionId = this.startRun();
     this.unidentified.clear();
     this.items = [];
+    this.epoch = siloEpoch();
     try {
       this.client = siloClient();
       // Stops here, changing nothing, when Silo speaks another API major.
@@ -460,6 +492,7 @@ export class SiloScanner
       this.libraryItems?.end();
       return;
     }
+    this.sameSilo();
     const forgotten = (await this.libraryItems?.prune()) ?? 0;
     if (forgotten) {
       this.log(

@@ -18,6 +18,7 @@ import { Permission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner } from '@server/lib/scanners/silo';
 import { getSettings, siloDefaults } from '@server/lib/settings';
+import { noteSiloResetMarked } from '@server/lib/silo';
 import {
   SiloSignInError,
   resetSiloIdentityForTests,
@@ -944,6 +945,51 @@ describe('connecting a different Silo, safely', () => {
       (await users.findOneByOrFail({ id: glasswing.id })).siloRelinkUntil,
       null
     );
+  });
+
+  it('a scan writes nothing it read before a reset was marked, and one that won’t stop holds the reset back', async () => {
+    getSettings().restore(
+      'silo',
+      silo.settings({
+        libraries: [
+          { id: '1', name: 'Films', type: 'movie', enabled: true },
+        ] as never,
+      })
+    );
+    silo.items = [siloMovie('movie-glasswing', { tmdbId: 9102 })];
+    const holdCatalog = () => {
+      let release = () => undefined as void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      let reached = () => undefined as void;
+      const holding = new Promise<void>((resolve) => (reached = resolve));
+      silo.beforeAnswer = async (_method, path) => {
+        if (path !== '/api/v2/admin/catalog/items') return;
+        silo.beforeAnswer = undefined;
+        reached();
+        await held;
+      };
+      return { holding, release };
+    };
+
+    // Marked while the scan reads Silo: nothing it read is written.
+    let hold = holdCatalog();
+    let scan = siloFullScanner.run();
+    await hold.holding;
+    noteSiloResetMarked();
+    hold.release();
+    await scan;
+    assert.equal(
+      await getRepository(Media).countBy({ siloMediaId: Not(IsNull()) }),
+      0
+    );
+
+    // A scan that doesn't stop in time: the reset waits, to be tried again.
+    hold = holdCatalog();
+    scan = siloFullScanner.run();
+    await hold.holding;
+    await assert.rejects(() => siloFullScanner.stop(20), /did not stop/);
+    hold.release();
+    await scan;
   });
 
   it('says who would be left without a way to sign in', async () => {

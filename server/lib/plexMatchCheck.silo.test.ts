@@ -9,6 +9,7 @@ import plexMatchCheck, {
 } from '@server/lib/plexMatchCheck';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { noteSiloResetMarked } from '@server/lib/silo';
 import { setupTestDb } from '@server/test/db';
 import {
   createFakeSilo,
@@ -202,6 +203,25 @@ describe('Match Check on Silo', () => {
     assert.match(
       plexMatchText(series).detail,
       /Match Item in Silo, entering TVDB id 1001/
+    );
+  });
+
+  it('keeps none of the old Silo’s findings when a reset is marked during the run', async (t) => {
+    arrsHave(t);
+    let marked = false;
+    silo.beforeAnswer = (_method, path) => {
+      // While Silo's catalog is read, a different Silo is connected.
+      if (!marked && path === '/api/v2/admin/catalog/items') {
+        marked = true;
+        noteSiloResetMarked();
+      }
+    };
+    await plexMatchCheck.run();
+    assert.ok(marked);
+    const report = await plexMatchCheck.lastReport();
+    assert.deepEqual(
+      report.problems.filter((p) => p.mediaServer === 'Silo'),
+      []
     );
   });
 

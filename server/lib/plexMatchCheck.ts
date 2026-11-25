@@ -18,6 +18,8 @@ import { getSettings } from '@server/lib/settings';
 import {
   SILO_NEEDS_PATHS_SCOPE,
   siloClient,
+  siloEpoch,
+  siloEpochCurrent,
   siloHasScope,
   siloSettings,
 } from '@server/lib/silo';
@@ -789,6 +791,9 @@ class PlexMatchCheck {
     if (this.running) return;
     this.running = true;
     this.cancelled = false;
+    // A different Silo's reset drops Silo's findings (dropServer); one
+    // marked during this run means what it read of Silo is the old one's.
+    const epoch = siloEpoch();
     const report: PlexMatchReport = {
       finishedAt: null,
       running: false,
@@ -885,6 +890,14 @@ class PlexMatchCheck {
           label: 'Match Check',
         });
       } else {
+        if (!siloEpochCurrent(epoch)) {
+          report.problems = report.problems.filter(
+            (p) => p.mediaServer !== 'Silo'
+          );
+          if (connectedServers().includes('silo') && !unread.includes('Silo')) {
+            unread.push('Silo');
+          }
+        }
         report.finishedAt = new Date().toISOString();
         this.report = report;
         await fs.writeFile(REPORT_PATH, JSON.stringify(report)).catch((e) =>

@@ -2,7 +2,11 @@ import { MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
-import { getSettings, jellyfinDefaults } from '@server/lib/settings';
+import {
+  getSettings,
+  jellyfinDefaults,
+  siloDefaults,
+} from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
@@ -36,6 +40,7 @@ beforeEach(() => {
     externalHostname: 'https://emby.example.com',
     serverId: 'emby-server',
   };
+  settings.silo = siloDefaults();
 });
 
 const title = () =>
@@ -214,5 +219,40 @@ describe('play links', () => {
       'https://emby.example.com/web/index.html#!/item?id=em-1&context=home&serverId=emby-server'
     );
     assert.equal(media.playLinks?.length, 1);
+  });
+
+  it("adds Silo's item page, at its external address when set", () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.silo = {
+      ...siloDefaults(),
+      ip: 'silo.lan',
+      port: 8090,
+      connected: true,
+    };
+    const media = new Media({
+      tmdbId: 604,
+      mediaType: MediaType.MOVIE,
+      ratingKey: '111',
+      siloMediaId: 'movie-tmdb-604',
+      siloMediaId4k: 'movie-tmdb-604',
+    });
+    media.setPlayLinks();
+    const link = media.playLinks?.find((l) => l.server === 'silo');
+    assert.deepEqual(link, {
+      server: 'silo',
+      name: 'Silo',
+      url: 'http://silo.lan:8090/item/movie-tmdb-604',
+      url4k: 'http://silo.lan:8090/item/movie-tmdb-604',
+    });
+    // Plex stays the title's main link.
+    assert.match(media.mediaUrl ?? '', /^https:\/\/app\.plex\.tv/);
+
+    settings.silo.externalHostname = 'https://silo.example.com/';
+    media.setPlayLinks();
+    assert.equal(
+      media.playLinks?.find((l) => l.server === 'silo')?.url,
+      'https://silo.example.com/item/movie-tmdb-604'
+    );
   });
 });

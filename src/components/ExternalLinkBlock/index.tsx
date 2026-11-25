@@ -8,6 +8,7 @@ import SimklLogo from '@app/assets/services/simkl.svg';
 import TmdbLogo from '@app/assets/services/tmdb.svg';
 import TraktLogo from '@app/assets/services/trakt.svg';
 import TvdbLogo from '@app/assets/services/tvdb.svg';
+import SiloLogo from '@app/components/Common/SiloLogo';
 import useLocale from '@app/hooks/useLocale';
 import type { PlayLink } from '@app/utils/playLinks';
 import { MediaType } from '@server/constants/media';
@@ -20,6 +21,7 @@ const SERVER_LOGOS: Record<
   plex: PlexLogo,
   jellyfin: JellyfinLogo,
   emby: EmbyLogo,
+  silo: SiloLogo,
 };
 
 type ExternalLinkType = 'movie' | 'tv' | 'person';

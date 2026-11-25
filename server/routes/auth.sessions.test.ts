@@ -279,14 +279,16 @@ describe('a media server that stops letting someone in', () => {
     connected: MEDIA_SERVER_KINDS.map((kind) => settings[kind].connected),
   };
 
-  const SERVER_NAME: Record<MediaServerKind, string> = {
+  // Plex, Jellyfin and Emby here; Silo in auth.silo.test.ts.
+  const SERVER_NAME: Record<Exclude<MediaServerKind, 'silo'>, string> = {
     plex: 'Plex',
     jellyfin: 'Jellyfin',
     emby: 'Emby',
   };
+  const SIGN_IN_KINDS = ['plex', 'jellyfin', 'emby'] as const;
 
   /** Connects only `kind`, and makes the friend an account there. */
-  const connect = async (kind: MediaServerKind) => {
+  const connect = async (kind: (typeof SIGN_IN_KINDS)[number]) => {
     settings.main.mediaServerType = typeOfKind(kind);
     for (const other of MEDIA_SERVER_KINDS) {
       settings[other].connected = other === kind;
@@ -334,7 +336,7 @@ describe('a media server that stops letting someone in', () => {
     resetSignInMemoryForTests();
   });
 
-  for (const kind of MEDIA_SERVER_KINDS) {
+  for (const kind of SIGN_IN_KINDS) {
     it(`signs out everywhere someone ${SERVER_NAME[kind]} no longer lets in`, async () => {
       await connect(kind);
       const here = await signIn('friend@seerr.dev');

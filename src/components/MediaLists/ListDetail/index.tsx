@@ -99,7 +99,7 @@ const ListDetail = () => {
   } = useListDetail(router.query.listId as string);
 
   // The viewer's series progress from watch history (Tautulli for Plex,
-  // else Jellyfin or Emby). Missing entries show nothing.
+  // else Jellyfin, Emby or Silo). Missing entries show nothing.
   const { data: progress } = useSWR<Record<number, SeriesProgress>>(
     router.query.listId && data?.kind !== 'music'
       ? `/api/v1/list/${router.query.listId}/progress`

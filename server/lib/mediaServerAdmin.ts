@@ -4,26 +4,34 @@ import {
   MUSIC_ALBUM_ID,
   USER_ID,
   isJellyfinFamily,
+  isMusicServerKind,
   typeOfKind,
 } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
 import type { MediaServerRemovalImpact } from '@server/interfaces/api/mediaServerInterfaces';
 import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
+import cacheManager from '@server/lib/cache';
 import matchWatch from '@server/lib/matchWatch';
+import { MediaServerChangeError } from '@server/lib/mediaServerChangeError';
 import {
   connectedServers,
   linkedServers,
   primaryServer,
   serverName,
+  signInOffered,
 } from '@server/lib/mediaServers';
 import { usableProviderLinks } from '@server/lib/oidc';
 import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { getSettings } from '@server/lib/settings';
+import { forgetSiloPictures } from '@server/lib/siloAccounts';
+import { stopSiloHistory } from '@server/lib/siloHistory';
 import logger from '@server/logger';
 import { IsNull, Not } from 'typeorm';
 
@@ -32,20 +40,14 @@ import { IsNull, Not } from 'typeorm';
  * which allow sign-in.
  */
 
-/** Why a media server change was refused, with the response status. */
-export class MediaServerChangeError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
-    super(message);
-  }
-}
+export { MediaServerChangeError } from '@server/lib/mediaServerChangeError';
 
 /** Whether any connected server allows sign-in. */
 const anyServerAllowsSignIn = (): boolean => {
   const settings = getSettings();
-  return connectedServers().some((kind) => settings[kind].signIn !== false);
+  return connectedServers().some(
+    (kind) => signInOffered(kind) && settings[kind].signIn !== false
+  );
 };
 
 /**
@@ -67,7 +69,7 @@ export const applyMediaServerLogin = (wanted: boolean | undefined): void => {
   if (typeof wanted === 'boolean' && connectedServers().length) {
     if (wanted !== anyServerAllowsSignIn()) {
       const settings = getSettings();
-      for (const kind of connectedServers()) {
+      for (const kind of connectedServers().filter(signInOffered)) {
         settings[kind].signIn = wanted;
       }
     }
@@ -92,7 +94,10 @@ export const setSignIn = async (
     !signIn &&
     settings.main.localLogin === false &&
     !connectedServers().some(
-      (other) => other !== kind && settings[other].signIn !== false
+      (other) =>
+        other !== kind &&
+        signInOffered(other) &&
+        settings[other].signIn !== false
     )
   ) {
     throw new MediaServerChangeError(
@@ -122,6 +127,37 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
 };
 
 /**
+ * How a user could still sign in without `kind`: with another connected
+ * server that allows sign-in, an enabled single sign-on provider ('other'),
+ * or a password they may use ('password'); undefined if not at all.
+ */
+export const signInWithout = async (
+  kind: MediaServerKind,
+  user: Pick<
+    User,
+    'id' | 'plexId' | 'jellyfinUserId' | 'embyUserId' | 'siloUserId'
+  > & { password?: string | null }
+): Promise<'other' | 'password' | undefined> => {
+  const settings = getSettings();
+  const remaining = connectedServers().filter(
+    (other) =>
+      other !== kind && signInOffered(other) && settings[other].signIn !== false
+  );
+  if (linkedServers(user).some((other) => remaining.includes(other))) {
+    return 'other';
+  }
+  if ((await usableProviderLinks(user.id)).length) {
+    return 'other';
+  }
+  // The owner can always use their password; others only while password
+  // sign-in is on.
+  if (user.password && (user.id === 1 || settings.main.localLogin !== false)) {
+    return 'password';
+  }
+  return undefined;
+};
+
+/**
  * Who removing this server would affect: users with an account on it and none
  * on another sign-in-enabled connected server or enabled SSO provider. Their
  * link stays but no longer signs them in; anyone with a usable password can
@@ -130,10 +166,6 @@ export const makePrimary = async (kind: MediaServerKind): Promise<void> => {
 export const removalImpact = async (
   kind: MediaServerKind
 ): Promise<MediaServerRemovalImpact> => {
-  const settings = getSettings();
-  const remaining = connectedServers().filter(
-    (other) => other !== kind && settings[other].signIn !== false
-  );
   const users = await getRepository(User)
     .createQueryBuilder('user')
     .select([
@@ -141,6 +173,7 @@ export const removalImpact = async (
       'user.plexId',
       'user.jellyfinUserId',
       'user.embyUserId',
+      'user.siloUserId',
     ])
     .addSelect('user.password')
     .where(`user.${USER_ID[kind]} IS NOT NULL`)
@@ -148,19 +181,10 @@ export const removalImpact = async (
 
   const impact: MediaServerRemovalImpact = { passwordOnly: 0, noSignIn: 0 };
   for (const user of users) {
-    if (linkedServers(user).some((other) => remaining.includes(other))) {
-      continue;
-    }
-    if ((await usableProviderLinks(user.id)).length) {
-      continue;
-    }
-    // The owner can always use their password; others only while password
-    // sign-in is on.
-    const mayUsePassword =
-      !!user.password && (user.id === 1 || settings.main.localLogin !== false);
-    if (mayUsePassword) {
+    const way = await signInWithout(kind, user);
+    if (way === 'password') {
       impact.passwordOnly += 1;
-    } else {
+    } else if (!way) {
       impact.noSignIn += 1;
     }
   }
@@ -192,13 +216,28 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
       'Seerr needs at least one media server. Connect another before removing this one.'
     );
   }
+  // The primary server is the one people sign in with at setup, so only a
+  // server that offers sign-in can take its place.
+  const nextPrimary = servers.find(
+    (other) => other !== kind && signInOffered(other)
+  );
+  if (primaryServer() === kind && !nextPrimary) {
+    throw new MediaServerChangeError(
+      400,
+      `${serverName(kind)} is the primary server, and no other connected server can take its place. Connect another server before removing it.`
+    );
+  }
 
-  if (primaryServer() === kind) {
-    settings.main.mediaServerType = typeOfKind(next);
+  if (primaryServer() === kind && nextPrimary) {
+    settings.main.mediaServerType = typeOfKind(nextPrimary);
   }
   settings[kind].connected = false;
-  if (isJellyfinFamily(kind)) {
+  if (isJellyfinFamily(kind) || kind === 'silo') {
     settings[kind].apiKey = '';
+  }
+  // Its play history copy is cleared below and read in full on reconnecting.
+  if (kind === 'silo') {
+    settings.silo.historyCopiedTo = '';
   }
   deriveMediaServerLogin();
   await settings.save();
@@ -212,10 +251,29 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   for (const column of MEDIA_ID[kind]) {
     await media.update({ [column]: Not(IsNull()) }, { [column]: null });
   }
-  await getRepository(MusicAlbum).update(
-    { [MUSIC_ALBUM_ID[kind]]: Not(IsNull()) },
-    { [MUSIC_ALBUM_ID[kind]]: null }
-  );
+  if (isMusicServerKind(kind)) {
+    await getRepository(MusicAlbum).update(
+      { [MUSIC_ALBUM_ID[kind]]: Not(IsNull()) },
+      { [MUSIC_ALBUM_ID[kind]]: null }
+    );
+  }
+  // Silo's episode list is rebuilt by its next full scan, and its play
+  // history copied again when it is connected again.
+  if (kind === 'silo') {
+    // A history read under way stops before writing its plays back.
+    stopSiloHistory();
+    forgetSiloPictures();
+    cacheManager.getCache('libraryaccess').flush();
+    await getRepository(SiloEpisode).clear();
+    await getRepository(SiloPlay).clear();
+    // A key can't delete itself; the next sign-in to connect deletes it.
+    if (settings.silo.keyId) {
+      logger.info(
+        "Seerr AI's key stays in Silo until it is deleted there, or Seerr AI connects to this Silo again by signing in",
+        { label: 'Media Servers' }
+      );
+    }
+  }
 
   await plexMatchCheck.dropServer(serverName(kind) as MediaServerName);
   await matchWatch.dropServer(serverName(kind) as MediaServerName);
@@ -231,6 +289,6 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
 
   logger.info(`Disconnected from ${serverName(kind)}`, {
     label: 'Media Servers',
-    primary: serverName(primaryServer() ?? next),
+    primary: serverName(primaryServer() ?? nextPrimary ?? next),
   });
 };

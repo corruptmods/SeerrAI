@@ -6,10 +6,14 @@ import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import QualityApply from '@server/entity/QualityApply';
 import { Session } from '@server/entity/Session';
+import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
 import agent from '@server/lib/agent';
 import { connectedServers, MEDIA_SERVER_KINDS } from '@server/lib/mediaServers';
 import discordBot from '@server/lib/notifications/discordBot';
 import { getSettings } from '@server/lib/settings';
+import { siloClient } from '@server/lib/silo';
+import { pruneSiloPlays } from '@server/lib/siloHistory';
 import logger from '@server/logger';
 import { isPgsql } from '@server/utils/dbType';
 import { In, IsNull, LessThan, Not } from 'typeorm';
@@ -19,7 +23,9 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
  * downloads and spent packs past the days kept, old admin agent
  * conversations, long-expired music details, which library held a title on
  * a server or library that is gone, quality applies History no longer lists,
- * the Discord bot's messages for requests settled over a day ago.
+ * the Discord bot's messages for requests settled over a day ago, and Silo
+ * episodes and plays Silo no longer has (Silo's history is read again in
+ * full for that; plays are never dropped for their age).
  * Then vacuums (Postgres) or checkpoints and
  * compacts when worth it (SQLite).
  *
@@ -58,7 +64,11 @@ export interface MaintenanceReport {
     libraryItems: number;
     qualityApplies: number;
     discordMessages: number;
+    siloEpisodes: number;
+    siloPlays: number;
   };
+  /** Rows left in Seerr AI's copies of Silo's episodes and plays. */
+  rows: { siloEpisodes: number; siloPlays: number };
   /** VACUUM (ANALYZE) on Postgres; checkpoint, optimize and maybe VACUUM on SQLite. */
   vacuum: string;
   tookMs: number;
@@ -166,6 +176,52 @@ const pruneLibraryItems = async (): Promise<number> => {
 const DELETE_CHUNK = 500;
 
 /**
+ * Silo episodes Silo no longer has; all of them once Silo is disconnected
+ * (its next full scan lists them again). Kept as they are while Silo can't
+ * be asked.
+ */
+const pruneSiloEpisodes = async (): Promise<number> => {
+  const repo = getRepository(SiloEpisode);
+  if (!connectedServers().includes('silo')) {
+    const count = await repo.count();
+    if (count) await repo.clear();
+    return count;
+  }
+  const stored = (await repo.find({ select: { contentId: true } })).map(
+    (row) => row.contentId
+  );
+  if (!stored.length) return 0;
+  let present: Set<string>;
+  try {
+    const client = siloClient();
+    await client.getCompatibleInfo();
+    present = new Set(
+      (await client.getCatalogItems(stored)).map((item) => item.content_id)
+    );
+  } catch (e) {
+    logger.warn("Silo couldn't be asked which episodes it still has", {
+      label: LABEL,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return 0;
+  }
+  // Silo answering "none of these" for many ids is far more likely a wrong
+  // answer than every episode gone at once; keep them all.
+  if (stored.length > 1 && present.size === 0) {
+    logger.warn(
+      'Silo listed none of the stored episodes; keeping them all this time',
+      { label: LABEL, episodes: stored.length }
+    );
+    return 0;
+  }
+  const gone = stored.filter((id) => !present.has(id));
+  for (let i = 0; i < gone.length; i += DELETE_CHUNK) {
+    await repo.delete({ contentId: In(gone.slice(i, i + DELETE_CHUNK)) });
+  }
+  return gone.length;
+};
+
+/**
  * Quality applies older than those History lists, with the copies kept for
  * Undo. Each server's newest apply stays (its last-applied date), and its
  * newest not undone (what Undo reverts).
@@ -241,6 +297,8 @@ export const runDbMaintenance = async (
     const libraryItems = await pruneLibraryItems();
     const qualityApplies = await pruneQualityApplies();
     const discordMessages = await discordBot.prune(now);
+    const siloEpisodes = await pruneSiloEpisodes();
+    const siloPlays = await pruneSiloPlays();
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -265,6 +323,12 @@ export const runDbMaintenance = async (
         libraryItems,
         qualityApplies,
         discordMessages,
+        siloEpisodes,
+        siloPlays,
+      },
+      rows: {
+        siloEpisodes: await getRepository(SiloEpisode).count(),
+        siloPlays: await getRepository(SiloPlay).count(),
       },
       vacuum: vacuumed,
       tookMs: Date.now() - started,

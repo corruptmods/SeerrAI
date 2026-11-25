@@ -43,6 +43,12 @@ import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
 import {
+  SILO_RESETTING,
+  SiloResettingError,
+  siloResetPending,
+} from '@server/lib/silo';
+import { importSiloUsers } from '@server/lib/siloUserImport';
+import {
   MediaServerRemovalError,
   removeFromMediaServer,
   removeSeerrUser,
@@ -790,7 +796,8 @@ router.delete<{ id: string }>(
       }
 
       // Also off their media server: ends a Plex friendship, or disables a
-      // Jellyfin or Emby account. First, so a refusal leaves both in place.
+      // Jellyfin, Emby or Silo account. First, so a refusal leaves both in
+      // place.
       if (req.query.fromMediaServer === 'true') {
         if (!req.user?.hasPermission(Permission.ADMIN)) {
           return next({
@@ -1077,6 +1084,28 @@ router.post(
         .json(await importJellyfinUsers('emby', body?.embyUserIds));
     } catch (e) {
       next({ status: 500, message: e.message });
+    }
+  }
+);
+
+router.post(
+  '/import-from-silo',
+  isAuthenticated(Permission.MANAGE_USERS),
+  async (req, res, next) => {
+    try {
+      const body = req.body as { siloUserIds?: string[] } | undefined;
+      if (!isConnected('silo')) {
+        return next({ status: 400, message: 'Silo is not connected.' });
+      }
+      if (siloResetPending()) {
+        return next({ status: 503, message: SILO_RESETTING });
+      }
+      return res.status(201).json(await importSiloUsers(body?.siloUserIds));
+    } catch (e) {
+      next({
+        status: e instanceof SiloResettingError ? e.status : 500,
+        message: e.message,
+      });
     }
   }
 );

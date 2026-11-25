@@ -42,8 +42,13 @@ import type {
   RadarrSettings,
   SonarrSettings,
 } from '@server/lib/settings';
-import { getSettings, jellyfinDefaults } from '@server/lib/settings';
+import {
+  getSettings,
+  jellyfinDefaults,
+  siloDefaults,
+} from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
+import { createFakeSilo, siloMovie } from '@server/test/fakeSilo';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
@@ -56,6 +61,8 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
  */
 
 setupTestDb();
+
+const silo = createFakeSilo();
 
 const MIN = 60_000;
 const T0 = new Date('2026-10-19T12:00:00.000Z');
@@ -733,6 +740,81 @@ describe('looking at new requests as they are imported', () => {
       sent[0].message ?? '',
       /Identify in Jellyfin, entering TMDB id 846213/
     );
+  });
+
+  it('checks Silo too, when its key may see file paths', async () => {
+    await silo.start();
+    try {
+      silo.items = [
+        {
+          ...siloMovie('silo-70', {
+            tmdbId: 1427986,
+            libraryId: 'sm',
+            title: 'Jardín Estático',
+            addedAt: T0.toISOString(),
+          }),
+          year: 2024,
+          versions: [
+            {
+              file_id: 'f70',
+              library_id: 'sm',
+              resolution: '1080p',
+              file_path: '/media/films/Static Garden (2024)/f.mkv',
+            },
+          ],
+        },
+        // Older imports in the same hour, more than one page of them: read
+        // a page at a time, keeping only the newest.
+        ...Array.from({ length: 250 }, (_, i) =>
+          siloMovie(`silo-old-${i}`, {
+            tmdbId: 5000 + i,
+            libraryId: 'sm',
+            title: `Harbour Lights ${i}`,
+            addedAt: new Date(T0.getTime() - 30 * 60 * 1000).toISOString(),
+          })
+        ),
+      ];
+      getSettings().silo = silo.settings({
+        libraries: [{ id: 'sm', name: 'Films', enabled: true, type: 'mixed' }],
+        optionalScopes: ['admin:catalog:paths'],
+      });
+      await requestedMovie(846213, 10);
+      radarrHas({ 10: borderFeud });
+      plexHas(() => [
+        plexMovie('70', 'Static Garden', 2024, 'Static Garden (2024)', [
+          'tmdb://846213',
+        ]),
+      ]);
+      await matchWatch.noteImports([imported('movie', 10)], T0);
+      await matchWatch.run(at(2));
+      assert.deepEqual(
+        (await problems()).map((r) => r.mediaServer),
+        ['Silo']
+      );
+      const listed = silo.calls.filter(
+        (call) => call.path === '/admin/catalog/items'
+      );
+      assert.equal(listed[0]?.query.include_file_paths, 'true');
+      assert.equal(listed.length, 2, 'two pages');
+      await matchWatch.run(at(12));
+      assert.match(
+        sent[0].message ?? '',
+        /Match Item in Silo, entering TMDB id 846213/
+      );
+
+      // Without the scope Silo isn't looked at.
+      getSettings().silo.optionalScopes = [];
+      await requestedMovie(846214, 11);
+      await matchWatch.noteImports([imported('movie', 11)], T0);
+      assert.ok(
+        !(await pending()).some(
+          (row) => row.mediaServer === 'Silo' && row.arrItemId === 11
+        )
+      );
+    } finally {
+      getSettings().silo = siloDefaults();
+      await silo.stop();
+    }
   });
 
   it('finds a series by its folder, once for the series', async () => {

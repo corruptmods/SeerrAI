@@ -36,6 +36,7 @@ import {
 import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
+import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -66,6 +67,8 @@ const stubEveryJob = () => {
     [jellyfinFullScanner, 'run'],
     [embyRecentScanner, 'run'],
     [embyFullScanner, 'run'],
+    [siloRecentScanner, 'run'],
+    [siloFullScanner, 'run'],
     [musicSync, 'run'],
     [musicFullScan, 'run'],
     [refreshToken, 'run'],
@@ -273,6 +276,27 @@ describe('scheduled jobs', () => {
           id !== 'plex-watchlist-sync'
       )
     );
+  });
+
+  it('schedules Silo’s scans and history sync beside the primary server’s', () => {
+    connect('plex', 'silo');
+    stubEveryJob();
+    startJobs();
+    assert.ok(ids().includes('silo-recently-added-scan'));
+    assert.ok(ids().includes('silo-full-scan'));
+    assert.equal(
+      scheduledJobs.find((job) => job.id === 'silo-full-scan')?.name,
+      'Silo Full Library Scan'
+    );
+    // Its watch history is copied every few minutes while it is connected.
+    assert.equal(
+      scheduledJobs.find((job) => job.id === 'silo-history-sync')?.name,
+      'Silo Watch History Sync'
+    );
+
+    connect('plex');
+    refreshMediaServerJobs();
+    assert.ok(!ids().some((id) => id.startsWith('silo-')));
   });
 
   it('adds and drops a server’s jobs as it is connected and removed', () => {

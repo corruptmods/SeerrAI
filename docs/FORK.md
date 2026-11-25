@@ -413,6 +413,12 @@ handled. Drop the patch and that line once deepmerge releases a fix. The Node.js
 | `src/components/Music/` | music pages, cards, request cards and the artist's manage panel |
 | `server/lib/quality/`, `server/routes/settings/quality.ts` | quality profiles: presets, TRaSH Guides, building and applying them, What it does, step-down |
 | `src/components/Settings/SettingsQuality/` | the Quality settings page, its preview and What it does |
+| `server/api/silo/` | the Silo client: the only code that builds Silo URLs or reads Silo's JSON (`client.ts`), the hand-written part of Silo's contract it reads (`types.ts`), and the API version gate (`compat.ts`) |
+| `server/lib/silo.ts`, `siloConnect.ts`, `siloAccounts.ts`, `siloUserImport.ts`, `siloAvailability.ts` | Silo's settings and client with the saved key, connecting (key or administrator sign-in, scope probes, a different Silo at the same address), sign-in and device codes, user import, availability |
+| `server/lib/siloHistory.ts`, `server/lib/watchHistory/silo.ts` | Seerr AI's copy of Silo's play history (`silo_play`) and the watch source that reads it |
+| `server/lib/scanners/silo/` | Silo's full and recently added scans, and its episode list (`silo_episode`) |
+| `server/lib/libraryAccess/silo.ts` | Silo library sharing (needs the `admin:users` scope) |
+| `server/test/fakeSilo.ts` | an in-process stand-in Silo for tests: scopes (403), cursor paging and its 200 limit, account tags (If-Match), sign-in and device codes |
 
 ## Deliberate decisions
 
@@ -454,6 +460,28 @@ Do not undo these without reading why first — each was tried the other way.
   links Plex to connect it. Episodes are counted per server, so a season
   split across two servers shows as partly available; that is a known
   limitation, told to admins in the guide.
+- **Silo is reached only through `server/api/silo/`, behind an API version
+  gate.** Silo (pre-release; its API v2 is fixed from Silo 1.0) is the
+  fourth kind. Nothing outside `server/api/silo/` builds a Silo URL or
+  parses Silo's JSON. `compat.ts` checks `api_major === 2` from the public
+  `/system/info` on connect, in Health and at the start of every scan and
+  history read; another major stops Silo's scans and history without
+  touching availability, and leaves the other servers running. The
+  contract digest is kept and a change is logged once. The key needs only
+  `admin:monitor:read` and `libraries:read`; `admin:users` (library sharing,
+  switching an account off) and `admin:catalog:paths` (Match Check, Match
+  Watch) are optional and probed at connect (`optionalScopes`), and the
+  features needing them leave Silo out with a plain note when they're
+  missing. Silo's account ids are small numbers reused by a rebuilt server,
+  so sign-in, codes and links check `/system/identity` against the saved
+  `serverId` (cached a minute), and connecting a different Silo asks first
+  (`confirmReset`) and then forgets everything of the old one. Silo's play
+  history is copied into `silo_play` (its mark, `historyCopiedTo`, moves only
+  when a read finishes) rather than read live; plays are never pruned for
+  age, only when Silo no longer has them. `MediaServerType.SILO` and
+  `UserType.SILO` are 5, after `NOT_CONFIGURED = 4` and `EMBY = 4`, so stored
+  values never shift. Silo's own Seerr plugin uses `/api/v1/request`, which
+  stays unchanged; `seerr-api.yml` changes for Silo are additive only.
 - **Pages pick a play link for the viewer.** A title's page shows Play on
   each server; badges, request cards and issues show one, on a server the
   viewer has an account on (the primary one first), else the first that

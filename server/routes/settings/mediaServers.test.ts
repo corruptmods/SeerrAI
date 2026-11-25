@@ -240,6 +240,7 @@ interface Summary {
   connected: boolean;
   primary: boolean;
   signIn: boolean;
+  signInOffered: boolean;
   libraries: number;
   enabledLibraries: number;
   lastScan?: number;
@@ -273,7 +274,7 @@ const at = () => ({
 });
 
 describe('the media servers list', () => {
-  it('lists all three, connected or not, without API keys', async () => {
+  it('lists all four, connected or not, without API keys', async () => {
     connectJellyfin();
     await getRepository(User).update(1, { jellyfinUsername: 'den-admin' });
 
@@ -286,8 +287,11 @@ describe('the media servers list', () => {
         ['plex', true, true],
         ['jellyfin', true, false],
         ['emby', false, false],
+        ['silo', false, false],
       ]
     );
+    assert.equal(byKind(list, 'silo').signInOffered, true);
+    assert.equal(byKind(list, 'jellyfin').signInOffered, true);
     const plex = byKind(list, 'plex');
     assert.equal(plex.name, 'Den Plex');
     assert.equal(plex.libraries, 2);

@@ -29,9 +29,12 @@ import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
 import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
+import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { finishSiloReset } from '@server/lib/siloConnect';
+import { siloHistorySync } from '@server/lib/siloHistory';
 import userAccessCheck from '@server/lib/userAccessCheck';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
@@ -77,8 +80,14 @@ export const runJob =
     }
   };
 
+/** The full and recently added scanners of Jellyfin, Emby or Silo. */
+const scannersOf = (kind: Exclude<MediaServerKind, 'plex'>) =>
+  kind === 'silo'
+    ? { full: siloFullScanner, recent: siloRecentScanner }
+    : jellyfinScanners(kind);
+
 const recentScanner = (kind: MediaServerKind) =>
-  kind === 'plex' ? plexRecentScanner : jellyfinScanners(kind).recent;
+  kind === 'plex' ? plexRecentScanner : scannersOf(kind).recent;
 
 /** Jobs for one media server, registered while it's connected. */
 const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
@@ -164,7 +173,29 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
   }
 
   const name = serverName(kind);
-  const scanners = jellyfinScanners(kind);
+  const scanners = scannersOf(kind);
+  // Silo's play history is copied here (lib/siloHistory).
+  const history: ScheduledJob[] =
+    kind === 'silo'
+      ? [
+          {
+            id: 'silo-history-sync',
+            server: 'silo',
+            name: 'Silo Watch History Sync',
+            type: 'process',
+            interval: 'minutes',
+            cronSchedule: jobs['silo-history-sync'].schedule,
+            job: schedule.scheduleJob(
+              jobs['silo-history-sync'].schedule,
+              // A different Silo's reset left part-way is finished first.
+              runJob('Silo Watch History Sync', () =>
+                finishSiloReset().then(() => siloHistorySync.run())
+              )
+            ),
+            running: () => siloHistorySync.running(),
+          },
+        ]
+      : [];
   const recentId = `${kind}-recently-added-scan` as const;
   const fullId = `${kind}-full-scan` as const;
 
@@ -207,6 +238,7 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
       running: () => scanners.full.status().running,
       cancelFn: () => scanners.full.cancel(),
     },
+    ...history,
   ];
 };
 

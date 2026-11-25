@@ -44,7 +44,7 @@ import Season from './Season';
 /** Where a title can be played on one media server. */
 export interface PlayLink {
   server: MediaServerKind;
-  /** Display name of the server kind: Plex, Jellyfin, Emby. */
+  /** Display name of the server kind: Plex, Jellyfin, Emby, Silo. */
   name: string;
   url?: string;
   url4k?: string;
@@ -290,6 +290,13 @@ class Media {
   @Column({ nullable: true, type: 'varchar' })
   public embyMediaId4k?: string | null;
 
+  /** Silo's content id for the title (movie-… or series-…). */
+  @Column({ nullable: true, type: 'varchar' })
+  public siloMediaId?: string | null;
+
+  @Column({ nullable: true, type: 'varchar' })
+  public siloMediaId4k?: string | null;
+
   /**
    * An admin's anime setting on the title page: true or false overrides
    * detection and override rules; null defers to them (lib/animePlacement).
@@ -346,6 +353,7 @@ class Media {
       this.ratingKey = null;
       this.jellyfinMediaId = null;
       this.embyMediaId = null;
+      this.siloMediaId = null;
     }
     if (is4k === undefined || is4k) {
       this.serviceId4k = null;
@@ -354,6 +362,7 @@ class Media {
       this.ratingKey4k = null;
       this.jellyfinMediaId4k = null;
       this.embyMediaId4k = null;
+      this.siloMediaId4k = null;
     }
   }
 
@@ -417,10 +426,7 @@ class Media {
         this.tautulliUrl4k = `${tautulliUrl}/info?rating_key=${ratingKey4k}`;
       }
     } else {
-      const link = this.playLinkFor(
-        primary === 'emby' ? 'emby' : 'jellyfin',
-        ids
-      );
+      const link = this.playLinkFor(primary ?? 'jellyfin', ids);
       if (link.url) {
         this.mediaUrl = link.url;
       }

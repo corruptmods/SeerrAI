@@ -980,6 +980,7 @@ const UserList = () => {
                       {user.username ||
                         user.jellyfinUsername ||
                         user.embyUsername ||
+                        user.siloUsername ||
                         user.plexUsername ||
                         (isStandInEmail(user.email)
                           ? `#${user.id}`
@@ -989,6 +990,7 @@ const UserList = () => {
                       user.username ||
                         user.jellyfinUsername ||
                         user.embyUsername ||
+                        user.siloUsername ||
                         user.plexUsername,
                       user.email
                     ) && (

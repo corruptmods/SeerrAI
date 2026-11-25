@@ -1,3 +1,4 @@
+import { SiloError } from '@server/api/silo/client';
 import { MediaStatus } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import {
@@ -17,6 +18,12 @@ import { availableQuality } from '@server/lib/mediaQuality';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import {
+  SiloResettingError,
+  siloClient,
+  siloEpoch,
+  siloEpochCurrent,
+} from '@server/lib/silo';
 import logger from '@server/logger';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -70,12 +77,54 @@ const isPlexOwner = async (accountId: string): Promise<boolean> => {
   return owner?.plexId != null && String(owner.plexId) === accountId;
 };
 
+/**
+ * The libraries a Silo account opens, by the policy Silo enforces (its access
+ * group's included): an administrator, or no list, opens every library. An
+ * account Silo no longer has, or switched off, opens none. Read with the
+ * server key; a household profile's own limits aren't readable, so the
+ * account's apply to each of its profiles.
+ */
+const siloReach = async (accountId: string): Promise<Reach> => {
+  // The link names an account on the old Silo while a different one's
+  // reset is under way: unknown until it is done.
+  const epoch = siloEpoch();
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
+  let account;
+  try {
+    account = await siloClient({ timeout: 10_000 }).getAdminUser(accountId);
+  } catch (e) {
+    if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
+    if (e instanceof SiloError && e.status === 404) return new Set();
+    throw e;
+  }
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
+  if (!account.enabled) return new Set();
+  if (account.role === 'admin') return 'all';
+  const policy = account.effective_policy;
+  if (!policy) {
+    throw new Error("Silo didn't say which libraries this account may see.");
+  }
+  const libraries = policy.library_ids;
+  return libraries == null
+    ? 'all'
+    : new Set(libraries.map((id) => MediaLibraryItem.key('silo', id)));
+};
+
 const readReach = async (
   kind: MediaServerKind,
   accountId: string
 ): Promise<Reach | undefined> => {
   const key = `${kind}:${accountId}`;
   try {
+    if (kind === 'silo') {
+      const reach = await siloReach(accountId);
+      reachCache().set<CachedReach>(
+        key,
+        reach === 'all' ? 'all' : [...reach],
+        REACH_TTL
+      );
+      return reach;
+    }
     const server = await libraryAccess.server(kind);
     const access = await server.read(accountId);
     const person = access.people.find((p) =>

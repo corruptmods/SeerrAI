@@ -1,5 +1,5 @@
 import { MediaStatus, MediaType } from '@server/constants/media';
-import type { MediaServerKind } from '@server/constants/server';
+import type { MusicServerKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
@@ -8,6 +8,7 @@ import {
   MUSIC_ALBUM_ID,
   connectedServers,
   isJellyfinFamily,
+  isMusicServerKind,
   serverName,
 } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
@@ -55,7 +56,7 @@ const LABEL = 'Music Scan';
 
 /** Album rows Seerr has for these item ids on one server. */
 const rowsWithItemIds = async (
-  kind: MediaServerKind,
+  kind: MusicServerKind,
   itemIds: string[]
 ): Promise<Pick<MusicAlbum, 'id' | 'mediaId'>[]> => {
   const rows: Pick<MusicAlbum, 'id' | 'mediaId'>[] = [];
@@ -82,7 +83,7 @@ export interface MusicScanStatus {
   total: number;
 }
 
-const openSource = (kind: MediaServerKind): Promise<MusicSource> =>
+const openSource = (kind: MusicServerKind): Promise<MusicSource> =>
   isJellyfinFamily(kind)
     ? JellyfinMusicSource.open(kind)
     : PlexMusicSource.open();
@@ -227,7 +228,7 @@ class MusicScanner {
     let matched = 0;
     let unplaced = 0;
 
-    for (const kind of connectedServers()) {
+    for (const kind of connectedServers().filter(isMusicServerKind)) {
       const libraries = enabledMusicLibraries(kind);
       if (!libraries.length || this.cancelled) continue;
       try {

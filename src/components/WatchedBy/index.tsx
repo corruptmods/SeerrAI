@@ -39,7 +39,8 @@ const sinceLastWatched = (
 
 /**
  * Admin-only facts row: who watched this title and when last (Tautulli for
- * Plex, or Jellyfin/Emby). Nothing without watch history.
+ * Plex, Jellyfin, Emby, or Seerr AI's copy of Silo's history). Nothing
+ * without watch history.
  */
 const WatchedBy = ({
   mediaId,

@@ -17,7 +17,8 @@ type KeyMapFunction = (
 
 /**
  * Webhook template variables. The Jellyfin ones fall back to Emby ids, which
- * they carried before Emby had its own; the Emby ones are Emby-only.
+ * they carried before Emby had its own; the Emby and Silo ones are their
+ * server's only.
  */
 export const KeyMap: Record<string, string | KeyMapFunction> = {
   notification_type: (_payload, type) => Notification[type],
@@ -61,6 +62,8 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
     '',
   media_embyMediaId: (payload) =>
     payload.media?.embyMediaId ?? payload.media?.embyMediaId4k ?? '',
+  media_siloMediaId: (payload) =>
+    payload.media?.siloMediaId ?? payload.media?.siloMediaId4k ?? '',
   media_status: (payload) =>
     payload.media ? MediaStatus[payload.media.status] : '',
   media_status4k: (payload) =>
@@ -74,6 +77,8 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
     '',
   requestedBy_embyUserId: (payload) =>
     payload.request?.requestedBy?.embyUserId ?? '',
+  requestedBy_siloUserId: (payload) =>
+    payload.request?.requestedBy?.siloUserId ?? '',
   requestedBy_username: 'request.requestedBy.displayName',
   requestedBy_email: 'request.requestedBy.email',
   requestedBy_avatar: 'request.requestedBy.avatar',

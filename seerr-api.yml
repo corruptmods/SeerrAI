@@ -1035,13 +1035,17 @@ components:
           type: string
           nullable: true
           readOnly: true
+        siloUsername:
+          type: string
+          nullable: true
+          readOnly: true
         linkedServers:
           type: array
           readOnly: true
           description: The media servers this person has an account linked from.
           items:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
         plexToken:
           type: string
           readOnly: true
@@ -1302,6 +1306,7 @@ components:
         mediaServerType:
           type: number
           example: 1
+          description: 1 Plex, 2 Jellyfin, 3 Emby, 4 not set up yet, 5 Silo.
         newPlexLogin:
           type: boolean
           example: true
@@ -1615,6 +1620,91 @@ components:
         - id
         - name
         - enabled
+    SiloLibrary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: Films
+        enabled:
+          type: boolean
+          example: false
+        type:
+          type: string
+          enum: [movie, show, mixed]
+          description: mixed holds both films and series.
+        lastScan:
+          type: number
+      required:
+        - id
+        - name
+        - enabled
+    SiloSettings:
+      type: object
+      properties:
+        name:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+        port:
+          type: number
+          example: 8090
+        useSsl:
+          type: boolean
+        urlBase:
+          type: string
+        externalHostname:
+          type: string
+        forgotPasswordUrl:
+          type: string
+        libraries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiloLibrary'
+        serverId:
+          type: string
+          readOnly: true
+        apiKey:
+          type: string
+          description: Always empty in answers.
+        hasApiKey:
+          type: boolean
+          readOnly: true
+        connected:
+          type: boolean
+          readOnly: true
+        serverVersion:
+          type: string
+          readOnly: true
+        optionalScopes:
+          type: array
+          readOnly: true
+          description: Optional scopes the key was found to hold.
+          items:
+            type: string
+            enum: ['admin:users', 'admin:catalog:paths']
+        notice:
+          type: string
+          readOnly: true
+          description: Only in the answer to saving, when the address now leads to a different Silo and every link to the old one was removed.
+    SiloSyncStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        progress:
+          type: number
+        total:
+          type: number
+        currentLibrary:
+          $ref: '#/components/schemas/SiloLibrary'
+        libraries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiloLibrary'
     JellyfinSettings:
       type: object
       properties:
@@ -2433,7 +2523,7 @@ components:
             properties:
               kind:
                 type: string
-                enum: [plex, jellyfin, emby]
+                enum: [plex, jellyfin, emby, silo]
               name:
                 type: string
               primary:
@@ -2502,7 +2592,7 @@ components:
           type: integer
         kind:
           type: string
-          enum: [plex, jellyfin, emby]
+          enum: [plex, jellyfin, emby, silo]
         action:
           type: string
           enum: [remove, add, person]
@@ -2538,13 +2628,38 @@ components:
                 type: string
         skipped:
           type: integer
+    SiloDeviceCode:
+      type: object
+      description: A code someone approves in Silo to sign in or link Silo.
+      properties:
+        handle:
+          type: string
+          description: Seerr AI's reference for this sign-in, to check or withdraw it.
+        userCode:
+          type: string
+          example: 4821-7730
+        verificationUrl:
+          type: string
+          description: Silo's page to approve the code on, with the code filled in.
+        expiresIn:
+          type: number
+          description: Seconds until the code expires.
+        interval:
+          type: number
+          description: Seconds to wait between checks.
+      required:
+        - handle
+        - userCode
+        - verificationUrl
+        - expiresIn
+        - interval
     MediaServerSummary:
       type: object
       description: A media server as Settings → Media Servers shows it.
       properties:
         kind:
           type: string
-          enum: [plex, jellyfin, emby]
+          enum: [plex, jellyfin, emby, silo]
         name:
           type: string
           description: The server's own name, once Seerr has been connected to it.
@@ -2555,6 +2670,9 @@ components:
         signIn:
           type: boolean
           description: People may sign in with their account on this server.
+        signInOffered:
+          type: boolean
+          description: Whether people can sign in with this server at all (every server can).
         libraries:
           type: number
         enabledLibraries:
@@ -2581,6 +2699,20 @@ components:
         ownerAccount:
           type: string
           description: The owner's account on the server, when one is linked.
+        notice:
+          type: string
+          description: Only in the answer to connecting, when connecting changed something the admin should know (a different Silo than before removes every link to the old one).
+        unavailable:
+          type: array
+          description: Silo only, while connected. Features its API key can't offer for lack of an optional scope, each with why in words.
+          items:
+            type: object
+            properties:
+              feature:
+                type: string
+                enum: [librarySharing, matchCheck]
+              reason:
+                type: string
       required:
         - kind
         - name
@@ -3699,7 +3831,7 @@ components:
           type: object
           nullable: true
           readOnly: true
-          description: What each media server (plex, jellyfin, emby) and Radarr saw of the title at its last scan, by side (standard, 4k). Shown as availableQuality.
+          description: What each media server (plex, jellyfin, emby, silo) and Radarr saw of the title at its last scan, by side (standard, 4k). Shown as availableQuality.
         availableQuality:
           $ref: '#/components/schemas/AvailableQuality'
         availableQuality4k:
@@ -3720,6 +3852,15 @@ components:
           type: string
           nullable: true
           readOnly: true
+        siloMediaId:
+          type: string
+          nullable: true
+          readOnly: true
+          description: Silo's content id for the title.
+        siloMediaId4k:
+          type: string
+          nullable: true
+          readOnly: true
         mediaUrl:
           type: string
           readOnly: true
@@ -3733,7 +3874,7 @@ components:
             properties:
               server:
                 type: string
-                enum: [plex, jellyfin, emby]
+                enum: [plex, jellyfin, emby, silo]
               name:
                 type: string
                 example: Plex
@@ -5711,6 +5852,185 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/JellyfinLibrary'
+  /settings/silo:
+    get:
+      summary: Get Silo settings
+      description: Retrieves the Silo settings. The saved API key is never sent; hasApiKey says whether one is saved.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSettings'
+    post:
+      summary: Update Silo settings
+      description: Tries Silo at the given address with the given API key (a blank key keeps the saved one for the same address), then saves them and reads its film and series libraries again. Connecting and removing Silo is under /settings/media-servers.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: number
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+                externalHostname:
+                  type: string
+                forgotPasswordUrl:
+                  type: string
+                apiKey:
+                  type: string
+                confirmReset:
+                  type: boolean
+                  description: A different Silo than before is connected only with this set; it removes every link to the old Silo, its watch history copy and its title ids.
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSettings'
+        '409':
+          description: A different Silo than before answers at this address. The message says what connecting it removes; send again with confirmReset to go ahead. Also refused when it would leave the owner unable to sign in.
+        '400':
+          description: Silo speaks an API version Seerr AI doesn't support, or the form is incomplete
+        '403':
+          description: The API key lacks a scope Seerr AI needs
+        '502':
+          description: Silo could not be reached
+  /settings/silo/users:
+    get:
+      summary: Silo accounts not yet imported
+      description: Silo's switched-on accounts not imported yet, sorted by name.
+      tags:
+        - settings
+        - users
+      responses:
+        '200':
+          description: Silo accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    thumb:
+                      type: string
+  /settings/silo/library:
+    get:
+      summary: Get Silo libraries
+      description: Silo's film and series libraries as Seerr AI keeps them. Book, podcast and manga libraries are left out.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Silo libraries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SiloLibrary'
+  /settings/silo/library/{libraryId}:
+    put:
+      summary: Turn a Silo library on or off
+      description: Whether Seerr AI scans this Silo library.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: The library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloLibrary'
+        '404':
+          description: No such library
+  /settings/silo/library/sync:
+    post:
+      summary: Read Silo's libraries again
+      description: Reads Silo's film and series libraries again. Whether each is on is kept.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Silo libraries returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SiloLibrary'
+  /settings/silo/sync:
+    get:
+      summary: Get the status of Silo's full scan
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Status of the Silo full scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSyncStatus'
+    post:
+      summary: Start or cancel Silo's full scan
+      tags:
+        - settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancel:
+                  type: boolean
+                  example: false
+                start:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Status of the Silo full scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloSyncStatus'
   /settings/plex:
     get:
       summary: Get Plex settings
@@ -6035,7 +6355,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6067,9 +6387,14 @@ paths:
                   type: boolean
                 signIn:
                   type: boolean
+                confirmReset:
+                  type: boolean
+                  description: Silo only. A different Silo than before is connected only with this set; it removes every link to the old Silo, its watch history copy and its title ids.
               required:
                 - hostname
       responses:
+        '409':
+          description: Silo only. A different Silo than before answers at this address; the message says what connecting it removes. Send again with confirmReset to go ahead.
         '200':
           description: Connected; every media server
           content:
@@ -6137,7 +6462,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Counts of people
@@ -6163,7 +6488,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Removed; every media server
@@ -6184,7 +6509,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Every media server
@@ -6206,7 +6531,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6239,7 +6564,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Changes
@@ -6292,7 +6617,7 @@ paths:
                   properties:
                     kind:
                       type: string
-                      enum: [plex, jellyfin, emby]
+                      enum: [plex, jellyfin, emby, silo]
                     libraries:
                       type: array
                       items:
@@ -6323,7 +6648,7 @@ paths:
               properties:
                 kind:
                   type: string
-                  enum: [plex, jellyfin, emby]
+                  enum: [plex, jellyfin, emby, silo]
                 all:
                   type: boolean
                 libraries:
@@ -6352,7 +6677,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       responses:
         '200':
           description: Libraries and people
@@ -6388,7 +6713,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -6435,7 +6760,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [plex, jellyfin, emby]
+            enum: [plex, jellyfin, emby, silo]
       requestBody:
         required: true
         content:
@@ -11399,6 +11724,133 @@ paths:
           description: Quick Connect not authorized or access denied
         '500':
           description: Authentication failed
+  /auth/silo:
+    post:
+      summary: Sign in with a Silo account's username and password
+      description: |
+        Signs in to Silo with this name and password (Silo routes it to its own password or its LDAP directory), signs out of Silo again at once, and starts a session here. Someone new gets an account when new users may sign in; a new account whose name another account already has is refused with `EXISTING_ACCOUNT`: that person signs in with their account and links Silo from their profile.
+
+        At first-run setup (no primary server yet) the address fields are required and only a Silo administrator may sign in: Silo becomes the primary server, Seerr AI creates its own API key (or tries `apiKey` when given), and that administrator becomes the owner.
+
+        Refusals: `INVALID_CREDENTIALS` (401), `NOT_ADMIN` (403, setup), `PASSWORD_CHANGE_REQUIRED` (403: change the temporary password in Silo first), 429 when Silo or Seerr AI has paused sign-in for this name, `CONNECTION_ERROR` (502).
+      security: []
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                email:
+                  type: string
+                  description: Their sign-in name here; defaults to the Silo username.
+                hostname:
+                  type: string
+                  description: Setup only.
+                port:
+                  type: number
+                  description: Setup only.
+                useSsl:
+                  type: boolean
+                  description: Setup only.
+                urlBase:
+                  type: string
+                  description: Setup only.
+                apiKey:
+                  type: string
+                  description: Setup only; a Silo API key to use instead of creating one.
+              required:
+                - username
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Wrong username or password
+        '403':
+          description: Not allowed to sign in
+        '429':
+          description: Too many attempts
+  /auth/silo/device/start:
+    post:
+      summary: Start signing in with a code approved in Silo
+      description: Asks Silo for a code the person approves in Silo (any way they sign in to Silo works there). `handle` is Seerr AI's own reference for this sign-in, used to check it; Silo's device secret never leaves the server.
+      security: []
+      tags:
+        - auth
+      responses:
+        '200':
+          description: The code to approve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloDeviceCode'
+        '403':
+          description: Silo sign-in is off, or setup isn't finished
+  /auth/silo/device/check:
+    post:
+      summary: Check a Silo sign-in code
+      description: While the code waits, `pending` (`opened` once someone looked it up in Silo). Once approved the person is signed in here and their account returned (their Silo profile is chosen later under Linked Accounts); the code can't be used again. `denied` and `expired` end it.
+      security: []
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '200':
+          description: Where the sign-in stands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, approved, denied, expired]
+                  opened:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                  - status
+  /auth/silo/device/cancel:
+    post:
+      summary: Withdraw a Silo sign-in code
+      security: []
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '204':
+          description: Withdrawn
   /auth/local:
     post:
       summary: Sign in using a local account
@@ -12498,6 +12950,52 @@ paths:
                         reason:
                           type: string
                           example: EXISTING_ACCOUNT
+  /user/import-from-silo:
+    post:
+      summary: Import users from Silo
+      description: |
+        Imports Silo's switched-on accounts. People already imported are refreshed (their name, and their picture when Silo is their main account). With a list of Silo account ids, only those of them not yet imported are created; otherwise everyone not yet imported is. Someone whose name another account already has is skipped with `EXISTING_ACCOUNT`.
+
+        Requires the `MANAGE_USERS` permission.
+      tags:
+        - users
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                siloUserIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: The newly created users, how many people already imported were refreshed, and who was left out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  createdUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  refreshedUsers:
+                    type: number
+                  skippedUsers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        reason:
+                          type: string
+                          example: EXISTING_ACCOUNT
   /user/registerPushSubscription:
     post:
       summary: Register a web push /user/registerPushSubscription
@@ -12689,7 +13187,7 @@ paths:
         - in: query
           name: fromMediaServer
           required: false
-          description: Also take them off their media server first (admins only) - ends a Plex friendship, or disables a Jellyfin or Emby account. If that fails, the user is not deleted.
+          description: Also take them off their media server first (admins only) - ends a Plex friendship, or disables a Jellyfin or Emby account, or switches off a Silo account (needs the admin:users scope on Seerr AI's Silo key). If that fails, the user is not deleted.
           schema:
             type: string
             enum: ['true', 'false']
@@ -15093,6 +15591,215 @@ paths:
           description: Unlink request invalid
         '404':
           description: User does not exist
+  /user/{userId}/settings/linked-accounts/silo:
+    post:
+      summary: Link a Silo account to the current user
+      description: Signs in to Silo with these credentials (and out again at once), then links that Silo account. Users can only link accounts to their own account; the account must not be linked to anyone else. A password account becomes a Silo account; any other keeps its kind. `PASSWORD_CHANGE_REQUIRED` when the Silo account holds a temporary password.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+      responses:
+        '204':
+          description: Linked
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Silo refused the sign-in
+        '422':
+          description: Account already linked to a user
+    delete:
+      summary: Remove the linked Silo account for a user
+      description: The same rules as unlinking Plex apply. Their chosen Silo profile is forgotten too.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Unlinked
+        '400':
+          description: Unlink request invalid
+        '404':
+          description: User does not exist
+  /user/{userId}/settings/linked-accounts/silo/device/start:
+    post:
+      summary: Start linking Silo with a code approved in Silo
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: The code to approve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiloDeviceCode'
+  /user/{userId}/settings/linked-accounts/silo/device/check:
+    post:
+      summary: Check a code for linking Silo
+      description: Once approved, the Silo account is linked; their profile is then chosen with My profile.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '200':
+          description: Where linking stands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, approved, denied, expired]
+                  opened:
+                    type: boolean
+                required:
+                  - status
+        '422':
+          description: Account already linked to a user
+  /user/{userId}/settings/linked-accounts/silo/device/cancel:
+    post:
+      summary: Withdraw a code for linking Silo
+      description: Withdraws a code this user started for linking Silo, in Seerr AI and in Silo. Another user's code is left alone.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handle:
+                  type: string
+              required:
+                - handle
+      responses:
+        '204':
+          description: Withdrawn, or nothing to withdraw
+  /user/{userId}/settings/linked-accounts/silo/profiles:
+    get:
+      summary: A user's Silo profiles, and the one chosen as theirs
+      description: The household profiles on their linked Silo account. `profileId` is the one chosen as theirs; null counts every profile on the account.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profileId:
+                    type: string
+                    nullable: true
+                  profiles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        primary:
+                          type: boolean
+                        child:
+                          type: boolean
+  /user/{userId}/settings/linked-accounts/silo/profile:
+    put:
+      summary: Choose a user's Silo profile
+      description: One of the profiles on their linked Silo account, or null for all of them.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profileId:
+                  type: string
+                  nullable: true
+              required:
+                - profileId
+      responses:
+        '200':
+          description: Chosen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profileId:
+                    type: string
+                    nullable: true
+        '400':
+          description: Not one of their profiles
   /user/{userId}/settings/linked-accounts/oidc:
     get:
       summary: Someone's single sign-on links

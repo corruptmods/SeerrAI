@@ -19,6 +19,7 @@ const BADGE_TYPES = {
   plex: 'warning',
   jellyfin: 'default',
   emby: 'success',
+  silo: 'primary',
 } as const;
 
 interface AccountTypeBadgesProps {

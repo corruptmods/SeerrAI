@@ -22,12 +22,14 @@ import { resetProviderMemoryForTests } from '@server/lib/ai/providers';
 import * as deletingSoon from '@server/lib/deletingSoon';
 import ImageProxy from '@server/lib/imageproxy';
 import { Permission } from '@server/lib/permissions';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, siloDefaults } from '@server/lib/settings';
+import { resetSiloHistorySync } from '@server/lib/siloHistory';
 import { watchedFor } from '@server/lib/watched';
 import * as watchedBy from '@server/lib/watchedBy';
 import aiRoutes from '@server/routes/ai';
 import aiSettingsRoutes from '@server/routes/settings/ai';
 import { setupTestDb } from '@server/test/db';
+import { createFakeSilo, siloMovie } from '@server/test/fakeSilo';
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
@@ -2364,6 +2366,122 @@ describe('picking for a room', () => {
     answers = ['{"p":[{"n":1,"w":"Viewer1 would."}]}'];
     await pick();
     assert.match(calls[0].prompt.split('Titles:')[1], /Lantern Song/);
+  });
+});
+
+describe('picking for a room from Silo’s history', () => {
+  // Their own ids: suggestions are cached a day per server account.
+  const titles: Record<number, string> = {
+    7211: 'Glasswing',
+    7212: 'Static Garden',
+    7213: 'Lantern Song',
+    7214: 'Harbour Lights',
+  };
+  const idOf = (tmdbId: number) => `silo-pick-${tmdbId}`;
+  const silo = createFakeSilo();
+  let partner: User;
+
+  before(() => silo.start());
+  after(async () => {
+    await silo.stop();
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    settings.silo = siloDefaults();
+  });
+
+  beforeEach(async () => {
+    silo.reset();
+    resetSiloHistorySync();
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.SILO;
+    settings.plex.connected = false;
+    settings.silo = silo.settings();
+    silo.items = Object.keys(titles).map((id) =>
+      siloMovie(idOf(Number(id)), { title: titles[Number(id)] })
+    );
+    member.siloUserId = 'silo-member';
+    await getRepository(User).save(member);
+    partner = await makeUser('ai-silo-partner', Permission.REQUEST);
+    partner.siloUserId = 'silo-partner';
+    await getRepository(User).save(partner);
+    const list = await getRepository(MediaList).save(
+      new MediaList({ name: 'Ours', ownerId: member.id })
+    );
+    await getRepository(MediaListMember).save(
+      new MediaListMember({
+        listId: list.id,
+        userId: partner.id,
+        acceptedAt: new Date(),
+      })
+    );
+    for (const tmdbId of Object.keys(titles).map(Number)) {
+      await getRepository(Media).save(
+        new Media({
+          tmdbId,
+          mediaType: MediaType.MOVIE,
+          siloMediaId: idOf(tmdbId),
+        })
+      );
+    }
+    const watch = (
+      session: string,
+      userId: string,
+      tmdbId: number,
+      completed = true
+    ) => ({
+      session_id: session,
+      user_id: userId,
+      profile_id: '1',
+      media_item_id: idOf(tmdbId),
+      ended_at: new Date(Date.now() - 600_000).toISOString(),
+      end_position_seconds: completed ? 5900 : 3000,
+      duration_seconds: 6000,
+      completed,
+    });
+    silo.plays = [
+      watch('p-1', 'silo-member', 7211),
+      // Partway through Lantern Song.
+      watch('p-2', 'silo-partner', 7213, false),
+      watch('p-3', 'silo-partner', 7212),
+    ];
+    stub(
+      'getMovieRecommendations',
+      async ({ movieId }: { movieId: number }) => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: (movieId === 7211 ? [7213, 7214] : [7214]).map((id) => ({
+          id,
+          title: titles[id],
+          release_date: '2001-01-01',
+          genre_ids: [],
+          overview: '',
+          popularity: 1,
+          vote_average: 7,
+          vote_count: 1,
+          adult: false,
+          original_language: 'en',
+          original_title: titles[id],
+          video: false,
+        })),
+      })
+    );
+  });
+
+  it('suggests from what they watched, and leaves out what anyone started', async () => {
+    answers = ['{"p":[{"n":1,"w":"Viewer1 and Viewer2 both would."}]}'];
+    const picked = await call<{ reason: string }[]>('POST', '/api/v1/ai/pick', {
+      people: [partner.id],
+      kind: 'any',
+      availableOnly: false,
+    });
+    assert.equal(picked.status, 200, JSON.stringify(picked.body));
+    // Both people's history reached the model as their tastes.
+    assert.match(calls[0].prompt, /Glasswing/);
+    assert.match(calls[0].prompt, /Static Garden/);
+    const offered = calls[0].prompt.split('Titles:')[1];
+    assert.match(offered, /Harbour Lights/);
+    assert.doesNotMatch(offered, /Lantern Song/);
   });
 });
 

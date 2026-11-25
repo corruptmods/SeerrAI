@@ -48,9 +48,10 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
     ),
   });
 
-  // Jellyfin/Emby users have their username as email until they set one.
+  // Jellyfin, Emby and Silo users have their username as email until they
+  // set one.
   const jellyfinFamilyNames = settings.currentSettings.mediaServers
-    .filter((server) => server.kind === 'jellyfin' || server.kind === 'emby')
+    .filter((server) => server.kind !== 'plex')
     .map((server) => SERVER_NAMES[server.kind]);
 
   const passwordResetEnabled =

@@ -13,7 +13,7 @@ export type { PlayLink };
 /** Where to play one version of a title. */
 export interface PlayTarget {
   server: MediaServerKind;
-  /** Server kind: Plex, Jellyfin, Emby. */
+  /** Server kind: Plex, Jellyfin, Emby, Silo. */
   name: string;
   url: string;
 }

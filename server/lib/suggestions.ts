@@ -22,7 +22,8 @@ import { In } from 'typeorm';
  * "Suggested for you": titles like what the user has been watching.
  *
  * Recent finished plays come from the server's watch history (Tautulli for
- * Plex, the server itself for Jellyfin and Emby). Each of the latest few
+ * Plex, the server itself for Jellyfin and Emby, Seerr AI's copy for Silo).
+ * Each of the latest few
  * titles asks TMDB for recommendations; a title several point to outranks one
  * suggested once, and recent watching weighs more. Anything already started
  * is excluded.

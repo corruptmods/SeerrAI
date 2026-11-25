@@ -1,15 +1,17 @@
 import ImageProxy, {
   ImageNotFoundError,
+  loggedPath,
   maxAgeOf,
   redirectGuard,
 } from '@server/lib/imageproxy';
+import logger from '@server/logger';
 import assert from 'node:assert/strict';
 import { promises } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 
 /**
  * Guards against blank posters:
@@ -444,5 +446,46 @@ describe('image redirects', () => {
         hostname
       );
     }
+  });
+});
+
+describe('what the image cache logs', () => {
+  it('never logs a signed address’s query', async () => {
+    assert.equal(
+      loggedPath('https://cdn.example.invalid/a/b.png?exp=1&sig=secret#x'),
+      'https://cdn.example.invalid/a/b.png'
+    );
+    const proxy = new ImageProxy('avatar', '', {});
+    Object.defineProperty(proxy, 'axios', {
+      configurable: true,
+      value: {
+        get: async () => {
+          throw Object.assign(new Error('upstream broke'), {
+            response: { status: 500 },
+          });
+        },
+      },
+    });
+    const logged: unknown[] = [];
+    const warn = mock.method(logger, 'warn', (...args: unknown[]) => {
+      logged.push(args);
+      return logger;
+    });
+    const debug = mock.method(logger, 'debug', (...args: unknown[]) => {
+      logged.push(args);
+      return logger;
+    });
+    try {
+      await proxy
+        .getImage(
+          `https://cdn.example.invalid/${process.pid}-${Date.now()}.png?exp=1&sig=secret`
+        )
+        .catch(() => undefined);
+    } finally {
+      warn.mock.restore();
+      debug.mock.restore();
+    }
+    assert.ok(logged.length > 0, 'the failure is logged');
+    assert.ok(!JSON.stringify(logged).includes('secret'));
   });
 });

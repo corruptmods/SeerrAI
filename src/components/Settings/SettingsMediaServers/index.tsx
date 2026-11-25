@@ -7,6 +7,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiloLogo from '@app/components/Common/SiloLogo';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import CardFooter from '@app/components/Settings/CardFooter';
 import LibrarySharing from '@app/components/Settings/SettingsMediaServers/LibrarySharing';
@@ -38,7 +39,7 @@ import useSWR, { mutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsMediaServers', {
   mediaServers: 'Media Servers',
   mediaServersDescription:
-    'Connect any mix of Plex, Jellyfin and Emby. A title is available if any of them has it.',
+    'Connect any mix of Plex, Jellyfin, Emby and Silo. A title is available if any of them has it.',
   primary: 'Primary',
   notConnected: 'Not connected',
   libraries:
@@ -81,6 +82,7 @@ const LOGOS: Record<
   plex: PlexLogo,
   jellyfin: JellyfinLogo,
   emby: EmbyLogo,
+  silo: SiloLogo,
 };
 
 const ENDPOINT = '/api/v1/settings/media-servers';
@@ -316,23 +318,25 @@ const SettingsMediaServers = () => {
                               })
                             : intl.formatMessage(messages.neverScanned)}
                         </p>
-                        <div className="mt-4 flex items-center gap-3">
-                          <SlideCheckbox
-                            checked={server.signIn}
-                            label={intl.formatMessage(messages.allowSignIn, {
-                              server: name,
-                            })}
-                            onClick={() => setSignIn(server)}
-                          />
-                          <span
-                            className="text-sm text-gray-200"
-                            aria-hidden="true"
-                          >
-                            {intl.formatMessage(messages.allowSignIn, {
-                              server: name,
-                            })}
-                          </span>
-                        </div>
+                        {server.signInOffered !== false && (
+                          <div className="mt-4 flex items-center gap-3">
+                            <SlideCheckbox
+                              checked={server.signIn}
+                              label={intl.formatMessage(messages.allowSignIn, {
+                                server: name,
+                              })}
+                              onClick={() => setSignIn(server)}
+                            />
+                            <span
+                              className="text-sm text-gray-200"
+                              aria-hidden="true"
+                            >
+                              {intl.formatMessage(messages.allowSignIn, {
+                                server: name,
+                              })}
+                            </span>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -353,7 +357,8 @@ const SettingsMediaServers = () => {
                             icon: PencilIcon,
                             href: `/settings/${server.kind}`,
                           },
-                          ...(!server.primary
+                          // Only a server people can sign in with can be primary.
+                          ...(!server.primary && server.signInOffered !== false
                             ? [
                                 {
                                   label: intl.formatMessage(
@@ -393,8 +398,22 @@ const SettingsMediaServers = () => {
       {data?.some((server) => server.connected) && (
         <LibrarySharing
           servers={data
-            .filter((server) => server.connected)
+            // Silo's key may lack the scope to change its accounts.
+            .filter(
+              (server) =>
+                server.connected &&
+                !server.unavailable?.some(
+                  (off) => off.feature === 'librarySharing'
+                )
+            )
             .map((server) => ({ kind: server.kind, name: nameOf(server) }))}
+          notes={data.flatMap((server) =>
+            server.connected
+              ? (server.unavailable ?? [])
+                  .filter((off) => off.feature === 'librarySharing')
+                  .map((off) => off.reason)
+              : []
+          )}
         />
       )}
 

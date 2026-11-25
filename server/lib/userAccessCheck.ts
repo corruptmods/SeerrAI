@@ -11,22 +11,25 @@ import {
 } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { siloEpoch, siloEpochCurrent } from '@server/lib/silo';
+import { enabledSiloAccounts } from '@server/lib/siloAccounts';
 import { removeSeerrUser } from '@server/lib/userRemoval';
 import logger from '@server/logger';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 
 /*
  * With Remove Users Who Lose Access on, deletes the accounts of people the
- * media server no longer has: no longer shared on the Plex server, or deleted
- * from Jellyfin or Emby. Someone must be missing on two checks in a row, so
- * one odd reply can't remove anyone, and a check that would remove every
- * account of a server removes none. The owner and admins are never removed.
+ * media server no longer has: no longer shared on the Plex server, deleted
+ * from Jellyfin or Emby, or deleted or switched off in Silo. Someone must be
+ * missing on two checks in a row, so one odd reply can't remove anyone, and a
+ * check that would remove every account of a server removes none. The owner and admins are never removed.
  */
 
 const TYPES: Record<MediaServerKind, UserType> = {
   plex: UserType.PLEX,
   jellyfin: UserType.JELLYFIN,
   emby: UserType.EMBY,
+  silo: UserType.SILO,
 };
 
 /** The server's own id for an account here, comparable with presentOn's. */
@@ -35,7 +38,9 @@ const serverIdOf = (kind: MediaServerKind, user: User): string | null =>
     ? user.plexId
       ? String(user.plexId)
       : null
-    : normalizeJellyfinGuid(user[USER_ID[kind]]);
+    : kind === 'silo'
+      ? (user.siloUserId ?? null)
+      : normalizeJellyfinGuid(user[USER_ID[kind]]);
 
 /** Everyone the server still has, by serverIdOf. Throws if it can't tell. */
 const presentOn = async (kind: MediaServerKind): Promise<Set<string>> => {
@@ -63,6 +68,18 @@ const presentOn = async (kind: MediaServerKind): Promise<Set<string>> => {
     );
   }
 
+  if (kind === 'silo') {
+    if (!getSettings().silo.apiKey) {
+      throw new Error('Silo has no API key in Seerr AI.');
+    }
+    // A switched-off account counts as gone, as it can't sign in.
+    const accounts = await enabledSiloAccounts();
+    // Silo always has its owner, so none means a bad reply.
+    if (!accounts.length) {
+      throw new Error('Silo sent no accounts.');
+    }
+    return new Set(accounts.map((account) => account.id));
+  }
   if (!getSettings()[kind].apiKey) {
     throw new Error(`${serverName(kind)} has no API key in Seerr AI.`);
   }
@@ -96,11 +113,18 @@ class UserAccessCheck {
 
     try {
       const missingNow = new Set<number>();
+      // Silo's accounts are the old Silo's if a reset is marked meanwhile:
+      // then nobody counts as missing from it (siloEpoch).
+      const epoch = siloEpoch();
+      const fromSilo = new Set<number>();
 
       for (const kind of connectedServers()) {
         let present: Set<string>;
         try {
           present = await presentOn(kind);
+          if (kind === 'silo' && !siloEpochCurrent(epoch)) {
+            throw new Error('A different Silo is being connected.');
+          }
         } catch (e) {
           // Nobody counts as missing from a server that couldn't be read.
           logger.warn(
@@ -120,6 +144,7 @@ class UserAccessCheck {
               plexId: true,
               jellyfinUserId: true,
               embyUserId: true,
+              siloUserId: true,
               permissions: true,
               userType: true,
             },
@@ -142,8 +167,10 @@ class UserAccessCheck {
           );
           continue;
         }
+        if (kind === 'silo' && !siloEpochCurrent(epoch)) continue;
         for (const user of gone) {
           missingNow.add(user.id);
+          if (kind === 'silo') fromSilo.add(user.id);
           if (!this.missing.has(user.id)) {
             logger.info(
               `A user no longer has ${serverName(kind)} access; removed at the next check unless that changes`,
@@ -153,6 +180,10 @@ class UserAccessCheck {
         }
       }
 
+      // A reset marked during the check: what Silo said no longer holds.
+      if (fromSilo.size && !siloEpochCurrent(epoch)) {
+        for (const id of fromSilo) missingNow.delete(id);
+      }
       const confirmed = [...missingNow].filter((id) => this.missing.has(id));
       this.missing = missingNow;
 
@@ -162,8 +193,13 @@ class UserAccessCheck {
           where: { id },
           relations: { requests: true },
         });
-        // Gone already, or made an admin since.
-        if (!user || user.hasPermission(Permission.ADMIN)) {
+        // Gone already, or made an admin since; or missing from a Silo a
+        // reset has replaced since.
+        if (
+          !user ||
+          user.hasPermission(Permission.ADMIN) ||
+          (fromSilo.has(id) && !siloEpochCurrent(epoch))
+        ) {
           continue;
         }
         try {

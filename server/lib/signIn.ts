@@ -15,6 +15,12 @@ import {
   signInAllowed,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import {
+  siloEpoch,
+  siloEpochCurrent,
+  siloResetPending,
+} from '@server/lib/silo';
+import { siloAccountAllowed } from '@server/lib/siloAccounts';
 import type { Request } from 'express';
 import { In, Like } from 'typeorm';
 
@@ -59,6 +65,8 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * enough. Disconnected servers have no say: a user whose only accounts are
  * there signs in like a password account.
  *
+ * The same goes for a Silo account deleted or switched off there.
+ *
  * A passkey stands in for media server sign-in, so it follows each server's
  * sign-in switch. Passwords have their own switch, checked where typed, and
  * the owner can always use theirs. On an account with no media server a
@@ -73,7 +81,12 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
 export const maySignIn = async (
   user: Pick<
     User,
-    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+    | 'id'
+    | 'userType'
+    | 'plexId'
+    | 'jellyfinUserId'
+    | 'embyUserId'
+    | 'siloUserId'
   >,
   how: 'passkey' | 'password' | 'signedIn'
 ): Promise<boolean> => {
@@ -119,7 +132,9 @@ export const maySignIn = async (
       const answer =
         kind === 'plex'
           ? await plexLetsIn(user, how)
-          : await jellyfinLetsIn(user, kind, how);
+          : kind === 'silo'
+            ? await siloLetsIn(user, how)
+            : await jellyfinLetsIn(user, kind, how);
       if (answer) {
         return true;
       }
@@ -196,6 +211,29 @@ const jellyfinLetsIn = async (
   return !!account && !account.Policy?.IsDisabled;
 };
 
+/**
+ * Whether their Silo account still exists and is switched on. Throws when
+ * Silo is unreachable. No answer (undefined) while a different Silo's reset
+ * is under way, or if one was marked while Silo was asked: the link names
+ * an account on the old Silo, and the new one's answer about it says
+ * nothing of them.
+ */
+const siloLetsIn = async (
+  user: Pick<User, 'siloUserId'>,
+  how: 'passkey' | 'password' | 'signedIn'
+): Promise<boolean | undefined> => {
+  if (!user.siloUserId) {
+    return false;
+  }
+  if (!getSettings().silo.apiKey) {
+    return how === 'signedIn' ? undefined : false;
+  }
+  if (siloResetPending()) return undefined;
+  const epoch = siloEpoch();
+  const allowed = await siloAccountAllowed(user.siloUserId);
+  return siloEpochCurrent(epoch) ? allowed : undefined;
+};
+
 /** How long the owner's Plex share list is reused across users. */
 const PLEX_USERS_EVERY_MS = 60 * 1000;
 type SharedUsers = Awaited<
@@ -268,6 +306,18 @@ const stillAllowed = new Map<number, { ok: boolean; at: number }>();
 /** Answers being fetched, so concurrent requests ask the media server once. */
 const stillAllowedPending = new Map<number, Promise<boolean>>();
 
+/**
+ * Forgets the "may still sign in" answers for these users, and any being
+ * fetched (a different Silo was connected, so earlier answers from Silo
+ * are about someone else).
+ */
+export const forgetStillAllowed = (userIds: number[]): void => {
+  for (const id of userIds) {
+    stillAllowed.delete(id);
+    stillAllowedPending.delete(id);
+  }
+};
+
 /** For tests: forgets every "may still sign in" answer. */
 export const resetSignInMemoryForTests = (): void => {
   stillAllowed.clear();
@@ -283,7 +333,12 @@ export const resetSignInMemoryForTests = (): void => {
 export const stillMaySignIn = (
   user: Pick<
     User,
-    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+    | 'id'
+    | 'userType'
+    | 'plexId'
+    | 'jellyfinUserId'
+    | 'embyUserId'
+    | 'siloUserId'
   >
 ): Promise<boolean> => {
   const known = stillAllowed.get(user.id);

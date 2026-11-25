@@ -79,7 +79,8 @@ const defaultPayload = {
   '{{extra}}': [],
 };
 
-// Seerr AI's guide: Seerr's lacks variables added here (Emby ids, albums).
+// Seerr AI's guide: Seerr's lacks variables added here (Emby and Silo ids,
+// albums).
 const TEMPLATE_VARIABLES_URL = `${PROJECT_URL}/blob/${PROJECT_BRANCH}/docs/using-seerr/notifications/webhook.md#template-variables`;
 
 const messages = defineMessages(

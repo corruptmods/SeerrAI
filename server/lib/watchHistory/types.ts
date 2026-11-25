@@ -3,7 +3,8 @@ import type { User } from '@server/entity/User';
 
 /*
  * Server-agnostic watch history: Tautulli for Plex, native for Jellyfin and
- * Emby. Features using it go through WatchSource only.
+ * Emby, and Seerr AI's copy of Silo's play history. Features using it go
+ * through WatchSource only.
  */
 
 /** One play of a film or an episode. */
@@ -33,7 +34,7 @@ export interface Play {
 
 export interface WatchSource {
   /** 'multi' when merging several servers. */
-  readonly kind: 'tautulli' | 'jellyfin' | 'emby' | 'multi';
+  readonly kind: 'tautulli' | 'jellyfin' | 'emby' | 'silo' | 'multi';
   /** Display name for messages. */
   readonly label: string;
   /** The user's server id; undefined when not linked. */

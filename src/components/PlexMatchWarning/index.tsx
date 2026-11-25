@@ -40,6 +40,14 @@ const messages = defineMessages('components.PlexMatchWarning', {
     'In Plex, choose Fix Match and search for {search} or {alt}. This clears after the next Match Check.',
   identifyByIdAlt:
     'In {mediaServer}, choose Identify and enter {idName} id {id} or IMDb id {alt}. This clears after the next Match Check.',
+  matchItem:
+    'In Silo, choose Match Item and pick {expected}. This clears after the next Match Check.',
+  matchItemById:
+    'In Silo, choose Match Item and enter {idName} id {id}. This clears after the next Match Check.',
+  matchItemDifferentId:
+    'In Silo, choose Match Item and enter {idName} id {id}. If nothing’s found, {server}’s entry may be outdated.',
+  matchItemByIdAlt:
+    'In Silo, choose Match Item and enter {idName} id {id} or IMDb id {alt}. This clears after the next Match Check.',
   fileWrong:
     '{server}’s file may not be {expected}: it runs {file} min, the movie {film} min. Replace the file in {server}; don’t fix the match.',
   rename:
@@ -111,24 +119,37 @@ const MatchProblem = ({
         : sameName(problem.matched, problem.expected)
           ? messages.otherSameName
           : messages.other;
-  const plex = mediaServer === 'Plex';
+  // What each server calls putting a match right.
+  const words =
+    mediaServer === 'Plex'
+      ? {
+          plain: messages.fix,
+          differentId: messages.fixDifferentId,
+          byIdAlt: messages.fixByIdAlt,
+          byId: messages.fixById,
+        }
+      : mediaServer === 'Silo'
+        ? {
+            plain: messages.matchItem,
+            differentId: messages.matchItemDifferentId,
+            byIdAlt: messages.matchItemByIdAlt,
+            byId: messages.matchItemById,
+          }
+        : {
+            plain: messages.identify,
+            differentId: messages.identifyDifferentId,
+            byIdAlt: messages.identifyByIdAlt,
+            byId: messages.identifyById,
+          };
   const fix = wrongFile
     ? messages.fileWrong
     : !want
-      ? plex
-        ? messages.fix
-        : messages.identify
+      ? words.plain
       : problem.reason === 'differentId'
-        ? plex
-          ? messages.fixDifferentId
-          : messages.identifyDifferentId
+        ? words.differentId
         : alt
-          ? plex
-            ? messages.fixByIdAlt
-            : messages.identifyByIdAlt
-          : plex
-            ? messages.fixById
-            : messages.identifyById;
+          ? words.byIdAlt
+          : words.byId;
 
   return (
     <section className="mb-6 rounded-lg bg-yellow-900/30 p-4 ring-1 ring-yellow-600/60 light:bg-warning-soft/20 light:ring-warning">

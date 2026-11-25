@@ -3,6 +3,7 @@ import { connectedServers, jellyfinFamily } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import { CompositeWatchSource } from '@server/lib/watchHistory/composite';
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
+import { SiloWatchSource } from '@server/lib/watchHistory/silo';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
 import type { WatchSource } from '@server/lib/watchHistory/types';
 
@@ -14,7 +15,8 @@ export {
 export type { Play, WatchSource } from '@server/lib/watchHistory/types';
 
 /**
- * Tautulli for Plex (if configured); the server itself for Jellyfin and Emby.
+ * Tautulli for Plex (if configured); the server itself for Jellyfin and Emby;
+ * Seerr AI's copy of its play history for Silo.
  */
 const serverWatchSource = (
   server: MediaServerKind
@@ -24,6 +26,10 @@ const serverWatchSource = (
     return tautulli.hostname && tautulli.apiKey
       ? new TautulliWatchSource(tautulli)
       : undefined;
+  }
+  // Seerr AI's copy of Silo's history, kept by lib/siloHistory.
+  if (server === 'silo') {
+    return getSettings().silo.apiKey ? new SiloWatchSource() : undefined;
   }
   const { ip, apiKey } = jellyfinFamily(server);
   return ip && apiKey ? new JellyfinWatchSource(server, apiKey) : undefined;

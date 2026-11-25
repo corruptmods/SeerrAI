@@ -21,11 +21,24 @@ import {
   viewerReach,
 } from '@server/lib/libraryVisibility';
 import { Permission } from '@server/lib/permissions';
-import { getSettings, jellyfinDefaults } from '@server/lib/settings';
+import {
+  getSettings,
+  jellyfinDefaults,
+  siloDefaults,
+} from '@server/lib/settings';
 import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
+import { createFakeSilo } from '@server/test/fakeSilo';
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+  mock,
+} from 'node:test';
 
 /*
  * Showing people only what their libraries hold: which copies of a title a
@@ -349,6 +362,105 @@ describe('whose libraries limit what they see', () => {
     assert.deepEqual(await viewerReach(viewer()), {
       plex: 'all',
       jellyfin: new Set(),
+    });
+  });
+
+  describe('on Silo', () => {
+    const silo = createFakeSilo();
+    before(() => silo.start());
+    after(() => silo.stop());
+
+    beforeEach(() => {
+      silo.reset();
+      silo.accounts = [
+        { id: '1', username: 'owner', password: 'pw', role: 'admin' },
+        {
+          id: '2',
+          username: 'lantern',
+          password: 'song',
+          role: 'user',
+          libraryIds: ['1'],
+        },
+        {
+          id: '3',
+          username: 'garden',
+          password: 'pw',
+          role: 'user',
+          groupLibraryIds: ['2', '3'],
+        },
+        { id: '4', username: 'harbour', password: 'pw', role: 'user' },
+        {
+          id: '5',
+          username: 'gone',
+          password: 'pw',
+          role: 'user',
+          enabled: false,
+        },
+      ];
+      getSettings().silo = silo.settings();
+      // Everything on Plex, so only Silo limits anyone.
+      shared['501'] = { all: true, libraries: ['9001', '9002'] };
+    });
+
+    afterEach(() => {
+      getSettings().silo = siloDefaults();
+    });
+
+    const siloReach = async (siloUserId?: string) =>
+      (await viewerReach(viewer({ siloUserId })))?.silo;
+
+    it('reads each person’s libraries as Silo enforces them', async () => {
+      assert.deepEqual(await siloReach('2'), new Set(['1']));
+      // Their access group's, when they have none of their own.
+      assert.deepEqual(await siloReach('3'), new Set(['2', '3']));
+      // An administrator, or someone with no list, sees every library.
+      assert.equal(await siloReach('1'), undefined);
+      assert.equal(await siloReach('4'), undefined);
+      assert.ok(
+        silo.calls.some((c) => c.path === '/admin/users/2'),
+        'read with the server key'
+      );
+    });
+
+    it('gives no library to someone unlinked, switched off or gone from Silo', async () => {
+      assert.deepEqual(await siloReach(undefined), new Set());
+      assert.deepEqual(await siloReach('5'), new Set());
+      assert.deepEqual(await siloReach('9'), new Set());
+    });
+
+    it('limits nothing on Silo, and logs it, while Silo cannot be read', async () => {
+      silo.down = true;
+      const warn = mock.method(logger, 'warn', () => logger);
+      assert.equal(await siloReach('2'), undefined);
+      assert.ok(warn.mock.callCount() >= 1);
+    });
+
+    it('shows a title held only in a Silo library they can’t open as not available to them', async () => {
+      const media = await getRepository(Media).save(
+        new Media({
+          tmdbId: 9701,
+          mediaType: MediaType.MOVIE,
+          status: MediaStatus.AVAILABLE,
+          siloMediaId: 'movie-9701',
+        })
+      );
+      await getRepository(MediaLibraryItem).save(
+        new MediaLibraryItem({
+          mediaId: media.id,
+          server: 'silo',
+          libraryId: '2',
+          itemId: 'movie-9701',
+        })
+      );
+      const shown = await getRepository(Media).findOneByOrFail({
+        id: media.id,
+      });
+      await limitToLibraries([shown], viewer({ siloUserId: '2' }));
+      assert.equal(shown.status, MediaStatus.UNKNOWN);
+      assert.equal(shown.outsideLibraries, true);
+      const open = await getRepository(Media).findOneByOrFail({ id: media.id });
+      await limitToLibraries([open], viewer({ siloUserId: '3' }));
+      assert.equal(open.status, MediaStatus.AVAILABLE);
     });
   });
 

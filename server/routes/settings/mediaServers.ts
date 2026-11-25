@@ -32,8 +32,20 @@ import {
   jellyfinAccountColumns,
   primaryServer,
   serverName,
+  signInOffered,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import {
+  SILO_NEEDS_PATHS_SCOPE,
+  SILO_NEEDS_USERS_SCOPE,
+  siloHasScope,
+} from '@server/lib/silo';
+import {
+  SiloResetNeeded,
+  finishSiloReset,
+  storeSilo,
+  trySilo,
+} from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import { ApiError } from '@server/types/error';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
@@ -41,10 +53,10 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 
 /*
- * Settings → Media Servers: connecting and removing Plex, Jellyfin and Emby,
- * choosing the primary, and whether users may sign in with each. Editing a
- * connected server is at /settings/plex, /settings/jellyfin and
- * /settings/emby.
+ * Settings → Media Servers: connecting and removing Plex, Jellyfin, Emby and
+ * Silo, choosing the primary, and whether users may sign in with each.
+ * Editing a connected server is at /settings/plex, /settings/jellyfin,
+ * /settings/emby and /settings/silo.
  */
 
 /** Seerr's device id on a Jellyfin or Emby server, as used at setup. */
@@ -68,13 +80,15 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
     const scans = enabled
       .map((library) => library.lastScan)
       .filter((scan): scan is number => !!scan);
-    const family = isJellyfinFamily(kind) ? settings[kind] : undefined;
+    const family =
+      isJellyfinFamily(kind) || kind === 'silo' ? settings[kind] : undefined;
     return {
       kind,
       name: server.name ?? '',
       connected: connected.includes(kind),
       primary: kind === primary,
-      signIn: server.signIn !== false,
+      signIn: signInOffered(kind) && server.signIn !== false,
+      signInOffered: signInOffered(kind),
       libraries: libraries.length,
       enabledLibraries: enabled.length,
       lastScan: scans.length ? Math.max(...scans) : undefined,
@@ -90,14 +104,51 @@ const summaries = async (): Promise<MediaServerSummary[]> => {
           : { webAppUrl: settings.plex.webAppUrl ?? '' }),
       },
       ownerAccount: owner?.[USERNAME[kind]] || undefined,
+      ...(kind === 'silo' && connected.includes(kind)
+        ? { unavailable: siloUnavailable() }
+        : {}),
     };
   });
 };
 
-const listed = async (res: Response) => res.status(200).json(await summaries());
+/** What Silo's key can't do, by the optional scopes it lacks. */
+const siloUnavailable = (): NonNullable<MediaServerSummary['unavailable']> => [
+  ...(siloHasScope('admin:users')
+    ? []
+    : [{ feature: 'librarySharing' as const, reason: SILO_NEEDS_USERS_SCOPE }]),
+  ...(siloHasScope('admin:catalog:paths')
+    ? []
+    : [{ feature: 'matchCheck' as const, reason: SILO_NEEDS_PATHS_SCOPE }]),
+];
+
+/**
+ * The servers as listed; `notice` is something connecting changed that the
+ * admin should know, said on that server's entry.
+ */
+const listed = async (
+  res: Response,
+  notice?: { kind: MediaServerKind; text: string }
+) =>
+  res
+    .status(200)
+    .json(
+      (await summaries()).map((summary) =>
+        notice && summary.kind === notice.kind
+          ? { ...summary, notice: notice.text }
+          : summary
+      )
+    );
 
 /** Forwards a refused change with its status, anything else as a 500. */
 const failed = (next: NextFunction, e: unknown) => {
+  // A different Silo than before: the page asks, then sends confirmReset.
+  if (e instanceof SiloResetNeeded) {
+    return next({
+      status: e.status,
+      message: e.message,
+      errors: ['confirmReset'],
+    });
+  }
   if (e instanceof MediaServerChangeError) {
     return next({ status: e.status, message: e.message });
   }
@@ -198,6 +249,8 @@ interface ConnectBody {
   adminUserId?: string;
   linkOwner?: boolean;
   signIn?: boolean;
+  /** Silo: connect a different Silo than before, resetting the old one's. */
+  confirmReset?: boolean;
 }
 
 /*
@@ -315,6 +368,48 @@ const apiKeyAdmin = async (
     admin: { id: admin.Id, name: admin.Name },
     authToken: null,
   };
+};
+
+/*
+ * Connecting Silo: with an administrator's API key, or by signing in as an
+ * administrator once so Seerr AI creates its own key. Libraries are read at
+ * once and chosen at /settings/silo/library.
+ */
+const connectSilo = async (
+  req: Request,
+  body: ConnectBody
+): Promise<string | undefined> => {
+  // Before setup, Silo is set up as the primary server from the setup page.
+  if (!primaryServer()) {
+    throw new MediaServerChangeError(
+      400,
+      'Set up Seerr AI first; Silo can be chosen there as the primary server.'
+    );
+  }
+  const connection = await trySilo(body, {
+    confirmReset: body.confirmReset === true,
+    actingUserId: req.user?.id ?? 0,
+  });
+  const settings = getSettings();
+  const stored = await storeSilo(body, connection, {
+    connect: true,
+    by: { userId: req.user?.id },
+  });
+  stored.silo.signIn = body.signIn ?? stored.silo.signIn !== false;
+  const { reset } = stored;
+  try {
+    // Saved marked resetPending: nothing signs in through the new Silo
+    // until the old one is forgotten below.
+    if (reset) await settings.save();
+  } catch (e) {
+    // Exactly as before: the old Silo, with no reset mark.
+    settings.restore('silo', stored.previous);
+    throw e;
+  }
+  if (reset) {
+    await finishSiloReset({ sessionId: req.sessionID });
+  }
+  return reset;
 };
 
 /** A Jellyfin or Emby server's address from the form. */
@@ -443,13 +538,18 @@ mediaServerRoutes.post<{ kind: string }>(
     }
     try {
       const body = req.body as ConnectBody;
-      const done =
-        kind === 'plex'
-          ? await connectPlex(req, body, next)
-          : await connectJellyfinFamily(req, kind, body, next);
-      if (!done) return;
+      let notice: string | undefined;
+      if (kind === 'silo') {
+        notice = await connectSilo(req, body);
+      } else {
+        const done =
+          kind === 'plex'
+            ? await connectPlex(req, body, next)
+            : await connectJellyfinFamily(req, kind, body, next);
+        if (!done) return;
+      }
       await connected(kind);
-      return await listed(res);
+      return await listed(res, notice ? { kind, text: notice } : undefined);
     } catch (e) {
       return failed(next, e);
     }

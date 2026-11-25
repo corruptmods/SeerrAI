@@ -15,7 +15,7 @@ const PLEX_AVATAR =
 /**
  * A Plex avatar served through Seerr AI's cache, as plex.tv doesn't always
  * answer. The version number is kept, so a changed picture is refetched.
- * Jellyfin and Emby avatars already go through it.
+ * Jellyfin, Emby and Silo avatars already go through it.
  */
 export const avatarSrc = (src: string): string => {
   const plex = PLEX_AVATAR.exec(src);

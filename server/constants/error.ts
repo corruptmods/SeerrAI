@@ -19,5 +19,10 @@ export enum ApiErrorCode {
   ExistingAccount = 'EXISTING_ACCOUNT',
   /** The media server account is disabled there. */
   AccountDisabled = 'ACCOUNT_DISABLED',
+  /**
+   * The media server account holds a temporary password it must change
+   * there before signing in anywhere else.
+   */
+  PasswordChangeRequired = 'PASSWORD_CHANGE_REQUIRED',
   Unknown = 'UNKNOWN',
 }

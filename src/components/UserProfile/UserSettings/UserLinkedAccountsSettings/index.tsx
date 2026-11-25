@@ -5,8 +5,11 @@ import Alert from '@app/components/Common/Alert';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import Dropdown from '@app/components/Common/Dropdown';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiloLogo from '@app/components/Common/SiloLogo';
+import SiloCodeModal from '@app/components/Login/SiloCodeModal';
 import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
 import LinkJellyfinQuickConnectModal from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/LinkJellyfinQuickConnectModal';
+import SiloProfilePicker from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/SiloProfilePicker';
 import usePlexLogin from '@app/hooks/usePlexLogin';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -16,10 +19,7 @@ import { SERVER_NAMES, accountServers } from '@app/utils/mediaServerAccounts';
 import { KeyIcon } from '@heroicons/react/24/outline';
 import { TrashIcon } from '@heroicons/react/24/solid';
 import { oidcApplicationUrl } from '@server/constants/oidc';
-import type {
-  JellyfinFamilyKind,
-  MediaServerKind,
-} from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
@@ -53,6 +53,7 @@ const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
   plex: PlexLogo,
   jellyfin: JellyfinLogo,
   emby: EmbyLogo,
+  silo: SiloLogo,
 };
 
 type LinkedAccount = {
@@ -86,8 +87,9 @@ const UserLinkedAccountsSettings = () => {
     user ? `/api/v1/user/${user?.id}/settings/password` : null
   );
   const [jellyfinModalKind, setJellyfinModalKind] = useState<
-    JellyfinFamilyKind | undefined
+    Exclude<MediaServerKind, 'plex'> | undefined
   >();
+  const [showSiloCode, setShowSiloCode] = useState(false);
   const [showJellyfinQuickConnectModal, setShowJellyfinQuickConnectModal] =
     useState(false);
   const { data: providerLinks, mutate: revalidateProviderLinks } = useSWR<
@@ -114,6 +116,7 @@ const UserLinkedAccountsSettings = () => {
       plex: user.plexUsername,
       jellyfin: user.jellyfinUsername,
       emby: user.embyUsername,
+      silo: user.siloUsername,
     };
     return accountServers(user).map((kind) => ({
       kind,
@@ -356,6 +359,9 @@ const UserLinkedAccountsSettings = () => {
                   <div className="break-words text-xl font-semibold text-strong">
                     {acct.username}
                   </div>
+                  {acct.kind === 'silo' && acct.connected && user && (
+                    <SiloProfilePicker userId={user.id} />
+                  )}
                 </div>
                 <div className="flex-grow" />
                 {mayUnlink(acct) && (
@@ -439,10 +445,27 @@ const UserLinkedAccountsSettings = () => {
           revalidateUser();
         }}
         onSwitchToQuickConnect={() => {
+          const silo = jellyfinModalKind === 'silo';
           setJellyfinModalKind(undefined);
-          setShowJellyfinQuickConnectModal(true);
+          if (silo) {
+            setShowSiloCode(true);
+          } else {
+            setShowJellyfinQuickConnectModal(true);
+          }
         }}
       />
+
+      {showSiloCode && user && (
+        <SiloCodeModal
+          linking
+          endpoint={`/api/v1/user/${user.id}/settings/linked-accounts/silo`}
+          onApproved={() => {
+            setShowSiloCode(false);
+            revalidateUser();
+          }}
+          onClose={() => setShowSiloCode(false)}
+        />
+      )}
 
       <LinkJellyfinQuickConnectModal
         show={showJellyfinQuickConnectModal}

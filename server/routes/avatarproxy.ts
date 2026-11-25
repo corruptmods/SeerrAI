@@ -1,3 +1,4 @@
+import { SiloError } from '@server/api/silo/client';
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
@@ -12,6 +13,19 @@ import {
   jellyfinFamilyServer,
   USER_ID,
 } from '@server/lib/mediaServers';
+import { getSettings } from '@server/lib/settings';
+import {
+  siloClient,
+  siloEpoch,
+  siloEpochCurrent,
+  siloResetPending,
+} from '@server/lib/silo';
+import {
+  pictureProfile,
+  pictureVersion,
+  siloProfiles,
+  siloProfilesForPicture,
+} from '@server/lib/siloAccounts';
 import logger from '@server/logger';
 import axios from 'axios';
 import type { Request, Response } from 'express';
@@ -57,10 +71,46 @@ function computeImageHash(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+/**
+ * Whether a Silo account's picture changed: its chosen (else primary)
+ * profile shows another one. Stores the new version on the user.
+ */
+const checkSiloAvatarChanged = async (
+  user: User
+): Promise<{ changed: boolean; etag?: string }> => {
+  // Not from a link a different Silo's reset is about to clear.
+  if (!user.siloUserId || siloResetPending()) return { changed: false };
+  const epoch = siloEpoch();
+  const profiles = await siloProfiles(user.siloUserId);
+  if (!siloEpochCurrent(epoch)) return { changed: false };
+  const version = pictureVersion(pictureProfile(profiles, user.siloProfileId));
+  if ((user.avatarVersion ?? '') === version) {
+    return { changed: false, etag: user.avatarETag ?? undefined };
+  }
+  user.avatarVersion = version || null;
+  user.avatarETag = version || null;
+  await getRepository(User).update(user.id, {
+    avatarVersion: user.avatarVersion,
+    avatarETag: user.avatarETag,
+  });
+  return { changed: true, etag: version };
+};
+
 export async function checkAvatarChanged(
   user: User,
-  server?: JellyfinFamilyKind
+  server?: JellyfinFamilyKind | 'silo'
 ): Promise<{ changed: boolean; etag?: string }> {
+  if (server === 'silo') {
+    try {
+      return await checkSiloAvatarChanged(user);
+    } catch (e) {
+      logger.warn('Could not check a Silo picture', {
+        label: 'Avatar',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return { changed: false };
+    }
+  }
   try {
     const kind = user ? (server ?? avatarServerOf(user)) : undefined;
     const accountId = kind ? user[USER_ID[kind]] : undefined;
@@ -211,6 +261,91 @@ router.get('/plex/:plexAvatarId', async (req, res, next) => {
     return sendPicture(req, res, imageData);
   } catch (e) {
     logger.warn('Could not fetch a Plex avatar', { errorMessage: e.message });
+    if (!res.headersSent) {
+      return sendSilhouette(res);
+    }
+    next(e);
+  }
+});
+
+/** Silo account ids: opaque, but plain. */
+const SILO_ACCOUNT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/**
+ * A Silo account's picture: its chosen (else primary) profile's, read with
+ * the server key. Silo may name a signed address that expires, so where the
+ * picture lives is read again every couple of minutes (once however many ask
+ * meanwhile, never waiting out a rate limit); the cache keeps it by the
+ * picture, not by that address. The key goes only to Silo itself. Only
+ * accounts someone here has; others get the stand-in.
+ */
+router.get('/silo/:accountId', async (req, res, next) => {
+  const accountId = req.params.accountId;
+  if (!SILO_ACCOUNT_ID.test(accountId)) {
+    return next({ status: 400, message: 'Provided URL is not a Silo avatar.' });
+  }
+  try {
+    const user = await getRepository(User).findOne({
+      where: { siloUserId: accountId },
+    });
+    const fallbackUrl = gravatarUrl(user?.email || 'none', {
+      default: 'mm',
+      size: 200,
+    });
+    const avatarImageCache = initAvatarImageProxy();
+    // While a different Silo's reset is under way, the link names an
+    // account on the old Silo, someone else's on the new one.
+    if (!user || !connectedServers().includes('silo') || siloResetPending()) {
+      return sendPicture(
+        req,
+        res,
+        await avatarImageCache.getImage(fallbackUrl)
+      );
+    }
+
+    const epoch = siloEpoch();
+    let profile;
+    try {
+      profile = pictureProfile(
+        await siloProfilesForPicture(accountId),
+        user.siloProfileId
+      );
+      if (!siloEpochCurrent(epoch)) profile = undefined;
+    } catch (e) {
+      if (!(e instanceof SiloError)) throw e;
+      logger.debug('Could not read a Silo account’s profiles', {
+        label: 'Avatar',
+        status: e.status,
+      });
+    }
+    const client = siloClient({ timeout: 10_000 });
+    const where = profile?.avatar_url
+      ? client.pictureAddress(profile.avatar_url)
+      : undefined;
+    let imageData;
+    if (profile && where) {
+      const proxy = where.onSilo
+        ? new ImageProxy('avatar', '', {
+            headers: {
+              Authorization: `Bearer ${getSettings().silo.apiKey}`,
+            },
+          })
+        : avatarImageCache;
+      imageData = await proxy.getImage(where.url, fallbackUrl, {
+        cacheAs: `silo:${accountId}:${profile.id}:${profile.avatar ?? ''}`,
+      });
+      if (imageData.meta.extension === 'json') {
+        imageData = await avatarImageCache.getImage(fallbackUrl);
+      }
+    } else {
+      imageData = await avatarImageCache.getImage(fallbackUrl);
+    }
+    return sendPicture(req, res, imageData);
+  } catch (e) {
+    logger.warn('Could not fetch a Silo avatar', {
+      label: 'Avatar',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
     if (!res.headersSent) {
       return sendSilhouette(res);
     }

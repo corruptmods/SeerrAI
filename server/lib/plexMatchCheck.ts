@@ -4,6 +4,7 @@ import PlexAPI from '@server/api/plexapi';
 import type { RadarrMovie } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import type { SiloCatalogItem } from '@server/api/silo/types';
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
@@ -14,6 +15,14 @@ import {
   serverName,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import {
+  SILO_NEEDS_PATHS_SCOPE,
+  siloClient,
+  siloEpoch,
+  siloEpochCurrent,
+  siloHasScope,
+  siloSettings,
+} from '@server/lib/silo';
 import logger from '@server/logger';
 import type { MatchKind } from '@server/utils/plexMatch';
 import { runtimeMinutes } from '@server/utils/plexMatch';
@@ -21,7 +30,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 /*
- * Match Check: folders each connected media server (Plex, Jellyfin, Emby) has
+ * Match Check: folders each connected media server (Plex, Jellyfin, Emby,
+ * Silo) has
  * matched to a different title than Sonarr or Radarr has there, or not matched
  * at all. One report covers every server; each problem names its server.
  *
@@ -30,11 +40,12 @@ import path from 'node:path';
  * Diaries" made the wrong title available in Seerr, left the right one
  * unchecked, and showed the other show's subtitles. Each item's folder is
  * looked up in Sonarr or Radarr by name and the ids compared. Report only:
- * nothing is changed; the fix is "Fix Match" in Plex or "Identify" in
- * Jellyfin and Emby.
+ * nothing is changed; the fix is "Fix Match" in Plex, "Identify" in
+ * Jellyfin and Emby, or "Match Item" in Silo. Silo is read only with the
+ * optional admin:catalog:paths scope, which shows each file's path.
  */
 
-export type MediaServerName = 'Plex' | 'Jellyfin' | 'Emby';
+export type MediaServerName = 'Plex' | 'Jellyfin' | 'Emby' | 'Silo';
 
 export interface PlexMatchProblem {
   /** Music comes only from the new-request check (lib/matchWatch). */
@@ -93,6 +104,8 @@ export interface PlexMatchProblem {
 export interface PlexMatchReport {
   finishedAt: string | null;
   running: boolean;
+  /** Servers left out on purpose, and why (Silo without its scope). */
+  notes?: string[];
   /** Items whose folder Sonarr or Radarr has. */
   checked: number;
   /** Items that couldn't be compared: no folder, or no shared id. */
@@ -279,6 +292,88 @@ export const jellyfinMatchItem = (
       ? msToMinutes(item.RunTimeTicks / 10_000)
       : undefined,
 });
+
+/**
+ * Folder names a season's episodes are kept in, under the series folder:
+ * "Season 1", "S01", "Specials" and their translations, and nothing more,
+ * so a series folder such as "Extras (2005)" in a flat layout is never
+ * taken for one.
+ */
+const SEASON_FOLDER =
+  /^(?:(?:season|series|staffel|saison|temporada|stagione|seizoen)[ ._-]*\d{1,4}|s\d{1,3}|specials?)$/i;
+
+/**
+ * A series' folder from one of its episode files: the file's folder, or the
+ * one above it when that is a season folder.
+ */
+export const seriesFolderOf = (file: string): string => {
+  const parts = file.split(/[\\/]/).filter(Boolean);
+  const parent = parts[parts.length - 2] ?? '';
+  return SEASON_FOLDER.test(parent) ? (parts[parts.length - 3] ?? '') : parent;
+};
+
+/** A Silo catalog item's provider ids. */
+export const siloIds = (item: SiloCatalogItem): Ids => {
+  const ids: Ids = {};
+  const tmdb = Number(item.tmdb_id);
+  const tvdb = Number(item.tvdb_id);
+  if (Number.isInteger(tmdb) && tmdb > 0) ids.tmdbId = tmdb;
+  if (Number.isInteger(tvdb) && tvdb > 0) ids.tvdbId = tvdb;
+  if (item.imdb_id && /^tt\d+$/.test(item.imdb_id)) ids.imdbId = item.imdb_id;
+  return ids;
+};
+
+/**
+ * A Silo film or series as the check needs it. A film's folders come from
+ * its own files; a series' are those its episodes' files are in
+ * (`seriesFolders`, from addSeriesFolders), as Silo lists no folder for a
+ * series.
+ */
+export const siloMatchItem = (
+  kind: 'movie' | 'series',
+  item: SiloCatalogItem,
+  seriesFolders: Iterable<string> = []
+): MatchItem => ({
+  title: item.title,
+  year: item.year,
+  key: item.content_id,
+  folders: [
+    ...new Set(
+      kind === 'series'
+        ? seriesFolders
+        : item.versions.flatMap((v) =>
+            v.file_path ? [parentFolder(v.file_path)] : []
+          )
+    ),
+  ].filter(Boolean),
+  ids: siloIds(item),
+});
+
+/** The series folders a Silo episode's files are in. */
+export const episodeSeriesFolders = (episode: SiloCatalogItem): string[] =>
+  episode.versions.flatMap((version) => {
+    const folder = version.file_path ? seriesFolderOf(version.file_path) : '';
+    return folder ? [folder] : [];
+  });
+
+/**
+ * Adds the series folders of these Silo episodes' files to `folders`, by
+ * series id: only the folder names are kept, not the episodes.
+ */
+export const addSeriesFolders = (
+  folders: Map<string, Set<string>>,
+  episodes: { seriesId?: string | null; folders: string[] }[]
+): void => {
+  for (const episode of episodes) {
+    if (!episode.seriesId) continue;
+    let found = folders.get(episode.seriesId);
+    if (!found) {
+      found = new Set();
+      folders.set(episode.seriesId, found);
+    }
+    for (const folder of episode.folders) found.add(folder);
+  }
+};
 
 /**
  * Radarr facts that show whose mistake a wrong match is: the film's runtime,
@@ -609,6 +704,80 @@ class PlexMatchCheck {
     }
   }
 
+  /**
+   * Silo: each enabled library's films, and its series with their episodes'
+   * files, read with their paths (admin:catalog:paths).
+   */
+  private async checkSilo(
+    report: PlexMatchReport,
+    expected: {
+      series: Map<string, Expected[]>;
+      movies: Map<string, Expected[]>;
+    }
+  ): Promise<void> {
+    const client = siloClient();
+    await client.getCompatibleInfo();
+    for (const library of siloSettings().libraries) {
+      if (!library.enabled || this.cancelled) continue;
+      if (library.type === 'movie' || library.type === 'mixed') {
+        // A page at a time: a large library's files aren't all held.
+        for await (const films of client.catalogItemPages({
+          libraryId: library.id,
+          type: 'movie',
+          includeFilePaths: true,
+        })) {
+          for (const film of films) {
+            this.tally(
+              report,
+              compareMatch(
+                'movie',
+                siloMatchItem('movie', film),
+                expected.movies,
+                'Silo'
+              )
+            );
+          }
+          if (this.cancelled) break;
+        }
+      }
+      if (this.cancelled) break;
+      if (library.type === 'show' || library.type === 'mixed') {
+        // Each series' folders, from its episodes a page at a time.
+        const folders = new Map<string, Set<string>>();
+        for await (const episodes of client.catalogItemPages({
+          libraryId: library.id,
+          type: 'episode',
+          includeFilePaths: true,
+        })) {
+          addSeriesFolders(
+            folders,
+            episodes.map((episode) => ({
+              seriesId: episode.series_id,
+              folders: episodeSeriesFolders(episode),
+            }))
+          );
+          if (this.cancelled) break;
+        }
+        if (this.cancelled) break;
+        const series = await client.listCatalogItems({
+          libraryId: library.id,
+          type: 'series',
+        });
+        for (const show of series) {
+          this.tally(
+            report,
+            compareMatch(
+              'series',
+              siloMatchItem('series', show, folders.get(show.content_id)),
+              expected.series,
+              'Silo'
+            )
+          );
+        }
+      }
+    }
+  }
+
   private tally(
     report: PlexMatchReport,
     { checked, problem }: { checked: boolean; problem?: PlexMatchProblem }
@@ -622,6 +791,9 @@ class PlexMatchCheck {
     if (this.running) return;
     this.running = true;
     this.cancelled = false;
+    // A different Silo's reset drops Silo's findings (dropServer); one
+    // marked during this run means what it read of Silo is the old one's.
+    const epoch = siloEpoch();
     const report: PlexMatchReport = {
       finishedAt: null,
       running: false,
@@ -629,16 +801,26 @@ class PlexMatchCheck {
       notChecked: 0,
       problems: [],
     };
-    // Servers this run can't speak for: not read, or not reached.
+    // Servers this run can't speak for: not read, or not reached. Silo is
+    // read only when its key may see file paths.
+    const skipped =
+      connectedServers().includes('silo') &&
+      !siloHasScope('admin:catalog:paths');
+    if (skipped) report.notes = [SILO_NEEDS_PATHS_SCOPE];
+    const checked = connectedServers().filter(
+      (server) => !(server === 'silo' && skipped)
+    );
     let unread: MediaServerName[] = connectedServers().map(
       (server) => serverName(server) as MediaServerName
     );
     try {
-      const servers = connectedServers();
-      if (!servers.length) {
+      const servers = checked;
+      if (!servers.length && !skipped) {
         throw new Error('No media server is set up.');
       }
-      const { series, movies } = await this.expectedFolders();
+      const { series, movies } = servers.length
+        ? await this.expectedFolders()
+        : { series: new Map(), movies: new Map() };
       // Each connected server separately: one unreadable server leaves the
       // others' findings, and the report names it.
       const failed: { server: MediaServerName; message: string }[] = [];
@@ -647,6 +829,8 @@ class PlexMatchCheck {
         try {
           if (server === 'plex') {
             await this.checkPlex(report, { series, movies });
+          } else if (server === 'silo') {
+            await this.checkSilo(report, { series, movies });
           } else {
             await this.checkJellyfin(report, server, { series, movies });
           }
@@ -670,7 +854,10 @@ class PlexMatchCheck {
       const stillFailed = failed.filter((f) =>
         stillConnected.includes(f.server)
       );
-      unread = failed.map((f) => f.server);
+      unread = [
+        ...failed.map((f) => f.server),
+        ...(skipped ? (['Silo'] as MediaServerName[]) : []),
+      ];
       report.problems.sort((a, b) =>
         a.expected.title.localeCompare(b.expected.title)
       );
@@ -703,6 +890,14 @@ class PlexMatchCheck {
           label: 'Match Check',
         });
       } else {
+        if (!siloEpochCurrent(epoch)) {
+          report.problems = report.problems.filter(
+            (p) => p.mediaServer !== 'Silo'
+          );
+          if (connectedServers().includes('silo') && !unread.includes('Silo')) {
+            unread.push('Silo');
+          }
+        }
         report.finishedAt = new Date().toISOString();
         this.report = report;
         await fs.writeFile(REPORT_PATH, JSON.stringify(report)).catch((e) =>

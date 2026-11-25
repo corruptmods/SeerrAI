@@ -11,6 +11,9 @@ import ProwlarrAPI from '@server/api/prowlarr';
 import type LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import type SiloAPI from '@server/api/silo/client';
+import { SiloError, toSiloError } from '@server/api/silo/client';
+import { SiloIncompatibleError } from '@server/api/silo/compat';
 import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import {
@@ -54,6 +57,7 @@ import { lastStates } from '@server/lib/quality/engine';
 import { readTrashState } from '@server/lib/quality/trash';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
+import { siloClient } from '@server/lib/silo';
 import type { ShownId } from '@server/utils/plexMatch';
 import {
   comparedIds,
@@ -561,6 +565,89 @@ const serviceDown = (id: string, name: string, e: unknown): HealthCheck => ({
 });
 
 /**
+ * Silo: answering, speaking the API Seerr AI knows, and what its own status
+ * reports (a restart it needs, its database or cache down). Uses the key, as
+ * the scans do.
+ */
+export const siloCheck = async (
+  api: Pick<SiloAPI, 'getCompatibleInfo' | 'getServerStatus' | 'getIdentity'>,
+  /** The server id Seerr AI connected to; checked when given. */
+  serverId?: string
+): Promise<HealthCheck> => {
+  const started = Date.now();
+  try {
+    const info = await withTimeout(api.getCompatibleInfo(), SERVICE_TIMEOUT_MS);
+    const status = await withTimeout(api.getServerStatus(), SERVICE_TIMEOUT_MS);
+    const found: { status: HealthStatus; item: HealthItem }[] = [];
+    if (serverId) {
+      const answering = await withTimeout(
+        api.getIdentity(),
+        SERVICE_TIMEOUT_MS
+      );
+      if (answering.server_id !== serverId) {
+        found.push({
+          status: 'error',
+          item: {
+            title: 'A different Silo answers at this address',
+            detail:
+              'Silo sign-ins and account links are refused until an administrator connects Silo again (Settings → Media Servers).',
+          },
+        });
+      }
+    }
+    if (status.restart_required) {
+      found.push({
+        status: 'warning',
+        item: {
+          title: 'Silo needs a restart',
+          ...(status.restart_required_reason
+            ? { detail: status.restart_required_reason }
+            : {}),
+        },
+      });
+    }
+    for (const [part, label] of [
+      ['postgres', 'database'],
+      ['redis', 'cache'],
+    ] as const) {
+      const component = status.health?.[part];
+      if (component?.configured && component.ok === false) {
+        found.push({
+          status: 'error',
+          item: { title: `Silo can't reach its ${label}` },
+        });
+      }
+    }
+    return reported(
+      'silo',
+      'Silo',
+      Date.now() - started,
+      found,
+      info.server_version && info.server_version !== 'unavailable'
+        ? `Silo ${info.server_version}, API v${info.api_major}`
+        : `API v${info.api_major}`
+    );
+  } catch (e) {
+    const error = e instanceof SiloIncompatibleError ? e : toSiloError(e);
+    const status = error instanceof SiloError ? error.status : undefined;
+    return {
+      id: 'silo',
+      group: 'services',
+      name: 'Silo',
+      status: 'error',
+      count: 1,
+      detail:
+        status === 401
+          ? 'Silo did not accept the API key (Settings → Silo).'
+          : status === 403
+            ? 'The API key lacks the admin:monitor:read scope (Settings → Silo).'
+            : error.message,
+      items: [],
+    };
+  }
+};
+
+/**
  * Jellyfin or Emby: answering with its version, or why not. Checks the API
  * key, since scans and watch history use it.
  */
@@ -701,6 +788,15 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
           timeout: SERVICE_TIMEOUT_MS,
         }).getStatus();
       })
+    );
+  }
+
+  if (mediaServers.includes('silo') && settings.silo.ip) {
+    pending.push(
+      siloCheck(
+        siloClient({ timeout: SERVICE_TIMEOUT_MS }),
+        settings.silo.serverId
+      )
     );
   }
 
@@ -1424,6 +1520,11 @@ export const fixMatchText = (
       ? `Fix Match in Plex, searching ${typed(want)}${also ? ` or ${typed(also)}` : ''}`
       : 'Fix Match in Plex';
   }
+  if (server === 'Silo') {
+    return want
+      ? `Match Item in Silo, entering ${entered(want)}${also ? ` or ${entered(also)}` : ''}`
+      : 'Match Item in Silo';
+  }
   return want
     ? `Identify in ${server}, entering ${entered(want)}${also ? ` or ${entered(also)}` : ''}`
     : `Identify in ${server}`;
@@ -1605,18 +1706,22 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
               : undefined,
       };
     }),
-    detail: report.error
-      ? `The last check could not finish: ${report.error}`
-      : report.finishedAt
-        ? [
-            `${report.checked} checked ${ago(new Date(report.finishedAt))}`,
-            report.notChecked
-              ? `${report.notChecked} could not be compared (no folder, or no id both sides have)`
-              : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')
-        : 'Runs nightly (Settings → Jobs → Match Check)',
+    detail: [
+      report.error
+        ? `The last check could not finish: ${report.error}`
+        : report.finishedAt
+          ? [
+              `${report.checked} checked ${ago(new Date(report.finishedAt))}`,
+              report.notChecked
+                ? `${report.notChecked} could not be compared (no folder, or no id both sides have)`
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          : 'Runs nightly (Settings → Jobs → Match Check)',
+      // Servers left out on purpose (Silo without its scope).
+      ...(report.notes ?? []),
+    ].join(' · '),
     items: items.map((p) => ({
       ...plexMatchText(p),
       ...(fixable(p) ? { fix: problemKey(p) } : {}),

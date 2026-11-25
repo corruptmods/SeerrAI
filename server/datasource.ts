@@ -44,6 +44,8 @@ import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { Session } from '@server/entity/Session';
+import SiloEpisode from '@server/entity/SiloEpisode';
+import SiloPlay from '@server/entity/SiloPlay';
 import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import UsedActionToken from '@server/entity/UsedActionToken';
@@ -116,6 +118,8 @@ const entities = [
   SeasonRequest,
   Session,
   SongFetch,
+  SiloEpisode,
+  SiloPlay,
   SongRequest,
   UsedActionToken,
   User,

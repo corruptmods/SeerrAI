@@ -155,7 +155,8 @@ class PlexScanner
                   addedAt: library.lastScan - 1000 * 60 * 10,
                 }
               : undefined,
-            library.type
+            // Plex libraries are never mixed.
+            library.type as 'movie' | 'show'
           );
           const due = await this.refreshed(
             library,

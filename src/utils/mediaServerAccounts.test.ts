@@ -6,6 +6,7 @@ import {
   connectedAccountServers,
   hasAccountOn,
   mainServerOf,
+  musicServers,
   signInServers,
 } from './mediaServerAccounts';
 
@@ -78,5 +79,15 @@ describe('the servers people may sign in with', () => {
       signInServers({ mediaServerLogin: false, mediaServers }),
       []
     );
+  });
+});
+
+describe('servers with music', () => {
+  it('leaves out Silo, which has no music libraries', () => {
+    assert.deepEqual(
+      musicServers([{ kind: 'silo' }, { kind: 'plex' }, { kind: 'emby' }]),
+      ['plex', 'emby']
+    );
+    assert.deepEqual(musicServers([{ kind: 'silo' }]), []);
   });
 });

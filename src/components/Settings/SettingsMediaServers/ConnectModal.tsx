@@ -10,6 +10,7 @@ import {
 } from '@app/components/Settings/MusicLibraries';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
 import usePlexLogin from '@app/hooks/usePlexLogin';
+import useToasts from '@app/hooks/useToasts';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import type {
@@ -25,16 +26,17 @@ import { mutate } from 'swr';
 
 /*
  * Connecting a media server from Settings → Media Servers, loaded only on
- * Connect. Plex: the owner signs in, then picks a server. Jellyfin and Emby:
- * the address, then an admin sign-in or API key. Then, for any of them, its
- * libraries as found now (films, series and, while music is on, music), each
- * switched on or off before closing.
+ * Connect. Plex: the owner signs in, then picks a server. Jellyfin, Emby and
+ * Silo: the address, then an admin sign-in or API key. Then, for any of them,
+ * its libraries as found now (films, series and, while music is on, music;
+ * Silo has none), each switched on or off before closing.
  */
 
 const messages = defineMessages(
   'components.Settings.SettingsMediaServers.ConnectModal',
   {
     connectTitle: 'Connect {server}',
+    connectAnyway: 'Connect Anyway',
     plexOwnerOnly:
       'Only the owner can connect Plex, as Seerr AI reaches Plex through their account.',
     plexSignInDescription:
@@ -63,6 +65,10 @@ const messages = defineMessages(
     adminLogin: "An administrator's sign-in",
     adminLoginTip: 'Seerr AI makes itself an API key with it',
     apiKeyOption: 'An API key',
+    siloApiKeyTip:
+      'An administrator’s key with the admin:monitor:read and libraries:read scopes',
+    siloAdminLoginTip:
+      'Used once: Seerr AI makes itself an API key with it and signs out',
     username: 'Username',
     password: 'Password',
     apiKey: 'API Key',
@@ -111,12 +117,16 @@ type Step = 'account' | 'server' | 'libraries';
 
 const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const intl = useIntl();
+  const { addToast } = useToasts();
   const kind = server.kind;
   const name = SERVER_NAMES[kind];
   const isPlex = kind === 'plex';
+  const isSilo = kind === 'silo';
 
   const [step, setStep] = useState<Step>(isPlex ? 'account' : 'server');
   const [error, setError] = useState<string>();
+  // A different Silo than before: what connecting it removes, to confirm.
+  const [resetQuestion, setResetQuestion] = useState<string>();
   const [busy, setBusy] = useState(false);
 
   // Plex
@@ -126,7 +136,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   // The address Seerr last reached the server at, if any.
   const [hostname, setHostname] = useState(server.address.ip ?? '');
   const [port, setPort] = useState(
-    String(server.address.port || (isPlex ? 32400 : 8096))
+    String(server.address.port || (isPlex ? 32400 : isSilo ? 8090 : 8096))
   );
   const [useSsl, setUseSsl] = useState(!!server.address.useSsl);
   const [urlBase, setUrlBase] = useState(server.address.urlBase ?? '');
@@ -150,7 +160,8 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
 
   const settingsEndpoint = `/api/v1/settings/${kind}`;
   // Read once the libraries have been synced, below.
-  const music = useMusicLibraries(settingsEndpoint, !!libraries);
+  // Silo has no music libraries.
+  const music = useMusicLibraries(settingsEndpoint, !!libraries && !isSilo);
 
   const errorFor = (e: unknown): string => {
     const response = (
@@ -158,6 +169,10 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     )?.response;
     const status = response?.status;
     const code = response?.data?.message;
+    // Silo's refusals are already plain sentences.
+    if (isSilo && code && status !== 500) {
+      return code;
+    }
     if (code === 'NOT_ADMIN') {
       return intl.formatMessage(messages.errorNotAdmin, { server: name });
     }
@@ -265,7 +280,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
         `${settingsEndpoint}/library/sync`
       );
       // Music libraries as this sync found them, not as last cached.
-      if (music.ready) {
+      if (music.ready && !isSilo) {
         const key = musicLibrariesKey(settingsEndpoint);
         await mutate(
           key,
@@ -279,30 +294,51 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     }
   };
 
-  const connect = async () => {
+  const connect = async (confirmReset = false) => {
     setError(undefined);
+    setResetQuestion(undefined);
     setBusy(true);
     try {
-      await axios.post(`/api/v1/settings/media-servers/${kind}/connect`, {
-        hostname,
-        port: Number(port),
-        useSsl,
-        signIn,
-        ...(isPlex
-          ? {}
-          : {
-              urlBase,
-              externalHostname: externalUrl,
-              linkOwner: isOwner && linkOwner,
-              ...(method === 'login'
-                ? { username, password }
-                : { apiKey, adminUserId }),
-            }),
-      });
+      const res = await axios.post<MediaServerSummary[]>(
+        `/api/v1/settings/media-servers/${kind}/connect`,
+        {
+          hostname,
+          port: Number(port),
+          useSsl,
+          signIn,
+          ...(isPlex
+            ? {}
+            : isSilo
+              ? {
+                  urlBase,
+                  externalHostname: externalUrl,
+                  ...(method === 'login' ? { username, password } : { apiKey }),
+                  ...(confirmReset ? { confirmReset: true } : {}),
+                }
+              : {
+                  urlBase,
+                  externalHostname: externalUrl,
+                  linkOwner: isOwner && linkOwner,
+                  ...(method === 'login'
+                    ? { username, password }
+                    : { apiKey, adminUserId }),
+                }),
+        }
+      );
+      // Connecting a different Silo than before removes the old one's links.
+      const notice = res.data?.find?.((entry) => entry.kind === kind)?.notice;
+      if (notice) addToast(notice, { appearance: 'info' });
       setStep('libraries');
       syncLibraries();
     } catch (e) {
-      setError(errorFor(e));
+      const response = (
+        e as { response?: { data?: { message?: string; errors?: string[] } } }
+      )?.response;
+      if (isSilo && response?.data?.errors?.includes('confirmReset')) {
+        setResetQuestion(response.data.message);
+      } else {
+        setError(errorFor(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -335,7 +371,14 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const canConnect =
     !!hostname &&
     !!Number(port) &&
-    (isPlex || (method === 'login' ? !!username : !!apiKey && !!adminUserId));
+    (isPlex ||
+      (isSilo
+        ? method === 'login'
+          ? !!username && !!password
+          : !!apiKey
+        : method === 'login'
+          ? !!username
+          : !!apiKey && !!adminUserId));
 
   const title = intl.formatMessage(messages.connectTitle, { server: name });
 
@@ -392,37 +435,39 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                 </ul>
               )}
             </section>
-            <section aria-labelledby="connect-libraries-music">
-              <h4
-                id="connect-libraries-music"
-                className="mb-3 font-medium text-strong"
-              >
-                {intl.formatMessage(messages.music)}
-              </h4>
-              {!music.ready ? (
-                <MusicLibrariesOff linked />
-              ) : !music.data ? (
-                <div className="flex items-center gap-2 text-gray-300">
-                  <SmallLoadingSpinner />
-                  <span>{intl.formatMessage(messages.syncingLibraries)}</span>
-                </div>
-              ) : music.data.length === 0 ? (
-                <p className="text-sm text-gray-400">
-                  {intl.formatMessage(messages.noneFound)}
-                </p>
-              ) : (
-                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {music.data.map((library) => (
-                    <LibraryItem
-                      key={library.id}
-                      name={library.name}
-                      isEnabled={library.enabled}
-                      onToggle={() => music.toggle(library)}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
+            {!isSilo && (
+              <section aria-labelledby="connect-libraries-music">
+                <h4
+                  id="connect-libraries-music"
+                  className="mb-3 font-medium text-strong"
+                >
+                  {intl.formatMessage(messages.music)}
+                </h4>
+                {!music.ready ? (
+                  <MusicLibrariesOff linked />
+                ) : !music.data ? (
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <SmallLoadingSpinner />
+                    <span>{intl.formatMessage(messages.syncingLibraries)}</span>
+                  </div>
+                ) : music.data.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    {intl.formatMessage(messages.noneFound)}
+                  </p>
+                ) : (
+                  <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {music.data.map((library) => (
+                      <LibraryItem
+                        key={library.id}
+                        name={library.name}
+                        isEnabled={library.enabled}
+                        onToggle={() => music.toggle(library)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
           </div>
         )}
         <p className="mt-4 text-sm text-gray-400">
@@ -498,6 +543,20 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
       {error && (
         <div className="mb-4">
           <Alert type="error" title={error} />
+        </div>
+      )}
+      {resetQuestion && (
+        <div className="mb-4">
+          <Alert type="warning" title={resetQuestion}>
+            <Button
+              buttonType="danger"
+              buttonSize="sm"
+              disabled={busy}
+              onClick={() => connect(true)}
+            >
+              {intl.formatMessage(messages.connectAnyway)}
+            </Button>
+          </Alert>
         </div>
       )}
       {isPlex && (
@@ -650,7 +709,11 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                 <span>
                   {intl.formatMessage(messages.adminLogin)}
                   <span className="block text-sm text-gray-400">
-                    {intl.formatMessage(messages.adminLoginTip)}
+                    {intl.formatMessage(
+                      isSilo
+                        ? messages.siloAdminLoginTip
+                        : messages.adminLoginTip
+                    )}
                   </span>
                 </span>
               </label>
@@ -661,7 +724,14 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                   checked={method === 'apiKey'}
                   onChange={() => setMethod('apiKey')}
                 />
-                <span>{intl.formatMessage(messages.apiKeyOption)}</span>
+                <span>
+                  {intl.formatMessage(messages.apiKeyOption)}
+                  {isSilo && (
+                    <span className="block text-sm text-gray-400">
+                      {intl.formatMessage(messages.siloApiKeyTip)}
+                    </span>
+                  )}
+                </span>
               </label>
             </div>
           </div>
@@ -687,6 +757,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
               <div className="form-row">
                 <label htmlFor="connect-password" className="text-label">
                   {intl.formatMessage(messages.password)}
+                  {isSilo && <span className="label-required">*</span>}
                 </label>
                 <div className="form-input-area">
                   <div className="form-input-field">
@@ -714,7 +785,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                       id="connect-apikey"
                       type="text"
                       autoComplete="off"
-                      className="rounded-l-only"
+                      className={isSilo ? undefined : 'rounded-l-only'}
                       value={apiKey}
                       onChange={(e) => {
                         setApiKey(e.target.value);
@@ -722,14 +793,16 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
                         setAdminUserId('');
                       }}
                     />
-                    <Button
-                      type="button"
-                      className="rounded-l-none"
-                      disabled={busy || !hostname || !apiKey}
-                      onClick={() => findAdmins()}
-                    >
-                      {intl.formatMessage(messages.findAdmins)}
-                    </Button>
+                    {!isSilo && (
+                      <Button
+                        type="button"
+                        className="rounded-l-none"
+                        disabled={busy || !hostname || !apiKey}
+                        onClick={() => findAdmins()}
+                      >
+                        {intl.formatMessage(messages.findAdmins)}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -766,7 +839,7 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
               )}
             </>
           )}
-          {isOwner && (
+          {isOwner && !isSilo && (
             <div className="form-row">
               <label htmlFor="connect-mine" className="checkbox-label">
                 {intl.formatMessage(messages.myAccount)}
@@ -786,22 +859,24 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
           )}
         </>
       )}
-      <div className="form-row">
-        <label htmlFor="connect-signin" className="checkbox-label">
-          {intl.formatMessage(messages.allowSignIn, { server: name })}
-          <span className="label-tip">
-            {intl.formatMessage(messages.allowSignInTip, { server: name })}
-          </span>
-        </label>
-        <div className="form-input-area">
-          <input
-            id="connect-signin"
-            type="checkbox"
-            checked={signIn}
-            onChange={() => setSignIn(!signIn)}
-          />
+      {server.signInOffered !== false && (
+        <div className="form-row">
+          <label htmlFor="connect-signin" className="checkbox-label">
+            {intl.formatMessage(messages.allowSignIn, { server: name })}
+            <span className="label-tip">
+              {intl.formatMessage(messages.allowSignInTip, { server: name })}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <input
+              id="connect-signin"
+              type="checkbox"
+              checked={signIn}
+              onChange={() => setSignIn(!signIn)}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </Modal>
   );
 };

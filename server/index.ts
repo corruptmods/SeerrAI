@@ -33,6 +33,7 @@ import checkOverseerrMerge from '@server/lib/overseerrMerge';
 import playlists from '@server/lib/playlists';
 import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
+import { finishSiloReset } from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import apiPathCase from '@server/middleware/apiPathCase';
 import { unlessApiKey } from '@server/middleware/auth';
@@ -142,6 +143,10 @@ app
     // stored with them.
     await rememberJellyfinAdmins();
 
+    // A different Silo's reset cut short by a restart is finished before
+    // anyone signs in through it.
+    await finishSiloReset();
+
     if (
       isConnected('plex') &&
       settings.plex.libraries.length > 1 &&
@@ -232,7 +237,7 @@ app
       );
     } else {
       logger.info(
-        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
+        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby/Silo servers setup yet`,
         {
           label: 'Server',
         }

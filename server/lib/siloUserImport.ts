@@ -5,6 +5,7 @@ import { User } from '@server/entity/User';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { getSettings } from '@server/lib/settings';
 import { enabledSiloAccounts, siloAvatarPath } from '@server/lib/siloAccounts';
+import { siloAccountToRelink } from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { In } from 'typeorm';
@@ -73,6 +74,24 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
       continue;
     }
     if (chosen && !chosen.has(account.id)) continue;
+
+    // An account a different Silo's reset unlinked, with this Silo name,
+    // is linked again rather than left out for its name.
+    const unlinked = await siloAccountToRelink(account);
+    if (unlinked) {
+      await userRepository.update(unlinked.id, {
+        siloUserId: account.id,
+        siloUsername: account.username,
+        siloProfileId: null,
+        avatar: siloAvatarPath(account.id, unlinked.avatarVersion),
+      });
+      logger.info('Silo user linked again after a different Silo', {
+        label: 'API',
+        siloUserId: account.id,
+      });
+      refreshedUsers += 1;
+      continue;
+    }
 
     const taken = await userRepository
       .createQueryBuilder('user')

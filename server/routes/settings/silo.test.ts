@@ -14,6 +14,7 @@ import {
   signInAllowed,
   signInOffered,
 } from '@server/lib/mediaServers';
+import { Permission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner } from '@server/lib/scanners/silo';
 import { getSettings, siloDefaults } from '@server/lib/settings';
@@ -801,6 +802,45 @@ describe('connecting a different Silo, safely', () => {
       watchDropped.mock.calls.map((call) => call.arguments[0]),
       ['Silo']
     );
+  });
+
+  it('says who would be left without a way to sign in', async () => {
+    const users = getRepository(User);
+    await oldAccountTwo();
+    // An administrator from Silo with no password: never linked again by
+    // name.
+    await users.save(
+      new User({
+        email: 'lantern@test.local',
+        siloUserId: '3',
+        siloUsername: 'lantern',
+        userType: UserType.SILO,
+        permissions: Permission.ADMIN,
+        avatar: '',
+      })
+    );
+    // Has a password: not counted.
+    const harbour = new User({
+      email: 'harbour@test.local',
+      siloUserId: '5',
+      siloUsername: 'harbour',
+      userType: UserType.SILO,
+      avatar: '',
+    });
+    await harbour.setPassword('Harbour Lights 1');
+    await users.save(harbour);
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(res.status, 409);
+    const { message } = (await res.json()) as { message: string };
+    assert.match(message, /\(3\)/);
+    assert.match(
+      message,
+      /1 of them sign in only with Silo and are linked again when they next sign in with the new Silo under the same username/
+    );
+    assert.match(message, /1 of them would be left unable to sign in/);
   });
 
   it('refuses when the owner’s only other server can’t sign them in, and says how to fix it', async () => {

@@ -8,6 +8,7 @@ import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
 import { siloCheck } from '@server/lib/health';
+import { Permission } from '@server/lib/permissions';
 import { getSettings, siloDefaults } from '@server/lib/settings';
 import {
   maySignIn,
@@ -22,6 +23,7 @@ import {
   startSiloDevice,
 } from '@server/lib/siloAccounts';
 import { finishSiloReset } from '@server/lib/siloConnect';
+import { importSiloUsers } from '@server/lib/siloUserImport';
 import userAccessCheck from '@server/lib/userAccessCheck';
 import { checkUser } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -259,6 +261,79 @@ describe('a different Silo at the same address', () => {
       .post('/auth/silo')
       .send({ username: 'lantern', password: 'song' });
     assert.equal(again.status, 200, JSON.stringify(again.body));
+  });
+});
+
+describe('after a different Silo was connected', () => {
+  /** Someone whose account came from the old Silo, as the reset left it. */
+  const unlinked = (fields: Partial<User> = {}) =>
+    users().save(
+      new User({
+        email: 'lantern',
+        siloUserId: null,
+        siloUsername: 'Lantern',
+        userType: UserType.SILO,
+        permissions: 0,
+        avatar: '',
+        ...fields,
+      })
+    );
+
+  it('links someone again by their Silo name when they sign in', async () => {
+    const left = await unlinked();
+    const res = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.id, left.id);
+    const user = await users().findOneByOrFail({ id: left.id });
+    assert.equal(user.siloUserId, 'acct-guest');
+    assert.equal(user.siloUsername, 'lantern');
+    assert.equal(await users().countBy({ siloUserId: 'acct-guest' }), 1);
+  });
+
+  it('never links an administrator, the owner or someone with a password by name', async () => {
+    await unlinked({ permissions: Permission.ADMIN });
+    let res = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.message, ApiErrorCode.ExistingAccount);
+
+    await users().delete({ email: 'lantern' });
+    const withPassword = await unlinked();
+    await withPassword.setPassword('Static Garden 1');
+    await users().save(withPassword);
+    res = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
+    assert.equal(res.status, 403);
+    assert.equal(
+      (await users().findOneByOrFail({ id: withPassword.id })).siloUserId,
+      null
+    );
+
+    await users().update(1, {
+      siloUserId: null,
+      siloUsername: 'harbour',
+      userType: UserType.SILO,
+    });
+    await users().update(1, { password: () => 'NULL' } as never);
+    await request(app)
+      .post('/auth/silo')
+      .send({ username: 'harbour', password: 'lights' });
+    assert.equal((await users().findOneByOrFail({ id: 1 })).siloUserId, null);
+  });
+
+  it('links someone again on Import Silo Users', async () => {
+    const left = await unlinked();
+    const result = await importSiloUsers(['acct-guest']);
+    assert.equal(result.createdUsers.length, 0);
+    assert.deepEqual(result.skippedUsers, []);
+    assert.equal(
+      (await users().findOneByOrFail({ id: left.id })).siloUserId,
+      'acct-guest'
+    );
   });
 });
 

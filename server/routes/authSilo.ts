@@ -32,6 +32,7 @@ import {
   SILO_BAD_PASSWORD,
   SILO_NOT_ADMIN,
   finishSiloReset,
+  siloAccountToRelink,
   siloAddressOf,
   storeSilo,
   trySilo,
@@ -143,6 +144,28 @@ const signInAccount = async (
   let user = await userRepository.findOne({
     where: { siloUserId: account.id },
   });
+  // Silo just vouched for this name on the Silo Seerr AI is connected to:
+  // an account a different Silo's reset unlinked, with this Silo name, is
+  // theirs again.
+  if (!user) {
+    const unlinked = await siloAccountToRelink(account);
+    if (unlinked) {
+      await userRepository.update(unlinked.id, {
+        siloUserId: account.id,
+        siloUsername: account.username,
+        siloProfileId: null,
+      });
+      user = await userRepository.findOneOrFail({
+        where: { id: unlinked.id },
+      });
+      logger.info('Linked a Silo account again after a different Silo', {
+        label: 'API',
+        ip: req.ip,
+        siloUsername: account.username,
+      });
+    }
+  }
+
   if (user) {
     const changes: Partial<User> = { siloUsername: account.username };
     if (mainAccountOn(user, 'silo') && user.username === account.username) {

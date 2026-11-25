@@ -21,6 +21,7 @@ import {
   signInWithout,
 } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
+import { Permission, hasPermission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
@@ -310,7 +311,7 @@ export const trySilo = async (
 
 /** Said when connecting a different Silo than before reset its links. */
 export const SILO_LINKS_RESET =
-  'This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People link their Silo accounts again under Linked Accounts.';
+  'This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People whose account here came from Silo are linked again when they next sign in with Silo under the same username; others link Silo again under Linked Accounts.';
 
 /** What connecting a different Silo would remove. */
 export interface SiloResetImpact {
@@ -320,6 +321,13 @@ export interface SiloResetImpact {
   plays: number;
   /** Titles with an id on the old Silo. */
   titles: number;
+  /**
+   * Linked users who sign in only with Silo, linked again when they next
+   * sign in with Silo under the same username (see relinkableBySiloName).
+   */
+  relinked: number;
+  /** Linked users left unable to sign in at all until given a password. */
+  noSignIn: number;
 }
 
 /**
@@ -328,12 +336,68 @@ export interface SiloResetImpact {
  */
 export class SiloResetNeeded extends MediaServerChangeError {
   constructor(public readonly impact: SiloResetImpact) {
+    const who = [
+      impact.relinked
+        ? ` ${impact.relinked} of them sign in only with Silo and are linked again when they next sign in with the new Silo under the same username.`
+        : '',
+      impact.noSignIn
+        ? ` ${impact.noSignIn} of them would be left unable to sign in until given a password.`
+        : '',
+    ].join('');
     super(
       409,
-      `This is a different Silo from the one connected before. Connecting it removes every link to a Silo account (${impact.links}), Seerr AI's copy of the old Silo's watch history (${impact.plays} plays) and the old Silo's ids for ${impact.titles} titles. People then link their Silo accounts again. Connect anyway?`
+      `This is a different Silo from the one connected before. Connecting it removes every link to a Silo account (${impact.links}), Seerr AI's copy of the old Silo's watch history (${impact.plays} plays) and the old Silo's ids for ${impact.titles} titles.${who} Others link their Silo accounts again under Linked Accounts. Connect anyway?`
     );
   }
 }
+
+/** Who may change others' accounts here. */
+const MANAGERS = [Permission.ADMIN, Permission.MANAGE_USERS];
+
+/**
+ * Whether an unlinked account here may be linked to a Silo account of this
+ * name when it signs in through Silo: only one a different Silo's reset
+ * unlinked (its account came from Silo, and it kept the Silo name), with no
+ * password to sign in otherwise, and never the owner, an administrator or
+ * a user manager, whom a same-named stranger must never become.
+ */
+export const relinkableBySiloName = (
+  user: Pick<
+    User,
+    'id' | 'userType' | 'siloUserId' | 'siloUsername' | 'permissions'
+  > & { password?: string | null },
+  username: string
+): boolean =>
+  user.userType === UserType.SILO &&
+  !user.siloUserId &&
+  !user.password &&
+  user.id !== 1 &&
+  !hasPermission(MANAGERS, user.permissions, { type: 'or' }) &&
+  !!user.siloUsername &&
+  user.siloUsername.toLowerCase() === username.toLowerCase();
+
+/**
+ * The account here a Silo account signing in may take back after a reset
+ * (relinkableBySiloName), if exactly one fits. Only for an account Silo just
+ * vouched for, on the Silo Seerr AI is connected to.
+ */
+export const siloAccountToRelink = async (
+  account: Pick<SiloAccount, 'username'>
+): Promise<User | undefined> => {
+  const found = await getRepository(User)
+    .createQueryBuilder('user')
+    .addSelect('user.password')
+    .where('user.siloUserId IS NULL')
+    .andWhere('user.userType = :type', { type: UserType.SILO })
+    .andWhere('LOWER(user.siloUsername) = :name', {
+      name: account.username.toLowerCase(),
+    })
+    .getMany();
+  const fits = found.filter((user) =>
+    relinkableBySiloName(user, account.username)
+  );
+  return fits.length === 1 ? fits[0] : undefined;
+};
 
 const resetImpact = async (): Promise<SiloResetImpact> => {
   const media = getRepository(Media)
@@ -341,12 +405,43 @@ const resetImpact = async (): Promise<SiloResetImpact> => {
     .where(
       MEDIA_ID.silo.map((column) => `media.${column} IS NOT NULL`).join(' OR ')
     );
+  const linked = await getRepository(User)
+    .createQueryBuilder('user')
+    .select([
+      'user.id',
+      'user.userType',
+      'user.permissions',
+      'user.plexId',
+      'user.jellyfinUserId',
+      'user.embyUserId',
+      'user.siloUserId',
+      'user.siloUsername',
+    ])
+    .addSelect('user.password')
+    .where('user.siloUserId IS NOT NULL')
+    .getMany();
+  let relinked = 0;
+  let noSignIn = 0;
+  for (const user of linked) {
+    if (await signInWithout('silo', user)) continue;
+    // Unlinked, as the reset leaves them.
+    if (
+      relinkableBySiloName(
+        { ...user, siloUserId: null },
+        user.siloUsername ?? ''
+      )
+    ) {
+      relinked += 1;
+    } else {
+      noSignIn += 1;
+    }
+  }
   return {
-    links: await getRepository(User).count({
-      where: { siloUserId: Not(IsNull()) },
-    }),
+    links: linked.length,
     plays: await getRepository(SiloPlay).count(),
     titles: await media.getCount(),
+    relinked,
+    noSignIn,
   };
 };
 
@@ -397,8 +492,9 @@ export interface SiloResetActor {
  * account ids are small numbers, so on another Silo account "2" is someone
  * else, and must never sign in as the person linked to the old one. Scans
  * and history reads under way stop first, so none writes an old id back.
- * Each user's Silo link goes, and sessions end for those whose account came
- * from Silo (keeping the connecting admin's own
+ * Each user's Silo link goes (an account that came from Silo keeps the Silo
+ * name, to be linked again by it: relinkableBySiloName), and sessions end
+ * for those whose account came from Silo (keeping the connecting admin's own
  * session); the old Silo's title ids, episode list, play copy, library
  * places and Match Check findings go too. The connecting admin is linked to
  * the new Silo's administrator they signed in as. Returns how many users
@@ -418,12 +514,21 @@ export const forgetPreviousSilo = async (
     where: { siloUserId: Not(IsNull()) },
   });
   if (linked.length) {
-    await users.update(
-      { id: In(linked.map((user) => user.id)) },
-      { siloUserId: null, siloUsername: null, siloProfileId: null }
-    );
-    for (const user of linked) {
-      if (user.userType !== UserType.SILO) continue;
+    const fromSilo = linked.filter((user) => user.userType === UserType.SILO);
+    const others = linked.filter((user) => user.userType !== UserType.SILO);
+    if (fromSilo.length) {
+      await users.update(
+        { id: In(fromSilo.map((user) => user.id)) },
+        { siloUserId: null, siloProfileId: null }
+      );
+    }
+    if (others.length) {
+      await users.update(
+        { id: In(others.map((user) => user.id)) },
+        { siloUserId: null, siloUsername: null, siloProfileId: null }
+      );
+    }
+    for (const user of fromSilo) {
       await endSessions(
         user.id,
         user.id === actor?.userId ? actor.sessionId : undefined

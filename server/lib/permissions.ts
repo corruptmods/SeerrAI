@@ -95,3 +95,10 @@ export const hasPermission = (
 
   return holds(value, Permission.ADMIN) || holds(value, total);
 };
+
+/**
+ * Whether every permission in `value` is also in `allowed` (none beyond
+ * it). Arithmetic, as for hasPermission; Admin is no wildcard here.
+ */
+export const permissionsWithin = (value: number, allowed: number): boolean =>
+  bitsOf(value).every((bit) => holds(allowed, bit));

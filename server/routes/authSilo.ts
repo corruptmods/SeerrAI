@@ -167,6 +167,7 @@ const signInAccount = async (
             siloUserId: account.id,
             siloUsername: account.username,
             siloProfileId: null,
+            siloRelinkUntil: null,
           })
           .where('id = :id AND siloUserId IS NULL', { id: unlinked.id })
           .execute()

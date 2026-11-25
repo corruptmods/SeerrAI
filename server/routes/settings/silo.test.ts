@@ -892,6 +892,33 @@ describe('connecting a different Silo, safely', () => {
     );
   });
 
+  it('marks for linking again by name only those who may be, for 30 days', async () => {
+    const users = getRepository(User);
+    const garden = await oldAccountTwo();
+    await users.update(garden.id, { permissions: 0 });
+    // Manages requests: more than new users get.
+    const glasswing = await users.save(
+      new User({
+        email: 'glasswing@test.local',
+        siloUserId: '3',
+        siloUsername: 'glasswing',
+        userType: UserType.SILO,
+        permissions: Permission.MANAGE_REQUESTS,
+        avatar: '',
+      })
+    );
+    await forgetPreviousSilo();
+    const until = (await users.findOneByOrFail({ id: garden.id }))
+      .siloRelinkUntil;
+    assert.ok(until);
+    const days = (new Date(until).getTime() - Date.now()) / 86_400_000;
+    assert.ok(days > 29.9 && days <= 30, String(days));
+    assert.equal(
+      (await users.findOneByOrFail({ id: glasswing.id })).siloRelinkUntil,
+      null
+    );
+  });
+
   it('says who would be left without a way to sign in', async () => {
     const users = getRepository(User);
     await oldAccountTwo();

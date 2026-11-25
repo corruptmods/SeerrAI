@@ -25,7 +25,11 @@ import {
   signInWithout,
 } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
-import { Permission, hasPermission } from '@server/lib/permissions';
+import {
+  Permission,
+  hasPermission,
+  permissionsWithin,
+} from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import type {
@@ -371,32 +375,52 @@ export class SiloResetNeeded extends MediaServerChangeError {
 /** Who may change others' accounts here. */
 const MANAGERS = [Permission.ADMIN, Permission.MANAGE_USERS];
 
+/** How long an account a reset unlinked may be linked again by name. */
+export const SILO_RELINK_DAYS = 30;
+
+type RelinkFields = Pick<
+  User,
+  'id' | 'userType' | 'siloUsername' | 'permissions'
+> & { password?: string | null };
+
 /**
- * Whether an unlinked account here may be linked to a Silo account of this
- * name when it signs in through Silo: only one a different Silo's reset
- * unlinked (its account came from Silo, and it kept the Silo name), with no
- * password to sign in otherwise, and never the owner, an administrator or
- * a user manager, whom a same-named stranger must never become.
+ * Whether an account a different Silo's reset unlinks may later be linked
+ * again by its Silo name: its account came from Silo and kept the name, it
+ * has no password, and it holds nothing beyond what new users get (never
+ * the owner, an administrator or a user manager, whom a same-named stranger
+ * must never become). Someone with another way to sign in (signInWithout)
+ * links Silo again themselves, under Linked Accounts.
  */
-export const relinkableBySiloName = (
-  user: Pick<
-    User,
-    'id' | 'userType' | 'siloUserId' | 'siloUsername' | 'permissions'
-  > & { password?: string | null },
-  username: string
-): boolean =>
+const mayRelinkByName = (user: RelinkFields): boolean =>
   user.userType === UserType.SILO &&
-  !user.siloUserId &&
   !user.password &&
   user.id !== 1 &&
   !hasPermission(MANAGERS, user.permissions, { type: 'or' }) &&
-  !!user.siloUsername &&
-  user.siloUsername.toLowerCase() === username.toLowerCase();
+  permissionsWithin(user.permissions, getSettings().main.defaultPermissions) &&
+  !!user.siloUsername;
+
+/**
+ * Whether an unlinked account here may be linked to a Silo account of this
+ * name when it signs in through Silo: only one a different Silo's reset
+ * marked for it (siloRelinkUntil, for SILO_RELINK_DAYS) that still fits
+ * mayRelinkByName.
+ */
+export const relinkableBySiloName = (
+  user: RelinkFields & Pick<User, 'siloUserId' | 'siloRelinkUntil'>,
+  username: string,
+  now = Date.now()
+): boolean =>
+  !user.siloUserId &&
+  !!user.siloRelinkUntil &&
+  new Date(user.siloRelinkUntil).getTime() > now &&
+  mayRelinkByName(user) &&
+  (user.siloUsername ?? '').toLowerCase() === username.toLowerCase();
 
 /**
  * The account here a Silo account signing in may take back after a reset
- * (relinkableBySiloName), if exactly one fits. Only for an account Silo just
- * vouched for, on the Silo Seerr AI is connected to.
+ * (relinkableBySiloName, and still no other way to sign in), if exactly one
+ * fits. Only for an account Silo just vouched for, on the Silo Seerr AI is
+ * connected to.
  */
 export const siloAccountToRelink = async (
   account: Pick<SiloAccount, 'username'>
@@ -406,13 +430,20 @@ export const siloAccountToRelink = async (
     .addSelect('user.password')
     .where('user.siloUserId IS NULL')
     .andWhere('user.userType = :type', { type: UserType.SILO })
+    .andWhere('user.siloRelinkUntil IS NOT NULL')
     .andWhere('LOWER(user.siloUsername) = :name', {
       name: account.username.toLowerCase(),
     })
     .getMany();
-  const fits = found.filter((user) =>
-    relinkableBySiloName(user, account.username)
-  );
+  const fits: User[] = [];
+  for (const user of found) {
+    if (
+      relinkableBySiloName(user, account.username) &&
+      !(await signInWithout('silo', user))
+    ) {
+      fits.push(user);
+    }
+  }
   return fits.length === 1 ? fits[0] : undefined;
 };
 
@@ -441,13 +472,8 @@ const resetImpact = async (): Promise<SiloResetImpact> => {
   let noSignIn = 0;
   for (const user of linked) {
     if (await signInWithout('silo', user)) continue;
-    // Unlinked, as the reset leaves them.
-    if (
-      relinkableBySiloName(
-        { ...user, siloUserId: null },
-        user.siloUsername ?? ''
-      )
-    ) {
+    // As the reset marks them (forgetPreviousSilo).
+    if (mayRelinkByName(user)) {
       relinked += 1;
     } else {
       noSignIn += 1;
@@ -534,23 +560,59 @@ export const forgetPreviousSilo = async (
   // So does a scan, before anything it would write is cleared.
   await Promise.all([siloFullScanner.stop(), siloRecentScanner.stop()]);
   const users = getRepository(User);
-  const linked = await users.find({
-    select: { id: true, userType: true },
-    where: { siloUserId: Not(IsNull()) },
-  });
+  const linked = await users
+    .createQueryBuilder('user')
+    .select([
+      'user.id',
+      'user.userType',
+      'user.permissions',
+      'user.plexId',
+      'user.jellyfinUserId',
+      'user.embyUserId',
+      'user.siloUserId',
+      'user.siloUsername',
+    ])
+    .addSelect('user.password')
+    .where('user.siloUserId IS NOT NULL')
+    .getMany();
   if (linked.length) {
     const fromSilo = linked.filter((user) => user.userType === UserType.SILO);
     const others = linked.filter((user) => user.userType !== UserType.SILO);
-    if (fromSilo.length) {
+    // Who may be linked again by name, for a while (relinkableBySiloName).
+    const byName: number[] = [];
+    for (const user of fromSilo) {
+      if (mayRelinkByName(user) && !(await signInWithout('silo', user))) {
+        byName.push(user.id);
+      }
+    }
+    const rest = fromSilo.filter((user) => !byName.includes(user.id));
+    if (byName.length) {
       await users.update(
-        { id: In(fromSilo.map((user) => user.id)) },
-        { siloUserId: null, siloProfileId: null }
+        { id: In(byName) },
+        {
+          siloUserId: null,
+          siloProfileId: null,
+          siloRelinkUntil: new Date(
+            Date.now() + SILO_RELINK_DAYS * 24 * 60 * 60 * 1000
+          ),
+        }
+      );
+    }
+    if (rest.length) {
+      await users.update(
+        { id: In(rest.map((user) => user.id)) },
+        { siloUserId: null, siloProfileId: null, siloRelinkUntil: null }
       );
     }
     if (others.length) {
       await users.update(
         { id: In(others.map((user) => user.id)) },
-        { siloUserId: null, siloUsername: null, siloProfileId: null }
+        {
+          siloUserId: null,
+          siloUsername: null,
+          siloProfileId: null,
+          siloRelinkUntil: null,
+        }
       );
     }
     for (const user of fromSilo) {
@@ -565,6 +627,7 @@ export const forgetPreviousSilo = async (
       siloUserId: actor.account.id,
       siloUsername: actor.account.username,
       siloProfileId: null,
+      siloRelinkUntil: null,
     });
   }
   const media = getRepository(Media);

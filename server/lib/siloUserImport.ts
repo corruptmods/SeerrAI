@@ -98,6 +98,7 @@ export const importSiloUsers = async (chosenIds: string[] | undefined) => {
             siloUserId: account.id,
             siloUsername: account.username,
             siloProfileId: null,
+            siloRelinkUntil: null,
             avatar: siloAvatarPath(account.id, unlinked.avatarVersion),
           })
           .where('id = :id AND siloUserId IS NULL', { id: unlinked.id })

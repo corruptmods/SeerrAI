@@ -266,6 +266,8 @@ describe('a different Silo at the same address', () => {
 });
 
 describe('after a different Silo was connected', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
   /** Someone whose account came from the old Silo, as the reset left it. */
   const unlinked = (fields: Partial<User> = {}) =>
     users().save(
@@ -276,9 +278,15 @@ describe('after a different Silo was connected', () => {
         userType: UserType.SILO,
         permissions: 0,
         avatar: '',
+        siloRelinkUntil: new Date(Date.now() + 29 * DAY),
         ...fields,
       })
     );
+
+  const signInAsLantern = () =>
+    request(app)
+      .post('/auth/silo')
+      .send({ username: 'lantern', password: 'song' });
 
   it('links someone again by their Silo name when they sign in', async () => {
     const left = await unlinked();
@@ -324,6 +332,46 @@ describe('after a different Silo was connected', () => {
       .post('/auth/silo')
       .send({ username: 'harbour', password: 'lights' });
     assert.equal((await users().findOneByOrFail({ id: 1 })).siloUserId, null);
+  });
+
+  it('links by name only someone the reset marked, for 30 days, with nothing beyond new users’ permissions and no other way in', async (t) => {
+    const defaults = getSettings().main.defaultPermissions;
+    t.after(() => {
+      getSettings().main.defaultPermissions = defaults;
+    });
+    getSettings().main.defaultPermissions = Permission.REQUEST;
+    const stillUnlinked = async () =>
+      (await users().findOneByOrFail({ email: 'lantern' })).siloUserId;
+    const refusedThenClear = async () => {
+      const res = await signInAsLantern();
+      assert.equal(res.status, 403, JSON.stringify(res.body));
+      assert.equal(await stillUnlinked(), null);
+      await users().delete({ email: 'lantern' });
+    };
+
+    // Never marked by a reset.
+    await unlinked({ siloRelinkUntil: null });
+    await refusedThenClear();
+    // Marked more than 30 days ago.
+    await unlinked({ siloRelinkUntil: new Date(Date.now() - DAY) });
+    await refusedThenClear();
+    // Can auto-approve, beyond what new users get.
+    await unlinked({
+      permissions: Permission.REQUEST + Permission.AUTO_APPROVE,
+    });
+    await refusedThenClear();
+    // Can still sign in with Plex, and links Silo themselves.
+    await unlinked({ plexId: 4321 });
+    await refusedThenClear();
+
+    // Within new users' permissions, marked, and no other way in.
+    const left = await unlinked({ permissions: Permission.REQUEST });
+    const res = await signInAsLantern();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const user = await users().findOneByOrFail({ id: left.id });
+    assert.equal(user.siloUserId, 'acct-guest');
+    // Once only.
+    assert.equal(user.siloRelinkUntil, null);
   });
 
   it('links someone again on Import Silo Users', async () => {

@@ -92,6 +92,7 @@ export class User {
     'embyDeviceId',
     'embyAuthToken',
     'siloProfileId',
+    'siloRelinkUntil',
     'plexToken',
     'settings',
     // Whether someone's Plex sign-in lapsed is only for them and admins.
@@ -182,6 +183,14 @@ export class User {
    */
   @Column({ type: 'varchar', nullable: true })
   public siloProfileId?: string | null;
+
+  /**
+   * Set when a different Silo's reset unlinked this account and it may be
+   * linked again by its Silo name until then (lib/siloConnect's
+   * relinkableBySiloName); null otherwise.
+   */
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public siloRelinkUntil?: Date | null;
 
   @Column({ type: 'varchar', nullable: true, select: false })
   public plexToken?: string | null;

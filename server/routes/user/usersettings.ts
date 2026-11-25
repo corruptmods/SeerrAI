@@ -915,6 +915,7 @@ const linkSiloAccount = async (
     siloUserId: account.id,
     siloUsername: account.username,
     siloProfileId: null,
+    siloRelinkUntil: null,
     // Only a password account takes Silo's account type, and its picture.
     ...(local
       ? { userType: UserType.SILO, avatar: siloAvatarPath(account.id) }

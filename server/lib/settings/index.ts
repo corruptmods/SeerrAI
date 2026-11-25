@@ -149,6 +149,23 @@ export interface SiloSettings {
    * finishes. Unset or empty: the next read copies everything.
    */
   historyCopiedTo?: string;
+  /**
+   * Set, in the same save as a different Silo's connection, until
+   * everything of the old Silo is forgotten (lib/siloConnect's
+   * finishSiloReset): meanwhile nobody signs in or links through Silo and
+   * nothing is read from it, as old links would name the new Silo's
+   * accounts. Finished at startup if Seerr AI stopped part-way.
+   */
+  resetPending?: SiloResetPending | null;
+}
+
+/** Who connected a different Silo, kept linked through its reset. */
+export interface SiloResetPending {
+  /** The Seerr AI user who connected it. */
+  userId?: number;
+  /** The new Silo's account they signed in as, linked to them. */
+  accountId?: string;
+  accountUsername?: string;
 }
 
 /** An unconfigured Silo server. */

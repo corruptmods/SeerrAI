@@ -2,6 +2,7 @@ import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
+import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { getSettings } from '@server/lib/settings';
@@ -22,6 +23,7 @@ import {
   siloMovie,
   siloSeries,
 } from '@server/test/fakeSilo';
+import schedule from 'node-schedule';
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
@@ -36,7 +38,12 @@ setupTestDb();
 const silo = createFakeSilo();
 
 before(() => silo.start());
-after(() => silo.stop());
+after(async () => {
+  await silo.stop();
+  // Replacing Silo reschedules its jobs.
+  await schedule.gracefulShutdown();
+  scheduledJobs.length = 0;
+});
 
 const MINUTE = 60 * 1000;
 const base = Date.parse('2026-11-20T20:00:00.000Z');
@@ -284,6 +291,14 @@ describe('copying Silo’s play history', () => {
     await syncSiloHistory();
     assert.equal(historyCalls()[0].query.ended_after, undefined);
     assert.equal(await getRepository(SiloPlay).count(), 250);
+  });
+
+  it('reads nothing while a different Silo’s reset is pending', async () => {
+    silo.plays = [play('s-movie', 'movie-glasswing', 1)];
+    getSettings().silo.resetPending = {};
+    await assert.rejects(() => syncSiloHistory(), SiloHistoryStopped);
+    assert.equal(historyCalls().length, 0);
+    getSettings().silo.resetPending = null;
   });
 
   it('tells readers at once while Silo just failed, then asks again', async () => {

@@ -35,6 +35,17 @@ export const SILO_NEEDS_USERS_SCOPE =
 export const SILO_NEEDS_PATHS_SCOPE =
   "Silo isn't checked: Seerr AI's Silo key lacks the admin:catalog:paths scope it needs to see each title's folder. In Silo, make a key with it, then paste it under Settings → Silo.";
 
+/**
+ * A different Silo was connected and the old one's links aren't all gone
+ * yet (settings.silo.resetPending): nobody signs in, links or is matched
+ * through Silo until they are.
+ */
+export const siloResetPending = (): boolean => !!siloSettings().resetPending;
+
+/** Why Silo is refused while a different Silo's reset finishes. */
+export const SILO_RESETTING =
+  'A different Silo was just connected, and Seerr AI is still forgetting the old one. Try again in a moment.';
+
 /** A client for the connected Silo, with its saved key. */
 export const siloClient = (options?: { timeout?: number }): SiloAPI =>
   new SiloAPI(hostnameFor('silo'), siloSettings().apiKey, options);

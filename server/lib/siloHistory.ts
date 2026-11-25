@@ -5,7 +5,7 @@ import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
 import { isConnected } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
-import { siloClient } from '@server/lib/silo';
+import { siloClient, siloResetPending } from '@server/lib/silo';
 import logger from '@server/logger';
 import { In, MoreThan } from 'typeorm';
 
@@ -341,7 +341,9 @@ const stillCurrentFrom = (): StillCurrent => {
     if (
       generation !== started ||
       getSettings().silo.serverId !== serverId ||
-      !isConnected('silo')
+      !isConnected('silo') ||
+      // A different Silo's reset clears the copy; nothing is written first.
+      siloResetPending()
     ) {
       throw new SiloHistoryStopped();
     }
@@ -410,6 +412,7 @@ const dropUnlisted = async (seen: Set<string>): Promise<number> => {
 
 const run = async (full: boolean): Promise<SiloHistoryResult> => {
   const still = stillCurrentFrom();
+  still();
   const client = siloClient();
   await client.getCompatibleInfo();
   if (!full) {

@@ -42,7 +42,7 @@ import {
 } from '@server/lib/silo';
 import {
   SiloResetNeeded,
-  resetToNewSilo,
+  finishSiloReset,
   storeSilo,
   trySilo,
 } from '@server/lib/siloConnect';
@@ -390,16 +390,25 @@ const connectSilo = async (
     confirmReset: body.confirmReset === true,
     actingUserId: req.user?.id ?? 0,
   });
-  const { silo, reset } = await storeSilo(body, connection, {
-    connect: true,
-  });
-  silo.signIn = body.signIn ?? silo.signIn !== false;
-  if (reset) {
-    await getSettings().save();
-    await resetToNewSilo(connection, {
-      userId: req.user?.id,
-      sessionId: req.sessionID,
+  const settings = getSettings();
+  const before = { ...settings.silo };
+  let reset: string | undefined;
+  try {
+    const stored = await storeSilo(body, connection, {
+      connect: true,
+      by: { userId: req.user?.id },
     });
+    stored.silo.signIn = body.signIn ?? stored.silo.signIn !== false;
+    reset = stored.reset;
+    // Saved marked resetPending: nothing signs in through the new Silo
+    // until the old one is forgotten below.
+    if (reset) await settings.save();
+  } catch (e) {
+    settings.silo = before;
+    throw e;
+  }
+  if (reset) {
+    await finishSiloReset({ sessionId: req.sessionID });
   }
   return reset;
 };

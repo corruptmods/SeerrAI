@@ -42,6 +42,7 @@ import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
+import { SILO_RESETTING, siloResetPending } from '@server/lib/silo';
 import { importSiloUsers } from '@server/lib/siloUserImport';
 import {
   MediaServerRemovalError,
@@ -1091,6 +1092,9 @@ router.post(
       const body = req.body as { siloUserIds?: string[] } | undefined;
       if (!isConnected('silo')) {
         return next({ status: 400, message: 'Silo is not connected.' });
+      }
+      if (siloResetPending()) {
+        return next({ status: 503, message: SILO_RESETTING });
       }
       return res.status(201).json(await importSiloUsers(body?.siloUserIds));
     } catch (e) {

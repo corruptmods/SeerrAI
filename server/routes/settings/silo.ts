@@ -8,7 +8,7 @@ import { siloClient, siloLibraries } from '@server/lib/silo';
 import type { SiloConnectInput } from '@server/lib/siloConnect';
 import {
   SiloResetNeeded,
-  resetToNewSilo,
+  finishSiloReset,
   siloAddressOf,
   storeSilo,
   trySilo,
@@ -47,6 +47,7 @@ const shown = (silo: SiloSettings) => {
   // Only for deleting Seerr AI's own key later.
   delete rest.keyId;
   delete rest.historyCopiedTo;
+  delete rest.resetPending;
   return { ...rest, apiKey: '', hasApiKey: !!silo.apiKey };
 };
 
@@ -123,13 +124,22 @@ siloRoutes.post('/', async (req, res, next) => {
       confirmReset: parsed.data.confirmReset === true,
       actingUserId: req.user?.id ?? 0,
     });
-    const { reset } = await storeSilo(input, connection, { connect: false });
-    await settings.save();
+    const before = { ...saved };
+    let reset: string | undefined;
+    try {
+      ({ reset } = await storeSilo(input, connection, {
+        connect: false,
+        by: { userId: req.user?.id },
+      }));
+      // A different Silo is saved marked resetPending, so nothing signs in
+      // through it until the old one is forgotten below.
+      await settings.save();
+    } catch (e) {
+      settings.silo = before;
+      throw e;
+    }
     if (reset) {
-      await resetToNewSilo(connection, {
-        userId: req.user?.id,
-        sessionId: req.sessionID,
-      });
+      await finishSiloReset({ sessionId: req.sessionID });
     }
     return res
       .status(200)

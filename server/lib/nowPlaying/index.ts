@@ -13,7 +13,7 @@ import {
   isJellyfinFamily,
   jellyfinClient,
 } from '@server/lib/mediaServers';
-import { siloClient } from '@server/lib/silo';
+import { siloClient, siloResetPending } from '@server/lib/silo';
 import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { In } from 'typeorm';
@@ -114,7 +114,9 @@ const fromJellyfin = (
  */
 const fromSilo = async (user: User): Promise<Session[]> => {
   const account = user.siloUserId;
-  if (!account) return [];
+  // While a different Silo's reset finishes, links name the old one's
+  // accounts.
+  if (!account || siloResetPending()) return [];
   const client = siloClient({ timeout: 10_000 });
   const playing = (await client.listSessions(account)).filter(
     (s) =>

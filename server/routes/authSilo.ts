@@ -31,7 +31,7 @@ import type { SiloConnection } from '@server/lib/siloConnect';
 import {
   SILO_BAD_PASSWORD,
   SILO_NOT_ADMIN,
-  resetToNewSilo,
+  finishSiloReset,
   siloAddressOf,
   storeSilo,
   trySilo,
@@ -143,7 +143,6 @@ const signInAccount = async (
   let user = await userRepository.findOne({
     where: { siloUserId: account.id },
   });
-
   if (user) {
     const changes: Partial<User> = { siloUsername: account.username };
     if (mainAccountOn(user, 'silo') && user.username === account.username) {
@@ -285,14 +284,13 @@ const setUpWithSilo = async (
     if (!who) {
       throw new Refused(500, 'Something went wrong.');
     }
-    let reset: string | undefined;
     let saved: User;
     try {
-      reset = (
-        await storeSilo({ ...address, hostname: address.ip }, connection, {
-          connect: true,
-        })
-      ).reset;
+      const { reset } = await storeSilo(
+        { ...address, hostname: address.ip },
+        connection,
+        { connect: true }
+      );
       connectAsPrimary('silo');
       const columns = {
         email: body.email || who.username,
@@ -308,6 +306,16 @@ const setUpWithSilo = async (
       } else {
         saved = await saveFirstOwner(withNewUserDefaults(new User(columns)));
       }
+      // A different Silo than before is saved marked resetPending, naming
+      // the owner to keep linked to it: until the old one is forgotten
+      // (after signing out of Silo, below), nothing signs in through it.
+      if (reset) {
+        settings.silo.resetPending = {
+          userId: saved.id,
+          accountId: who.id,
+          accountUsername: who.username,
+        };
+      }
       await settings.save();
     } catch (e) {
       settings.silo = before.silo;
@@ -315,11 +323,6 @@ const setUpWithSilo = async (
       throw e;
     }
     user = saved;
-    // Only once everything is saved: a different Silo than before forgets
-    // the old one's links, keeping the owner linked to this one.
-    if (reset) {
-      await resetToNewSilo(connection, { userId: saved.id, account: who });
-    }
   };
   try {
     await trySilo(
@@ -348,6 +351,10 @@ const setUpWithSilo = async (
   if (!user || !who) {
     throw new Refused(500, 'Something went wrong.');
   }
+  // Settings and Silo agree on the key now; a different Silo than before
+  // forgets the old one's links, keeping the owner linked to this one. If
+  // this fails, the reset stays pending and is finished later.
+  await finishSiloReset();
   startJobs();
   logger.info('Set up Seerr AI with Silo as the primary server', {
     label: 'API',

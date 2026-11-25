@@ -143,6 +143,8 @@ export interface FakeSilo {
   rateLimited: number;
   /** While set, every call gets a server error. */
   down: boolean;
+  /** Awaited before answering each call (its method and path), to hold one. */
+  beforeAnswer?: (method: string, path: string) => Promise<void> | void;
   /**
    * Every library id Silo has, for checking account changes; `libraries`
    * (what /user/libraries lists) when unset.
@@ -358,6 +360,7 @@ export const createFakeSilo = (): FakeSilo => {
       fake.mintNonAdminKeys = false;
       fake.rateLimited = 0;
       fake.down = false;
+      fake.beforeAnswer = undefined;
       fake.allLibraryIds = undefined;
       revisions = new Map();
       sessions = new Map();
@@ -368,7 +371,12 @@ export const createFakeSilo = (): FakeSilo => {
       server = http.createServer((req, res) => {
         let raw = '';
         req.on('data', (chunk) => (raw += chunk));
-        req.on('end', () => handle(req, res, raw));
+        req.on('end', () => {
+          const path = new URL(req.url ?? '/', 'http://silo.test').pathname;
+          void Promise.resolve(
+            fake.beforeAnswer?.(req.method ?? 'GET', path)
+          ).then(() => handle(req, res, raw));
+        });
       });
       await new Promise<void>((resolve) =>
         server?.listen(0, '127.0.0.1', resolve)

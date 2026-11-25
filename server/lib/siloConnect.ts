@@ -12,10 +12,14 @@ import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import SiloEpisode from '@server/entity/SiloEpisode';
 import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
+import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import cacheManager from '@server/lib/cache';
+import matchWatch from '@server/lib/matchWatch';
 import { MediaServerChangeError } from '@server/lib/mediaServerAdmin';
 import { hostnameOf } from '@server/lib/mediaServers';
+import plexMatchCheck from '@server/lib/plexMatchCheck';
+import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
@@ -382,18 +386,20 @@ export interface SiloResetActor {
   /** Their session, which stays. */
   sessionId?: string;
   /** The new Silo's administrator they signed in as, linked to them. */
-  account?: SiloAccount;
+  account?: Pick<SiloAccount, 'id' | 'username'>;
 }
 
 /**
  * Forgets everything that belonged to the Silo connected before: Silo's
  * account ids are small numbers, so on another Silo account "2" is someone
- * else, and must never sign in as the person linked to the old one. Each
- * user's Silo link goes, and sessions end for those whose account came from
- * Silo (keeping the connecting admin's own session); the old Silo's title
- * ids, episode list, play copy and library places go too. The connecting
- * admin is linked to the new Silo's administrator they signed in as.
- * Returns how many users were unlinked.
+ * else, and must never sign in as the person linked to the old one. Scans
+ * and history reads under way stop first, so none writes an old id back.
+ * Each user's Silo link goes, and sessions end for those whose account came
+ * from Silo (keeping the connecting admin's own
+ * session); the old Silo's title ids, episode list, play copy, library
+ * places and Match Check findings go too. The connecting admin is linked to
+ * the new Silo's administrator they signed in as. Returns how many users
+ * were unlinked.
  */
 export const forgetPreviousSilo = async (
   actor?: SiloResetActor
@@ -401,6 +407,8 @@ export const forgetPreviousSilo = async (
   // A history read under way stops before writing the old Silo's plays.
   stopSiloHistory();
   forgetSiloPictures();
+  // So does a scan, before anything it would write is cleared.
+  await Promise.all([siloFullScanner.stop(), siloRecentScanner.stop()]);
   const users = getRepository(User);
   const linked = await users.find({
     select: { id: true, userType: true },
@@ -433,8 +441,12 @@ export const forgetPreviousSilo = async (
   await getRepository(MediaLibraryItem).delete({ server: 'silo' });
   await getRepository(SiloEpisode).clear();
   await getRepository(SiloPlay).clear();
+  await plexMatchCheck.dropServer('Silo');
+  await matchWatch.dropServer('Silo');
   // Who may see which of the old Silo's libraries no longer holds.
   cacheManager.getCache('libraryaccess').flush();
+  // Scans start again on the new Silo's schedule.
+  refreshMediaServerJobs();
   // Titles only the old Silo had are no longer available.
   availabilitySync.runSoon().catch((e) =>
     logger.error('Availability sync after replacing Silo failed', {
@@ -445,36 +457,78 @@ export const forgetPreviousSilo = async (
   return linked.length;
 };
 
+let finishing: Promise<boolean> | undefined;
+
 /**
- * After a different Silo's settings are saved: forgets the old one, keeping
- * the connecting admin signed in and linking them to the administrator they
- * signed in to the new Silo as, if they did.
+ * Finishes a different Silo's reset once its connection is saved with
+ * settings.silo.resetPending: forgets the old one (forgetPreviousSilo),
+ * keeping who connected it linked and, with `sessionId`, signed in; then
+ * clears the mark, so Silo is used again. Until then nothing signs in or is
+ * read through Silo. Run by whatever connected it, and again at startup and
+ * by the Silo history job if it failed or Seerr AI stopped part-way. Never
+ * throws: a failure is logged and the reset stays pending. Resolves whether
+ * no reset is pending any more.
  */
-export const resetToNewSilo = async (
-  connection: SiloConnection,
-  by?: { userId?: number; sessionId?: string; account?: SiloAccount }
-): Promise<void> => {
-  const unlinked = await forgetPreviousSilo(
-    by?.userId
-      ? {
-          userId: by.userId,
-          sessionId: by.sessionId,
-          account: by.account ?? connection.admin,
+export const finishSiloReset = (
+  keep: { sessionId?: string } = {}
+): Promise<boolean> => {
+  // One at a time; a call meanwhile runs after, for a reset begun since.
+  if (finishing) {
+    return finishing.then(() => finishSiloReset(keep));
+  }
+  const promise = (async () => {
+    const settings = getSettings();
+    const pending = settings.silo.resetPending;
+    if (!pending) return true;
+    try {
+      const unlinked = await forgetPreviousSilo(
+        pending.userId
+          ? {
+              userId: pending.userId,
+              sessionId: keep.sessionId,
+              account: pending.accountId
+                ? {
+                    id: pending.accountId,
+                    username: pending.accountUsername ?? '',
+                  }
+                : undefined,
+            }
+          : undefined
+      );
+      // A reset begun again meanwhile is finished by its own call.
+      if (settings.silo.resetPending === pending) {
+        settings.silo.resetPending = null;
+        await settings.save();
+      }
+      logger.warn(
+        'Connected a different Silo than before; links to the old one were removed',
+        { label: 'Silo', unlinked }
+      );
+    } catch (e) {
+      logger.error(
+        "Couldn't finish forgetting the Silo connected before; Silo stays unused until it is, and Seerr AI tries again shortly",
+        {
+          label: 'Silo',
+          errorMessage: e instanceof Error ? e.message : String(e),
         }
-      : undefined
-  );
-  logger.warn(
-    'Connected a different Silo than before; links to the old one were removed',
-    { label: 'Silo', unlinked }
-  );
+      );
+    }
+    return !settings.silo.resetPending;
+  })();
+  finishing = promise;
+  return promise.finally(() => {
+    if (finishing === promise) finishing = undefined;
+  });
 };
 
 /**
  * Stores a working connection in the Silo settings (the caller saves), and
  * reads Silo's film and series libraries. A different Silo than before
- * starts with no libraries chosen; `reset` then says so, and the caller,
- * once everything is saved, forgets the old one (forgetPreviousSilo), so a
- * failure on the way leaves nothing half done.
+ * starts with no libraries chosen, and is marked resetPending, with `by`
+ * (who connected it), in the same change as the new connection: until
+ * finishSiloReset has forgotten the old one, nothing signs in or is read
+ * through Silo. `reset` then says so, and the caller, once everything is
+ * saved, calls finishSiloReset.
  */
 export const storeSilo = async (
   input: SiloConnectInput & {
@@ -482,15 +536,32 @@ export const storeSilo = async (
     forgotPasswordUrl?: string;
   },
   connection: SiloConnection,
-  { connect }: { connect: boolean }
+  {
+    connect,
+    by,
+  }: {
+    connect: boolean;
+    /** Who is connecting; the account defaults to the one signed in as. */
+    by?: { userId?: number; account?: Pick<SiloAccount, 'id' | 'username'> };
+  }
 ): Promise<{ silo: SiloSettings; reset?: string }> => {
   const silo = getSettings().silo;
   let reset: string | undefined;
-  if (silo.serverId && silo.serverId !== connection.serverId) {
+  if (
+    (silo.serverId && silo.serverId !== connection.serverId) ||
+    silo.resetPending
+  ) {
     silo.libraries = [];
     silo.keyId = '';
     // The old Silo's play history copy goes; the new one is read in full.
     silo.historyCopiedTo = '';
+    const account = by?.account ?? connection.admin;
+    silo.resetPending = {
+      ...(by?.userId ? { userId: by.userId } : {}),
+      ...(by?.userId && account
+        ? { accountId: account.id, accountUsername: account.username }
+        : {}),
+    };
     reset = SILO_LINKS_RESET;
   }
   Object.assign(silo, siloAddressOf(input), {

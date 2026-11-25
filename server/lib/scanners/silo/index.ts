@@ -31,7 +31,12 @@ import {
 } from '@server/lib/scanners/unidentified';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { isSilo4k, recordSiloInfo, siloClient } from '@server/lib/silo';
+import {
+  isSilo4k,
+  recordSiloInfo,
+  siloClient,
+  siloResetPending,
+} from '@server/lib/silo';
 
 /*
  * Silo's scans. Silo lists movies, series and episodes separately and can't
@@ -376,8 +381,36 @@ export class SiloScanner
     await getSettings().save();
   }
 
-  public async run(): Promise<void> {
-    if (!isConnected('silo')) {
+  /** Scans under way, so a reset can wait for them to stop. */
+  private scans = new Set<Promise<void>>();
+
+  public run(): Promise<void> {
+    const scan = this.scan();
+    this.scans.add(scan);
+    return scan.finally(() => this.scans.delete(scan));
+  }
+
+  /**
+   * Stops any scan under way and waits (up to `waitMs`) until it has, so
+   * nothing it read from the old Silo is written after a reset.
+   */
+  public async stop(waitMs = 60_000): Promise<void> {
+    this.cancel();
+    if (!this.scans.size) return;
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      Promise.allSettled([...this.scans]),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, waitMs);
+      }),
+    ]);
+    clearTimeout(timer);
+  }
+
+  private async scan(): Promise<void> {
+    // Not while a different Silo's reset is under way: it clears what a
+    // scan would write.
+    if (!isConnected('silo') || siloResetPending()) {
       return;
     }
     const sessionId = this.startRun();

@@ -6,7 +6,12 @@ import type {
 } from '@server/api/silo/types';
 import { hostnameFor } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
-import { siloClient, siloDeviceId } from '@server/lib/silo';
+import {
+  SILO_RESETTING,
+  siloClient,
+  siloDeviceId,
+  siloResetPending,
+} from '@server/lib/silo';
 import { createHash, randomBytes } from 'node:crypto';
 
 /*
@@ -91,9 +96,13 @@ export const DIFFERENT_SILO =
  * Refuses when the Silo answering at the saved address is not the one
  * Seerr AI connected to (a rebuilt server reuses small account ids, so an
  * old link would let someone else in). Read anonymously, at most once a
- * minute.
+ * minute. Also refuses while a different Silo's reset is under way, as
+ * the old links still name accounts the new Silo gives to others.
  */
 export const assertSameSilo = async (): Promise<void> => {
+  if (siloResetPending()) {
+    throw new SiloSignInError(503, 'differentServer', SILO_RESETTING);
+  }
   const expected = getSettings().silo.serverId;
   if (!expected) return;
   const hostname = hostnameFor('silo');
@@ -111,7 +120,11 @@ export const assertSameSilo = async (): Promise<void> => {
     }
     identity = { hostname, serverId: found, at: Date.now() };
   }
-  if (found !== expected) {
+  // A reset may have begun while Silo was asked.
+  if (siloResetPending()) {
+    throw new SiloSignInError(503, 'differentServer', SILO_RESETTING);
+  }
+  if (found !== expected || getSettings().silo.serverId !== expected) {
     throw new SiloSignInError(409, 'differentServer', DIFFERENT_SILO);
   }
 };
@@ -346,10 +359,13 @@ export const siloAccountAllowed = async (
 };
 
 /** Every account on Silo that may sign in (switched on). */
-export const enabledSiloAccounts = async (): Promise<SiloAdminUser[]> =>
-  (await siloClient().listAdminUsers()).filter(
+export const enabledSiloAccounts = async (): Promise<SiloAdminUser[]> => {
+  // Old links would be matched against the new Silo's accounts.
+  if (siloResetPending()) throw new Error(SILO_RESETTING);
+  return (await siloClient().listAdminUsers()).filter(
     (account) => account.enabled !== false
   );
+};
 
 /** An account's household profiles, read with the server key. */
 export const siloProfiles = (

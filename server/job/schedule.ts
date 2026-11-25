@@ -33,6 +33,7 @@ import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { finishSiloReset } from '@server/lib/siloConnect';
 import { siloHistorySync } from '@server/lib/siloHistory';
 import userAccessCheck from '@server/lib/userAccessCheck';
 import watchlistSync from '@server/lib/watchlistsync';
@@ -186,7 +187,10 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
             cronSchedule: jobs['silo-history-sync'].schedule,
             job: schedule.scheduleJob(
               jobs['silo-history-sync'].schedule,
-              runJob('Silo Watch History Sync', () => siloHistorySync.run())
+              // A different Silo's reset left part-way is finished first.
+              runJob('Silo Watch History Sync', () =>
+                finishSiloReset().then(() => siloHistorySync.run())
+              )
             ),
             running: () => siloHistorySync.running(),
           },

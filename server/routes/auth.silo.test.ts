@@ -3,6 +3,7 @@ import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
@@ -17,8 +18,10 @@ import {
   checkSiloDevice,
   resetSiloDevicesForTests,
   resetSiloIdentityForTests,
+  siloPasswordSignIn,
   startSiloDevice,
 } from '@server/lib/siloAccounts';
+import { finishSiloReset } from '@server/lib/siloConnect';
 import userAccessCheck from '@server/lib/userAccessCheck';
 import { checkUser } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -488,6 +491,52 @@ describe('setting up with Silo as the primary server', () => {
       null
     );
     // The owner stays linked to the Silo they set up with.
+    assert.equal(
+      (await users().findOneByOrFail({ id: res.body.id })).siloUserId,
+      'acct-owner'
+    );
+  });
+
+  it('keeps the key it made when forgetting the older Silo fails, and finishes that later', async (t) => {
+    const linked = await users().save(
+      new User({
+        email: 'old-silo@example.invalid',
+        siloUserId: 'acct-guest',
+        siloUsername: 'lantern',
+        userType: UserType.LOCAL,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+    const failing = t.mock.method(
+      getRepository(SiloPlay),
+      'clear',
+      async () => {
+        throw new Error('The disk is full.');
+      }
+    );
+    const res = await request(app).post('/auth/silo').send({
+      username: 'harbour',
+      password: 'lights',
+      hostname: '127.0.0.1',
+      port: silo.port(),
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    // Silo and the settings agree on the key it made.
+    const key = getSettings().silo.apiKey;
+    assert.match(key, /^sa_made_/);
+    assert.ok(silo.keys.has(key), 'the key is still in Silo');
+    assert.deepEqual(silo.openSessions(), []);
+    // The reset waits, and Silo is closed until it is done.
+    assert.equal(getSettings().silo.resetPending?.userId, res.body.id);
+    await assert.rejects(() => siloPasswordSignIn('lantern', 'song'));
+    failing.mock.restore();
+    assert.equal(await finishSiloReset(), true);
+    assert.equal(
+      (await users().findOneByOrFail({ id: linked.id })).siloUserId,
+      null
+    );
     assert.equal(
       (await users().findOneByOrFail({ id: res.body.id })).siloUserId,
       'acct-owner'

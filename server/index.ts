@@ -33,6 +33,7 @@ import checkOverseerrMerge from '@server/lib/overseerrMerge';
 import playlists from '@server/lib/playlists';
 import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
+import { finishSiloReset } from '@server/lib/siloConnect';
 import logger from '@server/logger';
 import apiPathCase from '@server/middleware/apiPathCase';
 import { unlessApiKey } from '@server/middleware/auth';
@@ -141,6 +142,10 @@ app
     // Store the owner's account on Jellyfin/Emby servers set up before it was
     // stored with them.
     await rememberJellyfinAdmins();
+
+    // A different Silo's reset cut short by a restart is finished before
+    // anyone signs in through it.
+    await finishSiloReset();
 
     if (
       isConnected('plex') &&

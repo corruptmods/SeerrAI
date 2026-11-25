@@ -8,16 +8,28 @@ import SiloPlay from '@server/entity/SiloPlay';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
+import matchWatch from '@server/lib/matchWatch';
 import {
   connectedServers,
   signInAllowed,
   signInOffered,
 } from '@server/lib/mediaServers';
+import plexMatchCheck from '@server/lib/plexMatchCheck';
+import { siloFullScanner } from '@server/lib/scanners/silo';
 import { getSettings, siloDefaults } from '@server/lib/settings';
-import { SILO_LINKS_RESET, forgetPreviousSilo } from '@server/lib/siloConnect';
+import {
+  SiloSignInError,
+  resetSiloIdentityForTests,
+  siloPasswordSignIn,
+} from '@server/lib/siloAccounts';
+import {
+  SILO_LINKS_RESET,
+  finishSiloReset,
+  forgetPreviousSilo,
+} from '@server/lib/siloConnect';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
-import { createFakeSilo } from '@server/test/fakeSilo';
+import { createFakeSilo, siloMovie } from '@server/test/fakeSilo';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import schedule from 'node-schedule';
@@ -27,6 +39,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { IsNull, Not } from 'typeorm';
 
 /*
  * Connecting Silo beside Plex (Settings → Media Servers), and its own page
@@ -616,5 +629,177 @@ describe('a connected Silo', () => {
       assert.equal(getSettings().main.mediaServerType, MediaServerType.PLEX);
       assert.equal(getSettings().plex.connected, true);
     }
+  });
+});
+
+describe('connecting a different Silo, safely', () => {
+  /** Someone who signs in only with the old Silo, as account "2". */
+  const oldAccountTwo = () =>
+    getRepository(User).save(
+      new User({
+        email: 'garden@test.local',
+        siloUserId: '2',
+        siloUsername: 'garden',
+        userType: UserType.SILO,
+        avatar: '',
+      })
+    );
+
+  beforeEach(() => {
+    resetSiloIdentityForTests();
+    // Account "2" on the new Silo is someone else.
+    silo.accounts = [
+      { id: '1', username: 'owner', password: 'pw', role: 'admin' },
+      { id: '2', username: 'stranger', password: 'pw', role: 'user' },
+    ];
+    getSettings().silo = { ...siloDefaults(), serverId: 'an-older-silo' };
+  });
+
+  it('lets nobody sign in through the new Silo until the old links are gone', async () => {
+    const garden = await oldAccountTwo();
+    // Hold Silo's library list, read after the new connection is set.
+    let release = () => undefined as void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let reached = () => undefined as void;
+    const holding = new Promise<void>((resolve) => (reached = resolve));
+    silo.beforeAnswer = async (_method, path) => {
+      // Once the new connection is set, while its libraries are read.
+      if (
+        path !== '/api/v2/user/libraries' ||
+        getSettings().silo.serverId !== silo.serverId
+      ) {
+        return;
+      }
+      reached();
+      await held;
+    };
+    const connecting = post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    await holding;
+    assert.equal(getSettings().silo.serverId, silo.serverId);
+    assert.ok(getSettings().silo.resetPending, 'marked in the same change');
+    // The new Silo's account "2" must not sign in as Garden meanwhile.
+    await assert.rejects(
+      () => siloPasswordSignIn('stranger', 'pw'),
+      (e: Error) =>
+        e instanceof SiloSignInError &&
+        e.reason === 'differentServer' &&
+        e.status === 503
+    );
+    release();
+    const res = await connecting;
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(getSettings().silo.resetPending, null);
+    assert.equal(
+      (await getRepository(User).findOneByOrFail({ id: garden.id })).siloUserId,
+      null
+    );
+    // Now the new Silo is used, and account "2" is nobody's here.
+    assert.equal((await siloPasswordSignIn('stranger', 'pw')).id, '2');
+  });
+
+  it('stays closed when forgetting the old Silo fails or stops part-way, and finishes later', async (t) => {
+    const garden = await oldAccountTwo();
+    const episodes = getRepository(SiloEpisode);
+    const failing = t.mock.method(episodes, 'clear', async () => {
+      throw new Error('The disk is full.');
+    });
+    const res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(failing.mock.callCount(), 1);
+    // Saved with the new connection, still marked.
+    assert.equal(getSettings().silo.serverId, silo.serverId);
+    assert.ok(getSettings().silo.resetPending);
+    await assert.rejects(
+      () => siloPasswordSignIn('stranger', 'pw'),
+      (e: Error) => e instanceof SiloSignInError && e.status === 503
+    );
+    failing.mock.restore();
+
+    // As at startup, or the next history job: the reset is finished.
+    assert.equal(await finishSiloReset(), true);
+    assert.equal(getSettings().silo.resetPending, null);
+    assert.equal(
+      (await getRepository(User).findOneByOrFail({ id: garden.id })).siloUserId,
+      null
+    );
+    assert.equal((await siloPasswordSignIn('stranger', 'pw')).id, '2');
+  });
+
+  it('finishes a reset a restart cut short, keeping whoever connected it linked', async () => {
+    const garden = await oldAccountTwo();
+    // Saved before Seerr AI stopped: the new connection and the mark.
+    getSettings().silo = silo.settings({
+      resetPending: {
+        userId: 1,
+        accountId: '1',
+        accountUsername: 'owner',
+      },
+    });
+    await assert.rejects(() => siloPasswordSignIn('owner', 'pw'));
+    assert.equal(await finishSiloReset(), true);
+    const users = getRepository(User);
+    assert.equal(
+      (await users.findOneByOrFail({ id: garden.id })).siloUserId,
+      null
+    );
+    const owner = await users.findOneByOrFail({ id: 1 });
+    assert.equal(owner.siloUserId, '1');
+    assert.equal(owner.siloUsername, 'owner');
+    assert.equal(getSettings().silo.resetPending, null);
+  });
+
+  it('stops a scan under way, and drops Match Check findings, before clearing', async (t) => {
+    const dropped = t.mock.method(plexMatchCheck, 'dropServer', async () => {
+      return undefined;
+    });
+    const watchDropped = t.mock.method(matchWatch, 'dropServer', async () => {
+      return undefined;
+    });
+    getSettings().silo = silo.settings({
+      libraries: [
+        { id: '1', name: 'Films', type: 'movie', enabled: true },
+      ] as never,
+    });
+    silo.items = [siloMovie('movie-glasswing', { tmdbId: 9102 })];
+    let release = () => undefined as void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let reached = () => undefined as void;
+    const holding = new Promise<void>((resolve) => (reached = resolve));
+    silo.beforeAnswer = async (_method, path) => {
+      if (path !== '/api/v2/admin/catalog/items') return;
+      silo.beforeAnswer = undefined;
+      reached();
+      await held;
+    };
+    const scan = siloFullScanner.run();
+    await holding;
+    let forgotten = false;
+    const forgetting = forgetPreviousSilo().then(() => (forgotten = true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(forgotten, false, 'waits for the scan to stop');
+    release();
+    await forgetting;
+    await scan;
+    assert.equal(siloFullScanner.status().running, false);
+    assert.equal(
+      await getRepository(Media).countBy({ siloMediaId: Not(IsNull()) }),
+      0
+    );
+    assert.deepEqual(
+      dropped.mock.calls.map((call) => call.arguments[0]),
+      ['Silo']
+    );
+    assert.deepEqual(
+      watchDropped.mock.calls.map((call) => call.arguments[0]),
+      ['Silo']
+    );
   });
 });

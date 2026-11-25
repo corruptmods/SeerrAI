@@ -28,7 +28,11 @@ import { hostnameOf } from '@server/lib/mediaServers';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { siloFullScanner, siloRecentScanner } from '@server/lib/scanners/silo';
-import type { SiloOptionalScope, SiloSettings } from '@server/lib/settings';
+import type {
+  SiloOptionalScope,
+  SiloResetPending,
+  SiloSettings,
+} from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import {
@@ -266,11 +270,16 @@ export const trySilo = async (
     );
   }
 
-  // A different Silo than before: asked first, before any key is made.
-  const previous = getSettings().silo.serverId;
-  if (previous && previous !== serverId && actingUserId !== undefined) {
-    await refuseOwnerLockOut(actingUserId, !input.apiKey);
-    if (!confirmReset) {
+  // A different Silo than before: asked first, before any key is made. A
+  // reset still pending is checked again, as saving now marks it afresh.
+  const before = getSettings().silo;
+  const previous = before.serverId;
+  const different = !!previous && previous !== serverId;
+  if ((different || before.resetPending) && actingUserId !== undefined) {
+    await refuseOwnerLockOut(actingUserId, !input.apiKey, {
+      kept: !different && !!input.apiKey ? before.resetPending : undefined,
+    });
+    if (different && !confirmReset) {
       throw new SiloResetNeeded(await resetImpact());
     }
   }
@@ -462,9 +471,17 @@ const resetImpact = async (): Promise<SiloResetImpact> => {
  */
 const refuseOwnerLockOut = async (
   actingUserId: number,
-  signingIn: boolean
+  signingIn: boolean,
+  {
+    kept,
+  }: {
+    /** A pending reset's mark this connection keeps (see storeSilo). */
+    kept?: SiloResetPending | null;
+  } = {}
 ): Promise<void> => {
   if (actingUserId === 1 && signingIn) return;
+  // The pending reset links the owner to the new Silo's account anyway.
+  if (kept?.userId === 1 && kept.accountId) return;
   const owner = await getRepository(User)
     .createQueryBuilder('user')
     .select([
@@ -693,12 +710,23 @@ export const storeSilo = async (
     // The old Silo's play history copy goes; the new one is read in full.
     silo.historyCopiedTo = '';
     const account = by?.account ?? connection.admin;
-    silo.resetPending = {
+    const marked: SiloResetPending = {
       ...(by?.userId ? { userId: by.userId } : {}),
       ...(by?.userId && account
         ? { accountId: account.id, accountUsername: account.username }
         : {}),
     };
+    // Saved again while this same Silo's reset is pending: whoever it keeps
+    // linked stays so, unless this connection signs someone in to replace
+    // them (refuseOwnerLockOut was asked first).
+    const pendingHere =
+      silo.resetPending && silo.serverId === connection.serverId
+        ? silo.resetPending
+        : undefined;
+    silo.resetPending =
+      pendingHere && !marked.accountId
+        ? { ...pendingHere, userId: pendingHere.userId ?? marked.userId }
+        : marked;
     reset = SILO_LINKS_RESET;
   }
   Object.assign(silo, siloAddressOf(input), {

@@ -734,6 +734,62 @@ describe('connecting a different Silo, safely', () => {
     }
   });
 
+  it('keeps whom a pending reset links when Silo is saved again, and never locks the owner out', async (t) => {
+    const users = getRepository(User);
+    // The owner signs in only with the old Silo, as account "9" (Plex
+    // sign-in is off).
+    getSettings().plex.signIn = false;
+    await users
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        siloUserId: '9',
+        siloUsername: 'lantern',
+        userType: UserType.SILO,
+        password: () => 'NULL',
+      })
+      .where('id = 1')
+      .execute();
+    const failing = t.mock.method(
+      getRepository(SiloEpisode),
+      'clear',
+      async () => {
+        throw new Error('The disk is full.');
+      }
+    );
+    // Pending, naming the owner and the new Silo's account they signed in
+    // as: saving the key again keeps both.
+    getSettings().restore(
+      'silo',
+      silo.settings({
+        resetPending: { userId: 1, accountId: '1', accountUsername: 'owner' },
+      })
+    );
+    let res = await post('/silo', { ...at(), apiKey: 'sa_test' });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(getSettings().silo.resetPending, {
+      userId: 1,
+      accountId: '1',
+      accountUsername: 'owner',
+    });
+
+    // Pending for someone else, with no account for the owner: saving it
+    // again would leave the owner unable to sign in, so it is refused.
+    getSettings().restore(
+      'silo',
+      silo.settings({ resetPending: { userId: 2 } })
+    );
+    await users.update(1, { siloUserId: '9' });
+    res = await post('/silo', { ...at(), apiKey: 'sa_test' });
+    assert.equal(res.status, 409);
+    assert.match(
+      ((await res.json()) as { message: string }).message,
+      /Set a password for your account first/
+    );
+    assert.deepEqual(getSettings().silo.resetPending, { userId: 2 });
+    failing.mock.restore();
+  });
+
   it('stays closed when forgetting the old Silo fails or stops part-way, and finishes later', async (t) => {
     const garden = await oldAccountTwo();
     const episodes = getRepository(SiloEpisode);

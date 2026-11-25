@@ -374,6 +374,29 @@ describe('after a different Silo was connected', () => {
     assert.equal(user.siloRelinkUntil, null);
   });
 
+  it('tells names apart as Silo does, in any script and composition', async () => {
+    silo.accounts.push({
+      id: 'acct-emile',
+      username: 'émile',
+      password: 'harbour',
+      role: 'user',
+    });
+    // Kept in capitals, with the accent as a separate mark.
+    const left = await unlinked({
+      email: 'emile@test.local',
+      siloUsername: 'ÉMILE',
+    });
+    const res = await request(app)
+      .post('/auth/silo')
+      .send({ username: 'émile', password: 'harbour' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.id, left.id);
+    assert.equal(
+      (await users().findOneByOrFail({ id: left.id })).siloUserId,
+      'acct-emile'
+    );
+  });
+
   it('links someone again on Import Silo Users', async () => {
     const left = await unlinked();
     const result = await importSiloUsers(['acct-guest']);

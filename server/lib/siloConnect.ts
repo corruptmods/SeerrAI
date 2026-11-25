@@ -400,6 +400,14 @@ const mayRelinkByName = (user: RelinkFields): boolean =>
   !!user.siloUsername;
 
 /**
+ * A Silo name as Silo tells names apart: case-insensitively (citext), in
+ * any script, so compared here rather than with SQL's LOWER(), which
+ * SQLite applies to ASCII letters only.
+ */
+export const siloNameKey = (name: string): string =>
+  name.normalize('NFC').toLowerCase();
+
+/**
  * Whether an unlinked account here may be linked to a Silo account of this
  * name when it signs in through Silo: only one a different Silo's reset
  * marked for it (siloRelinkUntil, for SILO_RELINK_DAYS) that still fits
@@ -414,7 +422,7 @@ export const relinkableBySiloName = (
   !!user.siloRelinkUntil &&
   new Date(user.siloRelinkUntil).getTime() > now &&
   mayRelinkByName(user) &&
-  (user.siloUsername ?? '').toLowerCase() === username.toLowerCase();
+  siloNameKey(user.siloUsername ?? '') === siloNameKey(username);
 
 /**
  * The account here a Silo account signing in may take back after a reset
@@ -431,9 +439,7 @@ export const siloAccountToRelink = async (
     .where('user.siloUserId IS NULL')
     .andWhere('user.userType = :type', { type: UserType.SILO })
     .andWhere('user.siloRelinkUntil IS NOT NULL')
-    .andWhere('LOWER(user.siloUsername) = :name', {
-      name: account.username.toLowerCase(),
-    })
+    .andWhere('user.siloUsername IS NOT NULL')
     .getMany();
   const fits: User[] = [];
   for (const user of found) {

@@ -892,6 +892,33 @@ describe('connecting a different Silo, safely', () => {
     );
   });
 
+  it('treats Silo as different when none is on record but people are linked', async () => {
+    // Settings lost, the database kept.
+    const garden = await oldAccountTwo();
+    getSettings().restore('silo', siloDefaults());
+    let res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+    });
+    assert.equal(res.status, 409);
+    assert.match(
+      ((await res.json()) as { message: string }).message,
+      /no record of which Silo/
+    );
+    assert.equal(getSettings().silo.serverId, '');
+    res = await post('/media-servers/silo/connect', {
+      ...at(),
+      apiKey: 'sa_test',
+      confirmReset: true,
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.ok(!getSettings().silo.resetPending);
+    assert.equal(
+      (await getRepository(User).findOneByOrFail({ id: garden.id })).siloUserId,
+      null
+    );
+  });
+
   it('marks for linking again by name only those who may be, for 30 days', async () => {
     const users = getRepository(User);
     const garden = await oldAccountTwo();
@@ -953,7 +980,7 @@ describe('connecting a different Silo, safely', () => {
     assert.match(message, /\(3\)/);
     assert.match(
       message,
-      /1 of them sign in only with Silo and are linked again when they next sign in with the new Silo under the same username/
+      /1 of them sign in only with Silo and are linked again if they sign in with the new Silo under the same username within 30 days/
     );
     assert.match(message, /1 of them would be left unable to sign in/);
   });

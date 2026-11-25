@@ -767,6 +767,45 @@ describe('setting up with Silo as the primary server', () => {
     );
   });
 
+  it('forgets links of a Silo no longer on record, keeping the owner who sets up linked', async () => {
+    // Settings lost, the database kept: nothing says whose Silo these are.
+    await users().update(1, {
+      siloUserId: 'acct-owner',
+      siloUsername: 'harbour',
+      userType: UserType.SILO,
+    });
+    const linked = await users().save(
+      new User({
+        email: 'glasswing@example.invalid',
+        siloUserId: 'acct-guest',
+        siloUsername: 'glasswing',
+        userType: UserType.LOCAL,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    const agent = request.agent(app);
+    const res = await agent.post('/auth/silo').send({
+      username: 'harbour',
+      password: 'lights',
+      hostname: '127.0.0.1',
+      port: silo.port(),
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.id, 1);
+    assert.ok(!getSettings().silo.resetPending);
+    assert.equal(
+      (await users().findOneByOrFail({ id: linked.id })).siloUserId,
+      null
+    );
+    assert.equal(
+      (await users().findOneByOrFail({ id: 1 })).siloUserId,
+      'acct-owner'
+    );
+    // Still signed in.
+    assert.equal((await agent.get('/auth/me')).body.id, 1);
+  });
+
   it('only lets a Silo administrator set up', async () => {
     const res = await request(app).post('/auth/silo').send({
       username: 'lantern',

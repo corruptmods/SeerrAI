@@ -277,8 +277,7 @@ export const trySilo = async (
   // A different Silo than before: asked first, before any key is made. A
   // reset still pending is checked again, as saving now marks it afresh.
   const before = getSettings().silo;
-  const previous = before.serverId;
-  const different = !!previous && previous !== serverId;
+  const different = await isDifferentSilo(serverId);
   if ((different || before.resetPending) && actingUserId !== undefined) {
     await refuseOwnerLockOut(actingUserId, !input.apiKey, {
       kept: !different && !!input.apiKey ? before.resetPending : undefined,
@@ -330,9 +329,21 @@ export const trySilo = async (
   return made.checked;
 };
 
+/**
+ * Whether the Silo with this id is a different one from the Silo links here
+ * belong to: another id than the one saved, or, with none saved (settings
+ * lost but the database kept), any link at all, as nothing then says which
+ * Silo they name accounts on.
+ */
+const isDifferentSilo = async (serverId: string): Promise<boolean> => {
+  const saved = getSettings().silo.serverId;
+  if (saved) return saved !== serverId;
+  return getRepository(User).exists({ where: { siloUserId: Not(IsNull()) } });
+};
+
 /** Said when connecting a different Silo than before reset its links. */
 export const SILO_LINKS_RESET =
-  'This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People whose account here came from Silo are linked again when they next sign in with Silo under the same username; others link Silo again under Linked Accounts.';
+  "This is a different Silo from before, so every link to a Silo account was removed, along with what Seerr AI knew of the old Silo. People whose account here came from Silo, with no password and nothing beyond new users' permissions, are linked again if they sign in with Silo under the same username within 30 days; others link Silo again under Linked Accounts.";
 
 /** What connecting a different Silo would remove. */
 export interface SiloResetImpact {
@@ -349,6 +360,11 @@ export interface SiloResetImpact {
   relinked: number;
   /** Linked users left unable to sign in at all until given a password. */
   noSignIn: number;
+  /**
+   * No Silo was on record (settings lost, the database kept), so the
+   * links can't be known to name this Silo's accounts.
+   */
+  unrecorded?: boolean;
 }
 
 /**
@@ -359,7 +375,7 @@ export class SiloResetNeeded extends MediaServerChangeError {
   constructor(public readonly impact: SiloResetImpact) {
     const who = [
       impact.relinked
-        ? ` ${impact.relinked} of them sign in only with Silo and are linked again when they next sign in with the new Silo under the same username.`
+        ? ` ${impact.relinked} of them sign in only with Silo and are linked again if they sign in with the new Silo under the same username within ${SILO_RELINK_DAYS} days.`
         : '',
       impact.noSignIn
         ? ` ${impact.noSignIn} of them would be left unable to sign in until given a password.`
@@ -367,7 +383,11 @@ export class SiloResetNeeded extends MediaServerChangeError {
     ].join('');
     super(
       409,
-      `This is a different Silo from the one connected before. Connecting it removes every link to a Silo account (${impact.links}), Seerr AI's copy of the old Silo's watch history (${impact.plays} plays) and the old Silo's ids for ${impact.titles} titles.${who} Others link their Silo accounts again under Linked Accounts. Connect anyway?`
+      `${
+        impact.unrecorded
+          ? "Seerr AI has no record of which Silo its users' Silo links belong to, so it treats this as a different Silo."
+          : 'This is a different Silo from the one connected before.'
+      } Connecting it removes every link to a Silo account (${impact.links}), Seerr AI's copy of the old Silo's watch history (${impact.plays} plays) and the old Silo's ids for ${impact.titles} titles.${who} Others link their Silo accounts again under Linked Accounts. Connect anyway?`
     );
   }
 }
@@ -486,6 +506,7 @@ const resetImpact = async (): Promise<SiloResetImpact> => {
     }
   }
   return {
+    ...(getSettings().silo.serverId ? {} : { unrecorded: true }),
     links: linked.length,
     plays: await getRepository(SiloPlay).count(),
     titles: await media.getCount(),
@@ -766,14 +787,12 @@ export const storeSilo = async (
   } catch {
     // Libraries can be read again from Settings → Silo.
   }
+  const different = await isDifferentSilo(connection.serverId);
   const settings = getSettings();
   const previous = settings.silo;
   const silo: SiloSettings = structuredClone(previous);
   let reset: string | undefined;
-  if (
-    (silo.serverId && silo.serverId !== connection.serverId) ||
-    silo.resetPending
-  ) {
+  if (different || silo.resetPending) {
     silo.libraries = [];
     silo.keyId = '';
     // The old Silo's play history copy goes; the new one is read in full.

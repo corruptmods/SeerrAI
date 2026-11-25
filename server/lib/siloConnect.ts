@@ -38,7 +38,7 @@ import type {
   SiloSettings,
 } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { endSessions } from '@server/lib/signIn';
+import { endSessions, forgetStillAllowed } from '@server/lib/signIn';
 import {
   noteSiloResetMarked,
   siloDeviceId,
@@ -642,6 +642,9 @@ export const forgetPreviousSilo = async (
         }
       );
     }
+    // What Silo said of whether they may still sign in was about the old
+    // Silo's accounts.
+    forgetStillAllowed(linked.map((user) => user.id));
     for (const user of fromSilo) {
       await endSessions(
         user.id,

@@ -26,6 +26,7 @@ import {
 import { finishSiloReset } from '@server/lib/siloConnect';
 import { importSiloUsers } from '@server/lib/siloUserImport';
 import userAccessCheck from '@server/lib/userAccessCheck';
+import { removeFromMediaServer } from '@server/lib/userRemoval';
 import { checkUser } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
 import { setupTestDb } from '@server/test/db';
@@ -840,6 +841,30 @@ describe('whether Silo still lets someone in', () => {
     assert.equal(await maySignIn(user, 'passkey'), false);
     silo.accounts = silo.accounts.slice(0, 1);
     assert.equal(await maySignIn(user, 'password'), false);
+  });
+
+  it('neither judges nor switches anyone off by an old link while a reset is under way', async () => {
+    const user = await person();
+    // The new Silo has no account "acct-guest".
+    silo.accounts = silo.accounts.slice(0, 1);
+    const settings = getSettings();
+    settings.silo.optionalScopes = ['admin:users'];
+    settings.silo.resetPending = {};
+    try {
+      // No answer, so they stay signed in, and none is remembered.
+      assert.equal(await stillMaySignIn(user), true);
+      assert.equal(await maySignIn(user, 'password'), true);
+      await assert.rejects(
+        () => removeFromMediaServer(user),
+        (e: Error & { status?: number }) => e.status === 503
+      );
+      assert.ok(
+        !silo.calls.some((c) => c.path.startsWith('/admin/users')),
+        'Silo was not asked about the old link'
+      );
+    } finally {
+      settings.silo.resetPending = null;
+    }
   });
 
   it('keeps someone signed in while Silo is down', async () => {

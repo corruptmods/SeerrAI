@@ -14,7 +14,12 @@ import {
   USER_ID,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
-import { siloClient } from '@server/lib/silo';
+import {
+  siloClient,
+  siloEpoch,
+  siloEpochCurrent,
+  siloResetPending,
+} from '@server/lib/silo';
 import {
   pictureProfile,
   pictureVersion,
@@ -73,8 +78,11 @@ function computeImageHash(buffer: Buffer): string {
 const checkSiloAvatarChanged = async (
   user: User
 ): Promise<{ changed: boolean; etag?: string }> => {
-  if (!user.siloUserId) return { changed: false };
+  // Not from a link a different Silo's reset is about to clear.
+  if (!user.siloUserId || siloResetPending()) return { changed: false };
+  const epoch = siloEpoch();
   const profiles = await siloProfiles(user.siloUserId);
+  if (!siloEpochCurrent(epoch)) return { changed: false };
   const version = pictureVersion(pictureProfile(profiles, user.siloProfileId));
   if ((user.avatarVersion ?? '') === version) {
     return { changed: false, etag: user.avatarETag ?? undefined };
@@ -285,7 +293,9 @@ router.get('/silo/:accountId', async (req, res, next) => {
       size: 200,
     });
     const avatarImageCache = initAvatarImageProxy();
-    if (!user || !connectedServers().includes('silo')) {
+    // While a different Silo's reset is under way, the link names an
+    // account on the old Silo, someone else's on the new one.
+    if (!user || !connectedServers().includes('silo') || siloResetPending()) {
       return sendPicture(
         req,
         res,
@@ -293,12 +303,14 @@ router.get('/silo/:accountId', async (req, res, next) => {
       );
     }
 
+    const epoch = siloEpoch();
     let profile;
     try {
       profile = pictureProfile(
         await siloProfilesForPicture(accountId),
         user.siloProfileId
       );
+      if (!siloEpochCurrent(epoch)) profile = undefined;
     } catch (e) {
       if (!(e instanceof SiloError)) throw e;
       logger.debug('Could not read a Silo account’s profiles', {

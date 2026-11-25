@@ -73,7 +73,12 @@ import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import { addressGroupOf } from '@server/lib/signInLimiter';
 import type { SiloEpoch } from '@server/lib/silo';
-import { siloEpoch } from '@server/lib/silo';
+import {
+  SILO_RESETTING,
+  siloEpoch,
+  siloEpochCurrent,
+  siloResetPending,
+} from '@server/lib/silo';
 import {
   SiloSignInError,
   assertSiloSignInEpoch,
@@ -1091,6 +1096,11 @@ const siloProfileOwner = async (
   if (!isConnected('silo')) {
     return { status: 400, message: 'Silo is not connected.' };
   }
+  // Their link names an account on the old Silo until a different one's
+  // reset is done.
+  if (siloResetPending()) {
+    return { status: 503, message: SILO_RESETTING };
+  }
   return { status: 200, user };
 };
 
@@ -1105,7 +1115,11 @@ userSettingsRoutes.get<{ id: string }>(
     const { status, message, user } = await siloProfileOwner(req);
     if (!user) return res.status(status).json({ message });
     try {
+      const epoch = siloEpoch();
       const profiles = await siloProfiles(user.siloUserId ?? '');
+      if (!siloEpochCurrent(epoch)) {
+        return res.status(503).json({ message: SILO_RESETTING });
+      }
       return res.status(200).json({
         profileId: user.siloProfileId ?? null,
         profiles: profiles.map((profile) => ({
@@ -1140,6 +1154,7 @@ userSettingsRoutes.put<{ id: string }>(
     const { status, message, user } = await siloProfileOwner(req);
     if (!user) return res.status(status).json({ message });
     const { profileId } = parsed.data;
+    const epoch = siloEpoch();
     if (profileId) {
       let profiles;
       try {
@@ -1154,6 +1169,9 @@ userSettingsRoutes.put<{ id: string }>(
           .status(400)
           .json({ message: 'That profile is not on their Silo account.' });
       }
+    }
+    if (!siloEpochCurrent(epoch)) {
+      return res.status(503).json({ message: SILO_RESETTING });
     }
     await getRepository(User).update(user.id, { siloProfileId: profileId });
     // Their picture follows the chosen profile.

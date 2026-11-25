@@ -12,7 +12,10 @@ import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import {
   SILO_NEEDS_USERS_SCOPE,
+  SILO_RESETTING,
   siloClient,
+  siloEpoch,
+  siloEpochCurrent,
   siloHasScope,
 } from '@server/lib/silo';
 
@@ -87,13 +90,25 @@ const switchOffInSilo = async (user: User): Promise<string> => {
   if (!siloHasScope('admin:users')) {
     throw new MediaServerRemovalError(400, SILO_NEEDS_USERS_SCOPE);
   }
+  // Their link names an account on the old Silo while a different one's
+  // reset is under way; on the new Silo that id is someone else's.
+  const epoch = siloEpoch();
+  if (!siloEpochCurrent(epoch)) {
+    throw new MediaServerRemovalError(503, SILO_RESETTING);
+  }
   const client = siloClient();
   let found;
   try {
     found = await client.getAdminUserForChange(user.siloUserId);
   } catch (e) {
+    if (!siloEpochCurrent(epoch)) {
+      throw new MediaServerRemovalError(503, SILO_RESETTING);
+    }
     if (e instanceof SiloError && e.status === 404) return 'Silo';
     throw e;
+  }
+  if (!siloEpochCurrent(epoch)) {
+    throw new MediaServerRemovalError(503, SILO_RESETTING);
   }
   if (found.account.role === 'admin') {
     throw new MediaServerRemovalError(

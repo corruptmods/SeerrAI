@@ -18,7 +18,12 @@ import { availableQuality } from '@server/lib/mediaQuality';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
-import { siloClient } from '@server/lib/silo';
+import {
+  SiloResettingError,
+  siloClient,
+  siloEpoch,
+  siloEpochCurrent,
+} from '@server/lib/silo';
 import logger from '@server/logger';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -80,13 +85,19 @@ const isPlexOwner = async (accountId: string): Promise<boolean> => {
  * account's apply to each of its profiles.
  */
 const siloReach = async (accountId: string): Promise<Reach> => {
+  // The link names an account on the old Silo while a different one's
+  // reset is under way: unknown until it is done.
+  const epoch = siloEpoch();
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
   let account;
   try {
     account = await siloClient({ timeout: 10_000 }).getAdminUser(accountId);
   } catch (e) {
+    if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
     if (e instanceof SiloError && e.status === 404) return new Set();
     throw e;
   }
+  if (!siloEpochCurrent(epoch)) throw new SiloResettingError();
   if (!account.enabled) return new Set();
   if (account.role === 'admin') return 'all';
   const policy = account.effective_policy;

@@ -8,7 +8,10 @@ import type {
 import { LibraryAccessError } from '@server/lib/libraryAccess/types';
 import {
   SILO_NEEDS_USERS_SCOPE,
+  SILO_RESETTING,
   siloClient,
+  siloEpoch,
+  siloEpochCurrent,
   siloHasScope,
   siloLibraryType,
   siloSettings,
@@ -48,6 +51,16 @@ export const siloAccess = async (): Promise<AccessServer> => {
   if (!siloHasScope('admin:users')) {
     throw new LibraryAccessError(400, SILO_NEEDS_USERS_SCOPE);
   }
+  // Accounts are matched to people here by their Silo links, which name the
+  // old Silo's accounts while a different one's reset is under way; work
+  // begun before a reset was marked stops (siloEpoch).
+  const epoch = siloEpoch();
+  const unchanged = () => {
+    if (!siloEpochCurrent(epoch)) {
+      throw new LibraryAccessError(503, SILO_RESETTING);
+    }
+  };
+  unchanged();
   const client = siloClient();
   /** Every library id Silo listed, to keep any other an account holds. */
   let known = new Set<string>();
@@ -69,6 +82,7 @@ export const siloAccess = async (): Promise<AccessServer> => {
             )
           : client.listAdminUsers(),
       ]);
+      unchanged();
       const libraries = found.map((library) => ({
         id: library.id,
         title: library.name,
@@ -103,9 +117,11 @@ export const siloAccess = async (): Promise<AccessServer> => {
     },
 
     async write(person, to) {
+      unchanged();
       try {
         // Read fresh: Silo changes an account only against its latest tag.
         const { account, tag } = await client.getAdminUserForChange(person.ref);
+        unchanged();
         if (account.role === 'admin') {
           throw new Error(
             `${person.name} is now an administrator in Silo, so their libraries are left as they are.`
@@ -127,6 +143,7 @@ export const siloAccess = async (): Promise<AccessServer> => {
         // today's libraries are listed instead (a later one isn't given).
         await client.updateAdminUser(person.ref, tag, { library_ids: null });
         const after = await client.getAdminUserForChange(person.ref);
+        unchanged();
         if (enforced(after.account) !== null) {
           // Its group limits it: list every library instead.
           await client.updateAdminUser(person.ref, after.tag, {
@@ -134,6 +151,7 @@ export const siloAccess = async (): Promise<AccessServer> => {
           });
         }
       } catch (e) {
+        if (e instanceof LibraryAccessError) throw e;
         throw refusal(e);
       }
     },

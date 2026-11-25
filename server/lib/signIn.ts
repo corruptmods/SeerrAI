@@ -15,6 +15,11 @@ import {
   signInAllowed,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
+import {
+  siloEpoch,
+  siloEpochCurrent,
+  siloResetPending,
+} from '@server/lib/silo';
 import { siloAccountAllowed } from '@server/lib/siloAccounts';
 import type { Request } from 'express';
 import { In, Like } from 'typeorm';
@@ -208,7 +213,10 @@ const jellyfinLetsIn = async (
 
 /**
  * Whether their Silo account still exists and is switched on. Throws when
- * Silo is unreachable.
+ * Silo is unreachable. No answer (undefined) while a different Silo's reset
+ * is under way, or if one was marked while Silo was asked: the link names
+ * an account on the old Silo, and the new one's answer about it says
+ * nothing of them.
  */
 const siloLetsIn = async (
   user: Pick<User, 'siloUserId'>,
@@ -220,7 +228,10 @@ const siloLetsIn = async (
   if (!getSettings().silo.apiKey) {
     return how === 'signedIn' ? undefined : false;
   }
-  return siloAccountAllowed(user.siloUserId);
+  if (siloResetPending()) return undefined;
+  const epoch = siloEpoch();
+  const allowed = await siloAccountAllowed(user.siloUserId);
+  return siloEpochCurrent(epoch) ? allowed : undefined;
 };
 
 /** How long the owner's Plex share list is reused across users. */
@@ -294,6 +305,18 @@ const STILL_ALLOWED_TIMEOUT_MS = 10 * 1000;
 const stillAllowed = new Map<number, { ok: boolean; at: number }>();
 /** Answers being fetched, so concurrent requests ask the media server once. */
 const stillAllowedPending = new Map<number, Promise<boolean>>();
+
+/**
+ * Forgets the "may still sign in" answers for these users, and any being
+ * fetched (a different Silo was connected, so earlier answers from Silo
+ * are about someone else).
+ */
+export const forgetStillAllowed = (userIds: number[]): void => {
+  for (const id of userIds) {
+    stillAllowed.delete(id);
+    stillAllowedPending.delete(id);
+  }
+};
 
 /** For tests: forgets every "may still sign in" answer. */
 export const resetSignInMemoryForTests = (): void => {

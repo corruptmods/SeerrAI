@@ -772,6 +772,8 @@ describe('connecting a different Silo, safely', () => {
       userId: 1,
       accountId: '1',
       accountUsername: 'owner',
+      // Forgetting the rest failed; the links went already.
+      usersCleared: true,
     });
 
     // Pending for someone else, with no account for the owner: saving it
@@ -821,6 +823,39 @@ describe('connecting a different Silo, safely', () => {
       null
     );
     assert.equal((await siloPasswordSignIn('stranger', 'pw')).id, '2');
+  });
+
+  it('keeps the reset mark until its removal is saved, without unlinking anyone again', async (t) => {
+    const users = getRepository(User);
+    const garden = await oldAccountTwo();
+    const settings = getSettings();
+    settings.restore('silo', silo.settings({ resetPending: {} }));
+    // Every save works but the one that removes the mark.
+    const failing = t.mock.method(settings, 'save', async () => {
+      if (settings.silo.resetPending === null) {
+        throw new Error('The disk is full.');
+      }
+    });
+    assert.equal(await finishSiloReset(), false);
+    failing.mock.restore();
+    assert.deepEqual(settings.silo.resetPending, { usersCleared: true });
+    await assert.rejects(
+      () => siloPasswordSignIn('stranger', 'pw'),
+      (e: Error) => e instanceof SiloSignInError && e.status === 503
+    );
+    assert.equal(
+      (await users.findOneByOrFail({ id: garden.id })).siloUserId,
+      null
+    );
+
+    // Linked again meanwhile: trying the reset again leaves that link.
+    await users.update(garden.id, { siloUserId: '7' });
+    assert.equal(await finishSiloReset(), true);
+    assert.ok(!settings.silo.resetPending);
+    assert.equal(
+      (await users.findOneByOrFail({ id: garden.id })).siloUserId,
+      '7'
+    );
   });
 
   it('finishes a reset a restart cut short, keeping whoever connected it linked', async () => {

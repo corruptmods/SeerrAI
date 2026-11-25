@@ -166,6 +166,11 @@ export interface SiloResetPending {
   /** The new Silo's account they signed in as, linked to them. */
   accountId?: string;
   accountUsername?: string;
+  /**
+   * The users' part is done (links removed, the connecting admin linked):
+   * trying the reset again doesn't redo it.
+   */
+  usersCleared?: boolean;
 }
 
 /** An unconfigured Silo server. */

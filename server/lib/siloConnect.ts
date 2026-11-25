@@ -566,26 +566,13 @@ export interface SiloResetActor {
 }
 
 /**
- * Forgets everything that belonged to the Silo connected before: Silo's
- * account ids are small numbers, so on another Silo account "2" is someone
- * else, and must never sign in as the person linked to the old one. Scans
- * and history reads under way stop first, so none writes an old id back.
- * Each user's Silo link goes (an account that came from Silo keeps the Silo
- * name, to be linked again by it: relinkableBySiloName), and sessions end
- * for those whose account came from Silo (keeping the connecting admin's own
- * session); the old Silo's title ids, episode list, play copy, library
- * places and Match Check findings go too. The connecting admin is linked to
- * the new Silo's administrator they signed in as. Returns how many users
- * were unlinked.
+ * The users' part of forgetPreviousSilo: every Silo link goes (an account
+ * that came from Silo keeps the Silo name, and may be marked to be linked
+ * again by it), sessions end for those whose account came from Silo, and
+ * the connecting admin is linked to the new Silo's account. Returns how
+ * many users were unlinked.
  */
-export const forgetPreviousSilo = async (
-  actor?: SiloResetActor
-): Promise<number> => {
-  // A history read under way stops before writing the old Silo's plays.
-  stopSiloHistory();
-  forgetSiloPictures();
-  // So does a scan, before anything it would write is cleared.
-  await Promise.all([siloFullScanner.stop(), siloRecentScanner.stop()]);
+const forgetSiloLinks = async (actor?: SiloResetActor): Promise<number> => {
   const users = getRepository(User);
   const linked = await users
     .createQueryBuilder('user')
@@ -660,6 +647,44 @@ export const forgetPreviousSilo = async (
       siloRelinkUntil: null,
     });
   }
+  return linked.length;
+};
+
+/**
+ * Forgets everything that belonged to the Silo connected before: Silo's
+ * account ids are small numbers, so on another Silo account "2" is someone
+ * else, and must never sign in as the person linked to the old one. Scans
+ * and history reads under way stop first, so none writes an old id back.
+ * Each user's Silo link goes (an account that came from Silo keeps the Silo
+ * name, to be linked again by it: relinkableBySiloName), and sessions end
+ * for those whose account came from Silo (keeping the connecting admin's own
+ * session); the old Silo's title ids, episode list, play copy, library
+ * places and Match Check findings go too. The connecting admin is linked to
+ * the new Silo's administrator they signed in as. Returns how many users
+ * were unlinked.
+ */
+export const forgetPreviousSilo = async (
+  actor?: SiloResetActor,
+  {
+    usersCleared = false,
+    onUsersCleared,
+  }: {
+    /**
+     * The users' part is done already (a reset tried again): it is not
+     * redone, which would unlink whoever was linked since.
+     */
+    usersCleared?: boolean;
+    /** Runs once the users' part is done, before the rest. */
+    onUsersCleared?: () => Promise<void>;
+  } = {}
+): Promise<number> => {
+  // A history read under way stops before writing the old Silo's plays.
+  stopSiloHistory();
+  forgetSiloPictures();
+  // So does a scan, before anything it would write is cleared.
+  await Promise.all([siloFullScanner.stop(), siloRecentScanner.stop()]);
+  const unlinked = usersCleared ? 0 : await forgetSiloLinks(actor);
+  if (!usersCleared) await onUsersCleared?.();
   const media = getRepository(Media);
   for (const column of MEDIA_ID.silo) {
     await media.update({ [column]: Not(IsNull()) }, { [column]: null });
@@ -680,7 +705,7 @@ export const forgetPreviousSilo = async (
       errorMessage: e instanceof Error ? e.message : String(e),
     })
   );
-  return linked.length;
+  return unlinked;
 };
 
 let finishing: Promise<boolean> | undefined;
@@ -724,12 +749,29 @@ export const finishSiloReset = (
                   }
                 : undefined,
             }
-          : undefined
+          : undefined,
+        {
+          usersCleared: !!pending.usersCleared,
+          // Noted on the mark, so trying again doesn't unlink anyone anew.
+          onUsersCleared: async () => {
+            if (settings.silo.resetPending !== pending) return;
+            pending.usersCleared = true;
+            await settings.save();
+          },
+        }
       );
-      // A reset begun again meanwhile is finished by its own call.
+      // A reset begun again meanwhile is finished by its own call. The mark
+      // stays until its removal is saved, so a failed save tries again.
       if (settings.silo.resetPending === pending) {
         settings.silo.resetPending = null;
-        await settings.save();
+        try {
+          await settings.save();
+        } catch (e) {
+          if (settings.silo.resetPending === null) {
+            settings.silo.resetPending = pending;
+          }
+          throw e;
+        }
       }
       logger.warn(
         'Connected a different Silo than before; links to the old one were removed',

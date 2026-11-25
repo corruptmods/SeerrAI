@@ -291,9 +291,14 @@ export const jellyfinMatchItem = (
       : undefined,
 });
 
-/** Folder names a season's episodes are kept in, under the series folder. */
+/**
+ * Folder names a season's episodes are kept in, under the series folder:
+ * "Season 1", "S01", "Specials" and their translations, and nothing more,
+ * so a series folder such as "Extras (2005)" in a flat layout is never
+ * taken for one.
+ */
 const SEASON_FOLDER =
-  /^(?:season|series|staffel|saison|temporada|stagione|seizoen|specials?|extras?)\b|^s\d{1,3}$/i;
+  /^(?:(?:season|series|staffel|saison|temporada|stagione|seizoen)[ ._-]*\d{1,4}|s\d{1,3}|specials?)$/i;
 
 /**
  * A series' folder from one of its episode files: the file's folder, or the

@@ -138,6 +138,27 @@ describe('Match Check on Silo', () => {
       'Harbour Lights'
     );
     assert.equal(seriesFolderOf('/tv/Glasswing/e.mkv'), 'Glasswing');
+    assert.equal(
+      seriesFolderOf('/tv/Lantern Song/Saison 2/e.mkv'),
+      'Lantern Song'
+    );
+    assert.equal(
+      seriesFolderOf('/tv/Lantern Song/Temporada_03/e.mkv'),
+      'Lantern Song'
+    );
+    assert.equal(seriesFolderOf('/tv/Glasswing/Specials/e.mkv'), 'Glasswing');
+  });
+
+  it('never takes a series folder for a season folder in a flat layout', () => {
+    assert.equal(seriesFolderOf('/tv/Extras (2005)/e01.mkv'), 'Extras (2005)');
+    assert.equal(
+      seriesFolderOf('/tv/Specials Unit (2011)/e01.mkv'),
+      'Specials Unit (2011)'
+    );
+    assert.equal(
+      seriesFolderOf('/tv/Season of the Lantern/e01.mkv'),
+      'Season of the Lantern'
+    );
   });
 
   it('reads a large library a page at a time, keeping each series’ folders', async (t) => {

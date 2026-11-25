@@ -13,6 +13,7 @@ import {
   freshSiloHistory,
   resetSiloHistorySync,
   siloHistorySync,
+  stopSiloHistory,
   syncSiloHistory,
 } from '@server/lib/siloHistory';
 import { setupTestDb } from '@server/test/db';
@@ -291,6 +292,19 @@ describe('copying Silo’s play history', () => {
     await syncSiloHistory();
     assert.equal(historyCalls()[0].query.ended_after, undefined);
     assert.equal(await getRepository(SiloPlay).count(), 250);
+  });
+
+  it('writes nothing when Silo is replaced while a page’s titles are looked up', async () => {
+    // An episode the scans haven't listed: its series is asked of Silo.
+    silo.plays = [play('s-episode', 'series-garden-1-2', 2)];
+    silo.beforeAnswer = (_method, path) => {
+      if (path !== '/api/v2/admin/catalog/items') return;
+      silo.beforeAnswer = undefined;
+      // Replaced while Silo answers, after the page passed its check.
+      stopSiloHistory();
+    };
+    await assert.rejects(() => syncSiloHistory(), SiloHistoryStopped);
+    assert.equal(await getRepository(SiloPlay).count(), 0);
   });
 
   it('reads nothing while a different Silo’s reset is pending', async () => {

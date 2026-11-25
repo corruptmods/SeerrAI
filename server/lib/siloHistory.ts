@@ -190,14 +190,20 @@ const placementsFor = async (
   return placed;
 };
 
+/** Throws once the Silo a read started on is no longer the connected one. */
+type StillCurrent = () => void;
+
 /**
  * Stores one page of Silo's history; returns how many plays were added or
  * refreshed. `retry` looks again for the title of plays stored without one.
+ * `still` is checked again right before writing, as finding titles waits on
+ * the database and Silo, and Silo may be removed or replaced meanwhile.
  */
 const storePage = async (
   client: SiloAPI,
   page: SiloPlaybackHistoryEntry[],
-  retry: boolean
+  retry: boolean,
+  still: StillCurrent
 ): Promise<number> => {
   const entries = page.filter(isVideo);
   if (!entries.length) return 0;
@@ -296,6 +302,7 @@ const storePage = async (
     );
   });
   for (let i = 0; i < changed.length; i += WRITE_CHUNK) {
+    still();
     await repo.upsert(changed.slice(i, i + WRITE_CHUNK), ['sessionId']);
   }
   return changed.length;
@@ -331,9 +338,6 @@ export class SiloHistoryStopped extends Error {
   }
 }
 
-/** Throws once the Silo a read started on is no longer the connected one. */
-type StillCurrent = () => void;
-
 const stillCurrentFrom = (): StillCurrent => {
   const started = generation;
   const serverId = getSettings().silo.serverId;
@@ -367,7 +371,7 @@ const readFrom = async (
     // A replaced attempt stored before is dropped by the nightly re-read.
     page.forEach((entry) => !isReplaced(entry) && seen?.add(entry.session_id));
     still();
-    stored += await storePage(client, page, retry);
+    stored += await storePage(client, page, retry, still);
   }
   return { read, stored, newest };
 };

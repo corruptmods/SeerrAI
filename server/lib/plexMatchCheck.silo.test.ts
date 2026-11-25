@@ -140,6 +140,29 @@ describe('Match Check on Silo', () => {
     assert.equal(seriesFolderOf('/tv/Glasswing/e.mkv'), 'Glasswing');
   });
 
+  it('reads a large library a page at a time, keeping each series’ folders', async (t) => {
+    arrsHave(t);
+    // More episodes than one page holds, all in the series' one folder.
+    silo.items.push(
+      ...Array.from({ length: 450 }, (_, i) =>
+        withFile(
+          siloEpisode('series-harbour', 2, i + 1, { libraryId: 'mixed' }),
+          `/data/tv/Static Garden/Season 02/Static.Garden.S02E${i + 1}.mkv`
+        )
+      )
+    );
+    await plexMatchCheck.run();
+    const report = await plexMatchCheck.lastReport();
+    assert.equal(report.error, undefined);
+    const series = report.problems.find((p) => p.kind === 'series');
+    assert.equal(series?.folder, 'Static Garden');
+    const episodePages = silo.calls.filter(
+      (call) =>
+        call.path === '/admin/catalog/items' && call.query.type === 'episode'
+    );
+    assert.equal(episodePages.length, 3, 'three pages of 200');
+  });
+
   it('checks films and series by their folders, with Silo’s wording', async (t) => {
     arrsHave(t);
     await plexMatchCheck.run();

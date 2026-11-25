@@ -180,6 +180,14 @@ export interface SiloScopeProbe {
   optional: SiloOptionalScopeName[];
 }
 
+/** A catalog query as Silo's parameters. */
+const catalogParams = (query: CatalogQuery): ListParams => ({
+  library_id: query.libraryId,
+  type: query.type,
+  added_after: query.addedAfter?.toISOString(),
+  include_file_paths: query.includeFilePaths || undefined,
+});
+
 /** How Seerr AI names itself on the sign-in sessions Silo records. */
 const DEVICE_NAME = 'Seerr AI';
 const DEVICE_PLATFORM = 'server';
@@ -371,12 +379,23 @@ class SiloAPI extends ExternalAPI {
   public listCatalogItems(
     query: CatalogQuery = {}
   ): Promise<SiloCatalogItem[]> {
-    return this.listAll<SiloCatalogItem>('/admin/catalog/items', {
-      library_id: query.libraryId,
-      type: query.type,
-      added_after: query.addedAfter?.toISOString(),
-      include_file_paths: query.includeFilePaths || undefined,
-    });
+    return this.listAll<SiloCatalogItem>(
+      '/admin/catalog/items',
+      catalogParams(query)
+    );
+  }
+
+  /**
+   * The catalog items matching the query a page at a time, for reading a
+   * large library without holding all of it.
+   */
+  public catalogItemPages(
+    query: CatalogQuery = {}
+  ): AsyncGenerator<SiloCatalogItem[]> {
+    return this.pages<SiloCatalogItem>(
+      '/admin/catalog/items',
+      catalogParams(query)
+    );
   }
 
   /**

@@ -318,13 +318,14 @@ export const siloIds = (item: SiloCatalogItem): Ids => {
 
 /**
  * A Silo film or series as the check needs it. A film's folders come from
- * its own files; a series' from its episodes' (`episodeFiles`), as Silo
- * lists no folder for a series.
+ * its own files; a series' are those its episodes' files are in
+ * (`seriesFolders`, from addSeriesFolders), as Silo lists no folder for a
+ * series.
  */
 export const siloMatchItem = (
   kind: 'movie' | 'series',
   item: SiloCatalogItem,
-  episodeFiles: string[] = []
+  seriesFolders: Iterable<string> = []
 ): MatchItem => ({
   title: item.title,
   year: item.year,
@@ -332,7 +333,7 @@ export const siloMatchItem = (
   folders: [
     ...new Set(
       kind === 'series'
-        ? episodeFiles.map(seriesFolderOf)
+        ? seriesFolders
         : item.versions.flatMap((v) =>
             v.file_path ? [parentFolder(v.file_path)] : []
           )
@@ -340,6 +341,32 @@ export const siloMatchItem = (
   ].filter(Boolean),
   ids: siloIds(item),
 });
+
+/** The series folders a Silo episode's files are in. */
+export const episodeSeriesFolders = (episode: SiloCatalogItem): string[] =>
+  episode.versions.flatMap((version) => {
+    const folder = version.file_path ? seriesFolderOf(version.file_path) : '';
+    return folder ? [folder] : [];
+  });
+
+/**
+ * Adds the series folders of these Silo episodes' files to `folders`, by
+ * series id: only the folder names are kept, not the episodes.
+ */
+export const addSeriesFolders = (
+  folders: Map<string, Set<string>>,
+  episodes: { seriesId?: string | null; folders: string[] }[]
+): void => {
+  for (const episode of episodes) {
+    if (!episode.seriesId) continue;
+    let found = folders.get(episode.seriesId);
+    if (!found) {
+      found = new Set();
+      folders.set(episode.seriesId, found);
+    }
+    for (const folder of episode.folders) found.add(folder);
+  }
+};
 
 /**
  * Radarr facts that show whose mistake a wrong match is: the film's runtime,
@@ -686,50 +713,55 @@ class PlexMatchCheck {
     for (const library of siloSettings().libraries) {
       if (!library.enabled || this.cancelled) continue;
       if (library.type === 'movie' || library.type === 'mixed') {
-        const films = await client.listCatalogItems({
+        // A page at a time: a large library's files aren't all held.
+        for await (const films of client.catalogItemPages({
           libraryId: library.id,
           type: 'movie',
           includeFilePaths: true,
-        });
-        for (const film of films) {
-          this.tally(
-            report,
-            compareMatch(
-              'movie',
-              siloMatchItem('movie', film),
-              expected.movies,
-              'Silo'
-            )
-          );
+        })) {
+          for (const film of films) {
+            this.tally(
+              report,
+              compareMatch(
+                'movie',
+                siloMatchItem('movie', film),
+                expected.movies,
+                'Silo'
+              )
+            );
+          }
+          if (this.cancelled) break;
         }
       }
       if (this.cancelled) break;
       if (library.type === 'show' || library.type === 'mixed') {
-        const [series, episodes] = await Promise.all([
-          client.listCatalogItems({ libraryId: library.id, type: 'series' }),
-          client.listCatalogItems({
-            libraryId: library.id,
-            type: 'episode',
-            includeFilePaths: true,
-          }),
-        ]);
-        const files = new Map<string, string[]>();
-        for (const episode of episodes) {
-          if (!episode.series_id) continue;
-          const paths = episode.versions.flatMap((v) =>
-            v.file_path ? [v.file_path] : []
+        // Each series' folders, from its episodes a page at a time.
+        const folders = new Map<string, Set<string>>();
+        for await (const episodes of client.catalogItemPages({
+          libraryId: library.id,
+          type: 'episode',
+          includeFilePaths: true,
+        })) {
+          addSeriesFolders(
+            folders,
+            episodes.map((episode) => ({
+              seriesId: episode.series_id,
+              folders: episodeSeriesFolders(episode),
+            }))
           );
-          files.set(episode.series_id, [
-            ...(files.get(episode.series_id) ?? []),
-            ...paths,
-          ]);
+          if (this.cancelled) break;
         }
+        if (this.cancelled) break;
+        const series = await client.listCatalogItems({
+          libraryId: library.id,
+          type: 'series',
+        });
         for (const show of series) {
           this.tally(
             report,
             compareMatch(
               'series',
-              siloMatchItem('series', show, files.get(show.content_id)),
+              siloMatchItem('series', show, folders.get(show.content_id)),
               expected.series,
               'Silo'
             )

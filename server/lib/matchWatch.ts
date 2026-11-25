@@ -38,7 +38,9 @@ import type {
   PlexMatchReport,
 } from '@server/lib/plexMatchCheck';
 import plexMatchCheck, {
+  addSeriesFolders,
   compareMatch,
+  episodeSeriesFolders,
   folderName,
   jellyfinMatchItem,
   plexMatchItem,
@@ -399,8 +401,6 @@ class Reading {
   ): Promise<MatchItem[]> {
     const client = siloClient({ timeout: TIMEOUT_MS });
     const type = kind === 'movie' ? 'movie' : 'show';
-    const newestFirst = (a: SiloCatalogItem, b: SiloCatalogItem) =>
-      Date.parse(b.added_at) - Date.parse(a.added_at);
     const items: MatchItem[] = [];
     for (const library of siloSettings().libraries) {
       if (
@@ -409,36 +409,49 @@ class Reading {
       ) {
         continue;
       }
-      // Start a little before the import, as for the other servers.
-      const added = (
-        await client.listCatalogItems({
-          libraryId: library.id,
-          type: kind === 'movie' ? 'movie' : 'episode',
-          addedAfter: new Date(since.getTime() - HOUR_MS),
-          includeFilePaths: true,
-        })
-      )
-        .sort(newestFirst)
-        .slice(0, NEWEST);
+      // Start a little before the import, as for the other servers. Read a
+      // page at a time, keeping only the newest few, and of an episode only
+      // its series and folder.
+      const newest: {
+        at: number;
+        film?: SiloCatalogItem;
+        seriesId?: string | null;
+        folders: string[];
+      }[] = [];
+      for await (const page of client.catalogItemPages({
+        libraryId: library.id,
+        type: kind === 'movie' ? 'movie' : 'episode',
+        addedAfter: new Date(since.getTime() - HOUR_MS),
+        includeFilePaths: true,
+      })) {
+        for (const item of page) {
+          const at = Date.parse(item.added_at) || 0;
+          newest.push(
+            kind === 'movie'
+              ? { at, film: item, folders: [] }
+              : {
+                  at,
+                  seriesId: item.series_id,
+                  folders: episodeSeriesFolders(item),
+                }
+          );
+        }
+        newest.sort((a, b) => b.at - a.at);
+        newest.length = Math.min(newest.length, NEWEST);
+      }
       if (kind === 'movie') {
-        items.push(...added.map((film) => siloMatchItem('movie', film)));
+        for (const { film } of newest) {
+          if (film) items.push(siloMatchItem('movie', film));
+        }
         continue;
       }
-      const files = new Map<string, string[]>();
-      for (const episode of added) {
-        if (!episode.series_id) continue;
-        files.set(episode.series_id, [
-          ...(files.get(episode.series_id) ?? []),
-          ...episode.versions.flatMap((v) =>
-            v.file_path ? [v.file_path] : []
-          ),
-        ]);
-      }
-      if (!files.size) continue;
-      const series = await client.getCatalogItems([...files.keys()]);
+      const folders = new Map<string, Set<string>>();
+      addSeriesFolders(folders, newest);
+      if (!folders.size) continue;
+      const series = await client.getCatalogItems([...folders.keys()]);
       items.push(
         ...series.map((show) =>
-          siloMatchItem('series', show, files.get(show.content_id))
+          siloMatchItem('series', show, folders.get(show.content_id))
         )
       );
     }

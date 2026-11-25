@@ -763,6 +763,16 @@ describe('looking at new requests as they are imported', () => {
             },
           ],
         },
+        // Older imports in the same hour, more than one page of them: read
+        // a page at a time, keeping only the newest.
+        ...Array.from({ length: 250 }, (_, i) =>
+          siloMovie(`silo-old-${i}`, {
+            tmdbId: 5000 + i,
+            libraryId: 'sm',
+            title: `Harbour Lights ${i}`,
+            addedAt: new Date(T0.getTime() - 30 * 60 * 1000).toISOString(),
+          })
+        ),
       ];
       getSettings().silo = silo.settings({
         libraries: [{ id: 'sm', name: 'Films', enabled: true, type: 'mixed' }],
@@ -781,10 +791,11 @@ describe('looking at new requests as they are imported', () => {
         (await problems()).map((r) => r.mediaServer),
         ['Silo']
       );
-      const listed = silo.calls.find(
+      const listed = silo.calls.filter(
         (call) => call.path === '/admin/catalog/items'
       );
-      assert.equal(listed?.query.include_file_paths, 'true');
+      assert.equal(listed[0]?.query.include_file_paths, 'true');
+      assert.equal(listed.length, 2, 'two pages');
       await matchWatch.run(at(12));
       assert.match(
         sent[0].message ?? '',

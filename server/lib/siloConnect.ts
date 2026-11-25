@@ -20,10 +20,8 @@ import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import cacheManager from '@server/lib/cache';
 import matchWatch from '@server/lib/matchWatch';
-import {
-  MediaServerChangeError,
-  signInWithout,
-} from '@server/lib/mediaServerAdmin';
+import { signInWithout } from '@server/lib/mediaServerAdmin';
+import { MediaServerChangeError } from '@server/lib/mediaServerChangeError';
 import { hostnameOf } from '@server/lib/mediaServers';
 import {
   Permission,

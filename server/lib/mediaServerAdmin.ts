@@ -18,6 +18,7 @@ import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import cacheManager from '@server/lib/cache';
 import matchWatch from '@server/lib/matchWatch';
+import { MediaServerChangeError } from '@server/lib/mediaServerChangeError';
 import {
   connectedServers,
   linkedServers,
@@ -39,15 +40,7 @@ import { IsNull, Not } from 'typeorm';
  * which allow sign-in.
  */
 
-/** Why a media server change was refused, with the response status. */
-export class MediaServerChangeError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
-    super(message);
-  }
-}
+export { MediaServerChangeError } from '@server/lib/mediaServerChangeError';
 
 /** Whether any connected server allows sign-in. */
 const anyServerAllowsSignIn = (): boolean => {

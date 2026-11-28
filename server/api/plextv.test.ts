@@ -407,7 +407,33 @@ describe('PlexTvAPI account and servers', () => {
     ]);
   });
 
-  it('falls back to account.json only when the v2 route is missing', async () => {
+  it('reads the older routes when a v2 route fails or answers unexpectedly', async () => {
+    for (const reply of [gone(500), { id: 'odd' }, null]) {
+      const plex = plexTv({
+        '/api/v2/user': reply,
+        '/users/account.json': accountJson,
+      });
+      assert.equal((await plex.api.getUser()).username, 'glasswing');
+      assert.deepEqual(plex.asked, ['/api/v2/user', '/users/account.json']);
+    }
+    for (const reply of [
+      gone(502),
+      { not: 'a list' },
+      [{ name: 'Harbour Lights' }],
+    ]) {
+      const plex = plexTv({
+        '/api/v2/resources': reply,
+        '/api/resources?includeHttps=1': resourcesXml,
+      });
+      assert.ok((await plex.api.getDevices()).length > 0);
+      assert.deepEqual(plex.asked, [
+        '/api/v2/resources',
+        '/api/resources?includeHttps=1',
+      ]);
+    }
+  });
+
+  it('falls back to account.json when the v2 route is missing, but not for a refused token', async () => {
     const fallback = plexTv({
       '/api/v2/user': gone(410),
       '/users/account.json': accountJson,

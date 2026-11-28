@@ -192,9 +192,15 @@ export const plexDeviceFromV2 = (resource: PlexResourceV2): PlexDevice => ({
   })),
 });
 
-/** plex.tv has no such v2 route (any more, or yet): use the older one. */
+/**
+ * Whether to read the older route after a v2 one failed: on anything but a
+ * refused token (401), so sign-in never depends on the v2 routes alone.
+ */
 const v2Missing = (e: unknown): boolean =>
-  isAxiosError(e) && [404, 410].includes(e.response?.status ?? 0);
+  !(isAxiosError(e) && e.response?.status === 401);
+
+/** A v2 reply that doesn't look as expected, read again from the older route. */
+class UnexpectedV2Reply extends Error {}
 
 interface ServerResponse {
   $: {
@@ -387,7 +393,18 @@ class PlexTvAPI extends ExternalAPI {
             headers: { 'X-Plex-Client-Identifier': getSettings().clientId },
           }
         );
-        return (resources.data ?? []).map(plexDeviceFromV2);
+        if (
+          !Array.isArray(resources.data) ||
+          resources.data.some(
+            (resource) =>
+              !resource?.clientIdentifier ||
+              !resource.name ||
+              !Array.isArray(resource.connections ?? [])
+          )
+        ) {
+          throw new UnexpectedV2Reply('plex.tv sent unexpected servers');
+        }
+        return resources.data.map(plexDeviceFromV2);
       } catch (e) {
         if (!v2Missing(e)) throw e;
       }
@@ -472,7 +489,16 @@ class PlexTvAPI extends ExternalAPI {
         const user = await this.axios.get<PlexUserV2>('/api/v2/user', {
           headers: { 'X-Plex-Client-Identifier': getSettings().clientId },
         });
-        return plexUserFromV2(user.data);
+        const data = user.data;
+        if (
+          typeof data?.id !== 'number' ||
+          !data.uuid ||
+          !data.username ||
+          !data.authToken
+        ) {
+          throw new UnexpectedV2Reply('plex.tv sent an unexpected account');
+        }
+        return plexUserFromV2(data);
       } catch (e) {
         if (!v2Missing(e)) throw e;
       }

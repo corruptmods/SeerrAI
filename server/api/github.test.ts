@@ -42,6 +42,18 @@ describe('GitHub commits', () => {
   });
 });
 
+describe('GitHub headers', () => {
+  it('asks for GitHub’s JSON at a fixed API version', () => {
+    const headers = (
+      new GithubAPI() as unknown as {
+        axios: { defaults: { headers: Record<string, unknown> } };
+      }
+    ).axios.defaults.headers;
+    assert.equal(headers.Accept, 'application/vnd.github+json');
+    assert.equal(headers['X-GitHub-Api-Version'], '2026-03-10');
+  });
+});
+
 describe('GitHub failing', () => {
   it('is not asked again for a while, then is', async (t) => {
     forgetGithubFailures();

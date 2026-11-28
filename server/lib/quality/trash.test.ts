@@ -157,6 +157,22 @@ describe('TRaSH Guides', () => {
       state = await refreshTrash();
       assert.equal(state.commit, 'c3');
       assert.equal(state.error, undefined);
+
+      // The latest commit, the comparison and the file list all name the
+      // GitHub API version they were written for.
+      const api = calls.filter((c) =>
+        c.url.startsWith('https://api.github.com/')
+      );
+      for (const part of ['/commits/master', '/compare/', '/git/trees/']) {
+        assert.ok(
+          api.some((c) => c.url.includes(part)),
+          part
+        );
+      }
+      for (const c of api) {
+        assert.equal(c.headers.Accept, 'application/vnd.github+json');
+        assert.equal(c.headers['X-GitHub-Api-Version'], '2026-03-10');
+      }
     } finally {
       settings.quality = saved;
       history = 'ahead';

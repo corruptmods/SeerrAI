@@ -1,3 +1,4 @@
+import { GITHUB_API_HEADERS } from '@server/constants/github';
 import type { TrashData, TrashMetadata } from '@server/lib/quality/trashData';
 import { compileTrashApp, inFolder } from '@server/lib/quality/trashData';
 import { getSettings } from '@server/lib/settings';
@@ -120,7 +121,7 @@ const inBatches = async <T>(
 const followsOn = async (base: string, head: string): Promise<boolean> => {
   const { data } = await http.get<{ status?: string }>(
     `${API}/repos/${REPO}/compare/${base}...${head}`,
-    { headers: { Accept: 'application/vnd.github+json' } }
+    { headers: { ...GITHUB_API_HEADERS } }
   );
   return data?.status === 'ahead' || data?.status === 'identical';
 };
@@ -155,7 +156,7 @@ const check = async (): Promise<TrashState> => {
       `${API}/repos/${REPO}/commits/${BRANCH}`,
       {
         headers: {
-          Accept: 'application/vnd.github+json',
+          ...GITHUB_API_HEADERS,
           ...(kept && state.etag ? { 'If-None-Match': state.etag } : {}),
         },
         validateStatus: (status) =>
@@ -199,7 +200,7 @@ const check = async (): Promise<TrashState> => {
       `${API}/repos/${REPO}/git/trees/${commit}`,
       {
         params: { recursive: 1 },
-        headers: { Accept: 'application/vnd.github+json' },
+        headers: { ...GITHUB_API_HEADERS },
       }
     );
     const filesDir = path.resolve(trashDir(), 'files');

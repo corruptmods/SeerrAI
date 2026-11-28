@@ -18,6 +18,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Trakt requests share a limit of 2 a second.
 - With OpenAI, the admin agent and AI chat now think at the effort you choose even when they use tools, on newer models such as GPT-6 Luna too: Seerr AI now uses OpenAI's newer Responses API. Other OpenAI-compatible servers (Ollama, LM Studio and the like) are used as before.
 - Settings → Services → Trakt now says that the Trakt account owning your app needs a GitHub account linked: from 1 January 2027 Trakt stops approving apps without one, and the Client ID of an unapproved app stops working.
+- Update checks and TRaSH Guides downloads now ask GitHub for a fixed version of its API (2026-03-10), so a change to GitHub's default can't break them.
 
 ### Fixed
 

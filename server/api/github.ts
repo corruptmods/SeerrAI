@@ -1,3 +1,4 @@
+import { GITHUB_API_HEADERS } from '@server/constants/github';
 import { PROJECT_BRANCH, PROJECT_REPO } from '@server/constants/project';
 import cacheManager from '@server/lib/cache';
 import logger from '@server/logger';
@@ -78,7 +79,7 @@ class GithubAPI extends ExternalAPI {
       {
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json',
+          ...GITHUB_API_HEADERS,
         },
         nodeCache: cacheManager.getCache('github').data,
         timeout: DEFAULT_REQUEST_TIMEOUT_MS,

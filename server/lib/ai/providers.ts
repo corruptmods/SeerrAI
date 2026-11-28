@@ -350,27 +350,36 @@ const withClaudeEffort = async <T>(
 const openAiPlan = (
   ai: AiSettings,
   model: string,
-  effort: AiEffort
+  effort: AiEffort,
+  withTools = false
 ): { efforts: (string | null)[]; key?: string } => {
+  // With tools a model can refuse an effort it takes without them (OpenAI's
+  // newer models take tools on chat completions only with "none"), so the
+  // two are remembered apart.
+  const tools = withTools ? 'tools' : 'plain';
+  // What was remembered goes first; if it is refused after all, the rest of
+  // the ladder below it is tried rather than failing.
+  const after = (
+    ladder: (string | null)[],
+    known: string | null | undefined
+  ) =>
+    known === undefined || !ladder.includes(known)
+      ? ladder
+      : [known, ...ladder.slice(ladder.indexOf(known) + 1)];
   if (isOfficialOpenAi(ai)) {
     if (!isReasoningModel(model)) {
       return { efforts: [null] };
     }
-    const key = memoKey(model, effort);
-    const known = openAiEffort.get(key);
-    return {
-      efforts: known !== undefined ? [known] : openAiLadder(effort),
-      key,
-    };
+    const key = memoKey(model, effort, tools);
+    return { efforts: after(openAiLadder(effort), openAiEffort.get(key)), key };
   }
   // Another server gets an effort only when one was chosen, dropped if it
   // refuses it.
   if (effort === 'lowest') {
     return { efforts: [null] };
   }
-  const key = memoKey(openAiBase(ai), model, effort);
-  const known = openAiEffort.get(key);
-  return { efforts: known !== undefined ? [known] : [effort, null], key };
+  const key = memoKey(openAiBase(ai), model, effort, tools);
+  return { efforts: after([effort, null], openAiEffort.get(key)), key };
 };
 
 /**
@@ -839,7 +848,7 @@ const converseOpenAi = async (
 
   // With tools, some models refuse the lowest efforts, so "none" and
   // "minimal" may each be refused once before "low" is remembered.
-  const { efforts, key } = openAiPlan(ai, req.model, effortSetting);
+  const { efforts, key } = openAiPlan(ai, req.model, effortSetting, true);
   let data;
   let lastError: unknown;
   for (let i = 0; i < efforts.length && !data; ) {

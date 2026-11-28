@@ -777,4 +777,48 @@ describe('effort', () => {
       ['medium', 'low']
     );
   });
+
+  it('remembers efforts with tools apart, and steps down if a remembered one is refused', async () => {
+    // As OpenAI words it for its newer models on chat completions.
+    const toolsRefused = httpError(400, {
+      error: {
+        message:
+          "Function tools with reasoning_effort are not supported for gpt-6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.",
+      },
+    });
+    const sent = capture([
+      openAiReply,
+      toolsRefused,
+      toolsRefused,
+      openAiReply,
+      openAiReply,
+      openAiReply,
+    ]);
+    const req = {
+      model: 'gpt-6-luna',
+      system: 'sys',
+      messages: [{ role: 'user' as const, text: 'hi' }],
+      tools: [],
+      maxTokens: 800,
+      effort: 'low' as const,
+    };
+    // Without tools, low is taken and remembered…
+    await complete(openai(), {
+      ...request,
+      model: 'gpt-6-luna',
+      effort: 'low',
+    });
+    // …which doesn't stop a conversation with tools stepping down to none.
+    await converse(openai(), req);
+    await converse(openai(), req);
+    await complete(openai(), {
+      ...request,
+      model: 'gpt-6-luna',
+      effort: 'low',
+    });
+    assert.deepEqual(
+      sent.map((s) => s.body.reasoning_effort),
+      ['low', 'low', 'minimal', 'none', 'none', 'low']
+    );
+  });
 });

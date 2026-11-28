@@ -23,6 +23,7 @@ import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import availabilitySync from '@server/lib/availabilitySync';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import type { Library, RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -71,6 +72,14 @@ Object.defineProperty(PlexAPI.prototype, 'getLibraryContents', {
 Object.defineProperty(PlexAPI.prototype, 'getMetadata', {
   get() {
     return async (key: string) => getMetadataImpl(key);
+  },
+  set() {},
+  configurable: true,
+});
+
+Object.defineProperty(PlexAPI.prototype, 'getStatus', {
+  get() {
+    return async () => ({});
   },
   set() {},
   configurable: true,
@@ -601,6 +610,154 @@ describe('Plex Scanner', () => {
       assert.deepEqual(await held(), [
         '7001 plex 11 std 501',
         '7001 plex 12 std 601',
+      ]);
+    });
+  });
+
+  /*
+   * A show split across libraries, each with its own item: seasons 1 and 2
+   * in a 1080p library, season 3 in a 4K one. The title's id holds whichever
+   * item was scanned last; the availability sync must still find the seasons
+   * the other one holds.
+   */
+  describe('a show split across libraries', () => {
+    const hd: Library = { id: '21', name: 'TV', enabled: true, type: 'show' };
+    const uhd: Library = {
+      id: '22',
+      name: 'TV 4K',
+      enabled: true,
+      type: 'show',
+    };
+    const syncTmdb = Object.getOwnPropertyDescriptor(
+      availabilitySync.tmdb,
+      'getTvShowForScan'
+    );
+
+    const episodes = (key: string, resolutions: string[]): PlexMetadata[] =>
+      resolutions.map(
+        (videoResolution, index) =>
+          ({
+            ...fakePlexSeasonMetadata(index + 1, `${key}-e${index}`),
+            Media: [
+              {
+                videoResolution,
+                width: videoResolution === '4k' ? 3840 : 1920,
+              },
+            ] as PlexMetadata['Media'],
+          }) as PlexMetadata
+      );
+
+    /** Each item's seasons, by the resolution of each episode. */
+    let items: Record<string, Record<number, string[]>>;
+
+    beforeEach(async () => {
+      getSettings().sonarr = [];
+      getSettings().radarr = [];
+      getTvShowImpl = async ({ tvId }) =>
+        fakeTmdbShow(
+          tvId,
+          [1, 2, 3].map((n) => ({
+            id: n,
+            air_date: '2024-01-01',
+            episode_count: 2,
+            name: `Season ${n}`,
+            overview: '',
+            season_number: n,
+          }))
+        );
+      Object.defineProperty(availabilitySync.tmdb, 'getTvShowForScan', {
+        value: async (args: { tvId: number }) => getTvShowImpl(args),
+        configurable: true,
+      });
+      await getRepository(User).update(1, { plexToken: 'test-plex-token' });
+      getLibrariesImpl = async () =>
+        [hd, uhd].map((library) => ({
+          key: library.id,
+          title: library.name,
+          type: 'show',
+          agent: 'tv.plex.agents.series',
+        }));
+      getLibraryContentsImpl = async (id) => {
+        const key = id === hd.id ? 'glasswing-hd' : 'glasswing-uhd';
+        return { totalSize: 1, items: [fakePlexShowItem(key)] };
+      };
+      const seasonsOf = (key: string) =>
+        Object.keys(items[key]).map((n) =>
+          fakePlexSeasonMetadata(Number(n), `${key}-s${n}`)
+        );
+      getMetadataImpl = async (key) =>
+        key in items
+          ? fakePlexShowMetadata(key, 9500, seasonsOf(key))
+          : undefined;
+      getChildrenMetadataImpl = async (key) => {
+        if (key in items) return seasonsOf(key);
+        const [, item, n] = /^(.*)-s(\d+)$/.exec(key) ?? [];
+        return episodes(key, items[item]?.[Number(n)] ?? []);
+      };
+    });
+
+    afterEach(() => {
+      if (syncTmdb) {
+        Object.defineProperty(
+          availabilitySync.tmdb,
+          'getTvShowForScan',
+          syncTmdb
+        );
+      }
+    });
+
+    const seasons = async () =>
+      (
+        await getRepository(Season).find({
+          where: { media: { tmdbId: 9500 } },
+          order: { seasonNumber: 'ASC' },
+        })
+      ).map((season) => season.status);
+
+    for (const order of [
+      [hd, uhd],
+      [uhd, hd],
+    ]) {
+      it(`keeps every season after scanning ${order.map((library) => library.name).join(', then ')}`, async () => {
+        configurePlexWithLibrary(order);
+        items = {
+          'glasswing-hd': { 1: ['1080', '1080'], 2: ['1080', '1080'] },
+          'glasswing-uhd': { 3: ['4k', '4k'] },
+        };
+
+        await runWithMockTimers(() => plexFullScanner.run());
+        assert.deepEqual(await seasons(), [
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+        ]);
+
+        await availabilitySync.run();
+
+        assert.deepEqual(await seasons(), [
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+        ]);
+      });
+    }
+
+    it('still marks a season deleted once neither library has it', async () => {
+      configurePlexWithLibrary([hd, uhd]);
+      items = {
+        'glasswing-hd': { 1: ['1080', '1080'], 2: ['1080', '1080'] },
+        'glasswing-uhd': { 3: ['4k', '4k'] },
+      };
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      // Season 3's files are gone; Plex keeps its entry.
+      items['glasswing-uhd'] = { 3: [] };
+      await availabilitySync.run();
+
+      assert.deepEqual(await seasons(), [
+        MediaStatus.AVAILABLE,
+        MediaStatus.AVAILABLE,
+        MediaStatus.DELETED,
       ]);
     });
   });

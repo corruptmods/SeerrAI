@@ -22,6 +22,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Deleting a user and switching off their Emby account works again: Emby accounts were looked up by the wrong id, so Seerr AI always said they had none.
 - **Remove Users Who Lose Access** now removes people deleted from Emby: Emby accounts were checked by the wrong id, so none was ever found missing.
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.
+- A series split across libraries on Plex, Jellyfin or Emby (say seasons 1 and 2 in a 1080p library and season 3 in a 4K one) no longer has the other library's seasons marked as removed: the availability sync now checks every library the series is in. If it leaves one library, its Play button links to the copy in another.
 
 ## 2.5.0 (24 November 2026)
 

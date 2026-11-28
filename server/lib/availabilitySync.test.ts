@@ -28,6 +28,7 @@ import type { MediaServerKind } from '@server/constants/server';
 import { MEDIA_SERVER_KINDS, typeOfKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaLibraryItem from '@server/entity/MediaLibraryItem';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -3185,6 +3186,371 @@ describe('AvailabilitySync', () => {
       const media = await reload(4930);
       assert.equal(media.status, MediaStatus.AVAILABLE);
       assert.equal(media.ratingKey, 'plex-gone-rk');
+    });
+  });
+
+  /*
+   * A show can sit in two libraries of one server, say seasons 1 and 2 in a
+   * 1080p library and season 3 in a 4K one, each library with its own item.
+   * The title's id column holds only one of them; the scans record each
+   * library's item (MediaLibraryItem), and the sync checks them all.
+   */
+  describe('a show split across libraries', () => {
+    const atWidth = (prefix: string, width: number) =>
+      fakePlexEpisodes(1).map((episode) => ({
+        ...episode,
+        ratingKey: prefix,
+        Media: episode.Media.map((version) => ({
+          ...version,
+          width,
+          height: width >= 2000 ? 2160 : 1080,
+          videoResolution: width >= 2000 ? '4k' : '1080',
+        })),
+      }));
+
+    /** Plex items by rating key: each season's episode widths. */
+    const plexHas = (items: Record<string, Record<number, number[]>>) => {
+      getMetadataImpl = async (key) => {
+        if (key in items) return fakePlexShow(key);
+        throw new Error('Request failed with status code 404');
+      };
+      getChildrenMetadataImpl = async (key) => {
+        if (key in items) {
+          return Object.keys(items[key]).map((n) =>
+            fakePlexSeason(Number(n), `${key}-s${n}`)
+          );
+        }
+        const [, item, n] = /^(.*)-s(\d+)$/.exec(key) ?? [];
+        return (items[item]?.[Number(n)] ?? []).flatMap((width, i) =>
+          atWidth(`${key}-e${i}`, width)
+        );
+      };
+    };
+
+    const saveShow = async (
+      tmdbId: number,
+      fields: Partial<Media>,
+      seasons: Record<number, [MediaStatus, MediaStatus?]>
+    ) => {
+      const media = new Media();
+      media.tmdbId = tmdbId;
+      media.mediaType = MediaType.TV;
+      media.status = MediaStatus.AVAILABLE;
+      Object.assign(media, fields);
+      media.seasons = Object.entries(seasons).map(
+        ([n, [status, status4k]]) =>
+          new Season({
+            seasonNumber: Number(n),
+            status,
+            status4k: status4k ?? MediaStatus.UNKNOWN,
+          })
+      );
+      return getRepository(Media).save(media);
+    };
+
+    /** What the scans recorded: server, library, 4K copy, item id. */
+    const placed = (
+      media: Media,
+      rows: [MediaServerKind, string, boolean, string][]
+    ) =>
+      getRepository(MediaLibraryItem).save(
+        rows.map(
+          ([server, libraryId, is4k, itemId]) =>
+            new MediaLibraryItem({
+              mediaId: media.id,
+              server,
+              libraryId,
+              is4k,
+              itemId,
+            })
+        )
+      );
+
+    const statuses = async (tmdbId: number, is4k = false) => {
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId },
+        relations: ['seasons'],
+      });
+      return {
+        media,
+        show: media[is4k ? 'status4k' : 'status'],
+        seasons: media.seasons
+          .sort((a, b) => a.seasonNumber - b.seasonNumber)
+          .map((season) => season[is4k ? 'status4k' : 'status']),
+      };
+    };
+
+    const ten = (width: number) => Array<number>(10).fill(width);
+    const all = (count: number) =>
+      Array<MediaStatus>(count).fill(MediaStatus.AVAILABLE);
+
+    for (const last of ['1080p', '4K'] as const) {
+      it(`keeps every season when the ${last} library was scanned last (no 4K Sonarr)`, async () => {
+        configurePlex();
+        configureSonarr([{ syncEnabled: true }]);
+        // Glasswing: seasons 1 and 2 in the 1080p library, 3 in the 4K one.
+        plexHas({
+          'glasswing-1080': { 1: ten(1920), 2: ten(1920) },
+          'glasswing-4k': { 3: ten(3840) },
+        });
+        const media = await saveShow(
+          9400,
+          { ratingKey: last === '4K' ? 'glasswing-4k' : 'glasswing-1080' },
+          {
+            1: [MediaStatus.AVAILABLE],
+            2: [MediaStatus.AVAILABLE],
+            3: [MediaStatus.AVAILABLE],
+          }
+        );
+        await placed(media, [
+          ['plex', 'tv-1080', false, 'glasswing-1080'],
+          ['plex', 'tv-4k', false, 'glasswing-4k'],
+        ]);
+
+        await availabilitySync.run();
+
+        const { show, seasons } = await statuses(9400);
+        assert.equal(show, MediaStatus.AVAILABLE);
+        assert.deepEqual(seasons, all(3));
+      });
+    }
+
+    it('keeps the 1080p seasons when a 1080p episode in the 4K library took the id', async () => {
+      configurePlex();
+      configureSonarr([
+        { syncEnabled: true },
+        { syncEnabled: true, is4k: true },
+      ]);
+      // Static Garden: seasons 1 and 2 in 1080p; season 3 in the 4K library,
+      // nine episodes in 4K and one in 1080p.
+      plexHas({
+        'static-garden-1080': { 1: ten(1920), 2: ten(1920) },
+        'static-garden-4k': { 3: [...Array<number>(9).fill(3840), 1920] },
+      });
+      const media = await saveShow(
+        9401,
+        {
+          status: MediaStatus.PARTIALLY_AVAILABLE,
+          status4k: MediaStatus.PARTIALLY_AVAILABLE,
+          ratingKey: 'static-garden-4k',
+          ratingKey4k: 'static-garden-4k',
+        },
+        {
+          1: [MediaStatus.AVAILABLE],
+          2: [MediaStatus.AVAILABLE],
+          3: [MediaStatus.PARTIALLY_AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE],
+        }
+      );
+      await placed(media, [
+        ['plex', 'tv-1080', false, 'static-garden-1080'],
+        ['plex', 'tv-4k', false, 'static-garden-4k'],
+        ['plex', 'tv-4k', true, 'static-garden-4k'],
+      ]);
+
+      await availabilitySync.run();
+
+      const standard = await statuses(9401);
+      assert.deepEqual(standard.seasons, [
+        MediaStatus.AVAILABLE,
+        MediaStatus.AVAILABLE,
+        MediaStatus.PARTIALLY_AVAILABLE,
+      ]);
+      assert.equal(standard.show, MediaStatus.PARTIALLY_AVAILABLE);
+      const uhd = await statuses(9401, true);
+      assert.deepEqual(uhd.seasons, [
+        MediaStatus.UNKNOWN,
+        MediaStatus.UNKNOWN,
+        MediaStatus.PARTIALLY_AVAILABLE,
+      ]);
+      assert.equal(uhd.show, MediaStatus.PARTIALLY_AVAILABLE);
+    });
+
+    it('keeps 4K seasons held by a 4K item other than the stored one', async () => {
+      configurePlex();
+      configureSonarr([
+        { syncEnabled: true },
+        { syncEnabled: true, is4k: true },
+      ]);
+      // Static Garden in two 4K libraries: season 1 in one, 2 in the other.
+      plexHas({
+        'static-garden-uhd-a': { 1: ten(3840) },
+        'static-garden-uhd-b': { 2: ten(3840) },
+      });
+      const media = await saveShow(
+        9402,
+        {
+          status: MediaStatus.UNKNOWN,
+          status4k: MediaStatus.AVAILABLE,
+          ratingKey4k: 'static-garden-uhd-b',
+        },
+        {
+          1: [MediaStatus.UNKNOWN, MediaStatus.AVAILABLE],
+          2: [MediaStatus.UNKNOWN, MediaStatus.AVAILABLE],
+        }
+      );
+      await placed(media, [
+        ['plex', 'uhd-a', true, 'static-garden-uhd-a'],
+        ['plex', 'uhd-b', true, 'static-garden-uhd-b'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { show, seasons } = await statuses(9402, true);
+      assert.equal(show, MediaStatus.AVAILABLE);
+      assert.deepEqual(seasons, all(2));
+    });
+
+    it('still marks a season deleted once no library has it', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      // Harbour Lights: season 3 was removed from the 4K library, which
+      // still lists an empty season entry.
+      plexHas({
+        'harbour-lights-1080': { 1: ten(1920), 2: ten(1920) },
+        'harbour-lights-4k': { 3: [], 4: ten(3840) },
+      });
+      const media = await saveShow(
+        9403,
+        { ratingKey: 'harbour-lights-4k' },
+        {
+          1: [MediaStatus.AVAILABLE],
+          2: [MediaStatus.AVAILABLE],
+          3: [MediaStatus.AVAILABLE],
+          4: [MediaStatus.AVAILABLE],
+        }
+      );
+      await placed(media, [
+        ['plex', 'tv-1080', false, 'harbour-lights-1080'],
+        ['plex', 'tv-4k', false, 'harbour-lights-4k'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { show, seasons } = await statuses(9403);
+      assert.equal(show, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.deepEqual(seasons, [
+        MediaStatus.AVAILABLE,
+        MediaStatus.AVAILABLE,
+        MediaStatus.DELETED,
+        MediaStatus.AVAILABLE,
+      ]);
+    });
+
+    it('marks the show deleted once neither library has it', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      plexHas({});
+      const media = await saveShow(
+        9404,
+        { ratingKey: 'harbour-lights-4k' },
+        { 1: [MediaStatus.AVAILABLE], 2: [MediaStatus.AVAILABLE] }
+      );
+      await placed(media, [
+        ['plex', 'tv-1080', false, 'harbour-lights-1080'],
+        ['plex', 'tv-4k', false, 'harbour-lights-4k'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { media: updated, show } = await statuses(9404);
+      assert.equal(show, MediaStatus.DELETED);
+      assert.equal(updated.ratingKey, null);
+    });
+
+    it('links the item still there when the stored one is gone', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      // Glasswing left the 4K library; the 1080p library still has it.
+      plexHas({ 'glasswing-1080': { 1: ten(1920), 2: ten(1920) } });
+      const media = await saveShow(
+        9405,
+        { ratingKey: 'glasswing-4k' },
+        { 1: [MediaStatus.AVAILABLE], 2: [MediaStatus.AVAILABLE] }
+      );
+      await placed(media, [
+        ['plex', 'tv-1080', false, 'glasswing-1080'],
+        ['plex', 'tv-4k', false, 'glasswing-4k'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { media: updated, show, seasons } = await statuses(9405);
+      assert.equal(show, MediaStatus.AVAILABLE);
+      assert.deepEqual(seasons, all(2));
+      assert.equal(updated.ratingKey, 'glasswing-1080');
+      const rows = await getRepository(MediaLibraryItem).findBy({
+        mediaId: media.id,
+      });
+      assert.deepEqual(
+        rows.map((row) => row.itemId),
+        ['glasswing-1080']
+      );
+    });
+
+    it('keeps every season of a Jellyfin series split across libraries', async () => {
+      configureJellyfin();
+      configureSonarr([{ syncEnabled: true }]);
+      // Lantern Song: seasons 1 and 2 in one library, 3 in another.
+      const seasonsOf: Record<string, number[]> = {
+        'lantern-a': [1, 2],
+        'lantern-b': [3],
+      };
+      getItemDataImpl = async (id) =>
+        id in seasonsOf ? fakeJellyfinShow(id, '9406') : undefined;
+      getSeasonsImpl = async (id) =>
+        (seasonsOf[id] ?? []).map((n) => fakeJellyfinSeason(n, `${id}-s${n}`));
+      getEpisodesImpl = async (series, season) =>
+        season.startsWith(`${series}-s`) ? fakeJellyfinEpisodes(4) : [];
+      const media = await saveShow(
+        9406,
+        { jellyfinMediaId: 'lantern-b' },
+        {
+          1: [MediaStatus.AVAILABLE],
+          2: [MediaStatus.AVAILABLE],
+          3: [MediaStatus.AVAILABLE],
+        }
+      );
+      await placed(media, [
+        ['jellyfin', 'a', false, 'lantern-a'],
+        ['jellyfin', 'b', false, 'lantern-b'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { show, seasons } = await statuses(9406);
+      assert.equal(show, MediaStatus.AVAILABLE);
+      assert.deepEqual(seasons, all(3));
+    });
+
+    it('still marks a Jellyfin season deleted once no library has it', async () => {
+      configureJellyfin();
+      configureSonarr([{ syncEnabled: true }]);
+      getItemDataImpl = async (id) =>
+        id === 'lantern-a' || id === 'lantern-b'
+          ? fakeJellyfinShow(id, '9407')
+          : undefined;
+      getSeasonsImpl = async (id) =>
+        id === 'lantern-a'
+          ? [fakeJellyfinSeason(1, 'lantern-a-s1')]
+          : [fakeJellyfinSeason(2, 'lantern-b-s2')];
+      // Season 2's files are gone; Jellyfin keeps its entry.
+      getEpisodesImpl = async (_series, season) =>
+        season === 'lantern-a-s1' ? fakeJellyfinEpisodes(4) : [];
+      const media = await saveShow(
+        9407,
+        { jellyfinMediaId: 'lantern-b' },
+        { 1: [MediaStatus.AVAILABLE], 2: [MediaStatus.AVAILABLE] }
+      );
+      await placed(media, [
+        ['jellyfin', 'a', false, 'lantern-a'],
+        ['jellyfin', 'b', false, 'lantern-b'],
+      ]);
+
+      await availabilitySync.run();
+
+      const { show, seasons } = await statuses(9407);
+      assert.equal(show, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.deepEqual(seasons, [MediaStatus.AVAILABLE, MediaStatus.DELETED]);
     });
   });
 });

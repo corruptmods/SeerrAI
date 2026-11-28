@@ -47,7 +47,9 @@ describe('LidarrAPI', () => {
       getAxios(lidarr).defaults.baseURL,
       'http://localhost:8686/api/v1'
     );
-    assert.deepEqual(getAxios(lidarr).defaults.params, { apikey: 'test' });
+    // In a header, not the query, where proxies and access logs keep it.
+    assert.deepEqual(getAxios(lidarr).defaults.params, {});
+    assert.equal(getAxios(lidarr).defaults.headers['X-Api-Key'], 'test');
   });
 
   it('looks artists and albums up by MusicBrainz id', async () => {

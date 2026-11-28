@@ -131,14 +131,16 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
   }) {
     const timeout = getSettings().network.apiRequestTimeout;
 
+    // The key goes in a header, which every Sonarr, Radarr and Lidarr
+    // version takes, rather than the query, where proxies and access logs
+    // keep it.
     super(
       url,
-      {
-        apikey: apiKey,
-      },
+      {},
       {
         nodeCache: cacheManager.getCache(cacheName).data,
         timeout,
+        headers: { 'X-Api-Key': apiKey },
       }
     );
 
@@ -154,6 +156,10 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     // Refused for the hostname used: say how to allow Seerr AI instead of
     // "status code 400".
     this.axios.interceptors.response.use(undefined, (e) => {
+      // Nor in a failed request kept on the error, should it be logged.
+      if (e?.config?.headers?.['X-Api-Key']) {
+        e.config.headers['X-Api-Key'] = '[hidden]';
+      }
       const host = refusedHost(e);
       if (host !== undefined && e instanceof Error) {
         e.message = hostRefusedMessage(apiName, host);

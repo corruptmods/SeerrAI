@@ -75,7 +75,7 @@ Anyone signed in can make lists of movies and series and add to them from **Add 
 - **Sorting:** recently added, oldest added, title, newest or oldest release. Remembered on each device.
 - **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Several added at once, as from a collection or an import, make one notice. Private lists send nothing.
 - **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions); the option starts ticked unless you turned off **Request What's Added to Lists**.
-- **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
+- **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services; from 1 January 2027 the Trakt app needs a GitHub account linked to its owner, or Trakt stops answering). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.
 
 ### Plex Lists

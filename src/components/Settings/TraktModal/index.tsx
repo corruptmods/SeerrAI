@@ -14,12 +14,12 @@ const messages = defineMessages('components.Settings.SettingsTrakt', {
   editTrakt: 'Edit Trakt',
   clientId: 'Client ID',
   clientIdTip:
-    'Make an app at <TraktAppsLink>developer.trakt.tv/apps</TraktAppsLink> and paste its Client ID. Unused apps are deleted after 30 days.',
+    'Make an app at <TraktAppsLink>developer.trakt.tv/apps</TraktAppsLink> and paste its Client ID. The Trakt account that owns the app needs a GitHub account linked: from 1 January 2027 Trakt stops approving apps without one.',
   savedTip: 'A Client ID is saved. Enter a new one to replace it.',
   connected: 'Connected to Trakt.',
   saveFailed: 'Could not save: {reason}',
   badKey:
-    'Trakt did not accept that Client ID. Check it, and that Trakt has approved the app.',
+    'Trakt did not accept that Client ID. Check it, and that Trakt has approved the app: from 1 January 2027 that needs a GitHub account linked to the Trakt account that owns it.',
   unreachable: 'Could not reach Trakt. Try again in a while.',
   format: 'That does not look like a Trakt Client ID.',
   watchHistory: 'Use What People Watched on Trakt',

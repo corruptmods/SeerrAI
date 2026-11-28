@@ -4,12 +4,14 @@ import { isAxiosError } from 'axios';
 
 /*
  * Reads public Trakt lists, watchlists and what people watched with only an
- * app Client ID, no sign-in. Each admin creates a Trakt app (developer.trakt.tv/apps) and
- * pastes its Client ID into Settings; Trakt deletes apps unused for 30 days,
- * which regular watchlist sync prevents.
+ * app Client ID, no sign-in. Each admin creates a Trakt app
+ * (developer.trakt.tv/apps) and pastes its Client ID into Settings. From
+ * 2027-01-01 Trakt only approves apps whose owner has linked a GitHub
+ * account; an unapproved app's Client ID is refused with a 403.
  *
  * Shapes and paths follow Trakt API v2 (github.com/trakt/trakt-api). Since
- * 2026 lists and watchlists are always paged, up to 250 items a page.
+ * 2026 every list answer is paged (100 a page by default, up to 250), and
+ * the watched endpoints never include seasons, so no `extended` is sent.
  */
 
 const BASE_URL = 'https://api.trakt.tv';
@@ -253,8 +255,7 @@ class TraktAPI extends ExternalAPI {
   public async watchedShows(user: string): Promise<TraktWatched[]> {
     return (
       await this.allPages<TraktWatchedItem>(
-        `/users/${pathPart(user)}/watched/shows`,
-        { extended: 'noseasons' }
+        `/users/${pathPart(user)}/watched/shows`
       )
     )
       .map((item) => asWatched('show', item))
@@ -273,9 +274,22 @@ class TraktAPI extends ExternalAPI {
           params: { ...params, page, limit: PAGE_LIMIT },
         })
       );
-      items.push(...(Array.isArray(response.data) ? response.data : []));
+      const batch = Array.isArray(response.data) ? response.data : [];
+      items.push(...batch);
+      if (batch.length === 0) {
+        break;
+      }
       const pages = Number(response.headers['x-pagination-page-count']);
-      if (!Number.isFinite(pages) || page >= pages) {
+      if (Number.isFinite(pages) && pages > 0) {
+        if (page >= pages) {
+          break;
+        }
+        continue;
+      }
+      // No page count: go on only while pages come back full, by the limit
+      // Trakt says it applied.
+      const limit = Number(response.headers['x-pagination-limit']);
+      if (!Number.isFinite(limit) || limit <= 0 || batch.length < limit) {
         break;
       }
     }
@@ -317,7 +331,7 @@ class TraktAPI extends ExternalAPI {
       if (status === 403) {
         throw new TraktError(
           'badKey',
-          'Trakt did not accept the Client ID. Check it in Settings → Services → Trakt, and that the Trakt app is approved.'
+          'Trakt did not accept the Client ID. Check it in Settings → Services → Trakt, and that the Trakt app is approved (from 1 January 2027 its owner needs a GitHub account linked on Trakt).'
         );
       }
       if (status === 401 || status === 423) {

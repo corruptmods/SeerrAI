@@ -32,8 +32,22 @@ before(async () => {
     }
     const page = Number(url.searchParams.get('page') ?? 1);
     let body: unknown[] = [];
-    let pages = 1;
-    if (url.pathname === '/users/someone/lists/big-one/items/movie,show') {
+    let pages: number | undefined = 1;
+    let limit: number | undefined;
+    if (url.pathname === '/users/someone/lists/overcounted/items/movie,show') {
+      // Says five pages, but runs out after the first.
+      pages = 5;
+      body = page === 1 ? [item(1), item(2)] : [];
+    } else if (
+      url.pathname === '/users/someone/lists/uncounted/items/movie,show'
+    ) {
+      // No page count, only the limit applied: 3 full pages of 2, then 1.
+      pages = undefined;
+      limit = 2;
+      body = page <= 3 ? [item(page * 2 - 1), item(page * 2)] : [item(7)];
+    } else if (
+      url.pathname === '/users/someone/lists/big-one/items/movie,show'
+    ) {
       // 260 entries: pages of 250 and 10.
       pages = 2;
       const from = (page - 1) * 250 + 1;
@@ -88,7 +102,8 @@ before(async () => {
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'X-Pagination-Page': String(page),
-      'X-Pagination-Page-Count': String(pages),
+      ...(pages !== undefined && { 'X-Pagination-Page-Count': String(pages) }),
+      ...(limit !== undefined && { 'X-Pagination-Limit': String(limit) }),
     });
     res.end(JSON.stringify(body));
   });
@@ -272,10 +287,30 @@ describe('the Trakt client', () => {
     assert.deepEqual(
       seen.map((s) => s.path),
       [
-        '/users/someone/watched/shows?extended=noseasons&page=1&limit=250',
-        '/users/someone/watched/shows?extended=noseasons&page=2&limit=250',
+        '/users/someone/watched/shows?page=1&limit=250',
+        '/users/someone/watched/shows?page=2&limit=250',
       ]
     );
+  });
+
+  it('stops at an empty page, whatever the page count says', async () => {
+    const titles = await new TraktAPI('client-id', base).titles({
+      kind: 'list',
+      user: 'someone',
+      list: 'overcounted',
+    });
+    assert.equal(titles.length, 2);
+    assert.equal(seen.length, 2);
+  });
+
+  it('without a page count, reads on while pages are full by Trakt’s limit', async () => {
+    const titles = await new TraktAPI('client-id', base).titles({
+      kind: 'list',
+      user: 'someone',
+      list: 'uncounted',
+    });
+    assert.equal(titles.length, 7);
+    assert.equal(seen.length, 4);
   });
 
   it('never asks for what a made-up name watched', async () => {

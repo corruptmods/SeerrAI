@@ -51,14 +51,19 @@ export const pageRefreshMs = (page: unknown): number => {
  * stay shown as downloading after it arrived. Pages holding one are read
  * again on coming back to the list, and every so often while it's shown.
  */
-const useOnItsWayRefresh = (
-  pages: unknown[] | undefined,
+const useOnItsWayRefresh = <Page>(
+  pages: Page[] | undefined,
   mutate: (
-    data: undefined,
-    opts: { revalidate: (page: unknown) => boolean }
+    data: Page[],
+    opts: { revalidate: (page: Page) => boolean }
   ) => unknown
 ): void => {
   const fromCache = useRef(pages !== undefined);
+  // The pages on screen go back to swr as they are: mutate(undefined) would
+  // empty the row until the read comes back, and with a read already under
+  // way when the page is shown again the row could stay empty.
+  const shown = useRef(pages);
+  shown.current = pages;
   const refreshMs = Math.min(
     ...(pages ?? []).map(pageRefreshMs).filter((ms) => ms > 0),
     Infinity
@@ -68,8 +73,9 @@ const useOnItsWayRefresh = (
       return;
     }
     const refresh = () => {
-      if (document.visibilityState === 'visible') {
-        mutate(undefined, { revalidate: (page) => pageRefreshMs(page) > 0 });
+      const current = shown.current;
+      if (current && document.visibilityState === 'visible') {
+        mutate(current, { revalidate: (page) => pageRefreshMs(page) > 0 });
       }
     };
     // Shown from what was kept: read now. A list just read needn't be.

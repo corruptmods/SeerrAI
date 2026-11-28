@@ -74,7 +74,8 @@ const MediaSlider = ({
   // After a request, reload only the pages holding the title.
   useTitleChanged((title) => {
     if (data?.some((page) => pageHolds(page, title))) {
-      mutate(undefined, { revalidate: (page) => pageHolds(page, title) });
+      // The pages as they are, so the rest stay shown while these reload.
+      mutate(data, { revalidate: (page) => pageHolds(page, title) });
     }
   });
 

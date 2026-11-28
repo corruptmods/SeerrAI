@@ -28,6 +28,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- Rows on the home page (Trending, Popular Movies and the like) no longer stay grey and loading after going to another page and back: a row holding a title on its way was emptied while it was read again, and could stay empty.
 - When a newer qBittorrent (5.2 and later) refuses a torrent Backfill sends, Backfill now says qBittorrent would not add it, instead of showing a bare request error.
 - The admin agent and AI chat work again with OpenAI's newer models, such as GPT-6 Luna: every request with tools failed.
 - Deleting a user and switching off their Emby account works again: Emby accounts were looked up by the wrong id, so Seerr AI always said they had none.

@@ -4,6 +4,7 @@ import { today } from '@server/lib/ai/day';
 import type { Completion } from '@server/lib/ai/providers';
 import {
   ANTHROPIC_URL,
+  ANTHROPIC_VERSION,
   AiProviderError,
   OPENAI_URL,
   billedBy,
@@ -25,7 +26,8 @@ import { LessThan, MoreThanOrEqual } from 'typeorm';
  * the prices an admin entered per model.
  */
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 /** Days of daily counts kept: a little over a year. */
 const KEEP_DAYS = 400;
@@ -153,6 +155,18 @@ interface AnthropicCosts {
   next_page?: string | null;
 }
 
+interface AnthropicCostRows {
+  data?: { cost?: { amount?: string } }[];
+  has_more?: boolean;
+  next_page?: string | null;
+}
+
+/** The beta that Anthropic's cost analytics needs on every request. */
+const ANTHROPIC_ANALYTICS_BETA = 'analytics-usage-cost-2026-08-24';
+/** Cost analytics has nothing before this. */
+const ANALYTICS_FIRST_DAY = Date.UTC(2026, 0, 1);
+const ANALYTICS_LOOKBACK_DAYS = 365;
+
 const openAiSpend = async (adminKey: string, since: Date) => {
   let total = 0;
   let page: string | undefined;
@@ -184,16 +198,28 @@ const openAiSpend = async (adminKey: string, since: Date) => {
   return total;
 };
 
-const anthropicSpend = async (adminKey: string, since: Date) => {
+const anthropicHeaders = (adminKey: string, beta?: string) => ({
+  'x-api-key': adminKey,
+  'anthropic-version': ANTHROPIC_VERSION,
+  ...(beta ? { 'anthropic-beta': beta } : {}),
+});
+
+/** Legacy daily cost report: whole UTC days, never today. */
+const anthropicCostReport = async (
+  adminKey: string,
+  since: Date,
+  until?: Date
+) => {
   let total = 0;
   let page: string | undefined;
   for (let i = 0; i < MAX_PAGES; i++) {
     const { data } = await axios.get<AnthropicCosts>(
       `${ANTHROPIC_URL}/organizations/cost_report`,
       {
-        headers: { 'x-api-key': adminKey, 'anthropic-version': '2023-06-01' },
+        headers: anthropicHeaders(adminKey),
         params: {
           starting_at: since.toISOString(),
+          ...(until ? { ending_at: until.toISOString() } : {}),
           bucket_width: '1d',
           limit: PAGE_DAYS,
           ...(page ? { page } : {}),
@@ -213,6 +239,132 @@ const anthropicSpend = async (adminKey: string, since: Date) => {
     page = data.next_page;
   }
   return total;
+};
+
+/** Cost analytics for one stretch of at most 31 days, as one total. */
+const anthropicAnalyticsWindow = async (
+  adminKey: string,
+  from: Date,
+  to: Date
+) => {
+  let total = 0;
+  let page: string | undefined;
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const { data } = await axios.get<AnthropicCostRows>(
+      `${ANTHROPIC_URL}/organizations/analytics/cost`,
+      {
+        headers: anthropicHeaders(adminKey, ANTHROPIC_ANALYTICS_BETA),
+        // No bucket width and no grouping: one row for the whole stretch.
+        params: {
+          starting_at: from.toISOString(),
+          ending_at: to.toISOString(),
+          limit: 1000,
+          ...(page ? { page } : {}),
+        },
+        timeout: REPORT_TIMEOUT_MS,
+      }
+    );
+    for (const row of data.data ?? []) {
+      // Cents with six decimals: "41280.000000" is $412.80.
+      total += (Number(row.cost?.amount) || 0) / 100;
+    }
+    if (!data.has_more || !data.next_page) {
+      break;
+    }
+    page = data.next_page;
+  }
+  return total;
+};
+
+/**
+ * Whether cost analytics is unavailable here, so the legacy report is
+ * used instead: not found, not allowed, or an error saying so.
+ */
+const analyticsUnavailable = (e: unknown) => {
+  if (!isAxiosError(e) || !e.response) {
+    return false;
+  }
+  const status = e.response.status;
+  if (status === 403 || status === 404) {
+    return true;
+  }
+  const message =
+    (e.response.data as { error?: { message?: string } } | undefined)?.error
+      ?.message ?? '';
+  return status >= 400 && status < 500 && /not (yet )?available/i.test(message);
+};
+
+/**
+ * Cost analytics from `since` to `until`, in stretches of 31 days. Unlike
+ * the legacy report it includes today, as far as Anthropic has counted it
+ * (usually within 4 hours).
+ */
+const anthropicAnalytics = async (
+  adminKey: string,
+  since: Date,
+  until: Date
+) => {
+  let total = 0;
+  let asked = false;
+  for (
+    let from = since.getTime(), i = 0;
+    from < until.getTime() && i < MAX_PAGES;
+    from += PAGE_DAYS * DAY_MS, i++
+  ) {
+    const to = Math.min(from + PAGE_DAYS * DAY_MS, until.getTime());
+    // Both ends round down to the hour: less than an hour is nothing yet.
+    if (to - from < HOUR_MS) {
+      continue;
+    }
+    total += await anthropicAnalyticsWindow(
+      adminKey,
+      new Date(from),
+      new Date(to)
+    );
+    asked = true;
+  }
+  if (!asked) {
+    // Within the day's first hour there is nothing to count yet, but the key
+    // and the endpoint are still checked, on the hour before.
+    await anthropicAnalyticsWindow(
+      adminKey,
+      new Date(since.getTime() - HOUR_MS),
+      since
+    );
+  }
+  return total;
+};
+
+/**
+ * The account's spend from `since`. Cost analytics covers the last 365
+ * days and nothing before 2026, so anything older comes from the legacy
+ * cost report, as does everything where cost analytics isn't available.
+ */
+const anthropicSpend = async (adminKey: string, since: Date, until: Date) => {
+  const floor = Math.max(
+    ANALYTICS_FIRST_DAY,
+    Math.ceil((until.getTime() - ANALYTICS_LOOKBACK_DAYS * DAY_MS) / DAY_MS) *
+      DAY_MS
+  );
+  const from = new Date(Math.max(since.getTime(), floor));
+  let recent: number;
+  try {
+    recent = await anthropicAnalytics(adminKey, from, until);
+  } catch (e) {
+    if (!analyticsUnavailable(e)) {
+      throw e;
+    }
+    logger.debug('Anthropic cost analytics unavailable; using cost_report', {
+      label: 'AI',
+      status: isAxiosError(e) ? e.response?.status : undefined,
+    });
+    return anthropicCostReport(adminKey, since);
+  }
+  const older =
+    since.getTime() < from.getTime()
+      ? await anthropicCostReport(adminKey, since, from)
+      : 0;
+  return older + recent;
 };
 
 /** A failed report, explained so an admin can act on it. */
@@ -254,7 +406,8 @@ const reports = new Map<string, { until: number; spent: number }>();
 export const providerSpend = async (
   provider: 'anthropic' | 'openai',
   adminKey: string,
-  since: Date
+  since: Date,
+  until = new Date()
 ): Promise<number> => {
   const from = new Date(
     Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate())
@@ -269,7 +422,7 @@ export const providerSpend = async (
   try {
     const spent =
       provider === 'anthropic'
-        ? await anthropicSpend(adminKey, from)
+        ? await anthropicSpend(adminKey, from, until)
         : await openAiSpend(adminKey, from);
     reports.set(key, { until: Date.now() + REPORT_TTL_MS, spent });
     return spent;
@@ -408,9 +561,9 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
         // nothing is spent in it yet.
         providerMonthStart > now
           ? Promise.resolve(0)
-          : providerSpend(provider, credit.adminKey, providerMonthStart),
+          : providerSpend(provider, credit.adminKey, providerMonthStart, now),
         balanceAt
-          ? providerSpend(provider, credit.adminKey, balanceAt)
+          ? providerSpend(provider, credit.adminKey, balanceAt, now)
           : Promise.resolve(null),
       ]);
       source = 'provider';

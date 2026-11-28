@@ -19,6 +19,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - With OpenAI, the admin agent and AI chat now think at the effort you choose even when they use tools, on newer models such as GPT-6 Luna too: Seerr AI now uses OpenAI's newer Responses API. Other OpenAI-compatible servers (Ollama, LM Studio and the like) are used as before.
 - Settings → Services → Trakt now says that the Trakt account owning your app needs a GitHub account linked: from 1 January 2027 Trakt stops approving apps without one, and the Client ID of an unapproved app stops working.
 - Update checks and TRaSH Guides downloads now ask GitHub for a fixed version of its API (2026-03-10), so a change to GitHub's default can't break them.
+- Seerr AI now uses version 2026-10-21 of the Claude API. With an Anthropic admin key, AI spending now includes today, as far as Anthropic has counted it (usually within about four hours); accounts where Anthropic's newer cost report isn't available keep the older one, which stops at the last midnight (UTC).
 
 ### Fixed
 
@@ -28,6 +29,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.
 - A series split across libraries on Plex, Jellyfin or Emby (say seasons 1 and 2 in a 1080p library and season 3 in a 4K one) no longer has the other library's seasons marked as removed: the availability sync now checks every library the series is in. If it leaves one library, its Play button links to the copy in another.
 - Reading a long Trakt list or watch history no longer asks Trakt for pages past its end.
+- When Claude's safety checks stop an answer, AI features now say that Claude declined to answer, instead of showing an empty reply.
 
 ## 2.5.0 (24 November 2026)
 

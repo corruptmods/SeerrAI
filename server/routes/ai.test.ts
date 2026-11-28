@@ -2834,23 +2834,165 @@ describe('credit', () => {
     }
   });
 
-  it("reads Anthropic's cost report in cents", async () => {
+  interface Asked {
+    url: string;
+    headers: Record<string, string>;
+    params: Record<string, string>;
+  }
+
+  /** Answers Anthropic's two spend reports, and notes what was asked. */
+  const anthropicReports = (
+    answer: (url: string, params: Record<string, string>) => unknown
+  ) => {
+    const asked: Asked[] = [];
+    const get = mock.method(
+      axios,
+      'get',
+      async (
+        url: string,
+        config: {
+          headers: Record<string, string>;
+          params: Record<string, string>;
+        }
+      ) => {
+        asked.push({ url, headers: config.headers, params: config.params });
+        const data = answer(url, config.params);
+        if (data instanceof Error) throw data;
+        return { data };
+      }
+    );
+    return { asked, get };
+  };
+
+  const ANALYTICS = 'https://api.anthropic.com/v1/organizations/analytics/cost';
+  const COST_REPORT = 'https://api.anthropic.com/v1/organizations/cost_report';
+
+  it("reads Anthropic's cost analytics in cents, today included", async () => {
     actingAs = admin;
-    const get = mock.method(axios, 'get', async () => ({
-      data: {
-        data: [{ results: [{ amount: '150' }, { amount: '25.5' }] }],
-        has_more: false,
-        next_page: null,
-      },
+    getSettings().aiCredit.adminKey = 'sk-ant-admin01-good';
+    forgetSpendReports();
+    const { asked, get } = anthropicReports((url) =>
+      url === ANALYTICS
+        ? {
+            data: [
+              { cost: { amount: '150.000000' } },
+              { cost: { amount: '25.500000' } },
+            ],
+            has_more: false,
+            next_page: null,
+          }
+        : httpError(500)
+    );
+    try {
+      const report = await creditReport(new Date('2026-10-15T12:30:00Z'));
+      assert.equal(report.source, 'provider');
+      assert.equal(report.spentThisMonth, 1.755);
+      assert.equal(asked.length, 1);
+      assert.equal(asked[0].url, ANALYTICS);
+      assert.equal(asked[0].headers['anthropic-version'], '2026-10-21');
+      assert.equal(
+        asked[0].headers['anthropic-beta'],
+        'analytics-usage-cost-2026-08-24'
+      );
+      assert.equal(asked[0].params.starting_at, '2026-10-01T00:00:00.000Z');
+      // Up to now, not the last midnight.
+      assert.equal(asked[0].params.ending_at, '2026-10-15T12:30:00.000Z');
+    } finally {
+      get.mock.restore();
+      getSettings().aiCredit.adminKey = '';
+    }
+  });
+
+  it("uses Anthropic's legacy cost report where cost analytics isn't available", async () => {
+    actingAs = admin;
+    getSettings().aiCredit.adminKey = 'sk-ant-admin01-good';
+    forgetSpendReports();
+    const { asked, get } = anthropicReports((url) =>
+      url === ANALYTICS
+        ? httpError(404)
+        : {
+            data: [{ results: [{ amount: '150' }, { amount: '25.5' }] }],
+            has_more: false,
+            next_page: null,
+          }
+    );
+    try {
+      const report = await creditReport(new Date('2026-10-15T12:30:00Z'));
+      assert.equal(report.source, 'provider');
+      assert.equal(report.spentThisMonth, 1.755);
+      assert.deepEqual(
+        asked.map((a) => a.url),
+        [ANALYTICS, COST_REPORT]
+      );
+      assert.equal(asked[1].headers['anthropic-version'], '2026-10-21');
+      assert.equal(asked[1].headers['anthropic-beta'], undefined);
+      assert.equal(asked[1].params.starting_at, '2026-10-01T00:00:00.000Z');
+    } finally {
+      get.mock.restore();
+      getSettings().aiCredit.adminKey = '';
+    }
+  });
+
+  it('reads days before cost analytics begins from the legacy report', async () => {
+    actingAs = admin;
+    const credit = getSettings().aiCredit;
+    const saved = { ...credit };
+    credit.adminKey = 'sk-ant-admin01-good';
+    credit.balance = 20;
+    credit.balanceAt = '2025-12-20T09:00:00.000Z';
+    forgetSpendReports();
+    const { asked, get } = anthropicReports((url) =>
+      url === ANALYTICS
+        ? {
+            data: [{ cost: { amount: '50.000000' } }],
+            has_more: false,
+            next_page: null,
+          }
+        : {
+            data: [{ results: [{ amount: '100' }] }],
+            has_more: false,
+            next_page: null,
+          }
+    );
+    try {
+      const report = await creditReport(new Date('2026-01-10T12:00:00Z'));
+      assert.equal(report.spentThisMonth, 0.5);
+      assert.equal(report.spentSinceBalance, 1.5);
+      assert.equal(report.remaining, 18.5);
+      const legacy = asked.filter((a) => a.url === COST_REPORT);
+      assert.equal(legacy.length, 1);
+      assert.equal(legacy[0].params.starting_at, '2025-12-20T00:00:00.000Z');
+      assert.equal(legacy[0].params.ending_at, '2026-01-01T00:00:00.000Z');
+      assert.ok(
+        asked
+          .filter((a) => a.url === ANALYTICS)
+          .every((a) => a.params.starting_at >= '2026-01-01')
+      );
+    } finally {
+      get.mock.restore();
+      Object.assign(credit, saved);
+    }
+  });
+
+  it('checks a new Anthropic admin key with cost analytics', async () => {
+    actingAs = admin;
+    forgetSpendReports();
+    const { asked, get } = anthropicReports(() => ({
+      data: [],
+      has_more: false,
+      next_page: null,
     }));
     try {
       const saved = await call<Report>('POST', '/api/v1/settings/ai/credit', {
-        adminKey: 'sk-ant-admin01-good',
+        adminKey: 'sk-ant-admin01-new',
       });
       assert.equal(saved.status, 200);
-      assert.equal(saved.body.spentThisMonth, 1.755);
+      assert.equal(saved.body.hasAdminKey, true);
+      assert.equal(asked[0].url, ANALYTICS);
+      assert.equal(asked[0].headers['x-api-key'], 'sk-ant-admin01-new');
     } finally {
       get.mock.restore();
+      getSettings().aiCredit.adminKey = '';
     }
   });
 

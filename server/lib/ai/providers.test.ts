@@ -118,7 +118,7 @@ describe('Claude', () => {
       output_config: { effort: 'low' },
     });
     assert.equal(sent[0].headers['x-api-key'], 'test-key');
-    assert.ok(sent[0].headers['anthropic-version']);
+    assert.equal(sent[0].headers['anthropic-version'], '2026-10-21');
     assert.deepEqual(answer, {
       text: 'Hello',
       inputTokens: 12,
@@ -153,6 +153,20 @@ describe('Claude', () => {
     await assert.rejects(
       complete(settings(), request),
       /used up its answer length/
+    );
+  });
+
+  it('says Claude declined instead of giving an empty answer', async () => {
+    capture([
+      {
+        content: [],
+        stop_reason: 'refusal',
+        stop_details: { type: 'refusal', category: null, explanation: null },
+      },
+    ]);
+    await assert.rejects(
+      complete(settings(), request),
+      /Claude declined to answer this/
     );
   });
 
@@ -617,6 +631,25 @@ describe('a conversation with tools', () => {
         ],
       },
     ]);
+  });
+
+  it('says Claude declined when it stops a turn with tools', async () => {
+    capture([
+      {
+        content: [{ type: 'text', text: 'I can look up Lantern' }],
+        stop_reason: 'refusal',
+      },
+    ]);
+    await assert.rejects(
+      converse(settings(), {
+        model: 'claude-x',
+        system: 'sys',
+        messages: [{ role: 'user', text: 'find Lantern Song' }],
+        tools,
+        maxTokens: 800,
+      }),
+      /Claude declined to answer this/
+    );
   });
 
   it('gives OpenAI flat functions, and reads the calls it made', async () => {

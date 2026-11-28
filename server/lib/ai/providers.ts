@@ -17,7 +17,12 @@ import axios, { isAxiosError } from 'axios';
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1';
 export const OPENAI_URL = 'https://api.openai.com/v1';
-const ANTHROPIC_VERSION = '2023-06-01';
+/**
+ * The Claude API version sent on every Anthropic request, spend reports
+ * included. 2026-10-21 rejects sampling settings, documents in assistant
+ * turns and citations in user turns; none is ever sent here.
+ */
+export const ANTHROPIC_VERSION = '2026-10-21';
 
 /**
  * Long enough for a slow model writing a few hundred words; more for the
@@ -320,6 +325,9 @@ const openAiHeaders = (ai: AiSettings) => ({
 const RAN_OUT =
   'used up its answer length thinking before it replied. Try again, or choose a model that thinks less.';
 
+/** Claude's safety checks stopped the answer: never shown as an empty one. */
+const DECLINED = 'Claude declined to answer this. Try asking another way.';
+
 /**
  * Sends a Claude request with an effort, or without one for older models
  * that have no effort setting and say so.
@@ -443,6 +451,9 @@ const completeAnthropic = async (
     .map((block) => block.text ?? '')
     .join('')
     .trim();
+  if (data.stop_reason === 'refusal') {
+    throw new AiProviderError(DECLINED);
+  }
   if (!text && data.stop_reason === 'max_tokens') {
     throw new AiProviderError(`Claude ${RAN_OUT}`);
   }
@@ -864,6 +875,9 @@ const converseAnthropic = async (
       name: block.name as string,
       input: block.input ?? {},
     }));
+  if (data.stop_reason === 'refusal') {
+    throw new AiProviderError(DECLINED);
+  }
   if (!text && !calls.length && data.stop_reason === 'max_tokens') {
     throw new AiProviderError(`Claude ${RAN_OUT}`);
   }

@@ -25,10 +25,12 @@ The cheapest models, at the lowest effort, can give weak suggestions in AI Searc
 
 Once a key is saved, a panel shows the balance you entered (as of when you saved it) less what has been spent since. Neither provider lets a program read your balance, so spending comes from:
 
-- the provider's own report, if you save an optional admin key. It counts everything the account spends, not only Seerr AI. An OpenAI admin key can only be made by the organization's owner;
+- the provider's own report, if you save an optional admin key. It counts everything the account spends, not only Seerr AI. An OpenAI admin key can only be made by the organization's owner. Anthropic's report includes today's spending, usually within about four hours; where Anthropic's newer cost report isn't available to the account, its older one is used, which counts up to the last midnight (UTC);
 - otherwise, an estimate from the tokens Seerr AI used, at prices you copy from the provider's pricing page.
 
 When the provider says the account is out of credit, the panel and the person asking are told; the warning clears on the next good answer.
+
+If Claude's safety checks stop an answer, the person asking is told that Claude declined to answer, instead of getting an empty reply.
 
 ## The AI features
 

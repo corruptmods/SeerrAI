@@ -3,20 +3,29 @@
 # Publishes the Seerr AI image for amd64 and arm64 (the platforms Seerr
 # ships), to GitHub's container registry and, when set up, Docker Hub:
 #
-#   :1.2.3, :1.2, :1, :latest   for a tag ai-v1.2.3
-#   :develop                    when run by hand, from dev
-#   :preview-<name>             for a tag preview-<name>, or when run by hand
-#                               from any other branch (preview-<branch>)
-#   :sha-abc1234                for every build
+#   :2026.11.28, :2026.11, :latest   for a tag ai-v2026.11.28
+#   :develop                         when run by hand, from dev
+#   :preview-<name>                  for a tag preview-<name>, or when run by
+#                                    hand from any other branch
+#                                    (preview-<branch>)
+#   :sha-abc1234                     for every build
 #
-# Release with:  git tag ai-v1.2.3 && git push origin ai-v1.2.3
-# CHANGELOG.md needs a "## 1.2.3" section (a date after it is fine, like
-# "## 1.2.3 (14 October 2026)"): it becomes the release notes, so rename
-# "Coming next" to the version before tagging. The changelog only lists
-# released versions, plus "Coming next" while dev has unreleased changes. A version with a "-"
-# (ai-v1.3.0-beta.1) is a pre-release: it gets only its own tag, and does not
-# move :1.2, :1 or :latest; without its own section, it uses "Coming next".
-# A preview never touches any of them either.
+# Releases are named by the day they're cut: YEAR.MONTH.DAY, without leading
+# zeros (2026.11.28, 2027.1.5). A second release the same day adds a number,
+# from 1: 2026.11.28.1, then 2026.11.28.2. Releases up to 2.5.0 were 1.2.3
+# style; those tags aren't built any more. :2026.11 is the newest release of
+# that month and :latest the newest of all: a release cut again after a newer
+# one (its tag moved) gets only its own tag, and leaves them alone.
+#
+# Release with:  git tag ai-v2026.11.28 && git push origin ai-v2026.11.28
+# CHANGELOG.md needs a "## 2026.11.28" section (a date after it is fine, like
+# "## 2026.11.28 (28 November 2026)"): it becomes the release notes, so
+# rename "Coming next" to the version before tagging. The changelog only
+# lists released versions, plus "Coming next" while dev has unreleased
+# changes. A version with a "-" (ai-v2026.11.28-beta.1, named for the day the
+# beta is cut) is a pre-release: it gets only its own tag, and does not move
+# :2026.11 or :latest; without its own section, it uses "Coming next". A
+# preview never touches any of them either.
 #
 # Seerr AI's tags start with "ai-v" because the repository also holds Seerr's
 # own v1.0.0…v3.x tags, which this must never build or collide with.
@@ -62,6 +71,7 @@ jobs:
       version: ${{ steps.plan.outputs.VERSION }}
       release: ${{ steps.plan.outputs.RELEASE }}
       prerelease: ${{ steps.plan.outputs.PRERELEASE }}
+      latest: ${{ steps.plan.outputs.LATEST }}
       tags: ${{ steps.plan.outputs.TAGS }}
       timestamp: ${{ steps.plan.outputs.TIMESTAMP }}
       created: ${{ steps.plan.outputs.CREATED }}
@@ -74,16 +84,23 @@ jobs:
 
       - name: Version and tags
         id: plan
+        env:
+          GH_TOKEN: ${{ github.token }} # the release tags there are
         run: |
           RELEASE=false
           PRERELEASE=false
           if [[ "${GITHUB_REF}" == refs/tags/ai-v* ]]; then
             KIND=release
             VERSION="${GITHUB_REF_NAME#ai-v}"
-            if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-              echo "::error::${GITHUB_REF_NAME} is not ai-v followed by a version like 1.2.3"
+            # YEAR.MONTH.DAY, a .N from 1 for another release that day, and
+            # a -beta.1 or the like for a pre-release.
+            DATE_RE='^(20[0-9]{2})\.([1-9][0-9]?)\.([1-9][0-9]?)(\.[1-9][0-9]*)?(-[0-9A-Za-z.-]+)?$'
+            if [[ ! "${VERSION}" =~ ${DATE_RE} ]] \
+              || ! date -u -d "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}" >/dev/null 2>&1; then
+              echo "::error::${GITHUB_REF_NAME} is not ai-v followed by a release's date, like ai-v2026.11.28 (no leading zeros), ai-v2026.11.28.1 for a second release that day, or ai-v2026.11.28-beta.1"
               exit 1
             fi
+            MONTH="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
             RELEASE=true
             [[ "${VERSION}" == *-* ]] && PRERELEASE=true
             # This version's section of CHANGELOG.md, without its heading, is
@@ -110,11 +127,22 @@ jobs:
               exit 1
             fi
             TAGS="${VERSION}"
+            LATEST=false
             if [[ "${PRERELEASE}" == "false" ]]; then
-              IFS=. read -r MAJOR MINOR _ <<< "${VERSION}"
-              TAGS+=" ${MAJOR}.${MINOR}"
-              [[ "${MAJOR}" != 0 ]] && TAGS+=" ${MAJOR}"
-              TAGS+=" latest"
+              # :MONTH and :latest only move forward: to this release when
+              # no newer one of the month, or at all, has been tagged.
+              RELEASES="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/ai-v" --jq '.[].ref')"
+              newest() {
+                sed -n -E 's#^refs/tags/ai-v([0-9]+(\.[0-9]+){2,3})$#\1#p' \
+                  | { cat; echo "${VERSION}"; } | sort -V | tail -n 1
+              }
+              if [[ "$(grep -F "refs/tags/ai-v${MONTH}." <<< "${RELEASES}" | newest)" == "${VERSION}" ]]; then
+                TAGS+=" ${MONTH}"
+              fi
+              if [[ "$(newest <<< "${RELEASES}")" == "${VERSION}" ]]; then
+                TAGS+=" latest"
+                LATEST=true
+              fi
             fi
           elif [[ "${GITHUB_REF}" == refs/tags/preview-* ]]; then
             KIND=preview
@@ -151,6 +179,7 @@ jobs:
             echo "VERSION=${VERSION}"
             echo "RELEASE=${RELEASE}"
             echo "PRERELEASE=${PRERELEASE}"
+            echo "LATEST=${LATEST:-false}"
             echo "TAGS=${TAGS}"
             echo "TIMESTAMP=${TIMESTAMP}"
             echo "CREATED=$(date -u -d "@${TIMESTAMP}" +%Y-%m-%dT%H:%M:%SZ)"
@@ -527,6 +556,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.plan.outputs.version }}
           PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+          LATEST: ${{ needs.plan.outputs.latest }}
           IMAGE: ${{ needs.plan.outputs.image }}
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
@@ -541,15 +571,16 @@ jobs:
             echo
             echo "Built from commit \`${GITHUB_SHA}\`. Digest \`${DIGEST}\`, signed with cosign, with an SBOM attached: [how to check it](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/seerr-ai/install.md#checking-an-image)."
           } >> release-notes.md
-          FLAGS=()
-          [[ "${PRERELEASE}" == "true" ]] && FLAGS=(--prerelease)
+          FLAGS=(--latest="${LATEST}")
+          [[ "${PRERELEASE}" == "true" ]] && FLAGS=(--prerelease --latest=false)
           # The title must contain the version: Settings → About compares it.
           # A release cut again (the tag moved) keeps its page, retitled and
           # with the notes refreshed from CHANGELOG.md. GitHub
           # turns a release back into a draft when its tag is deleted, so it is
-          # published again here, and made the latest unless a pre-release.
+          # published again here, and made the latest only when it is the
+          # newest release (as for :latest).
           if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            EDIT=(--prerelease=false --latest)
+            EDIT=(--prerelease=false --latest="${LATEST}")
             [[ "${PRERELEASE}" == "true" ]] && EDIT=(--prerelease)
             gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
               --title "Seerr AI ${VERSION}" --notes-file release-notes.md \

@@ -332,11 +332,11 @@ the first unreleased change lands), in plain words, in
 linked once where useful. No code names, file names or jargon. Changes
 nobody would notice (tests, refactors, the build) are left out.
 
-A release renames **Coming next** to its version, `## 1.2.3 (date)`;
+A release renames **Coming next** to its version, `## 2026.11.28 (date)`;
 `release.yml` uses that section as the release notes. No empty section is
 left behind: the changelog lists only what has been released, and **Coming
 next** comes back with the next change. A pre-release does the same with
-its own version, such as `## 2.0.0-beta.2 (date)`, listing what changed
+its own version, such as `## 2026.11.28-beta.2 (date)`, listing what changed
 since the last one; the first starts with one line saying what it
 previews. The release after its betas has one section covering
 everything since the last release, in place of the betas' sections, as
@@ -522,7 +522,11 @@ Do not undo these without reading why first — each was tried the other way.
   only for an install running one, matched to the version by its tag.
 - **Two branches: `dev` and `main`.** Work and patches go onto `dev`, which
   a self-built server runs. `main` only moves for a release, fast-forwarded
-  to `dev`, then tagged `ai-v…`. A release build checks for newer releases;
+  to `dev`, then tagged `ai-v…`. Releases are named by date
+  (`ai-v2026.11.28`, `ai-v2026.11.28.1` for a second that day; up to 2.5.0
+  they were 1.2.3 style), and `releases.ts` compares them as numbers itself,
+  not with `semver`, which takes neither four parts nor knows a date beats
+  2.5.0. A release build checks for newer releases;
   any other build (version `develop-<commit>`) checks `dev`'s commits,
   matching the short hash build.sh uses as well as the full one.
 - **A notice waits its turn.** Banners and pop-ups that ask something go

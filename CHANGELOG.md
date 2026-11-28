@@ -13,6 +13,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
+- Releases are now named by the day they come out, such as 2026.11.28 (2026.11.28.1 for a second one that day), after 2.5.0. The Docker image gets `:2026.11.28`, `:2026.11` for the newest release of the month, and `:latest`; the old `:2.5` and `:2` tags stay where they are and no longer move. Settings → About knows a release by date is newer than 2.5.0.
 - Settings → AI lists only the efforts the chosen model takes: Low to High for Claude, from None for OpenAI's newer models, and none at all for models without an effort setting (the choice is then hidden). Each feature's effort follows its own model.
 - AI features are told your 12 most recent titles instead of 8.
 - Trakt requests share a limit of 2 a second.

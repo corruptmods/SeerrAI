@@ -2,7 +2,7 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2026.11.28 (28 November 2026)
 
 ### New
 

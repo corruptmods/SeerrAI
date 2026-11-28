@@ -3,9 +3,9 @@ kubeVersion: '>=1.23.0-0'
 name: seerr-ai-chart
 description: Seerr AI helm chart for Kubernetes
 type: application
-version: 1.2.4
+version: 1.3.0
 # The Seerr AI release this chart installs by default (its image tag).
-appVersion: '2.5.0'
+appVersion: '2026.11.28'
 maintainers:
   - name: corruptmods
     url: https://github.com/corruptmods

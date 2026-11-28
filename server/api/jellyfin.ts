@@ -515,28 +515,43 @@ class JellyfinAPI extends ExternalAPI {
 
       return mediaFolderResponse.Items;
     } catch {
-      // Fall back to user views, which some LDAP users need.
-      try {
-        const mediaFolderResponse = await this.get<any>(
-          `/Users/${this.userId ?? 'Me'}/Views`
-        );
+      // Fall back to user views, which some LDAP users need. Jellyfin's
+      // current route is /UserViews (10.9+); /Users/{id}/Views is kept there
+      // only for older clients, and is the one Emby has.
+      const views = [
+        ...(this.kind === 'jellyfin'
+          ? [
+              this.userId
+                ? `/UserViews?userId=${encodeURIComponent(this.userId)}`
+                : '/UserViews',
+            ]
+          : []),
+        `/Users/${this.userId ?? 'Me'}/Views`,
+      ];
+      let failure: any;
+      for (const path of views) {
+        try {
+          const mediaFolderResponse = await this.get<any>(path);
 
-        return mediaFolderResponse.Items;
-      } catch (e) {
-        logger.error(
-          `Something went wrong while getting libraries from the ${this.serverName} server: ${e.message}`,
-          {
-            label: `${this.serverName} API`,
-            error: e.response?.status,
-          }
-        );
-
-        if (!e.response) {
-          throw new ApiError(502, ApiErrorCode.ConnectionError);
+          return mediaFolderResponse.Items;
+        } catch (e) {
+          failure = e;
+          if (!e.response) break;
         }
-
-        return [];
       }
+      logger.error(
+        `Something went wrong while getting libraries from the ${this.serverName} server: ${failure?.message}`,
+        {
+          label: `${this.serverName} API`,
+          error: failure?.response?.status,
+        }
+      );
+
+      if (!failure?.response) {
+        throw new ApiError(502, ApiErrorCode.ConnectionError);
+      }
+
+      return [];
     }
   }
 

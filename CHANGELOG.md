@@ -22,6 +22,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Update checks and TRaSH Guides downloads now ask GitHub for a fixed version of its API (2026-03-10), so a change to GitHub's default can't break them.
 - Seerr AI now uses version 2026-10-21 of the Claude API. With an Anthropic admin key, AI spending now includes today, as far as Anthropic has counted it (usually within about four hours); accounts where Anthropic's newer cost report isn't available keep the older one, which stops at the last midnight (UTC).
 - Transmission 4.1 and newer are now spoken to in their own newer format (JSON-RPC 2.0), which the older format will give way to in a later Transmission. Older versions are spoken to as before; Seerr AI checks which one it's talking to and checks again after the client restarts or is upgraded.
+- When Jellyfin won't list every library to Seerr AI (as for some LDAP users), the libraries the signed-in user can see are now read from Jellyfin's current address for them, with the older one kept for older Jellyfin versions. Emby is asked as before.
 
 ### Fixed
 

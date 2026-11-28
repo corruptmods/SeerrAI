@@ -53,3 +53,116 @@ describe("a Jellyfin season's episodes", () => {
     );
   });
 });
+
+describe('libraries when /Library/MediaFolders is refused', () => {
+  afterEach(() => mock.restoreAll());
+
+  const USER = '4f1c2d3e5a6b7c8d9e0f1a2b3c4d5e6f';
+
+  const refused = (status: number) =>
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      response: { status },
+    });
+
+  /** A server answering only `answers`, refusing the rest with a 403. */
+  const serverWith = (
+    kind: 'jellyfin' | 'emby',
+    answers: Record<string, unknown>,
+    asked: string[]
+  ) => {
+    const api = new JellyfinAPI('http://media.invalid:8096', 't', 'd', kind);
+    api.setUserId(USER);
+    mock.method(
+      (api as unknown as { axios: AxiosInstance }).axios,
+      'get',
+      async (url: string) => {
+        asked.push(url);
+        const answer = answers[url];
+        if (answer instanceof Error) throw answer;
+        if (answer === undefined) throw refused(403);
+        return { data: answer };
+      }
+    );
+    return api;
+  };
+
+  const folder = (Name: string) => ({
+    Id: `${Name.replace(/ /g, '')}Id`,
+    Name,
+    Type: 'CollectionFolder',
+    CollectionType: 'movies',
+  });
+
+  it('uses Jellyfin’s /UserViews for the signed-in user', async () => {
+    const asked: string[] = [];
+    const api = serverWith(
+      'jellyfin',
+      { [`/UserViews?userId=${USER}`]: { Items: [folder('Glasswing')] } },
+      asked
+    );
+    assert.deepEqual(
+      (await api.getLibraries()).map((l) => l.title),
+      ['Glasswing']
+    );
+    assert.deepEqual(asked, [
+      '/Library/MediaFolders',
+      `/UserViews?userId=${USER}`,
+    ]);
+  });
+
+  it('falls back to /Users/{id}/Views on a Jellyfin without /UserViews', async () => {
+    const asked: string[] = [];
+    const api = serverWith(
+      'jellyfin',
+      {
+        [`/UserViews?userId=${USER}`]: refused(404),
+        [`/Users/${USER}/Views`]: { Items: [folder('Static Garden')] },
+      },
+      asked
+    );
+    assert.deepEqual(
+      (await api.getLibraries()).map((l) => l.title),
+      ['Static Garden']
+    );
+    assert.equal(asked.length, 3);
+  });
+
+  it('keeps Emby on /Users/{id}/Views', async () => {
+    const asked: string[] = [];
+    const api = serverWith(
+      'emby',
+      { [`/Users/${USER}/Views`]: { Items: [folder('Lantern Song')] } },
+      asked
+    );
+    assert.deepEqual(
+      (await api.getLibraries()).map((l) => l.title),
+      ['Lantern Song']
+    );
+    assert.deepEqual(asked, ['/Library/MediaFolders', `/Users/${USER}/Views`]);
+  });
+
+  it('lists none when every route is refused, and stops when unreachable', async () => {
+    const asked: string[] = [];
+    assert.deepEqual(
+      await serverWith('jellyfin', {}, asked).getLibraries(),
+      []
+    );
+    assert.equal(asked.length, 3);
+
+    const gone: string[] = [];
+    const down = Object.assign(new Error('connect ECONNREFUSED'), {
+      code: 'ECONNREFUSED',
+    });
+    await assert.rejects(
+      serverWith(
+        'jellyfin',
+        {
+          '/Library/MediaFolders': down,
+          [`/UserViews?userId=${USER}`]: down,
+        },
+        gone
+      ).getLibraries()
+    );
+    assert.equal(gone.length, 2);
+  });
+});

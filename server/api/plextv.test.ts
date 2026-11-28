@@ -1,5 +1,6 @@
 import PlexTvAPI from '@server/api/plextv';
 import cacheManager from '@server/lib/cache';
+import { AxiosError, type AxiosResponse } from 'axios';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
@@ -241,5 +242,184 @@ describe('PlexTvAPI.getWatchlist', () => {
     await api.getWatchlist();
     await api.getWatchlist();
     assert.deepEqual(sent, [undefined, undefined]);
+  });
+});
+
+/*
+ * Account and servers: plex.tv's v2 JSON routes, read into exactly what the
+ * older account.json and XML resources gave, which stay as the fallback.
+ */
+describe('PlexTvAPI account and servers', () => {
+  const gone = (status: number) =>
+    new AxiosError(
+      `Request failed with status code ${status}`,
+      'ERR_BAD_REQUEST',
+      undefined,
+      undefined,
+      { status } as AxiosResponse
+    );
+
+  /** A PlexTvAPI answering `routes` by path, recording each path asked. */
+  const plexTv = (routes: Record<string, unknown>) => {
+    const api = new PlexTvAPI('token-a');
+    const asked: string[] = [];
+    const sent: Record<string, unknown>[] = [];
+    (
+      api as unknown as {
+        axios: { get: (...args: unknown[]) => Promise<unknown> };
+      }
+    ).axios.get = async (url, config) => {
+      asked.push(url as string);
+      sent.push((config ?? {}) as Record<string, unknown>);
+      const answer = routes[url as string];
+      if (answer instanceof Error) throw answer;
+      if (answer === undefined) throw gone(404);
+      return { status: 200, data: answer };
+    };
+    return { api, asked, sent };
+  };
+
+  const accountJson = {
+    user: {
+      id: 4021,
+      uuid: 'c0ffee00c0ffee00',
+      email: 'glasswing@example.invalid',
+      joined_at: '2019-06-24 11:38:02 UTC',
+      username: 'glasswing',
+      title: 'Glasswing',
+      thumb: 'https://plex.tv/users/c0ffee00c0ffee00/avatar?c=1',
+      hasPassword: true,
+      authToken: 'token-a',
+      subscription: {
+        active: true,
+        status: 'Active',
+        plan: 'lifetime',
+        features: ['webhooks'],
+      },
+      roles: { roles: ['plexpass'] },
+      entitlements: ['all'],
+    },
+  };
+  const userV2 = {
+    id: 4021,
+    uuid: 'c0ffee00c0ffee00',
+    email: 'glasswing@example.invalid',
+    joinedAt: Date.UTC(2019, 5, 24, 11, 38, 2) / 1000,
+    username: 'glasswing',
+    title: 'Glasswing',
+    thumb: 'https://plex.tv/users/c0ffee00c0ffee00/avatar?c=1',
+    hasPassword: true,
+    authToken: 'token-a',
+    subscription: {
+      active: true,
+      status: 'Active',
+      plan: 'lifetime',
+      features: ['webhooks'],
+    },
+    roles: ['plexpass'],
+    entitlements: ['all'],
+    friendlyName: 'Glasswing',
+  };
+
+  const created = Date.UTC(2024, 0, 2, 3, 4, 5) / 1000;
+  const seen = Date.UTC(2026, 10, 27, 8, 9, 10) / 1000;
+  const resourcesXml = `<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="1">
+  <Device name="Harbour Lights" product="Plex Media Server" productVersion="1.42.1" platform="Linux" platformVersion="6.1" device="PC" clientIdentifier="machine-1" createdAt="${created}" lastSeenAt="${seen}" provides="server" owned="1" accessToken="server-token" publicAddress="203.0.113.7" httpsRequired="0" synced="0" relay="1" dnsRebindingProtection="0" natLoopbackSupported="1" publicAddressMatches="1" presence="1" ownerID="77" home="0" sourceTitle="lantern">
+    <Connection protocol="https" address="192.168.1.20" port="32400" uri="https://192-168-1-20.abc.plex.direct:32400" local="1"/>
+    <Connection protocol="https" address="203.0.113.7" port="32400" uri="https://203-0-113-7.abc.plex.direct:32400" local="0"/>
+  </Device>
+</MediaContainer>`;
+  const resourcesV2 = [
+    {
+      name: 'Harbour Lights',
+      product: 'Plex Media Server',
+      productVersion: '1.42.1',
+      platform: 'Linux',
+      platformVersion: '6.1',
+      device: 'PC',
+      clientIdentifier: 'machine-1',
+      createdAt: new Date(created * 1000).toISOString().replace('.000', ''),
+      lastSeenAt: new Date(seen * 1000).toISOString().replace('.000', ''),
+      provides: 'server',
+      owned: true,
+      accessToken: 'server-token',
+      publicAddress: '203.0.113.7',
+      httpsRequired: false,
+      synced: false,
+      relay: true,
+      dnsRebindingProtection: false,
+      natLoopbackSupported: true,
+      publicAddressMatches: true,
+      presence: true,
+      ownerId: 77,
+      home: false,
+      sourceTitle: 'lantern',
+      connections: [
+        {
+          protocol: 'https',
+          address: '192.168.1.20',
+          port: 32400,
+          uri: 'https://192-168-1-20.abc.plex.direct:32400',
+          local: true,
+          relay: false,
+          IPv6: false,
+        },
+        {
+          protocol: 'https',
+          address: '203.0.113.7',
+          port: 32400,
+          uri: 'https://203-0-113-7.abc.plex.direct:32400',
+          local: false,
+          relay: false,
+          IPv6: false,
+        },
+      ],
+    },
+  ];
+
+  it('reads the account from /api/v2/user as account.json gave it', async () => {
+    const fromV2 = plexTv({ '/api/v2/user': userV2 });
+    const fromOld = plexTv({ '/users/account.json': accountJson });
+    assert.deepEqual(await fromV2.api.getUser(), await fromOld.api.getUser());
+    assert.deepEqual(fromV2.asked, ['/api/v2/user']);
+    assert.ok(
+      (fromV2.sent[0].headers as Record<string, string>)[
+        'X-Plex-Client-Identifier'
+      ]
+    );
+  });
+
+  it('reads servers from /api/v2/resources as the XML route gave them', async () => {
+    const fromV2 = plexTv({ '/api/v2/resources': resourcesV2 });
+    const fromOld = plexTv({
+      '/api/v2/resources': gone(410),
+      '/api/resources?includeHttps=1': resourcesXml,
+    });
+    const v2 = await fromV2.api.getDevices();
+    assert.deepEqual(v2, await fromOld.api.getDevices());
+    assert.equal(v2[0].connection.length, 2);
+    assert.equal(v2[0].createdAt.getTime(), created * 1000);
+    assert.deepEqual(fromV2.sent[0].params, { includeHttps: 1 });
+    assert.deepEqual(fromOld.asked, [
+      '/api/v2/resources',
+      '/api/resources?includeHttps=1',
+    ]);
+  });
+
+  it('falls back to account.json only when the v2 route is missing', async () => {
+    const fallback = plexTv({
+      '/api/v2/user': gone(410),
+      '/users/account.json': accountJson,
+    });
+    assert.equal((await fallback.api.getUser()).username, 'glasswing');
+    assert.deepEqual(fallback.asked, ['/api/v2/user', '/users/account.json']);
+
+    const refused = plexTv({
+      '/api/v2/user': gone(401),
+      '/users/account.json': accountJson,
+    });
+    await assert.rejects(refused.api.getUser(), /Invalid auth token/);
+    assert.deepEqual(refused.asked, ['/api/v2/user']);
   });
 });

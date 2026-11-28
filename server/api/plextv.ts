@@ -4,6 +4,7 @@ import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
+import { isAxiosError } from 'axios';
 import { randomUUID } from 'node:crypto';
 import xml2js from 'xml2js';
 import ExternalAPI from './externalapi';
@@ -72,6 +73,128 @@ interface DeviceResponse {
   };
   Connection: ConnectionResponse[];
 }
+
+/** plex.tv's /api/v2/user, read into the shape /users/account.json had. */
+interface PlexUserV2 {
+  id: number;
+  uuid: string;
+  email: string;
+  /** Seconds. */
+  joinedAt?: number;
+  username: string;
+  title: string;
+  thumb: string;
+  hasPassword: boolean;
+  authToken: string;
+  subscription?: PlexUser['subscription'];
+  roles?: string[];
+  entitlements?: string[];
+}
+
+/** One of plex.tv's /api/v2/resources. */
+interface PlexResourceV2 {
+  name: string;
+  product: string;
+  productVersion: string;
+  platform?: string | null;
+  platformVersion?: string | null;
+  device?: string | null;
+  clientIdentifier: string;
+  /** ISO 8601. */
+  createdAt: string;
+  lastSeenAt: string;
+  /** Comma-separated, as before. */
+  provides: string;
+  owned: boolean;
+  accessToken?: string | null;
+  publicAddress?: string | null;
+  publicAddressMatches?: boolean;
+  httpsRequired?: boolean;
+  synced?: boolean;
+  relay?: boolean;
+  dnsRebindingProtection?: boolean;
+  natLoopbackSupported?: boolean;
+  presence?: boolean;
+  ownerId?: number | null;
+  home?: boolean;
+  sourceTitle?: string | null;
+  connections?: {
+    protocol: string;
+    address: string;
+    port: number;
+    uri: string;
+    local: boolean;
+  }[];
+}
+
+/** account.json's date format, "2019-06-24 11:38:02 UTC". */
+const accountDate = (seconds?: number): string =>
+  typeof seconds === 'number'
+    ? new Date(seconds * 1000)
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d+Z$/, ' UTC')
+    : '';
+
+export const plexUserFromV2 = (user: PlexUserV2): PlexUser => ({
+  id: user.id,
+  uuid: user.uuid,
+  email: user.email,
+  joined_at: accountDate(user.joinedAt),
+  username: user.username,
+  title: user.title,
+  thumb: user.thumb,
+  hasPassword: user.hasPassword,
+  authToken: user.authToken,
+  subscription: {
+    active: !!user.subscription?.active,
+    status: user.subscription?.status ?? '',
+    plan: user.subscription?.plan ?? '',
+    features: user.subscription?.features ?? [],
+  },
+  roles: { roles: user.roles ?? [] },
+  entitlements: user.entitlements ?? [],
+});
+
+export const plexDeviceFromV2 = (resource: PlexResourceV2): PlexDevice => ({
+  name: resource.name,
+  product: resource.product,
+  productVersion: resource.productVersion,
+  platform: resource.platform ?? '',
+  platformVersion: resource.platformVersion ?? '',
+  device: resource.device ?? '',
+  clientIdentifier: resource.clientIdentifier,
+  createdAt: new Date(resource.createdAt),
+  lastSeenAt: new Date(resource.lastSeenAt),
+  provides: (resource.provides ?? '').split(','),
+  owned: !!resource.owned,
+  accessToken: resource.accessToken ?? undefined,
+  publicAddress: resource.publicAddress ?? undefined,
+  publicAddressMatches: !!resource.publicAddressMatches,
+  httpsRequired: !!resource.httpsRequired,
+  synced: !!resource.synced,
+  relay: !!resource.relay,
+  dnsRebindingProtection: !!resource.dnsRebindingProtection,
+  natLoopbackSupported: !!resource.natLoopbackSupported,
+  presence: !!resource.presence,
+  ownerID:
+    resource.ownerId === null || resource.ownerId === undefined
+      ? undefined
+      : String(resource.ownerId),
+  home: !!resource.home,
+  sourceTitle: resource.sourceTitle ?? undefined,
+  connection: (resource.connections ?? []).map((conn) => ({
+    protocol: conn.protocol,
+    address: conn.address,
+    port: Number(conn.port),
+    uri: conn.uri,
+    local: !!conn.local,
+  })),
+});
+
+/** plex.tv has no such v2 route (any more, or yet): use the older one. */
+const v2Missing = (e: unknown): boolean =>
+  isAxiosError(e) && [404, 410].includes(e.response?.status ?? 0);
 
 interface ServerResponse {
   $: {
@@ -250,53 +373,25 @@ class PlexTvAPI extends ExternalAPI {
     this.authToken = authToken;
   }
 
+  /**
+   * The account's servers and players, from /api/v2/resources (JSON), or
+   * the older /api/resources (XML) where plex.tv has no v2 route.
+   */
   public async getDevices(): Promise<PlexDevice[]> {
     try {
-      const devicesResp = await this.axios.get(
-        '/api/resources?includeHttps=1',
-        {
-          transformResponse: [],
-          responseType: 'text',
-        }
-      );
-      const parsedXml = await xml2js.parseStringPromise(
-        devicesResp.data as DeviceResponse
-      );
-      return parsedXml?.MediaContainer?.Device?.map((pxml: DeviceResponse) => ({
-        name: pxml.$.name,
-        product: pxml.$.product,
-        productVersion: pxml.$.productVersion,
-        platform: pxml.$?.platform,
-        platformVersion: pxml.$?.platformVersion,
-        device: pxml.$?.device,
-        clientIdentifier: pxml.$.clientIdentifier,
-        createdAt: new Date(parseInt(pxml.$?.createdAt, 10) * 1000),
-        lastSeenAt: new Date(parseInt(pxml.$?.lastSeenAt, 10) * 1000),
-        provides: pxml.$.provides.split(','),
-        owned: pxml.$.owned == '1' ? true : false,
-        accessToken: pxml.$?.accessToken,
-        publicAddress: pxml.$?.publicAddress,
-        publicAddressMatches:
-          pxml.$?.publicAddressMatches == '1' ? true : false,
-        httpsRequired: pxml.$?.httpsRequired == '1' ? true : false,
-        synced: pxml.$?.synced == '1' ? true : false,
-        relay: pxml.$?.relay == '1' ? true : false,
-        dnsRebindingProtection:
-          pxml.$?.dnsRebindingProtection == '1' ? true : false,
-        natLoopbackSupported:
-          pxml.$?.natLoopbackSupported == '1' ? true : false,
-        presence: pxml.$?.presence == '1' ? true : false,
-        ownerID: pxml.$?.ownerID,
-        home: pxml.$?.home == '1' ? true : false,
-        sourceTitle: pxml.$?.sourceTitle,
-        connection: pxml?.Connection?.map((conn: ConnectionResponse) => ({
-          protocol: conn.$.protocol,
-          address: conn.$.address,
-          port: parseInt(conn.$.port, 10),
-          uri: conn.$.uri,
-          local: conn.$.local == '1' ? true : false,
-        })),
-      }));
+      try {
+        const resources = await this.axios.get<PlexResourceV2[]>(
+          '/api/v2/resources',
+          {
+            params: { includeHttps: 1 },
+            headers: { 'X-Plex-Client-Identifier': getSettings().clientId },
+          }
+        );
+        return (resources.data ?? []).map(plexDeviceFromV2);
+      } catch (e) {
+        if (!v2Missing(e)) throw e;
+      }
+      return await this.getDevicesXml();
     } catch (e) {
       logger.error('Something went wrong getting the devices from plex.tv', {
         label: 'Plex.tv API',
@@ -304,6 +399,49 @@ class PlexTvAPI extends ExternalAPI {
       });
       throw new Error('Invalid auth token', { cause: e });
     }
+  }
+
+  private async getDevicesXml(): Promise<PlexDevice[]> {
+    const devicesResp = await this.axios.get('/api/resources?includeHttps=1', {
+      transformResponse: [],
+      responseType: 'text',
+    });
+    const parsedXml = await xml2js.parseStringPromise(
+      devicesResp.data as DeviceResponse
+    );
+    return parsedXml?.MediaContainer?.Device?.map((pxml: DeviceResponse) => ({
+      name: pxml.$.name,
+      product: pxml.$.product,
+      productVersion: pxml.$.productVersion,
+      platform: pxml.$?.platform,
+      platformVersion: pxml.$?.platformVersion,
+      device: pxml.$?.device,
+      clientIdentifier: pxml.$.clientIdentifier,
+      createdAt: new Date(parseInt(pxml.$?.createdAt, 10) * 1000),
+      lastSeenAt: new Date(parseInt(pxml.$?.lastSeenAt, 10) * 1000),
+      provides: pxml.$.provides.split(','),
+      owned: pxml.$.owned == '1' ? true : false,
+      accessToken: pxml.$?.accessToken,
+      publicAddress: pxml.$?.publicAddress,
+      publicAddressMatches: pxml.$?.publicAddressMatches == '1' ? true : false,
+      httpsRequired: pxml.$?.httpsRequired == '1' ? true : false,
+      synced: pxml.$?.synced == '1' ? true : false,
+      relay: pxml.$?.relay == '1' ? true : false,
+      dnsRebindingProtection:
+        pxml.$?.dnsRebindingProtection == '1' ? true : false,
+      natLoopbackSupported: pxml.$?.natLoopbackSupported == '1' ? true : false,
+      presence: pxml.$?.presence == '1' ? true : false,
+      ownerID: pxml.$?.ownerID,
+      home: pxml.$?.home == '1' ? true : false,
+      sourceTitle: pxml.$?.sourceTitle,
+      connection: pxml?.Connection?.map((conn: ConnectionResponse) => ({
+        protocol: conn.$.protocol,
+        address: conn.$.address,
+        port: parseInt(conn.$.port, 10),
+        uri: conn.$.uri,
+        local: conn.$.local == '1' ? true : false,
+      })),
+    }));
   }
 
   /**
@@ -327,8 +465,17 @@ class PlexTvAPI extends ExternalAPI {
     }
   }
 
+  /** From /api/v2/user, or /users/account.json where there is no v2 route. */
   public async getUser(): Promise<PlexUser> {
     try {
+      try {
+        const user = await this.axios.get<PlexUserV2>('/api/v2/user', {
+          headers: { 'X-Plex-Client-Identifier': getSettings().clientId },
+        });
+        return plexUserFromV2(user.data);
+      } catch (e) {
+        if (!v2Missing(e)) throw e;
+      }
       const account = await this.axios.get<PlexAccountResponse>(
         '/users/account.json'
       );

@@ -24,6 +24,11 @@ import axios, { isAxiosError } from 'axios';
  * which is kept between passes and renewed whenever refused again. Username
  * and password, when set, go with every call.
  *
+ * Transmission 4.1 moved to JSON-RPC 2.0 with snake_case names; older
+ * versions speak only the earlier format. The first call asks the RPC
+ * version in the earlier format, which both understand, and the client is
+ * spoken to in its own format from then on.
+ *
  * For Backfill it also adds torrents, picks their files and removes them.
  * Backfill's category is a label (Transmission 3.0+). Transmission cannot
  * stop a magnet once its file list is in, so its download speed is held at
@@ -201,13 +206,95 @@ export const transmissionTorrent = (
 /** Labels need RPC version 16 (Transmission 3.0). */
 const LABELS_RPC_VERSION = 16;
 
-interface RpcAnswer<T> {
-  result: string;
+/**
+ * Transmission 4.1 (RPC version 18, RPC semver 6.0.0) speaks JSON-RPC 2.0,
+ * with every method and field in snake_case. It still answers the older
+ * format, deprecated there; 3.x and 4.0 know only the older one.
+ */
+const JSON_RPC_VERSION = 18;
+const JSON_RPC_SEMVER_MAJOR = 6;
+
+type Protocol = 'jsonrpc' | 'legacy';
+
+interface SessionInfo {
+  version?: string;
+  'rpc-version'?: number;
+}
+
+const SESSION_FIELDS = ['version', 'rpc-version'];
+
+interface LegacyAnswer<T> {
+  result?: string;
   arguments?: T;
 }
 
+interface JsonRpcAnswer<T> {
+  jsonrpc?: string;
+  result?: T;
+  error?: {
+    code?: number;
+    message?: string;
+    data?: { error_string?: string };
+  };
+}
+
+/** JSON-RPC's "invalid request" and "method not found". */
+const JSON_RPC_WRONG_FORMAT = [-32600, -32601];
+/** What the older format says to a method it doesn't know. */
+const LEGACY_WRONG_FORMAT = /^(method name not recognized|no method name)$/i;
+
+/** The answer was in the other format, or refused the one sent. */
+class WrongFormat extends Error {}
+
+/** `torrent-get`, `hashString`, `delete-local-data` to their 4.1 names. */
+export const snakeCase = (name: string): string =>
+  name.replace(/-/g, '_').replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+
+/** Every older-format key read back, by its 4.1 name. */
+const FROM_SNAKE = new Map(
+  [
+    ...FIELDS,
+    ...INFO_FIELDS,
+    ...SESSION_FIELDS,
+    'torrents',
+    'files',
+    'length',
+    'bytesCompleted',
+    'torrent-added',
+    'torrent-duplicate',
+  ].map((key) => [snakeCase(key), key])
+);
+
+const toJsonRpc = (args: Record<string, unknown>) =>
+  Object.fromEntries(
+    Object.entries(args).map(([key, value]) => [
+      snakeCase(key),
+      key === 'fields' && Array.isArray(value)
+        ? value.map((field) => snakeCase(String(field)))
+        : value,
+    ])
+  );
+
+const fromJsonRpc = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(fromJsonRpc);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [
+      FROM_SNAKE.get(key) ?? key,
+      fromJsonRpc(inner),
+    ])
+  );
+};
+
 /** Session ids by client address, kept between passes. */
 const sessions = new Map<string, string>();
+/**
+ * The format each client address speaks, found once and kept between
+ * passes. Forgotten when the client can't be reached, comes back without
+ * saying its version, or refuses the format.
+ */
+const protocols = new Map<string, Protocol>();
+let requestId = 0;
 
 class TransmissionAPI implements TorrentClient {
   public readonly product = 'Transmission';
@@ -236,14 +323,87 @@ class TransmissionAPI implements TorrentClient {
     });
   }
 
+  /**
+   * One call by its older-format method and argument names, sent in the
+   * format the client speaks. Answers come back under the older names too.
+   */
   private async call<T>(
     method: string,
     args: Record<string, unknown> = {}
   ): Promise<T> {
+    try {
+      return await this.post<T>(method, args, await this.protocol());
+    } catch (e) {
+      if (!(e instanceof WrongFormat)) throw e;
+      // Upgraded or downgraded since: find out again, and try once more.
+      protocols.delete(this.sessionKey);
+      return this.post<T>(method, args, await this.protocol());
+    }
+  }
+
+  private async protocol(): Promise<Protocol> {
+    const known = protocols.get(this.sessionKey);
+    if (known) return known;
+    await this.detect();
+    return protocols.get(this.sessionKey) ?? 'legacy';
+  }
+
+  /** Asks in the older format, which every version so far answers. */
+  private async detect(): Promise<SessionInfo> {
+    try {
+      const session = await this.post<SessionInfo>(
+        'session-get',
+        { fields: SESSION_FIELDS },
+        'legacy',
+        true
+      );
+      protocols.set(
+        this.sessionKey,
+        Number(session?.['rpc-version'] ?? 0) >= JSON_RPC_VERSION
+          ? 'jsonrpc'
+          : 'legacy'
+      );
+      return session;
+    } catch (e) {
+      // A version that no longer takes the older format.
+      if (!(e instanceof WrongFormat)) throw e;
+      protocols.set(this.sessionKey, 'jsonrpc');
+      return this.post<SessionInfo>(
+        'session-get',
+        { fields: SESSION_FIELDS },
+        'jsonrpc',
+        true
+      );
+    }
+  }
+
+  /** The version and RPC version, finding the format if not yet known. */
+  private async session(): Promise<SessionInfo> {
+    if (!protocols.has(this.sessionKey)) {
+      return this.detect();
+    }
+    return this.call<SessionInfo>('session-get', { fields: SESSION_FIELDS });
+  }
+
+  private async post<T>(
+    method: string,
+    args: Record<string, unknown>,
+    sentAs: Protocol,
+    /** Detection asks in one format whatever a 409 says. */
+    pinned = false
+  ): Promise<T> {
+    let protocol = sentAs;
     const send = () =>
-      this.axios.post<RpcAnswer<T>>(
+      this.axios.post<unknown>(
         '',
-        { method, arguments: args },
+        protocol === 'jsonrpc'
+          ? {
+              jsonrpc: '2.0',
+              method: snakeCase(method),
+              params: toJsonRpc(args),
+              id: ++requestId,
+            }
+          : { method, arguments: args },
         {
           headers: sessions.has(this.sessionKey)
             ? { 'X-Transmission-Session-Id': sessions.get(this.sessionKey) }
@@ -254,23 +414,84 @@ class TransmissionAPI implements TorrentClient {
     try {
       answer = await send();
     } catch (e) {
-      const sessionId =
-        isAxiosError(e) && e.response?.status === 409
-          ? e.response.headers['x-transmission-session-id']
-          : undefined;
-      if (isAxiosError(e) && e.response?.status === 401) {
+      if (!isAxiosError(e)) throw e;
+      if (e.response?.status === 401) {
         throw new Error(
           'Transmission did not accept the username or password.'
         );
       }
+      if (!e.response) {
+        // Unreachable: it may come back as another version.
+        protocols.delete(this.sessionKey);
+      }
+      const sessionId =
+        e.response?.status === 409
+          ? e.response.headers['x-transmission-session-id']
+          : undefined;
       if (!sessionId) throw e;
       sessions.set(this.sessionKey, String(sessionId));
+      // From 4.1 the 409 also carries the RPC version; before, it doesn't.
+      const semver = e.response?.headers['x-transmission-rpc-version'];
+      if (semver) {
+        protocols.set(
+          this.sessionKey,
+          parseInt(String(semver), 10) >= JSON_RPC_SEMVER_MAJOR
+            ? 'jsonrpc'
+            : 'legacy'
+        );
+      } else if (protocols.get(this.sessionKey) === 'jsonrpc') {
+        protocols.delete(this.sessionKey);
+      }
+      // Restarted as another version: resend in its format.
+      if (!pinned) {
+        protocol = protocols.get(this.sessionKey) ?? protocol;
+      }
       answer = await send();
     }
-    if (answer.data?.result !== 'success') {
-      throw new Error(`Transmission: ${answer.data?.result ?? 'no answer'}`);
+    return protocol === 'jsonrpc'
+      ? this.readJsonRpc<T>(answer.data)
+      : this.readLegacy<T>(answer.data);
+  }
+
+  private readJsonRpc<T>(data: unknown): T {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Transmission: no answer');
     }
-    return answer.data.arguments as T;
+    const answer = data as JsonRpcAnswer<T>;
+    if (!('jsonrpc' in answer)) {
+      throw new WrongFormat(
+        `Transmission: ${(data as LegacyAnswer<T>).result ?? 'no answer'}`
+      );
+    }
+    if (answer.error) {
+      const reason =
+        answer.error.data?.error_string ||
+        answer.error.message ||
+        `error ${answer.error.code}`;
+      if (JSON_RPC_WRONG_FORMAT.includes(Number(answer.error.code))) {
+        throw new WrongFormat(`Transmission: ${reason}`);
+      }
+      throw new Error(`Transmission: ${reason}`);
+    }
+    return fromJsonRpc(answer.result) as T;
+  }
+
+  private readLegacy<T>(data: unknown): T {
+    if (data && typeof data === 'object' && 'jsonrpc' in data) {
+      const error = (data as JsonRpcAnswer<T>).error;
+      throw new WrongFormat(
+        `Transmission: ${error?.message ?? 'answered in JSON-RPC'}`
+      );
+    }
+    const answer = (data ?? {}) as LegacyAnswer<T>;
+    if (answer.result !== 'success') {
+      const reason = answer.result ?? 'no answer';
+      if (LEGACY_WRONG_FORMAT.test(reason)) {
+        throw new WrongFormat(`Transmission: ${reason}`);
+      }
+      throw new Error(`Transmission: ${reason}`);
+    }
+    return answer.arguments as T;
   }
 
   public async addTorrent(options: {
@@ -416,10 +637,7 @@ class TransmissionAPI implements TorrentClient {
   }
 
   public async backfillProblems(): Promise<string[]> {
-    const session = await this.call<{
-      version?: string;
-      'rpc-version'?: number;
-    }>('session-get', { fields: ['version', 'rpc-version'] });
+    const session = await this.session();
     return Number(session?.['rpc-version'] ?? 0) < LABELS_RPC_VERSION
       ? [
           `Transmission${session?.version ? ` ${session.version}` : ''} has no labels (3.0 and newer do), so a magnet link Backfill was reading when Seerr AI stopped is not cleared away by it.`,
@@ -428,10 +646,7 @@ class TransmissionAPI implements TorrentClient {
   }
 
   public async getVersion(): Promise<string> {
-    const answer = await this.call<{ version?: string }>('session-get', {
-      fields: ['version'],
-    });
-    return answer?.version ?? 'unknown';
+    return (await this.session())?.version ?? 'unknown';
   }
 
   public async getDownloads(ids: string[]): Promise<Map<string, LiveDownload>> {

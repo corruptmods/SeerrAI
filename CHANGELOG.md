@@ -21,6 +21,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Settings → Services → Trakt now says that the Trakt account owning your app needs a GitHub account linked: from 1 January 2027 Trakt stops approving apps without one, and the Client ID of an unapproved app stops working.
 - Update checks and TRaSH Guides downloads now ask GitHub for a fixed version of its API (2026-03-10), so a change to GitHub's default can't break them.
 - Seerr AI now uses version 2026-10-21 of the Claude API. With an Anthropic admin key, AI spending now includes today, as far as Anthropic has counted it (usually within about four hours); accounts where Anthropic's newer cost report isn't available keep the older one, which stops at the last midnight (UTC).
+- Transmission 4.1 and newer are now spoken to in their own newer format (JSON-RPC 2.0), which the older format will give way to in a later Transmission. Older versions are spoken to as before; Seerr AI checks which one it's talking to and checks again after the client restarts or is upgraded.
 
 ### Fixed
 

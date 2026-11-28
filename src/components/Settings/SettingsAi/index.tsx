@@ -21,7 +21,11 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import type { AiEffort, AiFeature } from '@server/constants/features';
-import { AI_EFFORTS, AI_FEATURES } from '@server/constants/features';
+import {
+  AI_FEATURES,
+  effortsFor,
+  shownEffort,
+} from '@server/constants/features';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -213,6 +217,15 @@ const SettingsAi = () => {
   if (!form) {
     return <LoadingSpinner />;
   }
+
+  // Only the efforts the chosen model takes; none at all hides the choice.
+  const defaultEfforts = effortsFor(form.provider, form.baseUrl, form.model);
+  const effortsOf = (feature: AiFeature) =>
+    effortsFor(
+      form.provider,
+      form.baseUrl,
+      form.featureModels[feature] || form.model
+    );
 
   // The saved key only goes to the provider and address it was saved for.
   const sameTarget =
@@ -520,29 +533,31 @@ const SettingsAi = () => {
               )}
             </div>
           </div>
-          <div className="form-row">
-            <label htmlFor="aiEffort" className="text-label">
-              {intl.formatMessage(messages.effort)}
-              <span className="label-tip">
-                {intl.formatMessage(messages.effortTip)}
-              </span>
-            </label>
-            <div className="form-input-area">
-              <div className="form-input-field">
-                <select
-                  id="aiEffort"
-                  value={form.effort ?? 'lowest'}
-                  onChange={(e) => set('effort', e.target.value as AiEffort)}
-                >
-                  {AI_EFFORTS.map((effort) => (
-                    <option key={effort} value={effort}>
-                      {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
-                    </option>
-                  ))}
-                </select>
+          {defaultEfforts.length > 0 && (
+            <div className="form-row">
+              <label htmlFor="aiEffort" className="text-label">
+                {intl.formatMessage(messages.effort)}
+                <span className="label-tip">
+                  {intl.formatMessage(messages.effortTip)}
+                </span>
+              </label>
+              <div className="form-input-area">
+                <div className="form-input-field">
+                  <select
+                    id="aiEffort"
+                    value={shownEffort(form.effort ?? 'lowest', defaultEfforts)}
+                    onChange={(e) => set('effort', e.target.value as AiEffort)}
+                  >
+                    {defaultEfforts.map((effort) => (
+                      <option key={effort} value={effort}>
+                        {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <div className="form-row">
             <label htmlFor="aiDailyLimit" className="text-label">
               {intl.formatMessage(messages.dailyLimit)}
@@ -605,37 +620,44 @@ const SettingsAi = () => {
                       loading={listing}
                       emptyLabel={intl.formatMessage(messages.sameAsAbove)}
                     />
-                    <select
-                      id={`aiEffort-${feature}`}
-                      className="sm:w-44 sm:flex-none"
-                      aria-label={intl.formatMessage(messages.featureEffort, {
-                        feature: intl.formatMessage(messages[feature]),
-                      })}
-                      value={form.featureEfforts?.[feature] ?? ''}
-                      onChange={(e) => {
-                        const { [feature]: _old, ...others } =
-                          form.featureEfforts ?? {};
-                        void _old;
-                        set(
-                          'featureEfforts',
-                          e.target.value
-                            ? {
-                                ...others,
-                                [feature]: e.target.value as AiEffort,
-                              }
-                            : others
-                        );
-                      }}
-                    >
-                      <option value="">
-                        {intl.formatMessage(messages.sameAsDefault)}
-                      </option>
-                      {AI_EFFORTS.map((effort) => (
-                        <option key={effort} value={effort}>
-                          {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
+                    {effortsOf(feature).length > 0 && (
+                      <select
+                        id={`aiEffort-${feature}`}
+                        className="sm:w-44 sm:flex-none"
+                        aria-label={intl.formatMessage(messages.featureEffort, {
+                          feature: intl.formatMessage(messages[feature]),
+                        })}
+                        value={(() => {
+                          const own = form.featureEfforts?.[feature];
+                          return own
+                            ? (shownEffort(own, effortsOf(feature)) ?? '')
+                            : '';
+                        })()}
+                        onChange={(e) => {
+                          const { [feature]: _old, ...others } =
+                            form.featureEfforts ?? {};
+                          void _old;
+                          set(
+                            'featureEfforts',
+                            e.target.value
+                              ? {
+                                  ...others,
+                                  [feature]: e.target.value as AiEffort,
+                                }
+                              : others
+                          );
+                        }}
+                      >
+                        <option value="">
+                          {intl.formatMessage(messages.sameAsDefault)}
                         </option>
-                      ))}
-                    </select>
+                        {effortsOf(feature).map((effort) => (
+                          <option key={effort} value={effort}>
+                            {intl.formatMessage(messages[EFFORT_NAMES[effort]])}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 ))}
               </div>

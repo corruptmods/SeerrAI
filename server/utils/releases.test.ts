@@ -1,4 +1,5 @@
 import {
+  compareVersions,
   isCurrentRelease,
   latestRelease,
   releaseUpdateAvailable,
@@ -93,5 +94,81 @@ describe('release update check', () => {
 
   it('assumes nothing when GitHub lists no releases', () => {
     assert.equal(releaseUpdateAvailable([], '1.2.1'), false);
+  });
+});
+
+describe('versions named by date', () => {
+  const newer = (a: string, b: string) => {
+    assert.equal(compareVersions(a, b), 1, `${a} > ${b}`);
+    assert.equal(compareVersions(b, a), -1, `${b} < ${a}`);
+  };
+
+  it('puts every date after the old versions', () => {
+    newer('2026.11.28', '2.5.0');
+    newer('2026.11.28-beta.1', '2.5.0');
+  });
+
+  it('orders dates by their numbers, not as text', () => {
+    newer('2026.12.1', '2026.11.30');
+    newer('2027.1.5', '2026.12.31');
+    newer('2026.11.28', '2026.11.9');
+  });
+
+  it('puts a second release of a day after the first', () => {
+    newer('2026.11.28.1', '2026.11.28');
+    newer('2026.11.28.10', '2026.11.28.2');
+    newer('2026.11.29', '2026.11.28.3');
+  });
+
+  it('puts a beta before the release of its day', () => {
+    newer('2026.11.28', '2026.11.28-beta.1');
+    newer('2026.11.28-beta.2', '2026.11.28-beta.1');
+    newer('2026.11.28-beta.10', '2026.11.28-beta.2');
+    newer('2026.11.28.1-beta.1', '2026.11.28');
+  });
+
+  it('finds a version equal to itself', () => {
+    assert.equal(compareVersions('2026.11.28', '2026.11.28'), 0);
+    assert.equal(compareVersions('2026.11.28.1', '2026.11.28.1'), 0);
+  });
+
+  it("can't compare a development build", () => {
+    assert.equal(compareVersions('develop-f7f224c', '2026.11.28'), undefined);
+    assert.equal(compareVersions('2026.11.28', 'local'), undefined);
+  });
+
+  it('offers a release by date to an install on the old versions', () => {
+    assert.equal(
+      releaseUpdateAvailable([release('2026.11.28')], '2.5.0'),
+      true
+    );
+  });
+
+  it("offers a day's second release, and nothing older", () => {
+    const list = [release('2026.11.28.1'), release('2026.11.28')];
+    assert.equal(releaseUpdateAvailable(list, '2026.11.28'), true);
+    assert.equal(releaseUpdateAvailable(list, '2026.11.28.1'), false);
+    assert.equal(releaseUpdateAvailable(list, '2026.12.1'), false);
+  });
+
+  it('offers the release to an install on its beta', () => {
+    assert.equal(
+      releaseUpdateAvailable(
+        [
+          release('2026.11.28'),
+          release('2026.11.28-beta.1', { prerelease: true }),
+        ],
+        '2026.11.28-beta.1'
+      ),
+      true
+    );
+  });
+
+  it('matches a version exactly, not as part of a longer one', () => {
+    assert.equal(
+      isCurrentRelease(release('2026.11.28.1'), '2026.11.28'),
+      false
+    );
+    assert.equal(isCurrentRelease(release('2026.11.28'), '2026.11.28'), true);
   });
 });

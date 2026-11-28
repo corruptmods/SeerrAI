@@ -355,9 +355,9 @@ const openAiPlan = (
   effort: AiEffort,
   withTools = false
 ): { efforts: (string | null)[]; key?: string } => {
-  // With tools a model can refuse an effort it takes without them (OpenAI's
-  // newer models take tools on chat completions only with "none"), so the
-  // two are remembered apart.
+  // With tools a model can refuse an effort it takes without them (as
+  // OpenAI's newer models do on chat completions, and other servers may),
+  // so the two are remembered apart.
   const tools = withTools ? 'tools' : 'plain';
   // What was remembered goes first; if it is refused after all, the rest of
   // the ladder below it is tried rather than failing.
@@ -453,6 +453,155 @@ const completeAnthropic = async (
   };
 };
 
+/**
+ * Tries each effort in turn until one is accepted, remembering it under
+ * `key`. A refused JSON mode is dropped; a refused effort steps down; any
+ * other failure is thrown as it is.
+ */
+const withOpenAiEffort = async <T>(
+  { efforts, key }: { efforts: (string | null)[]; key?: string },
+  send: (effort: string | null, json: boolean) => Promise<T>,
+  { json = false, refusals }: { json?: boolean; refusals: string[] }
+): Promise<T> => {
+  let lastError: unknown;
+  for (let i = 0; i < efforts.length; ) {
+    try {
+      const data = await send(efforts[i], json);
+      if (key) {
+        openAiEffort.set(key, efforts[i]);
+      }
+      return data;
+    } catch (e) {
+      lastError = e;
+      if (json && refused(e, 'response_format', 'text.format', 'json_object')) {
+        json = false;
+      } else if (efforts[i] && refused(e, ...refusals)) {
+        i += 1;
+      } else {
+        break;
+      }
+    }
+  }
+  throw lastError;
+};
+
+/*
+ * OpenAI itself is sent the Responses API (/responses), the only one on
+ * which its newer models take tools and an effort together. Nothing is
+ * stored there (store: false): each request carries the whole conversation.
+ */
+
+/** An item of a Responses reply: a message, a function call or reasoning. */
+interface ResponsesItem {
+  type?: string;
+  content?: unknown;
+  call_id?: string;
+  name?: string;
+  arguments?: string;
+}
+
+interface ResponsesReply {
+  status?: string;
+  incomplete_details?: { reason?: string } | null;
+  output?: ResponsesItem[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+const postResponses = async (
+  ai: AiSettings,
+  body: Record<string, unknown>,
+  effort: AiEffort
+) =>
+  (
+    await axios.post<ResponsesReply>(`${OPENAI_URL}/responses`, body, {
+      headers: openAiHeaders(ai),
+      timeout: COMPLETION_TIMEOUT_MS[effort],
+    })
+  ).data;
+
+/** The reply's text: every output_text part of its messages. */
+const responsesText = (data: ResponsesReply) =>
+  (data.output ?? [])
+    .filter((item) => item.type === 'message' && Array.isArray(item.content))
+    .flatMap((item) => item.content as { type?: string; text?: string }[])
+    .filter((part) => part?.type === 'output_text')
+    .map((part) => part.text ?? '')
+    .join('')
+    .trim();
+
+/** Whether the reply stopped at its cap. */
+const responsesCutOff = (data: ResponsesReply) =>
+  data.status === 'incomplete' &&
+  data.incomplete_details?.reason === 'max_output_tokens';
+
+const responsesUsage = (data: ResponsesReply) => ({
+  inputTokens: data.usage?.input_tokens ?? 0,
+  outputTokens: data.usage?.output_tokens ?? 0,
+});
+
+/** A Responses request's cap, with room to think, and its effort. */
+const responsesLimits = (
+  model: string,
+  maxTokens: number,
+  effortSetting: AiEffort,
+  effort: string | null
+) => ({
+  max_output_tokens: isReasoningModel(model)
+    ? maxTokens + THINKING_ROOM[effortSetting]
+    : maxTokens,
+  ...(effort ? { reasoning: { effort } } : {}),
+});
+
+const completeResponses = async (
+  ai: AiSettings,
+  req: CompletionRequest
+): Promise<Completion> => {
+  const effortSetting = req.effort ?? 'lowest';
+  // An image goes as a data URL after the text.
+  const content = [
+    { type: 'input_text', text: req.prompt },
+    ...(req.image
+      ? [
+          {
+            type: 'input_image',
+            image_url: `data:${req.image.type};base64,${req.image.data}`,
+            detail: 'auto',
+          },
+        ]
+      : []),
+  ];
+  const send = (effort: string | null, json: boolean) =>
+    postResponses(
+      ai,
+      {
+        model: req.model,
+        instructions: req.system,
+        input: [{ role: 'user', content }],
+        ...responsesLimits(req.model, req.maxTokens, effortSetting, effort),
+        ...(json ? { text: { format: { type: 'json_object' } } } : {}),
+        store: false,
+      },
+      effortSetting
+    );
+
+  let data: ResponsesReply;
+  try {
+    data = await withOpenAiEffort(
+      openAiPlan(ai, req.model, effortSetting),
+      send,
+      { json: !!req.json, refusals: ['reasoning_effort', 'reasoning'] }
+    );
+  } catch (e) {
+    throw explain(e, 'OpenAI', ai.apiKey, !!req.image);
+  }
+
+  const text = responsesText(data);
+  if (!text && responsesCutOff(data)) {
+    throw new AiProviderError(`OpenAI ${RAN_OUT}`);
+  }
+  return { text, ...responsesUsage(data) };
+};
+
 interface OpenAiResponse {
   choices?: {
     message?: { content?: string | null };
@@ -461,18 +610,25 @@ interface OpenAiResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
+/**
+ * OpenAI itself gets the Responses API. Any other OpenAI-compatible server
+ * (Ollama, LM Studio, vLLM, OpenRouter), many of which have no /responses,
+ * gets chat completions in the older form every one of them understands,
+ * with an effort only when one was chosen.
+ */
 const completeOpenAi = async (
   ai: AiSettings,
   req: CompletionRequest
 ): Promise<Completion> => {
-  const official = isOfficialOpenAi(ai);
-  const reasoning = official && isReasoningModel(req.model);
-  const name = official ? 'OpenAI' : 'The AI server';
+  if (isOfficialOpenAi(ai)) {
+    return completeResponses(ai, req);
+  }
+  const name = 'The AI server';
   const effortSetting = req.effort ?? 'lowest';
   const room = THINKING_ROOM[effortSetting];
 
-  // An image goes as a data URL beside the text, which OpenAI and its
-  // imitators (Ollama, LM Studio, vLLM) all accept.
+  // An image goes as a data URL beside the text, which OpenAI's imitators
+  // (Ollama, LM Studio, vLLM) all accept.
   const user = req.image
     ? [
         { type: 'text', text: req.prompt },
@@ -483,25 +639,11 @@ const completeOpenAi = async (
       ]
     : req.prompt;
 
-  // OpenAI itself gets its current names for the cap and system role,
-  // enforced JSON and the effort set. Other servers get the older form
-  // every OpenAI-compatible server understands, with an effort only when
-  // one was chosen.
-  const body = (effort: string | null, json: boolean) =>
-    official
-      ? {
-          model: req.model,
-          messages: [
-            { role: 'developer', content: req.system },
-            { role: 'user', content: user },
-          ],
-          max_completion_tokens: reasoning
-            ? req.maxTokens + room
-            : req.maxTokens,
-          ...(effort ? { reasoning_effort: effort } : {}),
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-        }
-      : {
+  const send = async (effort: string | null) =>
+    (
+      await axios.post<OpenAiResponse>(
+        `${openAiBase(ai)}/chat/completions`,
+        {
           model: req.model,
           messages: [
             { role: 'system', content: req.system },
@@ -509,43 +651,23 @@ const completeOpenAi = async (
           ],
           max_tokens: effort ? req.maxTokens + room : req.maxTokens,
           ...(effort ? { reasoning_effort: effort } : {}),
-        };
+        },
+        {
+          headers: openAiHeaders(ai),
+          timeout: COMPLETION_TIMEOUT_MS[effortSetting],
+        }
+      )
+    ).data;
 
-  const send = (effort: string | null, json: boolean) =>
-    axios.post<OpenAiResponse>(
-      `${openAiBase(ai)}/chat/completions`,
-      body(effort, json),
-      {
-        headers: openAiHeaders(ai),
-        timeout: COMPLETION_TIMEOUT_MS[effortSetting],
-      }
+  let data: OpenAiResponse;
+  try {
+    data = await withOpenAiEffort(
+      openAiPlan(ai, req.model, effortSetting),
+      send,
+      { refusals: ['reasoning_effort', 'reasoning'] }
     );
-
-  // The efforts still to try for this model, in order.
-  const { efforts, key } = openAiPlan(ai, req.model, effortSetting);
-  let json = !!req.json;
-
-  let data: OpenAiResponse | undefined;
-  let lastError: unknown;
-  for (let i = 0; i < efforts.length && !data; ) {
-    try {
-      data = (await send(efforts[i], json)).data;
-      if (key) {
-        openAiEffort.set(key, efforts[i]);
-      }
-    } catch (e) {
-      lastError = e;
-      if (json && refused(e, 'response_format')) {
-        json = false;
-      } else if (efforts[i] && refused(e, 'reasoning_effort', 'reasoning')) {
-        i += 1;
-      } else {
-        break;
-      }
-    }
-  }
-  if (!data) {
-    throw explain(lastError, name, ai.apiKey, !!req.image);
+  } catch (e) {
+    throw explain(e, name, ai.apiKey, !!req.image);
   }
 
   const choice = data.choices?.[0];
@@ -570,7 +692,8 @@ export const complete = (
 
 /**
  * Filters out OpenAI models this cannot use: speech, images, embeddings,
- * and ones only the Responses API serves.
+ * ones made for other tools (coding, computer use, deep research), and the
+ * far dearer -pro models.
  */
 const OPENAI_CHAT = /^(gpt-|o\d|chatgpt-)/i;
 const OPENAI_NOT_CHAT =
@@ -619,7 +742,7 @@ export const listModels = async (ai: AiSettings): Promise<ModelInfo[]> => {
  * Multi-turn conversations with tool calls, for the admin agent. Messages
  * are kept in one neutral form and written out in each API's shape. Each
  * model turn, thinking included, is sent back exactly as received, which
- * both APIs require to continue a tool conversation.
+ * the APIs require to continue a tool conversation.
  */
 
 /** A tool the model may call, its input described as a JSON schema. */
@@ -771,35 +894,181 @@ const argumentsOf = (text: string): Record<string, unknown> => {
   }
 };
 
-const openAiMessages = (
-  system: string,
-  official: boolean,
-  messages: ConverseMessage[]
-) => [
-  { role: official ? 'developer' : 'system', content: system },
+/** The Responses items a turn is kept as: its thinking, words and calls. */
+const RESPONSES_TURN = new Set(['reasoning', 'message', 'function_call']);
+
+/** Whether a kept turn came from the Responses API. */
+const isResponsesTurn = (raw: unknown): raw is ResponsesItem[] =>
+  Array.isArray(raw) &&
+  raw.every(
+    (item) =>
+      !!item &&
+      typeof item === 'object' &&
+      RESPONSES_TURN.has((item as ResponsesItem).type ?? '')
+  );
+
+/** Whether a kept turn is a chat completions message. */
+const isChatTurn = (raw: unknown) =>
+  !!raw &&
+  typeof raw === 'object' &&
+  !Array.isArray(raw) &&
+  (raw as { role?: unknown }).role === 'assistant';
+
+type AssistantMessage = Extract<ConverseMessage, { role: 'assistant' }>;
+
+const resultText = (result: ToolResult) =>
+  result.isError ? `Error: ${result.content}` : result.content;
+
+/**
+ * The conversation as Responses input. Each model turn is sent back as it
+ * came, encrypted reasoning included; one kept in another API's shape (a
+ * conversation saved before, or begun with another server) is rebuilt from
+ * its words and calls.
+ */
+const responsesInput = (messages: ConverseMessage[]) =>
+  messages.flatMap((message): unknown[] => {
+    switch (message.role) {
+      case 'user':
+        return [
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: message.text }],
+          },
+        ];
+      case 'assistant':
+        return isResponsesTurn(message.raw)
+          ? message.raw
+          : [
+              ...(message.text
+                ? [{ role: 'assistant', content: message.text }]
+                : []),
+              ...message.calls.map((call) => ({
+                type: 'function_call',
+                call_id: call.id,
+                name: call.name,
+                arguments: JSON.stringify(call.input),
+              })),
+            ];
+      default:
+        return message.results.map((result) => ({
+          type: 'function_call_output',
+          call_id: result.id,
+          output: resultText(result),
+        }));
+    }
+  });
+
+/** A turn rebuilt as a chat completions message, from its words and calls. */
+const chatTurn = (message: AssistantMessage) =>
+  isChatTurn(message.raw)
+    ? message.raw
+    : {
+        role: 'assistant',
+        content: message.text || null,
+        ...(message.calls.length
+          ? {
+              tool_calls: message.calls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: {
+                  name: call.name,
+                  arguments: JSON.stringify(call.input),
+                },
+              })),
+            }
+          : {}),
+      };
+
+const openAiMessages = (system: string, messages: ConverseMessage[]) => [
+  { role: 'system', content: system },
   ...messages.flatMap((message) => {
     switch (message.role) {
       case 'user':
         return [{ role: 'user', content: message.text }];
       case 'assistant':
-        return [message.raw];
+        return [chatTurn(message)];
       default:
         return message.results.map((result) => ({
           role: 'tool',
           tool_call_id: result.id,
-          content: result.isError ? `Error: ${result.content}` : result.content,
+          content: resultText(result),
         }));
     }
   }),
 ];
 
+const converseResponses = async (
+  ai: AiSettings,
+  req: ConverseRequest
+): Promise<ConverseTurn> => {
+  const effortSetting = req.effort ?? 'lowest';
+  const tools = req.tools.map((tool) => ({
+    type: 'function',
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    // Strict schemas need every property required; these are not.
+    strict: false,
+  }));
+  const input = responsesInput(req.messages);
+  const send = (effort: string | null) =>
+    postResponses(
+      ai,
+      {
+        model: req.model,
+        instructions: req.system,
+        input,
+        ...(tools.length ? { tools } : {}),
+        ...responsesLimits(req.model, req.maxTokens, effortSetting, effort),
+        store: false,
+        // Its thinking, sealed, to send back with the next turn: with
+        // nothing stored, that is how it keeps thinking across tool calls.
+        ...(isReasoningModel(req.model)
+          ? { include: ['reasoning.encrypted_content'] }
+          : {}),
+      },
+      effortSetting
+    );
+
+  let data: ResponsesReply;
+  try {
+    data = await withOpenAiEffort(
+      openAiPlan(ai, req.model, effortSetting, true),
+      send,
+      { refusals: ['reasoning_effort', 'reasoning', 'tools'] }
+    );
+  } catch (e) {
+    throw explain(e, 'OpenAI', ai.apiKey);
+  }
+
+  const output = data.output ?? [];
+  const text = responsesText(data);
+  const calls = output.filter(
+    (item) => item.type === 'function_call' && item.call_id && item.name
+  );
+  if (!text && !calls.length && responsesCutOff(data)) {
+    throw new AiProviderError(`OpenAI ${RAN_OUT}`);
+  }
+  return {
+    text,
+    calls: calls.map((call) => ({
+      id: call.call_id as string,
+      name: call.name as string,
+      input: argumentsOf(call.arguments ?? ''),
+    })),
+    raw: output.filter((item) => RESPONSES_TURN.has(item.type ?? '')),
+    ...responsesUsage(data),
+  };
+};
+
 const converseOpenAi = async (
   ai: AiSettings,
   req: ConverseRequest
 ): Promise<ConverseTurn> => {
-  const official = isOfficialOpenAi(ai);
-  const reasoning = official && isReasoningModel(req.model);
-  const name = official ? 'OpenAI' : 'The AI server';
+  if (isOfficialOpenAi(ai)) {
+    return converseResponses(ai, req);
+  }
+  const name = 'The AI server';
   const tools = req.tools.map((tool) => ({
     type: 'function',
     function: {
@@ -808,68 +1077,47 @@ const converseOpenAi = async (
       parameters: tool.parameters,
     },
   }));
-  const messages = openAiMessages(req.system, official, req.messages);
+  const messages = openAiMessages(req.system, req.messages);
   const effortSetting = req.effort ?? 'lowest';
   const room = THINKING_ROOM[effortSetting];
 
-  const send = (effort: string | null) =>
-    axios.post<{
-      choices?: {
-        message?: {
-          role?: string;
-          content?: string | null;
-          tool_calls?: OpenAiToolCall[];
-        };
-        finish_reason?: string;
-      }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    }>(
-      `${openAiBase(ai)}/chat/completions`,
-      official
-        ? {
-            model: req.model,
-            messages,
-            tools,
-            max_completion_tokens: reasoning
-              ? req.maxTokens + room
-              : req.maxTokens,
-            ...(effort ? { reasoning_effort: effort } : {}),
-          }
-        : {
-            model: req.model,
-            messages,
-            tools,
-            max_tokens: effort ? req.maxTokens + room : req.maxTokens,
-            ...(effort ? { reasoning_effort: effort } : {}),
-          },
-      {
-        headers: openAiHeaders(ai),
-        timeout: COMPLETION_TIMEOUT_MS[effortSetting],
-      }
-    );
+  const send = async (effort: string | null) =>
+    (
+      await axios.post<{
+        choices?: {
+          message?: {
+            role?: string;
+            content?: string | null;
+            tool_calls?: OpenAiToolCall[];
+          };
+          finish_reason?: string;
+        }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      }>(
+        `${openAiBase(ai)}/chat/completions`,
+        {
+          model: req.model,
+          messages,
+          tools,
+          max_tokens: effort ? req.maxTokens + room : req.maxTokens,
+          ...(effort ? { reasoning_effort: effort } : {}),
+        },
+        {
+          headers: openAiHeaders(ai),
+          timeout: COMPLETION_TIMEOUT_MS[effortSetting],
+        }
+      )
+    ).data;
 
-  // With tools, some models refuse the lowest efforts, so "none" and
-  // "minimal" may each be refused once before "low" is remembered.
-  const { efforts, key } = openAiPlan(ai, req.model, effortSetting, true);
   let data;
-  let lastError: unknown;
-  for (let i = 0; i < efforts.length && !data; ) {
-    try {
-      data = (await send(efforts[i])).data;
-      if (key) {
-        openAiEffort.set(key, efforts[i]);
-      }
-    } catch (e) {
-      lastError = e;
-      if (efforts[i] && refused(e, 'reasoning_effort', 'reasoning', 'tools')) {
-        i += 1;
-      } else {
-        break;
-      }
-    }
-  }
-  if (!data) {
-    throw explain(lastError, name, ai.apiKey);
+  try {
+    data = await withOpenAiEffort(
+      openAiPlan(ai, req.model, effortSetting, true),
+      send,
+      { refusals: ['reasoning_effort', 'reasoning', 'tools'] }
+    );
+  } catch (e) {
+    throw explain(e, name, ai.apiKey);
   }
 
   const choice = data.choices?.[0];

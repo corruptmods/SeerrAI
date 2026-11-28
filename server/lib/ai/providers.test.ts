@@ -70,6 +70,26 @@ const httpError = (status: number, data: unknown) =>
 
 const request = { model: 'm', system: 'sys', prompt: 'hi', maxTokens: 100 };
 
+/** OpenAI's Responses API answering with text, after any other items. */
+const responsesReply = (text: string, before: unknown[] = []) => ({
+  status: 'completed',
+  output: [
+    ...before,
+    {
+      type: 'message',
+      id: 'msg_1',
+      role: 'assistant',
+      status: 'completed',
+      content: [{ type: 'output_text', text, annotations: [] }],
+    },
+  ],
+  usage: { input_tokens: 20, output_tokens: 5 },
+});
+
+/** The effort a Responses request asked for. */
+const effortOf = (s: Sent) =>
+  (s.body.reasoning as { effort?: string } | undefined)?.effort;
+
 afterEach(() => {
   mock.restoreAll();
   resetProviderMemoryForTests();
@@ -168,43 +188,75 @@ describe('OpenAI', () => {
     usage: { prompt_tokens: 20, completion_tokens: 5 },
   });
 
-  it('uses its newer options on its own API, with JSON enforced when asked', async () => {
-    const sent = capture([reply('{"a":1}')]);
-    await complete(openai(), { ...request, model: 'gpt-4.1-mini', json: true });
+  it('uses the Responses API on its own servers, with JSON enforced when asked', async () => {
+    const sent = capture([responsesReply(' {"a":1} ')]);
+    const answer = await complete(openai(), {
+      ...request,
+      model: 'gpt-4.1-mini',
+      json: true,
+    });
 
-    assert.equal(sent[0].url, `${OPENAI_URL}/chat/completions`);
+    assert.equal(sent[0].url, `${OPENAI_URL}/responses`);
     assert.deepEqual(sent[0].body, {
       model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'developer', content: 'sys' },
-        { role: 'user', content: 'hi' },
-      ],
-      max_completion_tokens: 100,
-      response_format: { type: 'json_object' },
+      instructions: 'sys',
+      input: [{ role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+      max_output_tokens: 100,
+      text: { format: { type: 'json_object' } },
+      store: false,
     });
     assert.equal(sent[0].headers.authorization, 'Bearer test-key');
+    assert.deepEqual(answer, {
+      text: '{"a":1}',
+      inputTokens: 20,
+      outputTokens: 5,
+    });
+  });
+
+  it('reads the text of every message, after any reasoning', async () => {
+    capture([
+      {
+        output: [
+          { type: 'reasoning', id: 'rs_1', summary: [] },
+          {
+            type: 'message',
+            content: [
+              { type: 'output_text', text: 'Hello ' },
+              { type: 'refusal', refusal: 'no' },
+            ],
+          },
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: 'there' }],
+          },
+        ],
+      },
+    ]);
+    const answer = await complete(openai(), { ...request, model: 'o3' });
+    assert.deepEqual(answer, {
+      text: 'Hello there',
+      inputTokens: 0,
+      outputTokens: 0,
+    });
   });
 
   it('asks reasoning models for the least effort each accepts, and remembers it', async () => {
     const effortRefused = (value: string) =>
       httpError(400, {
         error: {
-          message: `Unsupported value: 'reasoning_effort' does not support '${value}' with this model.`,
+          message: `Unsupported value: 'reasoning.effort' does not support '${value}' with this model.`,
         },
       });
     const sent = capture([
       effortRefused('none'),
       effortRefused('minimal'),
-      reply('ok'),
-      reply('again'),
+      responsesReply('ok'),
+      responsesReply('again'),
     ]);
     await complete(openai(), { ...request, model: 'gpt-6-luna' });
     await complete(openai(), { ...request, model: 'gpt-6-luna' });
-    assert.deepEqual(
-      sent.map((s) => s.body.reasoning_effort),
-      ['none', 'minimal', 'low', 'low']
-    );
-    assert.ok((sent[0].body.max_completion_tokens as number) > 100);
+    assert.deepEqual(sent.map(effortOf), ['none', 'minimal', 'low', 'low']);
+    assert.equal(sent[0].body.max_output_tokens, 100 + 2048);
     assert.ok(isReasoningModel('gpt-5.6-terra'));
     assert.ok(isReasoningModel('o4-mini'));
     assert.ok(!isReasoningModel('gpt-4o'));
@@ -232,14 +284,18 @@ describe('OpenAI', () => {
   it('drops JSON mode if a model refuses it', async () => {
     const sent = capture([
       httpError(400, {
-        error: { message: "'response_format' is not supported" },
+        error: {
+          message:
+            "Unsupported parameter: 'text.format' of type 'json_object' is not supported with this model.",
+        },
       }),
-      reply('{}'),
+      responsesReply('{}'),
     ]);
     await complete(openai(), { ...request, model: 'gpt-4o', json: true });
     assert.equal(sent.length, 2);
-    assert.equal(sent[1].body.response_format, undefined);
-    assert.equal(sent[1].body.max_completion_tokens, 100);
+    assert.deepEqual(sent[0].body.text, { format: { type: 'json_object' } });
+    assert.equal(sent[1].body.text, undefined);
+    assert.equal(sent[1].body.max_output_tokens, 100);
   });
 
   it('reports any other refusal as it is, without a second try', async () => {
@@ -254,10 +310,31 @@ describe('OpenAI', () => {
   });
 
   it('explains an answer lost to thinking instead of returning nothing', async () => {
-    capture([reply('', 'length')]);
+    const incomplete = (output: unknown[]) => ({
+      status: 'incomplete',
+      incomplete_details: { reason: 'max_output_tokens' },
+      output,
+    });
+    capture([
+      incomplete([{ type: 'reasoning', id: 'rs_1', summary: [] }]),
+      incomplete([
+        { type: 'message', content: [{ type: 'output_text', text: 'Part' }] },
+      ]),
+      reply('', 'length'),
+    ]);
     await assert.rejects(
       complete(openai(), { ...request, model: 'o3' }),
-      /used up its answer length/
+      /OpenAI used up its answer length/
+    );
+    // What it did write is kept.
+    assert.equal(
+      (await complete(openai(), { ...request, model: 'o3' })).text,
+      'Part'
+    );
+    // Other servers say so as chat completions do.
+    await assert.rejects(
+      complete(openai({ baseUrl: 'http://nas.local:11434/v1' }), request),
+      /The AI server used up its answer length/
     );
   });
 });
@@ -284,24 +361,44 @@ describe('a picture with the message', () => {
     );
   });
 
-  it('goes to OpenAI and servers like it as a data URL beside the text', async () => {
-    const reply = { choices: [{ message: { content: 'ok' } }] };
-    const sent = capture([reply, reply]);
-    const openai = settings({ provider: 'openai' });
-    await complete(openai, { ...request, model: 'gpt-4.1-mini', image });
+  it('goes to OpenAI as an input image after the text', async () => {
+    const sent = capture([responsesReply('ok')]);
+    await complete(settings({ provider: 'openai' }), {
+      ...request,
+      model: 'gpt-4.1-mini',
+      image,
+    });
+    assert.deepEqual(sent[0].body.input, [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'hi' },
+          {
+            type: 'input_image',
+            image_url: 'data:image/jpeg;base64,/9j/4AAQ',
+            detail: 'auto',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('goes to servers like OpenAI as a data URL beside the text', async () => {
+    const sent = capture([{ choices: [{ message: { content: 'ok' } }] }]);
     await complete(
-      { ...openai, baseUrl: 'http://nas.local:11434/v1' },
+      settings({ provider: 'openai', baseUrl: 'http://nas.local:11434/v1' }),
       { ...request, image }
     );
-    for (const s of sent) {
-      assert.deepEqual((s.body.messages as { content: unknown }[])[1].content, [
+    assert.deepEqual(
+      (sent[0].body.messages as { content: unknown }[])[1].content,
+      [
         { type: 'text', text: 'hi' },
         {
           type: 'image_url',
           image_url: { url: 'data:image/jpeg;base64,/9j/4AAQ' },
         },
-      ]);
-    }
+      ]
+    );
   });
 
   it('says so plainly when the model only reads text', async () => {
@@ -522,7 +619,218 @@ describe('a conversation with tools', () => {
     ]);
   });
 
-  it('gives OpenAI functions, and reads the arguments it wrote', async () => {
+  it('gives OpenAI flat functions, and reads the calls it made', async () => {
+    const call = {
+      type: 'function_call',
+      id: 'fc_1',
+      call_id: 'call_1',
+      name: 'title_status',
+      arguments: '{"ref":"s1"}',
+      status: 'completed',
+    };
+    const sent = capture([
+      {
+        status: 'completed',
+        output: [call],
+        usage: { input_tokens: 50, output_tokens: 9 },
+      },
+      responsesReply('Nothing to do.'),
+    ]);
+    const ai = settings({ provider: 'openai', model: 'gpt-4o' });
+    const first = await converse(ai, {
+      model: 'gpt-4o',
+      system: 'sys',
+      messages: [{ role: 'user', text: 'find Wendle' }],
+      tools,
+      maxTokens: 800,
+    });
+    assert.deepEqual(first.calls, [
+      { id: 'call_1', name: 'title_status', input: { ref: 's1' } },
+    ]);
+    assert.equal(first.text, '');
+    assert.deepEqual([first.inputTokens, first.outputTokens], [50, 9]);
+    assert.equal(sent[0].url, `${OPENAI_URL}/responses`);
+    // A model that does not reason gets no effort and no reasoning back.
+    assert.deepEqual(sent[0].body, {
+      model: 'gpt-4o',
+      instructions: 'sys',
+      input: [
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: 'find Wendle' }],
+        },
+      ],
+      tools: [
+        {
+          type: 'function',
+          name: 'title_status',
+          description: 'What a title has and lacks',
+          parameters: tools[0].parameters,
+          strict: false,
+        },
+      ],
+      max_output_tokens: 800,
+      store: false,
+    });
+
+    const second = await converse(ai, {
+      model: 'gpt-4o',
+      system: 'sys',
+      messages: [
+        { role: 'user', text: 'find Wendle' },
+        { role: 'assistant', text: '', calls: first.calls, raw: first.raw },
+        {
+          role: 'tool',
+          results: [{ id: 'call_1', content: 'not found', isError: true }],
+        },
+      ],
+      tools,
+      maxTokens: 800,
+    });
+    assert.equal(second.text, 'Nothing to do.');
+    assert.deepEqual(sent[1].body.input, [
+      { role: 'user', content: [{ type: 'input_text', text: 'find Wendle' }] },
+      call,
+      {
+        type: 'function_call_output',
+        call_id: 'call_1',
+        output: 'Error: not found',
+      },
+    ]);
+  });
+
+  it('sends GPT-6 Luna tools and an effort together, and its reasoning back unchanged', async () => {
+    const reasoning = {
+      type: 'reasoning',
+      id: 'rs_1',
+      summary: [],
+      encrypted_content: 'sealed-thoughts',
+    };
+    const said = {
+      type: 'message',
+      id: 'msg_1',
+      role: 'assistant',
+      status: 'completed',
+      phase: 'commentary',
+      content: [{ type: 'output_text', text: 'Checking.', annotations: [] }],
+    };
+    const call = {
+      type: 'function_call',
+      id: 'fc_1',
+      call_id: 'call_9',
+      name: 'title_status',
+      arguments: '{"ref":"s1"}',
+    };
+    const sent = capture([
+      { status: 'completed', output: [reasoning, said, call] },
+      responsesReply('Done.'),
+    ]);
+    const ai = settings({ provider: 'openai', model: 'gpt-6-luna' });
+    const req = {
+      model: 'gpt-6-luna',
+      system: 'sys',
+      tools,
+      maxTokens: 800,
+      effort: 'medium' as const,
+    };
+    const first = await converse(ai, {
+      ...req,
+      messages: [{ role: 'user', text: 'find Wendle' }],
+    });
+    assert.equal(first.text, 'Checking.');
+    assert.deepEqual(first.calls, [
+      { id: 'call_9', name: 'title_status', input: { ref: 's1' } },
+    ]);
+    assert.deepEqual(first.raw, [reasoning, said, call]);
+    assert.equal(sent[0].url, `${OPENAI_URL}/responses`);
+    assert.deepEqual(sent[0].body.reasoning, { effort: 'medium' });
+    assert.deepEqual(sent[0].body.include, ['reasoning.encrypted_content']);
+    assert.equal(sent[0].body.store, false);
+    assert.equal(sent[0].body.max_output_tokens, 800 + 8192);
+    assert.equal((sent[0].body.tools as unknown[]).length, 1);
+
+    await converse(ai, {
+      ...req,
+      messages: [
+        { role: 'user', text: 'find Wendle' },
+        {
+          role: 'assistant',
+          text: first.text,
+          calls: first.calls,
+          raw: first.raw,
+        },
+        { role: 'tool', results: [{ id: 'call_9', content: 'missing 3' }] },
+      ],
+    });
+    assert.deepEqual(sent[1].body.input, [
+      { role: 'user', content: [{ type: 'input_text', text: 'find Wendle' }] },
+      reasoning,
+      said,
+      call,
+      { type: 'function_call_output', call_id: 'call_9', output: 'missing 3' },
+    ]);
+    assert.deepEqual(sent[1].body.reasoning, { effort: 'medium' });
+  });
+
+  it('rebuilds a turn kept in another shape for OpenAI, and for other servers', async () => {
+    const calls = [
+      { id: 'call_1', name: 'title_status', input: { ref: 's1' } },
+    ];
+    const chatTurn = {
+      role: 'assistant',
+      content: 'Checking.',
+      tool_calls: [
+        {
+          id: 'call_1',
+          type: 'function',
+          function: { name: 'title_status', arguments: '{"ref":"s1"}' },
+        },
+      ],
+    };
+    const responsesTurn = [
+      {
+        type: 'function_call',
+        call_id: 'call_1',
+        name: 'title_status',
+        arguments: '{"ref":"s1"}',
+      },
+    ];
+    const conversation = (raw: unknown) => ({
+      model: 'gpt-5',
+      system: 'sys',
+      messages: [
+        { role: 'user' as const, text: 'find Wendle' },
+        { role: 'assistant' as const, text: 'Checking.', calls, raw },
+        { role: 'tool' as const, results: [{ id: 'call_1', content: 'ok' }] },
+      ],
+      tools,
+      maxTokens: 800,
+    });
+    const sent = capture([
+      responsesReply('Done.'),
+      { choices: [{ message: { content: 'Done.' } }] },
+    ]);
+    // Saved before OpenAI moved to the Responses API.
+    await converse(settings({ provider: 'openai' }), conversation(chatTurn));
+    assert.deepEqual((sent[0].body.input as unknown[])[1], {
+      role: 'assistant',
+      content: 'Checking.',
+    });
+    assert.deepEqual((sent[0].body.input as unknown[])[2], {
+      type: 'function_call',
+      call_id: 'call_1',
+      name: 'title_status',
+      arguments: '{"ref":"s1"}',
+    });
+    // Begun with OpenAI, carried on with another server.
+    await converse(
+      settings({ provider: 'openai', baseUrl: 'http://local:1234/v1' }),
+      conversation(responsesTurn)
+    );
+    assert.deepEqual((sent[1].body.messages as unknown[])[2], chatTurn);
+  });
+
+  it('gives other servers functions on chat completions, as before', async () => {
     const sent = capture([
       {
         choices: [
@@ -544,9 +852,13 @@ describe('a conversation with tools', () => {
       },
       { choices: [{ message: { content: 'Nothing to do.' } }] },
     ]);
-    const ai = settings({ provider: 'openai', model: 'gpt-4o' });
+    const ai = settings({
+      provider: 'openai',
+      baseUrl: 'http://nas.local:11434/v1',
+      model: 'qwen3',
+    });
     const first = await converse(ai, {
-      model: 'gpt-4o',
+      model: 'qwen3',
       system: 'sys',
       messages: [{ role: 'user', text: 'find Wendle' }],
       tools,
@@ -555,20 +867,28 @@ describe('a conversation with tools', () => {
     assert.deepEqual(first.calls, [
       { id: 'call_1', name: 'title_status', input: { ref: 's1' } },
     ]);
-    assert.equal(sent[0].url, `${OPENAI_URL}/chat/completions`);
-    assert.deepEqual(sent[0].body.tools, [
-      {
-        type: 'function',
-        function: {
-          name: 'title_status',
-          description: 'What a title has and lacks',
-          parameters: tools[0].parameters,
+    assert.equal(sent[0].url, 'http://nas.local:11434/v1/chat/completions');
+    assert.deepEqual(sent[0].body, {
+      model: 'qwen3',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'find Wendle' },
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'title_status',
+            description: 'What a title has and lacks',
+            parameters: tools[0].parameters,
+          },
         },
-      },
-    ]);
+      ],
+      max_tokens: 800,
+    });
 
     await converse(ai, {
-      model: 'gpt-4o',
+      model: 'qwen3',
       system: 'sys',
       messages: [
         { role: 'user', text: 'find Wendle' },
@@ -582,13 +902,57 @@ describe('a conversation with tools', () => {
       maxTokens: 800,
     });
     const messages = sent[1].body.messages as Record<string, unknown>[];
-    assert.equal(messages[0].role, 'developer');
     assert.deepEqual(messages[2], first.raw);
     assert.deepEqual(messages[3], {
       role: 'tool',
       tool_call_id: 'call_1',
       content: 'Error: not found',
     });
+  });
+
+  it('takes OpenAI arguments that are not JSON as none', async () => {
+    capture([
+      {
+        output: [
+          {
+            type: 'function_call',
+            call_id: 'c',
+            name: 'title_status',
+            arguments: '{oops',
+          },
+        ],
+      },
+    ]);
+    const turn = await converse(settings({ provider: 'openai' }), {
+      model: 'gpt-5',
+      system: 'sys',
+      messages: [{ role: 'user', text: 'hi' }],
+      tools,
+      maxTokens: 100,
+    });
+    assert.deepEqual(turn.calls, [
+      { id: 'c', name: 'title_status', input: {} },
+    ]);
+  });
+
+  it('says when OpenAI ran out of room before calling or saying anything', async () => {
+    capture([
+      {
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' },
+        output: [{ type: 'reasoning', id: 'rs_1', summary: [] }],
+      },
+    ]);
+    await assert.rejects(
+      converse(settings({ provider: 'openai' }), {
+        model: 'gpt-6-luna',
+        system: 'sys',
+        messages: [{ role: 'user', text: 'hi' }],
+        tools,
+        maxTokens: 100,
+      }),
+      /OpenAI used up its answer length/
+    );
   });
 
   it('takes arguments that are not JSON as none', async () => {
@@ -625,7 +989,9 @@ describe('a conversation with tools', () => {
 
 describe('effort', () => {
   const claudeReply = { content: [{ type: 'text', text: 'ok' }] };
-  const openAiReply = {
+  // OpenAI's own reply, and another server's.
+  const openAiReply = responsesReply('ok');
+  const chatReply = {
     choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
   };
   const openai = (over: Partial<AiSettings> = {}) =>
@@ -633,7 +999,7 @@ describe('effort', () => {
   const effortRefused = (value: string) =>
     httpError(400, {
       error: {
-        message: `Unsupported value: 'reasoning_effort' does not support '${value}' with this model.`,
+        message: `Unsupported value: 'reasoning.effort' does not support '${value}' with this model.`,
       },
     });
 
@@ -705,12 +1071,10 @@ describe('effort', () => {
     await complete(openai(), { ...luna, effort: 'high' });
     // Another level is not answered from what "high" learned.
     await complete(openai(), { ...luna, effort: 'low' });
-    assert.deepEqual(
-      sent.map((s) => s.body.reasoning_effort),
-      ['high', 'medium', 'medium', 'low']
-    );
-    assert.equal(sent[0].body.max_completion_tokens, 100 + 16384);
-    assert.equal(sent[3].body.max_completion_tokens, 100 + 2048);
+    assert.deepEqual(sent.map(effortOf), ['high', 'medium', 'medium', 'low']);
+    assert.ok(sent.every((s) => s.url === `${OPENAI_URL}/responses`));
+    assert.equal(sent[0].body.max_output_tokens, 100 + 16384);
+    assert.equal(sent[3].body.max_output_tokens, 100 + 2048);
   });
 
   it('keeps the cheapest-first order for "lowest", the default', async () => {
@@ -722,26 +1086,23 @@ describe('effort', () => {
     });
     // No effort given is the same setting, so it is remembered for it.
     await complete(openai(), { ...request, model: 'gpt-6-luna' });
-    assert.deepEqual(
-      sent.map((s) => s.body.reasoning_effort),
-      ['none', 'minimal', 'minimal']
-    );
+    assert.deepEqual(sent.map(effortOf), ['none', 'minimal', 'minimal']);
   });
 
   it('sends no effort to OpenAI models that do not reason', async () => {
     const sent = capture([openAiReply]);
     await complete(openai(), { ...request, model: 'gpt-4o', effort: 'high' });
-    assert.equal(sent[0].body.reasoning_effort, undefined);
-    assert.equal(sent[0].body.max_completion_tokens, 100);
+    assert.equal(sent[0].body.reasoning, undefined);
+    assert.equal(sent[0].body.max_output_tokens, 100);
   });
 
   it('sends other servers an effort only when one is chosen, dropping it if refused', async () => {
     const local = openai({ baseUrl: 'http://nas.local:11434/v1', apiKey: '' });
     const sent = capture([
-      openAiReply,
+      chatReply,
       httpError(400, { error: { message: 'unknown field reasoning_effort' } }),
-      openAiReply,
-      openAiReply,
+      chatReply,
+      chatReply,
     ]);
     await complete(local, { ...request, effort: 'lowest' });
     await complete(local, { ...request, effort: 'medium' });
@@ -772,14 +1133,11 @@ describe('effort', () => {
     await converse(openai(), { ...req, model: 'gpt-6-luna' });
     assert.deepEqual(sent[0].body.output_config, { effort: 'medium' });
     assert.equal(sent[0].body.max_tokens, 800 + 8192);
-    assert.deepEqual(
-      sent.slice(1).map((s) => s.body.reasoning_effort),
-      ['medium', 'low']
-    );
+    assert.deepEqual(sent.slice(1).map(effortOf), ['medium', 'low']);
   });
 
   it('asks for no thinking with None: none to OpenAI and other servers, low to Claude', async () => {
-    const sent = capture([openAiReply, openAiReply, claudeReply]);
+    const sent = capture([openAiReply, chatReply, claudeReply]);
     await complete(openai(), {
       ...request,
       model: 'gpt-6-luna',
@@ -791,19 +1149,18 @@ describe('effort', () => {
       effort: 'none',
     });
     await complete(settings(), { ...request, effort: 'none' });
-    assert.deepEqual(
-      sent.slice(0, 2).map((s) => s.body.reasoning_effort),
-      ['none', 'none']
-    );
+    assert.deepEqual(sent[0].body.reasoning, { effort: 'none' });
+    assert.equal(sent[1].body.reasoning_effort, 'none');
     assert.deepEqual(sent[2].body.output_config, { effort: 'low' });
   });
 
   it('remembers efforts with tools apart, and steps down if a remembered one is refused', async () => {
-    // As OpenAI words it for its newer models on chat completions.
+    // Should a model take tools only at lower efforts, as GPT-6 Luna did on
+    // chat completions.
     const toolsRefused = httpError(400, {
       error: {
         message:
-          "Function tools with reasoning_effort are not supported for gpt-6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.",
+          "Function tools with reasoning.effort 'low' are not supported for gpt-6-luna.",
       },
     });
     const sent = capture([
@@ -836,9 +1193,13 @@ describe('effort', () => {
       model: 'gpt-6-luna',
       effort: 'low',
     });
-    assert.deepEqual(
-      sent.map((s) => s.body.reasoning_effort),
-      ['low', 'low', 'minimal', 'none', 'none', 'low']
-    );
+    assert.deepEqual(sent.map(effortOf), [
+      'low',
+      'low',
+      'minimal',
+      'none',
+      'none',
+      'low',
+    ]);
   });
 });

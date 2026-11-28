@@ -16,10 +16,11 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Settings → AI lists only the efforts the chosen model takes: Low to High for Claude, from None for OpenAI's newer models, and none at all for models without an effort setting (the choice is then hidden). Each feature's effort follows its own model.
 - AI features are told your 12 most recent titles instead of 8.
 - Trakt requests share a limit of 2 a second.
+- With OpenAI, the admin agent and AI chat now think at the effort you choose even when they use tools, on newer models such as GPT-6 Luna too: Seerr AI now uses OpenAI's newer Responses API. Other OpenAI-compatible servers (Ollama, LM Studio and the like) are used as before.
 
 ### Fixed
 
-- The admin agent and AI chat work again with OpenAI's newer models, such as GPT-6 Luna: OpenAI takes tools with those models only at the lowest effort, and Seerr AI had remembered the effort they took without tools, so every tool request failed.
+- The admin agent and AI chat work again with OpenAI's newer models, such as GPT-6 Luna: every request with tools failed.
 - Deleting a user and switching off their Emby account works again: Emby accounts were looked up by the wrong id, so Seerr AI always said they had none.
 - **Remove Users Who Lose Access** now removes people deleted from Emby: Emby accounts were checked by the wrong id, so none was ever found missing.
 - A title that arrived while the Movies or Series list, or a Discover row, was already open no longer keeps showing as downloading there: titles on their way are checked again when you come back to the list, and every so often while it's shown.

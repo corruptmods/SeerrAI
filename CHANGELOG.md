@@ -26,6 +26,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- When a newer qBittorrent (5.2 and later) refuses a torrent Backfill sends, Backfill now says qBittorrent would not add it, instead of showing a bare request error.
 - The admin agent and AI chat work again with OpenAI's newer models, such as GPT-6 Luna: every request with tools failed.
 - Deleting a user and switching off their Emby account works again: Emby accounts were looked up by the wrong id, so Seerr AI always said they had none.
 - **Remove Users Who Lose Access** now removes people deleted from Emby: Emby accounts were checked by the wrong id, so none was ever found missing.

@@ -338,8 +338,22 @@ class QBittorrentAPI implements TorrentClient {
     if (options.savePath) {
       form.append('savepath', options.savePath);
     }
-    const { data } = await this.post<string>('/torrents/add', form);
-    if (String(data).trim().toLowerCase().startsWith('fails')) {
+    // Before WebAPI 2.14 a refusal is "Fails."; from 2.14 the answer counts
+    // what was added, and a 409 means none was.
+    let data: string | { success_count?: number; failure_count?: number };
+    try {
+      ({ data } = await this.post<typeof data>('/torrents/add', form));
+    } catch (e) {
+      if (isAxiosError(e) && e.response?.status === 409) {
+        throw new Error('qBittorrent would not add the torrent.');
+      }
+      throw e;
+    }
+    if (
+      typeof data === 'object' && data
+        ? !data.success_count && !!data.failure_count
+        : String(data).trim().toLowerCase().startsWith('fails')
+    ) {
       throw new Error('qBittorrent would not add the torrent.');
     }
     await confirmListed(this, options.hash);

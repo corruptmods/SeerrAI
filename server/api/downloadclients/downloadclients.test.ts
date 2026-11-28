@@ -6,6 +6,7 @@ import SabnzbdAPI, {
   sabQueueDownload,
   sabSecondsLeft,
 } from '@server/api/downloadclients/sabnzbd';
+import { AxiosError, type AxiosResponse } from 'axios';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -502,6 +503,47 @@ describe('adding a torrent to qBittorrent for Backfill', () => {
       assert.ok(asked >= 15, String(asked));
     } finally {
       mock.timers.reset();
+    }
+  });
+
+  it('says it would not add a torrent, in old and new answers alike', async () => {
+    const answers: (() => unknown)[] = [
+      // Before WebAPI 2.14.
+      () => ({ data: 'Fails.' }),
+      // 2.14 and newer: every torrent refused.
+      () => {
+        throw new AxiosError(
+          'Request failed with status code 409',
+          'ERR_BAD_REQUEST',
+          undefined,
+          undefined,
+          {
+            status: 409,
+            data: { success_count: 0, failure_count: 1 },
+          } as AxiosResponse
+        );
+      },
+      () => ({
+        data: { success_count: 0, pending_count: 0, failure_count: 1 },
+      }),
+    ];
+    let answer = answers[0];
+    mock.method(
+      QBittorrentAPI.prototype as unknown as {
+        post: (path: string) => Promise<unknown>;
+      },
+      'post',
+      async () => answer()
+    );
+    for (answer of answers) {
+      await assert.rejects(
+        qbit().addTorrent({
+          magnet: `magnet:?xt=urn:btih:${'ab'.repeat(20)}`,
+          hash: 'ab'.repeat(20),
+          category: 'backfill',
+        }),
+        /qBittorrent would not add the torrent\./
+      );
     }
   });
 

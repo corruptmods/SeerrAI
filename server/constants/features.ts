@@ -61,10 +61,11 @@ export const featureOn = (
   !(globallyOff ?? []).includes(feature) && !(userOff ?? []).includes(feature);
 
 /**
- * How hard the model thinks before answering. "lowest" is the least each
+ * How hard the model thinks before answering. "none" asks for no thinking
+ * (what OpenAI's newer models want with tools); "lowest" is the least each
  * model accepts; higher costs more and is slower, but answers better.
  */
-export const AI_EFFORTS = ['lowest', 'low', 'medium', 'high'] as const;
+export const AI_EFFORTS = ['none', 'lowest', 'low', 'medium', 'high'] as const;
 
 export type AiEffort = (typeof AI_EFFORTS)[number];
 

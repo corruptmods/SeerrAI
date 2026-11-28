@@ -24,6 +24,7 @@ const ANTHROPIC_VERSION = '2023-06-01';
  * higher efforts, which think for longer first.
  */
 const COMPLETION_TIMEOUT_MS: Record<AiEffort, number> = {
+  none: 90_000,
   lowest: 90_000,
   low: 90_000,
   medium: 120_000,
@@ -37,6 +38,7 @@ const LIST_TIMEOUT_MS = 15_000;
  * nothing.
  */
 const THINKING_ROOM: Record<AiEffort, number> = {
+  none: 2048,
   lowest: 2048,
   low: 2048,
   medium: 8192,
@@ -133,14 +135,14 @@ const OPENAI_LEVELS = ['none', 'minimal', 'low', 'medium', 'high'];
  * first; any other setting is that level, then the levels below it.
  */
 const openAiLadder = (effort: AiEffort): (string | null)[] =>
-  effort === 'lowest'
+  effort === 'lowest' || effort === 'none'
     ? ['none', 'minimal', 'low', null]
     : [
         ...OPENAI_LEVELS.slice(0, OPENAI_LEVELS.indexOf(effort) + 1).reverse(),
         null,
       ];
 
-/** Claude's effort for a setting: it has no level below "low". */
+/** Claude's effort for a setting: it has no level below "low", so "none" is "low". */
 const claudeLevel = (effort: AiEffort) =>
   effort === 'medium' || effort === 'high' ? effort : 'low';
 

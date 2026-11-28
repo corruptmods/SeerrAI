@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Düşük",
   "components.Settings.SettingsAi.effortLowest": "En düşük",
   "components.Settings.SettingsAi.effortMedium": "Orta",
+  "components.Settings.SettingsAi.effortNone": "Yok",
   "components.Settings.SettingsAi.effortTip": "Modelin yanıt vermeden önce ne kadar düşündüğü. Daha yüksek efor, daha ucuz modellerden bile daha iyi yanıtlar verir ama daha pahalıdır ve daha yavaştır.",
   "components.Settings.SettingsAi.enabled": "Yapay Zekâ Özelliklerini Aç",
   "components.Settings.SettingsAi.failed": "Ayarlar kaydedilemedi.",

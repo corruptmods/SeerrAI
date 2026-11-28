@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "低",
   "components.Settings.SettingsAi.effortLowest": "最低",
   "components.Settings.SettingsAi.effortMedium": "中",
+  "components.Settings.SettingsAi.effortNone": "無",
   "components.Settings.SettingsAi.effortTip": "模型回答前思考的程度。強度越高，即使是較便宜的模型也能給出更好的回答，但成本更高、速度更慢。",
   "components.Settings.SettingsAi.enabled": "啟用 AI 功能",
   "components.Settings.SettingsAi.failed": "無法儲存設定。",

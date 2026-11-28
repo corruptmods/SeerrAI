@@ -3085,6 +3085,7 @@
   "components.Settings.SettingsAi.effortLow": "Alacsony",
   "components.Settings.SettingsAi.effortLowest": "Legalacsonyabb",
   "components.Settings.SettingsAi.effortMedium": "Közepes",
+  "components.Settings.SettingsAi.effortNone": "Nincs",
   "components.Settings.SettingsAi.effortTip": "Mennyit gondolkodik a modell válasz előtt. A nagyobb ráfordítás jobb válaszokat ad, még olcsóbb modellekkel is, de többe kerül és lassabb.",
   "components.Settings.SettingsAi.enabled": "MI-funkciók bekapcsolása",
   "components.Settings.SettingsAi.failed": "A beállításokat nem sikerült menteni.",

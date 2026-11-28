@@ -3076,6 +3076,7 @@
   "components.Settings.SettingsAi.effortLow": "Baxua",
   "components.Settings.SettingsAi.effortLowest": "Baxuena",
   "components.Settings.SettingsAi.effortMedium": "Ertaina",
+  "components.Settings.SettingsAi.effortNone": "Bat ere ez",
   "components.Settings.SettingsAi.effortTip": "Ereduak erantzun aurretik zenbat pentsatzen duen. Ahalegin handiagoak erantzun hobeak ematen ditu, eredu merkeagoekin ere, baina garestiagoa eta moteltzagoa da.",
   "components.Settings.SettingsAi.enabled": "Gaitu AA eginbideak",
   "components.Settings.SettingsAi.failed": "Ezin izan dira ezarpenak gorde.",

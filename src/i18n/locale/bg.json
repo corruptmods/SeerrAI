@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Ниско",
   "components.Settings.SettingsAi.effortLowest": "Най-ниско",
   "components.Settings.SettingsAi.effortMedium": "Средно",
+  "components.Settings.SettingsAi.effortNone": "Няма",
   "components.Settings.SettingsAi.effortTip": "Колко дълго мисли моделът, преди да отговори. По-голямото усилие дава по-добри отговори, дори от по-евтини модели, но струва повече и е по-бавно.",
   "components.Settings.SettingsAi.enabled": "Включи AI функциите",
   "components.Settings.SettingsAi.failed": "Настройките не можаха да бъдат запазени.",

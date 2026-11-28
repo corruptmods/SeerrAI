@@ -65,6 +65,7 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   effort: 'Effort',
   effortTip:
     'How hard the model thinks before answering. Higher effort gives better answers, even from cheaper models, but costs more and is slower.',
+  effortNone: 'None',
   effortLowest: 'Lowest',
   effortLow: 'Low',
   effortMedium: 'Medium',
@@ -107,6 +108,7 @@ interface AiSettingsForm {
 }
 
 const EFFORT_NAMES = {
+  none: 'effortNone',
   lowest: 'effortLowest',
   low: 'effortLow',
   medium: 'effortMedium',

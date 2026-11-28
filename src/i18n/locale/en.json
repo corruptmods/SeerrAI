@@ -2849,6 +2849,7 @@
   "components.Settings.SettingsAi.effortLow": "Low",
   "components.Settings.SettingsAi.effortLowest": "Lowest",
   "components.Settings.SettingsAi.effortMedium": "Medium",
+  "components.Settings.SettingsAi.effortNone": "None",
   "components.Settings.SettingsAi.effortTip": "How hard the model thinks before answering. Higher effort gives better answers, even from cheaper models, but costs more and is slower.",
   "components.Settings.SettingsAi.enabled": "Enable AI Features",
   "components.Settings.SettingsAi.failed": "The settings could not be saved.",

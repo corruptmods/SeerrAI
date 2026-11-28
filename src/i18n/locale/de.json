@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Niedrig",
   "components.Settings.SettingsAi.effortLowest": "Minimal",
   "components.Settings.SettingsAi.effortMedium": "Mittel",
+  "components.Settings.SettingsAi.effortNone": "Keine",
   "components.Settings.SettingsAi.effortTip": "Wie gründlich das Modell nachdenkt, bevor es antwortet. Mehr Aufwand liefert bessere Antworten, auch bei günstigeren Modellen, kostet aber mehr und ist langsamer.",
   "components.Settings.SettingsAi.enabled": "KI-Funktionen aktivieren",
   "components.Settings.SettingsAi.failed": "Die Einstellungen konnten nicht gespeichert werden.",

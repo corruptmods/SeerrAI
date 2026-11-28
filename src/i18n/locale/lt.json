@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Mažos",
   "components.Settings.SettingsAi.effortLowest": "Mažiausios",
   "components.Settings.SettingsAi.effortMedium": "Vidutinės",
+  "components.Settings.SettingsAi.effortNone": "Nėra",
   "components.Settings.SettingsAi.effortTip": "Kiek modelis galvoja prieš atsakydamas. Didesnės pastangos duoda geresnius atsakymus, net iš pigesnių modelių, bet kainuoja daugiau ir lėčiau.",
   "components.Settings.SettingsAi.enabled": "Įjungti DI funkcijas",
   "components.Settings.SettingsAi.failed": "Nustatymų išsaugoti nepavyko.",

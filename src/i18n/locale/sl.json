@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Nizek",
   "components.Settings.SettingsAi.effortLowest": "Najnižji",
   "components.Settings.SettingsAi.effortMedium": "Srednji",
+  "components.Settings.SettingsAi.effortNone": "Nič",
   "components.Settings.SettingsAi.effortTip": "Kako temeljito model razmišlja, preden odgovori. Večji napor daje boljše odgovore, tudi pri cenejših modelih, vendar stane več in je počasnejši.",
   "components.Settings.SettingsAi.enabled": "Omogoči funkcije UI",
   "components.Settings.SettingsAi.failed": "Nastavitev ni bilo mogoče shraniti.",

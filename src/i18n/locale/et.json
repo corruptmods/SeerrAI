@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Madal",
   "components.Settings.SettingsAi.effortLowest": "Madalaim",
   "components.Settings.SettingsAi.effortMedium": "Keskmine",
+  "components.Settings.SettingsAi.effortNone": "Pole",
   "components.Settings.SettingsAi.effortTip": "Kui põhjalikult mudel enne vastamist mõtleb. Suurem pingutus annab paremaid vastuseid, ka odavamatelt mudelitelt, kuid maksab rohkem ja on aeglasem.",
   "components.Settings.SettingsAi.enabled": "Luba AI funktsioonid",
   "components.Settings.SettingsAi.failed": "Seadeid ei õnnestunud salvestada.",

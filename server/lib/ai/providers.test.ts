@@ -778,6 +778,26 @@ describe('effort', () => {
     );
   });
 
+  it('asks for no thinking with None: none to OpenAI and other servers, low to Claude', async () => {
+    const sent = capture([openAiReply, openAiReply, claudeReply]);
+    await complete(openai(), {
+      ...request,
+      model: 'gpt-6-luna',
+      effort: 'none',
+    });
+    await complete(openai({ baseUrl: 'http://localhost:11434/v1' }), {
+      ...request,
+      model: 'qwen3',
+      effort: 'none',
+    });
+    await complete(settings(), { ...request, effort: 'none' });
+    assert.deepEqual(
+      sent.slice(0, 2).map((s) => s.body.reasoning_effort),
+      ['none', 'none']
+    );
+    assert.deepEqual(sent[2].body.output_config, { effort: 'low' });
+  });
+
   it('remembers efforts with tools apart, and steps down if a remembered one is refused', async () => {
     // As OpenAI words it for its newer models on chat completions.
     const toolsRefused = httpError(400, {

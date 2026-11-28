@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Matala",
   "components.Settings.SettingsAi.effortLowest": "Matalin",
   "components.Settings.SettingsAi.effortMedium": "Keskitaso",
+  "components.Settings.SettingsAi.effortNone": "Ei mitään",
   "components.Settings.SettingsAi.effortTip": "Kuinka perusteellisesti malli miettii ennen vastaamista. Suurempi ponnistus tuottaa parempia vastauksia, halvemmillakin malleilla, mutta maksaa enemmän ja on hitaampaa.",
   "components.Settings.SettingsAi.enabled": "Ota tekoälyominaisuudet käyttöön",
   "components.Settings.SettingsAi.failed": "Asetuksia ei voitu tallentaa.",

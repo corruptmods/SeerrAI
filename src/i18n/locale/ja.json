@@ -3063,6 +3063,7 @@
   "components.Settings.SettingsAi.effortLow": "低",
   "components.Settings.SettingsAi.effortLowest": "最低",
   "components.Settings.SettingsAi.effortMedium": "中",
+  "components.Settings.SettingsAi.effortNone": "なし",
   "components.Settings.SettingsAi.effortTip": "回答する前にモデルがどれだけ考えるかです。深くすると、安価なモデルでも良い回答になりますが、コストが増え、遅くなります。",
   "components.Settings.SettingsAi.enabled": "AI機能を有効にする",
   "components.Settings.SettingsAi.failed": "設定を保存できませんでした。",

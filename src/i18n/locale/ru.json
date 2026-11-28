@@ -3082,6 +3082,7 @@
   "components.Settings.SettingsAi.effortLow": "Низкое",
   "components.Settings.SettingsAi.effortLowest": "Минимальное",
   "components.Settings.SettingsAi.effortMedium": "Среднее",
+  "components.Settings.SettingsAi.effortNone": "Нет",
   "components.Settings.SettingsAi.effortTip": "Насколько глубоко модель размышляет перед ответом. Чем выше усилие, тем лучше ответы, даже у более дешёвых моделей, но дороже и медленнее.",
   "components.Settings.SettingsAi.enabled": "Включить функции ИИ",
   "components.Settings.SettingsAi.failed": "Не удалось сохранить настройки.",

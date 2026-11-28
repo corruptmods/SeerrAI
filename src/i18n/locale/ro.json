@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Scăzut",
   "components.Settings.SettingsAi.effortLowest": "Minim",
   "components.Settings.SettingsAi.effortMedium": "Mediu",
+  "components.Settings.SettingsAi.effortNone": "Niciunul",
   "components.Settings.SettingsAi.effortTip": "Cât de mult gândește modelul înainte de a răspunde. Mai mult efort dă răspunsuri mai bune, chiar și de la modele mai ieftine, dar costă mai mult și e mai lent.",
   "components.Settings.SettingsAi.enabled": "Activează funcțiile AI",
   "components.Settings.SettingsAi.failed": "Setările nu au putut fi salvate.",

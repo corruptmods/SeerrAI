@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "कम",
   "components.Settings.SettingsAi.effortLowest": "सबसे कम",
   "components.Settings.SettingsAi.effortMedium": "मध्यम",
+  "components.Settings.SettingsAi.effortNone": "कोई नहीं",
   "components.Settings.SettingsAi.effortTip": "जवाब देने से पहले मॉडल कितना सोचता है। ज़्यादा मेहनत से बेहतर जवाब मिलते हैं, सस्ते मॉडल से भी, पर खर्च ज़्यादा और रफ़्तार कम होती है।",
   "components.Settings.SettingsAi.enabled": "AI सुविधाएँ चालू करें",
   "components.Settings.SettingsAi.failed": "सेटिंग्स सहेजी नहीं जा सकीं।",

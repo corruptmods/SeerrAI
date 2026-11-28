@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "낮음",
   "components.Settings.SettingsAi.effortLowest": "최저",
   "components.Settings.SettingsAi.effortMedium": "중간",
+  "components.Settings.SettingsAi.effortNone": "없음",
   "components.Settings.SettingsAi.effortTip": "모델이 답하기 전에 얼마나 깊이 생각하는지입니다. 강도가 높을수록 저렴한 모델에서도 더 좋은 답을 얻지만 비용이 늘고 느려집니다.",
   "components.Settings.SettingsAi.enabled": "AI 기능 사용",
   "components.Settings.SettingsAi.failed": "설정을 저장할 수 없었습니다.",

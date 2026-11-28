@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Nízke",
   "components.Settings.SettingsAi.effortLowest": "Najnižšie",
   "components.Settings.SettingsAi.effortMedium": "Stredné",
+  "components.Settings.SettingsAi.effortNone": "Žiadne",
   "components.Settings.SettingsAi.effortTip": "Ako dlho model premýšľa pred odpoveďou. Vyššie úsilie dáva lepšie odpovede, aj od lacnejších modelov, ale stojí viac a je pomalšie.",
   "components.Settings.SettingsAi.enabled": "Zapnúť funkcie AI",
   "components.Settings.SettingsAi.failed": "Nastavenia sa nepodarilo uložiť.",

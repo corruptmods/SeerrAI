@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "منخفض",
   "components.Settings.SettingsAi.effortLowest": "الأدنى",
   "components.Settings.SettingsAi.effortMedium": "متوسط",
+  "components.Settings.SettingsAi.effortNone": "لا شيء",
   "components.Settings.SettingsAi.effortTip": "مقدار تفكير النموذج قبل الإجابة. الجهد الأعلى يعطي إجابات أفضل حتى من النماذج الأرخص، لكنه أكثر تكلفة وأبطأ.",
   "components.Settings.SettingsAi.enabled": "تفعيل ميزات الذكاء الاصطناعي",
   "components.Settings.SettingsAi.failed": "تعذّر حفظ الإعدادات.",

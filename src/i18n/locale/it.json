@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Basso",
   "components.Settings.SettingsAi.effortLowest": "Minimo",
   "components.Settings.SettingsAi.effortMedium": "Medio",
+  "components.Settings.SettingsAi.effortNone": "Nessuno",
   "components.Settings.SettingsAi.effortTip": "Quanto il modello ragiona prima di rispondere. Più impegno dà risposte migliori, anche con modelli più economici, ma costa di più ed è più lento.",
   "components.Settings.SettingsAi.enabled": "Attiva le funzioni IA",
   "components.Settings.SettingsAi.failed": "Impossibile salvare le impostazioni.",

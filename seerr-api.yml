@@ -838,14 +838,14 @@ components:
             type: string
         effort:
           type: string
-          enum: [lowest, low, medium, high]
-          description: How hard models think by default. lowest is the least each model accepts.
+          enum: [none, lowest, low, medium, high]
+          description: How hard models think by default. none asks for no thinking; lowest is the least each model accepts.
         featureEfforts:
           type: object
           description: Effort per AI feature; a feature left out uses the default.
           additionalProperties:
             type: string
-            enum: [lowest, low, medium, high]
+            enum: [none, lowest, low, medium, high]
         dailyLimit:
           type: number
     AiSettings:
@@ -870,14 +870,14 @@ components:
             type: string
         effort:
           type: string
-          enum: [lowest, low, medium, high]
-          description: How hard models think by default. lowest is the least each model accepts.
+          enum: [none, lowest, low, medium, high]
+          description: How hard models think by default. none asks for no thinking; lowest is the least each model accepts.
         featureEfforts:
           type: object
           description: Effort per AI feature; a feature left out uses the default.
           additionalProperties:
             type: string
-            enum: [lowest, low, medium, high]
+            enum: [none, lowest, low, medium, high]
         dailyLimit:
           type: number
     AiCreditReport:

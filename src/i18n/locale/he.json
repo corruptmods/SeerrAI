@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "נמוך",
   "components.Settings.SettingsAi.effortLowest": "הנמוך ביותר",
   "components.Settings.SettingsAi.effortMedium": "בינוני",
+  "components.Settings.SettingsAi.effortNone": "אין",
   "components.Settings.SettingsAi.effortTip": "כמה המודל חושב לפני שהוא עונה. מאמץ גבוה יותר נותן תשובות טובות יותר, גם ממודלים זולים יותר, אבל עולה יותר ואיטי יותר.",
   "components.Settings.SettingsAi.enabled": "הפעל תכונות AI",
   "components.Settings.SettingsAi.failed": "לא ניתן היה לשמור את ההגדרות.",

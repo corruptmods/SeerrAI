@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Thấp",
   "components.Settings.SettingsAi.effortLowest": "Thấp nhất",
   "components.Settings.SettingsAi.effortMedium": "Trung bình",
+  "components.Settings.SettingsAi.effortNone": "Không có",
   "components.Settings.SettingsAi.effortTip": "Mô hình suy nghĩ kỹ đến đâu trước khi trả lời. Mức cao cho câu trả lời tốt hơn, kể cả từ mô hình rẻ hơn, nhưng tốn hơn và chậm hơn.",
   "components.Settings.SettingsAi.enabled": "Bật tính năng AI",
   "components.Settings.SettingsAi.failed": "Không lưu được cài đặt.",

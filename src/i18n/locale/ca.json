@@ -3063,6 +3063,7 @@
   "components.Settings.SettingsAi.effortLow": "Baix",
   "components.Settings.SettingsAi.effortLowest": "Mínim",
   "components.Settings.SettingsAi.effortMedium": "Mitjà",
+  "components.Settings.SettingsAi.effortNone": "Cap",
   "components.Settings.SettingsAi.effortTip": "Com de a fons pensa el model abans de respondre. Més esforç dona millors respostes, fins i tot amb models més barats, però costa més i és més lent.",
   "components.Settings.SettingsAi.enabled": "Activa les funcions d'IA",
   "components.Settings.SettingsAi.failed": "No s'ha pogut desar la configuració.",

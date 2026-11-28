@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Lav",
   "components.Settings.SettingsAi.effortLowest": "Lavest",
   "components.Settings.SettingsAi.effortMedium": "Middels",
+  "components.Settings.SettingsAi.effortNone": "Ingen",
   "components.Settings.SettingsAi.effortTip": "Hvor grundig modellen tenker før den svarer. Høyere innsats gir bedre svar, selv fra billigere modeller, men koster mer og er tregere.",
   "components.Settings.SettingsAi.enabled": "Slå på AI-funksjoner",
   "components.Settings.SettingsAi.failed": "Innstillingene kunne ikke lagres.",

@@ -3085,6 +3085,7 @@
   "components.Settings.SettingsAi.effortLow": "Laag",
   "components.Settings.SettingsAi.effortLowest": "Laagst",
   "components.Settings.SettingsAi.effortMedium": "Gemiddeld",
+  "components.Settings.SettingsAi.effortNone": "Geen",
   "components.Settings.SettingsAi.effortTip": "Hoe grondig het model nadenkt voordat het antwoordt. Meer inspanning geeft betere antwoorden, ook van goedkopere modellen, maar kost meer en is langzamer.",
   "components.Settings.SettingsAi.enabled": "AI-functies inschakelen",
   "components.Settings.SettingsAi.failed": "De instellingen konden niet worden opgeslagen.",

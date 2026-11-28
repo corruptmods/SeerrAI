@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Niddreg",
   "components.Settings.SettingsAi.effortLowest": "Am niddregsten",
   "components.Settings.SettingsAi.effortMedium": "Mëttel",
+  "components.Settings.SettingsAi.effortNone": "Keng",
   "components.Settings.SettingsAi.effortTip": "Wéi grëndlech de Modell nodenkt, ier en äntwert. Méi Opwand gëtt besser Äntwerten, och vu méi bëllege Modeller, kascht awer méi a ass méi lues.",
   "components.Settings.SettingsAi.enabled": "KI-Funktiounen aschalten",
   "components.Settings.SettingsAi.failed": "D’Astellunge konnten net gespäichert ginn.",

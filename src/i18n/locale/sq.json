@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "E ulët",
   "components.Settings.SettingsAi.effortLowest": "Më e ulëta",
   "components.Settings.SettingsAi.effortMedium": "Mesatare",
+  "components.Settings.SettingsAi.effortNone": "Asnjë",
   "components.Settings.SettingsAi.effortTip": "Sa mendon modeli para se të përgjigjet. Më shumë përpjekje jep përgjigje më të mira, edhe nga modele më të lira, por kushton më shumë dhe është më e ngadaltë.",
   "components.Settings.SettingsAi.enabled": "Aktivizo veçoritë AI",
   "components.Settings.SettingsAi.failed": "Cilësimet nuk mund të ruheshin.",

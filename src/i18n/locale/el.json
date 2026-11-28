@@ -3062,6 +3062,7 @@
   "components.Settings.SettingsAi.effortLow": "Χαμηλή",
   "components.Settings.SettingsAi.effortLowest": "Ελάχιστη",
   "components.Settings.SettingsAi.effortMedium": "Μεσαία",
+  "components.Settings.SettingsAi.effortNone": "Κανένα",
   "components.Settings.SettingsAi.effortTip": "Πόσο σκέφτεται το μοντέλο πριν απαντήσει. Μεγαλύτερη προσπάθεια δίνει καλύτερες απαντήσεις, ακόμη και από φθηνότερα μοντέλα, αλλά κοστίζει περισσότερο και είναι πιο αργή.",
   "components.Settings.SettingsAi.enabled": "Ενεργοποίηση λειτουργιών AI",
   "components.Settings.SettingsAi.failed": "Δεν ήταν δυνατή η αποθήκευση των ρυθμίσεων.",
